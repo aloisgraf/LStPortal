@@ -555,13 +555,13 @@ select option{background:var(--sf)}
     </div>
   </div>
 </div>
-<div class="ov" id="ufOv"><div class="modal"><div class="mh"><h2 id="ufT">Benutzer</h2><button class="mc" onclick="backToAdmin('users')">✕</button></div><div class="mb2"><input type="hidden" id="ufId"><div class="fr"><div class="fg"><label>Name *</label><input type="text" id="ufNm"></div><div class="fg"><label>Kürzel *</label><input type="text" id="ufIn" maxlength="3"></div></div><div class="fg full"><label>Rollen</label><div class="role-chks" id="ufRoles"></div></div><div class="fg" id="ufPWRR" style="display:none"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="ufPWRst"> PW zurücksetzen auf <b>Passwort1</b></label></div><div class="fg"><label>Farbe</label><div class="cr" id="ufCR"></div></div></div><div class="mf"><button class="btn-s" onclick="backToAdmin('users')">Abbrechen</button><button class="btn-p" onclick="saveUser()">💾 Speichern</button></div></div></div>
-<div class="ov" id="cfOv"><div class="modal sm"><div class="mh"><h2 id="cfT">Kategorie</h2><button class="mc" onclick="backToAdmin('cats')">✕</button></div><div class="mb2"><input type="hidden" id="cfId"><div class="fr"><div class="fg"><label>Bezeichnung *</label><input type="text" id="cfLb"></div><div class="fg"><label>Emoji</label><input type="text" id="cfEm" maxlength="4"></div></div><div class="fg"><label>Farbe</label><div class="cr" id="cfCR"></div></div></div><div class="mf"><button class="btn-s" onclick="backToAdmin('cats')">Abbrechen</button><button class="btn-p" onclick="saveCategory()">💾 Speichern</button></div></div></div>
-<div class="ov" id="tfOv"><div class="modal sm"><div class="mh"><h2 id="tfT">Tag</h2><button class="mc" onclick="backToAdmin('tags')">✕</button></div><div class="mb2"><input type="hidden" id="tfId"><div class="fg"><label>Bezeichnung *</label><input type="text" id="tfLb"></div><div class="fg"><label>Farbe</label><div class="cr" id="tfCR"></div></div></div><div class="mf"><button class="btn-s" onclick="backToAdmin('tags')">Abbrechen</button><button class="btn-p" onclick="saveTag()">💾 Speichern</button></div></div></div>
+<div class="ov" id="ufOv"><div class="modal"><div class="mh"><h2 id="ufT">Benutzer</h2><button class="mc" onclick="backToAdmin('users')">✕</button></div><div class="mb2"><input type="hidden" id="ufId"><div class="fr"><div class="fg"><label>Name *</label><input type="text" id="ufNm"></div><div class="fg"><label>Kürzel *</label><input type="text" id="ufIn" maxlength="3"></div></div><div class="fg full"><label>Rollen</label><div class="role-chks" id="ufRoles"></div></div><div class="fg" id="ufPWRR" style="display:none"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="ufPWRst"> PW zurücksetzen auf <b>Passwort1</b></label></div><div class="fg"><label>Farbe</label><div class="cr" id="ufCR"></div></div><div id="ufErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div></div><div class="mf"><button class="btn-s" onclick="backToAdmin('users')">Abbrechen</button><button class="btn-p" onclick="saveUser()">💾 Speichern</button></div></div></div>
+<div class="ov" id="cfOv"><div class="modal sm"><div class="mh"><h2 id="cfT">Kategorie</h2><button class="mc" onclick="backToAdmin('cats')">✕</button></div><div class="mb2"><input type="hidden" id="cfId"><div class="fr"><div class="fg"><label>Bezeichnung *</label><input type="text" id="cfLb"></div><div class="fg"><label>Emoji</label><input type="text" id="cfEm" maxlength="4"></div></div><div class="fg"><label>Farbe</label><div class="cr" id="cfCR"></div></div><div id="cfErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div></div><div class="mf"><button class="btn-s" onclick="backToAdmin('cats')">Abbrechen</button><button class="btn-p" onclick="saveCategory()">💾 Speichern</button></div></div></div>
+<div class="ov" id="tfOv"><div class="modal sm"><div class="mh"><h2 id="tfT">Tag</h2><button class="mc" onclick="backToAdmin('tags')">✕</button></div><div class="mb2"><input type="hidden" id="tfId"><div class="fg"><label>Bezeichnung *</label><input type="text" id="tfLb"></div><div class="fg"><label>Farbe</label><div class="cr" id="tfCR"></div></div><div id="tfErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div></div><div class="mf"><button class="btn-s" onclick="backToAdmin('tags')">Abbrechen</button><button class="btn-p" onclick="saveTag()">💾 Speichern</button></div></div></div>
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = '1.3.2';
+const APP_VERSION = '1.3.3';
 
 // ══ CONSTANTS ══
 const MONTHS=['Jänner','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
@@ -1326,28 +1326,94 @@ function openUF(id){
   document.getElementById('ufId').value=u?.id||'';document.getElementById('ufNm').value=u?.name||'';document.getElementById('ufIn').value=u?.initials||'';
   document.getElementById('ufPWRR').style.display=u?'block':'none';document.getElementById('ufPWRst').checked=false;
   S.ufColor=u?.color||pal()[0];
-  document.getElementById('ufRoles').innerHTML=ROLES.map(r=>`<label class="rck"><input type="checkbox" value="${r.id}" ${(u?.roles||[]).includes(r.id)?'checked':''}><span>${r.icon} ${r.label}</span></label>`).join('');
+  // Für neuen Benutzer: "standard" vorausgewählt
+  const defaultRoles=u?.roles||['standard'];
+  document.getElementById('ufRoles').innerHTML=ROLES.map(r=>`<label class="rck"><input type="checkbox" value="${r.id}" ${defaultRoles.includes(r.id)?'checked':''}><span>${r.icon} ${r.label}</span></label>`).join('');
+  document.getElementById('ufErr').textContent='';
   buildCP('ufCR',S.ufColor,'pickU');closeModal('admOv');openModal('ufOv');
 }
 async function saveUser(){
   const name=document.getElementById('ufNm').value.trim(),initials=document.getElementById('ufIn').value.trim().toUpperCase();
-  if(!name||!initials){toast('⚠️ Name und Kürzel erforderlich!');return;}
+  const errEl=document.getElementById('ufErr');
+  errEl.textContent='';
+  if(!name||!initials){errEl.textContent='⚠️ Name und Kürzel erforderlich!';return;}
   const roles=Array.from(document.querySelectorAll('#ufRoles input:checked')).map(cb=>cb.value);
-  if(!roles.length){toast('⚠️ Mindestens eine Rolle!');return;}
+  if(!roles.length){errEl.textContent='⚠️ Mindestens eine Rolle auswählen!';return;}
   const id=document.getElementById('ufId').value;
+  loading(true);
   try{
     if(id)await api('PUT','/users/'+id,{name,initials,roles,color:S.ufColor,resetPassword:document.getElementById('ufPWRst').checked});
     else await api('POST','/users',{name,initials,roles,color:S.ufColor});
-    await fetchData();backToAdmin('users');await loadLoginUsers();toast('✅ Gespeichert!');
-  }catch(e){toast('⚠️ '+e.message,'err');}
+    await fetchData();
+    loadLoginUsers(); // fire & forget – kein await nötig
+    backToAdmin('users');
+    toast('✅ Benutzer gespeichert!');
+  }catch(e){errEl.textContent='⚠️ '+e.message;}
+  finally{loading(false);}
 }
-async function delUser(id){if(!confirm('Benutzer löschen?'))return;try{await api('DELETE','/users/'+id);await fetchData();backToAdmin('users');await loadLoginUsers();toast('🗑️ Gelöscht.');}catch(e){toast('⚠️ '+e.message,'err');}}
-function openCF(id){const c=id?getCat(id):null;document.getElementById('cfT').textContent=c?'Kategorie bearbeiten':'Kategorie';document.getElementById('cfId').value=c?.id||'';document.getElementById('cfLb').value=c?.label||'';document.getElementById('cfEm').value=c?.emoji||'📌';S.cfColor=c?.color||pal()[2];buildCP('cfCR',S.cfColor,'pickC');closeModal('admOv');openModal('cfOv');}
-async function saveCategory(){const label=document.getElementById('cfLb').value.trim();if(!label){toast('⚠️ Bezeichnung erforderlich!');return;}const id=document.getElementById('cfId').value;try{if(id)await api('PUT','/categories/'+id,{label,emoji:document.getElementById('cfEm').value.trim()||'📌',color:S.cfColor});else await api('POST','/categories',{label,emoji:document.getElementById('cfEm').value.trim()||'📌',color:S.cfColor});await fetchData();backToAdmin('cats');toast('✅ Gespeichert!');}catch(e){toast('⚠️ '+e.message,'err');}}
-async function delCat(id){if(!confirm('Kategorie löschen?'))return;try{await api('DELETE','/categories/'+id);await fetchData();backToAdmin('cats');}catch(e){toast('⚠️ '+e.message,'err');}}
-function openTF(id){const t=id?getTag(id):null;document.getElementById('tfT').textContent=t?'Tag bearbeiten':'Tag';document.getElementById('tfId').value=t?.id||'';document.getElementById('tfLb').value=t?.label||'';S.tfColor=t?.color||pal()[0];buildCP('tfCR',S.tfColor,'pickT');closeModal('admOv');openModal('tfOv');}
-async function saveTag(){const label=document.getElementById('tfLb').value.trim();if(!label){toast('⚠️ Bezeichnung erforderlich!');return;}const id=document.getElementById('tfId').value;try{if(id)await api('PUT','/tags/'+id,{label,color:S.tfColor});else await api('POST','/tags',{label,color:S.tfColor});await fetchData();backToAdmin('tags');toast('✅ Gespeichert!');}catch(e){toast('⚠️ '+e.message,'err');}}
-async function delTag(id){if(!confirm('Tag löschen?'))return;try{await api('DELETE','/tags/'+id);await fetchData();backToAdmin('tags');}catch(e){toast('⚠️ '+e.message,'err');}}
+async function delUser(id){
+  if(!confirm('Benutzer wirklich löschen?'))return;
+  loading(true);
+  try{await api('DELETE','/users/'+id);await fetchData();loadLoginUsers();backToAdmin('users');toast('🗑️ Benutzer gelöscht.');}
+  catch(e){toast('⚠️ '+e.message,'err');}
+  finally{loading(false);}
+}
+function openCF(id){
+  const c=id?getCat(id):null;
+  document.getElementById('cfT').textContent=c?'Kategorie bearbeiten':'Kategorie anlegen';
+  document.getElementById('cfId').value=c?.id||'';document.getElementById('cfLb').value=c?.label||'';document.getElementById('cfEm').value=c?.emoji||'📌';
+  document.getElementById('cfErr').textContent='';
+  S.cfColor=c?.color||pal()[2];buildCP('cfCR',S.cfColor,'pickC');closeModal('admOv');openModal('cfOv');
+}
+async function saveCategory(){
+  const label=document.getElementById('cfLb').value.trim();
+  const errEl=document.getElementById('cfErr');
+  errEl.textContent='';
+  if(!label){errEl.textContent='⚠️ Bezeichnung erforderlich!';return;}
+  const id=document.getElementById('cfId').value;
+  loading(true);
+  try{
+    if(id)await api('PUT','/categories/'+id,{label,emoji:document.getElementById('cfEm').value.trim()||'📌',color:S.cfColor});
+    else await api('POST','/categories',{label,emoji:document.getElementById('cfEm').value.trim()||'📌',color:S.cfColor});
+    await fetchData();backToAdmin('cats');toast('✅ Kategorie gespeichert!');
+  }catch(e){errEl.textContent='⚠️ '+e.message;}
+  finally{loading(false);}
+}
+async function delCat(id){
+  if(!confirm('Kategorie löschen?'))return;
+  loading(true);
+  try{await api('DELETE','/categories/'+id);await fetchData();backToAdmin('cats');toast('🗑️ Kategorie gelöscht.');}
+  catch(e){toast('⚠️ '+e.message,'err');}
+  finally{loading(false);}
+}
+function openTF(id){
+  const t=id?getTag(id):null;
+  document.getElementById('tfT').textContent=t?'Tag bearbeiten':'Tag anlegen';
+  document.getElementById('tfId').value=t?.id||'';document.getElementById('tfLb').value=t?.label||'';
+  document.getElementById('tfErr').textContent='';
+  S.tfColor=t?.color||pal()[0];buildCP('tfCR',S.tfColor,'pickT');closeModal('admOv');openModal('tfOv');
+}
+async function saveTag(){
+  const label=document.getElementById('tfLb').value.trim();
+  const errEl=document.getElementById('tfErr');
+  errEl.textContent='';
+  if(!label){errEl.textContent='⚠️ Bezeichnung erforderlich!';return;}
+  const id=document.getElementById('tfId').value;
+  loading(true);
+  try{
+    if(id)await api('PUT','/tags/'+id,{label,color:S.tfColor});
+    else await api('POST','/tags',{label,color:S.tfColor});
+    await fetchData();backToAdmin('tags');toast('✅ Tag gespeichert!');
+  }catch(e){errEl.textContent='⚠️ '+e.message;}
+  finally{loading(false);}
+}
+async function delTag(id){
+  if(!confirm('Tag löschen?'))return;
+  loading(true);
+  try{await api('DELETE','/tags/'+id);await fetchData();backToAdmin('tags');toast('🗑️ Tag gelöscht.');}
+  catch(e){toast('⚠️ '+e.message,'err');}
+  finally{loading(false);}
+}
 
 // ══ UTILS ══
 function toggleTheme(){const dark=document.documentElement.getAttribute('data-theme')==='dark';document.documentElement.setAttribute('data-theme',dark?'light':'dark');document.getElementById('thBtn').textContent=dark?'🌙':'☀️';localStorage.setItem('lst_theme',dark?'light':'dark');}
