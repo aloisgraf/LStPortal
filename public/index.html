@@ -275,6 +275,7 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
         <div class="ni" id="ni-schedule" onclick="setView(&#39;schedule&#39;)">&#128197; Eintrags&#252;bersicht</div>
         <div class="ni" id="ni-allw" onclick="setView(&#39;allw&#39;)">&#128202; Zulagendienste</div>
         <div class="ni" id="ni-abrechnung" onclick="setView(&#39;abrechnung&#39;)">&#129534; Abrechnung</div>
+        <div class="ni" id="ni-dienstplaene" onclick="setView(&#39;dienstplaene&#39;)">&#128196; Dienstpl&#228;ne</div>
       </div>
       <div class="ndiv"></div>
       <div class="nsh open" id="tkHdr" onclick="toggleNS(&#39;tk&#39;)"><span>&#127931; Ticketsystem</span><span class="arr">&#9660;</span></div>
@@ -284,8 +285,12 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
         <div class="ni" id="ni-checklists" onclick="setView(&#39;checklists&#39;)">&#9745;&#65039; Checklisten</div>
       </div>
       <div class="ndiv"></div>
-      <div class="ni top" id="ni-messages" onclick="setView(&#39;messages&#39;)">&#9993;&#65039; Nachrichten <span class="nbdg" id="navMsgBdg" style="display:none">0</span></div>
-      <div class="ni top" id="ni-messages_sent" onclick="setView(&#39;messages_sent&#39;)">&#128228; Gesendet</div>
+      <div class="ndiv"></div>
+      <div class="nsh open" id="msgHdr" onclick="toggleNS(&#39;msg&#39;)"><span>&#9993;&#65039; Nachrichten <span class="nbdg" id="navMsgBdg" style="display:none">0</span></span><span class="arr">&#9660;</span></div>
+      <div class="nsub open" id="msgSub">
+        <div class="ni" id="ni-messages" onclick="setView(&#39;messages&#39;)">&#128235; Eingang</div>
+        <div class="ni" id="ni-messages_sent" onclick="setView(&#39;messages_sent&#39;)">&#128228; Gesendet</div>
+      </div>
     </div>
     <div class="sbf" id="sbf"></div>
     <div class="sbver" style="cursor:pointer" onclick="openModal('changelogOv')" title="Changelog anzeigen">LSt Portal <span id="versionBadge"></span> <span style="font-size:9px;color:var(--acc)">&#9432;</span></div>
@@ -445,6 +450,7 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
       <div class="fg full"><label>Betreff *</label><input type="text" id="msgTitle"></div>
       <div class="fg full"><label>Nachricht *</label><textarea id="msgBody" rows="5"></textarea></div>
     </div>
+    <div class="mb2" style="padding-top:0;gap:4px"><div id="msgErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div></div>
     <div class="mf"><button class="btn-s" onclick="closeModal(&#39;msgFormOv&#39;)">Abbrechen</button><button class="btn-p" onclick="sendMessage()">&#128228; Senden</button></div>
   </div>
 </div>
@@ -472,7 +478,7 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
 <div class="ov" id="tfOv"><div class="modal sm"><div class="mh"><h2 id="tfT">Tag</h2><button class="mc" onclick="backToAdmin(&#39;tags&#39;)">&#10005;</button></div><div class="mb2"><input type="hidden" id="tfId"><div class="fg"><label>Bezeichnung *</label><input type="text" id="tfLb"></div><div class="fg"><label>Farbe</label><div class="cr" id="tfCR"></div></div><div id="tfErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div></div><div class="mf"><button class="btn-s" onclick="backToAdmin(&#39;tags&#39;)">Abbrechen</button><button class="btn-p" onclick="saveTag()">&#128190; Speichern</button></div></div></div>
 
 <script>
-const APP_VERSION='1.5.0';
+const APP_VERSION='1.6.0';
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
@@ -524,6 +530,7 @@ async function fetchData(){
     S.events=data.events||[]; S.tickets=data.tickets||[]; S.allowances=data.allowances||[];
     S.checklists=data.checklists||[]; S.messages=data.messages||[];
     S.notifications=data.notifications||[]; S.abrechnung=data.abrechnung||{einspringer:[],homeoffice:[]};
+    S.dienstplaene=data.dienstplaene||[];
     S.currentUser=data.currentUser; S.p=data.permissions||{};
     const u=getU(S.currentUser); const roles=u?.roles||['standard'];
     const has=(...r)=>r.some(x=>roles.includes(x));
@@ -644,7 +651,7 @@ function toggleSidebar(){const sb=document.getElementById('sidebar'),ov=document
 function toggleNS(id){document.getElementById(id+'Hdr').classList.toggle('open');document.getElementById(id+'Sub').classList.toggle('open');}
 function setView(v){
   S.view=v;
-  ['home','schedule','allw','abrechnung','tickets','tickets_closed','checklists','messages','messages_sent'].forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
+  ['home','schedule','allw','abrechnung','dienstplaene','tickets','tickets_closed','checklists','messages','messages_sent'].forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
   document.getElementById('sidebar').classList.remove('open');document.getElementById('sbOv').classList.remove('open');
   renderSBF();renderMain();
 }
@@ -703,6 +710,7 @@ function renderMain(){
   else if(S.view==='tickets'||S.view==='tickets_closed')renderTickets();
   else if(S.view==='checklists')renderChecklists();
   else if(S.view==='messages'||S.view==='messages_sent')renderMessages();
+  else if(S.view==='dienstplaene')renderDienstplaene();
 }
 
 // ── HOME ──────────────────────────────────────────────────────────────────────
@@ -916,14 +924,56 @@ function renderAllw(){
   const months=getPeriodMonths(),yr=S.allwYear;
   const pLbl=S.allwPeriod==='month'?MONTHS[S.allwMonth-1]:S.allwPeriod==='h1'?'1. Halbjahr':S.allwPeriod==='h2'?'2. Halbjahr':'Gesamtjahr';
   const showUsers=S.p.editAllw?S.users.filter(u=>!(u.roles||[]).includes('admin')):[getU(S.currentUser)].filter(Boolean);
-  const canEdit=S.p.editAllw&&S.allwPeriod==='month';
+  const isBulk=S.p.editAllw&&S.allwPeriod==='month'; // bulk-editable when month view + has rights
   document.getElementById('main').innerHTML=`
-    <div class="ph"><div class="pt">Zulagendienste <span>${pLbl} ${yr}</span></div></div>
+    <div class="ph"><div class="pt">Zulagendienste <span>${pLbl} ${yr}</span></div>
+      ${isBulk?`<button class="btn-p" onclick="saveAllBulk()">&#128190; Alle speichern</button>`:''}
+    </div>
     <div class="tw"><div class="tt"><h2>&#220;bersicht</h2></div>
       <div style="overflow-x:auto">
-      <table><thead><tr><th>Mitarbeiter</th><th style="text-align:center">&#127769; Nacht</th><th style="text-align:center">&#127881; Feiertag</th><th style="text-align:center">&#127958;&#65039; WE</th><th style="text-align:center">&#128203; C10</th>${canEdit?'<th></th>':''}</tr></thead>
-      <tbody>${showUsers.map(u=>{const sv=sumAllw(u.id,yr,months);return`<tr><td><div style="display:flex;align-items:center;gap:6px">${avHtml(u.initials,u.color,22,9)}<span>${u.name}</span></div></td>${numCell(sv.nd,'#3b6dd4')}${numCell(sv.fd,'#10b981')}${numCell(sv.fw,'#f59e0b')}${numCell(sv.c10,'#7c3aed')}${canEdit?`<td><button class="btn-e" onclick="openAllwM('${u.id}',${yr},${S.allwMonth})">&#9998;</button></td>`:''}</tr>`;}).join('')}</tbody>
-      </table></div></div>`;
+      <table><thead><tr>
+        <th>Mitarbeiter</th>
+        <th style="text-align:center">&#127769; Nacht</th>
+        <th style="text-align:center">&#127881; Feiertag</th>
+        <th style="text-align:center">&#127958;&#65039; WE</th>
+        <th style="text-align:center">&#128203; C10</th>
+        ${!isBulk?'<th></th>':''}
+      </tr></thead>
+      <tbody>${showUsers.map(u=>{
+        const sv=sumAllw(u.id,yr,months);
+        if(isBulk){
+          const a=getAllw(u.id,yr,S.allwMonth);
+          return`<tr>
+            <td><div style="display:flex;align-items:center;gap:6px">${avHtml(u.initials,u.color,22,9)}<span>${u.name}</span></div></td>
+            <td style="text-align:center"><input type="number" min="0" class="bulk-nd" data-uid="${u.id}" value="${a.nd||0}" style="width:60px;text-align:center;font-size:12px;padding:4px"></td>
+            <td style="text-align:center"><input type="number" min="0" class="bulk-fd" data-uid="${u.id}" value="${a.fd||0}" style="width:60px;text-align:center;font-size:12px;padding:4px"></td>
+            <td style="text-align:center"><input type="number" min="0" class="bulk-fw" data-uid="${u.id}" value="${a.fw||0}" style="width:60px;text-align:center;font-size:12px;padding:4px"></td>
+            <td style="text-align:center"><input type="number" min="0" class="bulk-c10" data-uid="${u.id}" value="${a.c10||0}" style="width:60px;text-align:center;font-size:12px;padding:4px"></td>
+          </tr>`;
+        }
+        return`<tr><td><div style="display:flex;align-items:center;gap:6px">${avHtml(u.initials,u.color,22,9)}<span>${u.name}</span></div></td>${numCell(sv.nd,'#3b6dd4')}${numCell(sv.fd,'#10b981')}${numCell(sv.fw,'#f59e0b')}${numCell(sv.c10,'#7c3aed')}<td><button class="btn-e" onclick="openAllwM('${u.id}',${yr},${months[0]})">&#9998;</button></td></tr>`;
+      }).join('')}</tbody>
+      </table></div>
+      ${isBulk?`<div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;justify-content:flex-end"><button class="btn-p" onclick="saveAllBulk()">&#128190; Alle speichern</button></div>`:''}
+    </div>`;
+}
+async function saveAllBulk(){
+  loading(true);
+  try{
+    const rows=document.querySelectorAll('tbody tr');
+    const saves=[];
+    document.querySelectorAll('.bulk-nd').forEach(inp=>{
+      const uid=inp.dataset.uid;
+      const nd=+inp.value||0;
+      const fd=+document.querySelector(`.bulk-fd[data-uid="${uid}"]`)?.value||0;
+      const fw=+document.querySelector(`.bulk-fw[data-uid="${uid}"]`)?.value||0;
+      const c10=+document.querySelector(`.bulk-c10[data-uid="${uid}"]`)?.value||0;
+      saves.push(api('PUT','/allowances',{userId:uid,year:S.allwYear,month:S.allwMonth,nd,fd,fw,c10}));
+    });
+    await Promise.all(saves);
+    await fetchData();renderMain();toast('\u2705 Alle Zulagen gespeichert!');
+  }catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
+  finally{loading(false);}
 }
 function openAllwM(uid,year,month){
   const u=getU(uid),a=getAllw(uid,year,month);
@@ -957,7 +1007,8 @@ function renderAbrechnung(){
     return true;
   };
   const filterHO=h2=>{
-    if(filterUid&&h2.userId!==filterUid)return false;
+    if(!S.p.seeAllAbrechnung&&h2.userId!==S.currentUser)return false;
+    if(S.p.seeAllAbrechnung&&S.abrUser&&h2.userId!==S.abrUser)return false;
     if(h2.year!==yr)return false;
     if(mo&&h2.month!==mo)return false;
     return true;
@@ -974,7 +1025,11 @@ function renderAbrechnung(){
           <div class="tt"><h2>&#128203; Einspringerdienste</h2></div>
           <div style="padding:14px;display:flex;flex-direction:column;gap:12px">
             ${months.map(m=>{
-              const einspMonth=S.abrechnung.einspringer.filter(e=>filterUid?e.userId===filterUid:e.userId===S.currentUser).filter(e=>{const d=new Date(e.date);return d.getFullYear()===yr&&d.getMonth()+1===m;});
+              const einspMonth=S.abrechnung.einspringer.filter(e=>{
+                if(!S.p.seeAllAbrechnung)return e.userId===S.currentUser;
+                if(S.abrUser)return e.userId===S.abrUser;
+                return true;
+              }).filter(e=>{const d=new Date(e.date);return d.getFullYear()===yr&&d.getMonth()+1===m;});
               const def=new Date(yr,m-1,15).toISOString().slice(0,10);
               return`<div>
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
@@ -1245,6 +1300,102 @@ async function saveTicket(){
 }
 
 // ── CHECKLISTS ────────────────────────────────────────────────────────────────
+function renderDienstplaene(){
+  const active=S.dienstplaene.filter(d=>!d.isArchived).sort((a,b)=>a.year!==b.year?b.year-a.year:b.month-a.month);
+  const archived=S.dienstplaene.filter(d=>d.isArchived).sort((a,b)=>a.year!==b.year?b.year-a.year:b.month-a.month);
+  const canUpload=S.p.addGeneral;
+  document.getElementById('main').innerHTML=`
+    <div class="ph">
+      <div class="pt">&#128196; Dienstpl&#228;ne</div>
+      ${canUpload?`<button class="btn-p" onclick="openDpUpload()">&#128228; PDF hochladen</button>`:''}
+    </div>
+    <div class="tw" style="margin-bottom:14px">
+      <div class="tt"><h2>&#128196; Aktuelle Pl&#228;ne (${active.length})</h2></div>
+      ${active.length?`<table><thead><tr><th>Monat</th><th>Bezeichnung</th><th>Version</th><th>Hochgeladen</th><th>Hochgeladen von</th><th></th></tr></thead><tbody>
+        ${active.map(d=>`<tr>
+          <td style="font-weight:600;white-space:nowrap">${MONTHS[d.month-1]} ${d.year}</td>
+          <td>${d.label}</td>
+          <td><span class="bdg st-open">v${d.version}</span></td>
+          <td style="font-size:11px;color:var(--mu)">${fdt(d.createdAt)}</td>
+          <td style="font-size:12px">${getU(d.createdBy)?.name||'?'}</td>
+          <td><div style="display:flex;gap:5px">
+            <a href="/api/dienstplaene/${d.id}/file" target="_blank" class="btn-ok" style="text-decoration:none;font-size:11px;padding:4px 8px">&#128065; Ansehen</a>
+            ${canUpload?`<button class="btn-d" onclick="deleteDp('${d.id}')" style="padding:4px 8px">&#10005;</button>`:''}
+          </div></td>
+        </tr>`).join('')}
+      </tbody></table>`:`<div class="empty">Noch keine Dienstpl&#228;ne</div>`}
+    </div>
+    ${archived.length?`<div class="tw">
+      <div class="tt" style="cursor:pointer" onclick="toggleArchiv()">
+        <h2>&#128230; Archiv (${archived.length})</h2>
+        <span id="archivToggleBtn" style="font-size:11px;color:var(--mu)">Einblenden</span>
+      </div>
+      <div id="archivContent" style="display:none">
+        <table><thead><tr><th>Monat</th><th>Bezeichnung</th><th>Version</th><th>Archiviert am</th><th></th></tr></thead><tbody>
+          ${archived.map(d=>`<tr style="opacity:.75">
+            <td style="font-weight:600;white-space:nowrap">${MONTHS[d.month-1]} ${d.year}</td>
+            <td>${d.label}</td>
+            <td><span class="bdg st-on_hold">v${d.version} archiviert</span></td>
+            <td style="font-size:11px;color:var(--mu)">${fdt(d.archivedAt)}</td>
+            <td><div style="display:flex;gap:5px">
+              <a href="/api/dienstplaene/${d.id}/file" target="_blank" class="btn-s" style="text-decoration:none;font-size:11px;padding:4px 8px">&#128065; Ansehen</a>
+              ${canUpload?`<button class="btn-d" onclick="deleteDp('${d.id}')" style="padding:4px 8px;font-size:10px">&#10005;</button>`:''}
+            </div></td>
+          </tr>`).join('')}
+        </tbody></table>
+      </div>
+    </div>`:``}`;
+}
+function toggleArchiv(){
+  const c=document.getElementById('archivContent');
+  const b=document.getElementById('archivToggleBtn');
+  if(!c)return;
+  const show=c.style.display==='none';
+  c.style.display=show?'block':'none';
+  if(b)b.textContent=show?'Ausblenden':'Einblenden';
+}
+function openDpUpload(){
+  document.getElementById('dpMonth').value=new Date().getMonth()+1;
+  document.getElementById('dpYear').value=new Date().getFullYear();
+  document.getElementById('dpLabel').value='';
+  document.getElementById('dpFile').value='';
+  document.getElementById('dpErr').textContent='';
+  document.getElementById('dpFileName').textContent='';
+  openModal('dpOv');
+}
+async function uploadDienstplan(){
+  const month=+document.getElementById('dpMonth').value;
+  const year=+document.getElementById('dpYear').value;
+  const label=document.getElementById('dpLabel').value.trim();
+  const fileInput=document.getElementById('dpFile');
+  const errEl=document.getElementById('dpErr');
+  errEl.textContent='';
+  if(!month||!year||!label){errEl.textContent='\u26A0\uFE0F Alle Felder ausf\u00fcllen!';return;}
+  if(!fileInput.files.length){errEl.textContent='\u26A0\uFE0F Bitte PDF ausw\u00e4hlen!';return;}
+  const file=fileInput.files[0];
+  if(!file.name.toLowerCase().endsWith('.pdf')&&file.type!=='application/pdf'){errEl.textContent='\u26A0\uFE0F Nur PDF-Dateien erlaubt!';return;}
+  if(file.size>10*1024*1024){errEl.textContent='\u26A0\uFE0F Datei zu gro\u00df (max. 10 MB)!';return;}
+  loading(true);
+  try{
+    const fileData=await new Promise((res,rej)=>{
+      const r=new FileReader();
+      r.onload=()=>res(r.result);
+      r.onerror=()=>rej(new Error('Lesefehler'));
+      r.readAsDataURL(file);
+    });
+    const result=await api('POST','/dienstplaene',{month,year,label,filename:file.name,fileData});
+    await fetchData();closeModal('dpOv');renderDienstplaene();
+    toast(`\u2705 Dienstplan v${result.version} hochgeladen! ${result.version>1?'Vorherige Version archiviert.':''}`);
+  }catch(e){errEl.textContent='\u26A0\uFE0F '+e.message;}
+  finally{loading(false);}
+}
+async function deleteDp(id){
+  if(!confirm('Dienstplan-Eintrag l\u00f6schen?'))return;
+  loading(true);
+  try{await api('DELETE','/dienstplaene/'+id);await fetchData();renderDienstplaene();toast('\uD83D\uDDD1\uFE0F Gel\u00f6scht.');}
+  catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
+  finally{loading(false);}
+}
 function renderChecklists(){
   const visible=S.p.manageUsers?S.checklists:S.checklists.filter(c=>S.tp.myDepts.includes(c.department)||c.createdBy===S.currentUser);
   document.getElementById('main').innerHTML=`
@@ -1432,7 +1583,7 @@ function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 function eyeToggle(inputId,btn){const inp=document.getElementById(inputId);const show=inp.type==='password';inp.type=show?'text':'password';btn.textContent=show?'\uD83D\uDE48':'\uD83D\uDC41';}
 function toast(msg,type=''){const t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3200);}
-const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOv','clFormOv','attachClOv','changelogOv','msgFormOv'];
+const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOv','clFormOv','attachClOv','changelogOv','dpOv','msgFormOv'];
 document.addEventListener('keydown',e=>{if(e.key==='Escape')ALL_MODALS.forEach(closeModal);});
 ALL_MODALS.forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('click',e=>{if(e.target===el)closeModal(id);});});
 document.addEventListener('click',e=>{if(!e.target.closest('.note-input-wrap'))document.getElementById('mentionSug')?.classList.remove('open');});
@@ -1453,6 +1604,35 @@ document.addEventListener('click',e=>{if(!e.target.closest('.note-input-wrap'))d
 })();
 </script>
 
+<!-- DIENSTPLAN UPLOAD -->
+<div class="ov" id="dpOv">
+  <div class="modal sm">
+    <div class="mh"><h2>&#128228; Dienstplan hochladen</h2><button class="mc" onclick="closeModal(&#39;dpOv&#39;)">&#10005;</button></div>
+    <div class="mb2">
+      <div class="fr">
+        <div class="fg"><label>Monat *</label><select id="dpMonth">
+          <option value="1">J&#228;nner</option><option value="2">Februar</option><option value="3">M&#228;rz</option>
+          <option value="4">April</option><option value="5">Mai</option><option value="6">Juni</option>
+          <option value="7">Juli</option><option value="8">August</option><option value="9">September</option>
+          <option value="10">Oktober</option><option value="11">November</option><option value="12">Dezember</option>
+        </select></div>
+        <div class="fg"><label>Jahr *</label><input type="number" id="dpYear" min="2020" max="2099" value="2025"></div>
+      </div>
+      <div class="fg full"><label>Bezeichnung *</label><input type="text" id="dpLabel" placeholder="z.B. M&#228;rz 2025 &#8211; Endversion"></div>
+      <div class="fg full">
+        <label>PDF-Datei * (max. 10 MB)</label>
+        <label style="display:flex;align-items:center;gap:9px;padding:9px 12px;background:var(--sf2);border:1px solid var(--border);border-radius:7px;cursor:pointer">
+          <span>&#128196;</span>
+          <span id="dpFileName" style="font-size:12px;color:var(--mu)">Keine Datei ausgew&#228;hlt</span>
+          <input type="file" id="dpFile" accept=".pdf,application/pdf" style="display:none" onchange="document.getElementById(&#39;dpFileName&#39;).textContent=this.files[0]?.name||&#39;Keine Datei&#39;">
+        </label>
+      </div>
+      <div class="ib3" style="font-size:11px">&#8505;&#65039; Wenn ein Plan f&#252;r diesen Monat bereits existiert, wird er automatisch archiviert.</div>
+      <div id="dpErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div>
+    </div>
+    <div class="mf"><button class="btn-s" onclick="closeModal(&#39;dpOv&#39;)">Abbrechen</button><button class="btn-p" onclick="uploadDienstplan()">&#128228; Hochladen</button></div>
+  </div>
+</div>
 <!-- CHANGELOG -->
 <div class="ov" id="changelogOv">
   <div class="modal lg">
@@ -1461,20 +1641,28 @@ document.addEventListener('click',e=>{if(!e.target.closest('.note-input-wrap'))d
       <div style="display:flex;flex-direction:column;gap:14px">
         <div style="padding:12px;background:color-mix(in srgb,var(--acc) 6%,var(--sf));border:1px solid color-mix(in srgb,var(--acc) 20%,transparent);border-radius:8px">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-            <span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v1.5.0</span>
+            <span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v1.6.0</span>
             <span style="font-size:11px;color:var(--mu)">Aktuell</span>
           </div>
           <ul style="font-size:12px;line-height:1.7;padding-left:18px">
-            <li>Abrechnung: Einspringerdienste als inline-Liste (&#43; Button &#8594; Datum &#43; Notiz-Felder)</li>
-            <li>Abrechnung: Home Office Monatsauswahl &#252;ber Sidebar-Filter</li>
-            <li>Abrechnung: Fachbereich-&#220;bersicht nach Namen sortiert</li>
-            <li>Nachrichten: Tab &#8222;Gesendet&#8220; &#8211; eigene versendete Nachrichten sichtbar</li>
-            <li>Navigation: Nachrichten aus Sidebar entfernt (Glocken-Button oben rechts)</li>
+            <li>Dienstpl&#228;ne: Neue Seite zum Ablegen von Dienstplan-PDFs pro Monat</li>
+            <li>Dienstpl&#228;ne: Automatische Versionierung &#8211; alte Version wird ins Archiv verschoben</li>
+            <li>Dienstpl&#228;ne: Archiv ein-/ausblendbar, direktes &#214;ffnen im Browser</li>
+            <li>Zulagendienste: Alle Mitarbeiter auf einmal im aktuellen Monat bearbeitbar</li>
+            <li>Abrechnung: Einspringer-&#220;bersicht jetzt auch f&#252;r Dienstplanung-Rolle sichtbar</li>
+            <li>Navigation: Nachrichten als klappbares Untermen&#252; (Eingang / Gesendet)</li>
+            <li>Bug-Fix: Nachricht senden &#8211; Fehler direkt im Formular angezeigt</li>
+          </ul>
+        </div>
+        <div style="padding:12px;background:var(--sf2);border:1px solid var(--border);border-radius:8px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--sf3);color:var(--mu);padding:2px 8px;border-radius:4px">v1.5.0</span>
+          </div>
+          <ul style="font-size:12px;line-height:1.7;padding-left:18px">
+            <li>Abrechnung: Einspringerdienste als inline-Liste, Ereignis-Best&#228;tigungen</li>
+            <li>Ereignisse: Alle Eintr&#228;ge sichtbar, fremde anonymisiert</li>
             <li>Administration als Zahnrad-Button oben rechts</li>
-            <li>Ereignisse: Alle Eintr&#228;ge f&#252;r alle sichtbar, fremde anonymisiert</li>
-            <li>Ereignisse: Nur eigene (selbst erstellt) sind bearbeitbar</li>
-            <li>Ereignisse: Neue/ge&#228;nderte Eintr&#228;ge f&#252;r mich &#8594; Best&#228;tigung in &#220;bersicht</li>
-            <li>Changelog-Seite (diese Ansicht)</li>
+            <li>Nachrichten: Tab &#8222;Gesendet&#8220;</li>
           </ul>
         </div>
         <div style="padding:12px;background:var(--sf2);border:1px solid var(--border);border-radius:8px">
