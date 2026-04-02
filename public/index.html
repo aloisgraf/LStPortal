@@ -248,6 +248,7 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
   <div class="logo"><div class="lm">&#128203;</div><div class="ln">LSt <em>Portal</em></div></div>
   <div class="hsp"></div>
   <button class="ib2" id="thBtn" onclick="toggleTheme()">&#127769;</button>
+  <button class="ib2" id="adminBtn" onclick="openAdminModal()" title="Administration" style="display:none">&#9881;&#65039;</button>
   <div class="ibw">
     <button class="ib2" onclick="setView(&#39;messages&#39;)" title="Nachrichten">&#9993;&#65039;</button>
     <div class="notif-dot" id="msgDot" style="display:none"></div>
@@ -284,10 +285,10 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
       </div>
       <div class="ndiv"></div>
       <div class="ni top" id="ni-messages" onclick="setView(&#39;messages&#39;)">&#9993;&#65039; Nachrichten <span class="nbdg" id="navMsgBdg" style="display:none">0</span></div>
-      <div class="ni top" id="ni-admin" style="display:none" onclick="openAdminModal()">&#9881;&#65039; Administration</div>
+      <div class="ni top" id="ni-messages_sent" onclick="setView(&#39;messages_sent&#39;)">&#128228; Gesendet</div>
     </div>
     <div class="sbf" id="sbf"></div>
-    <div class="sbver">LSt Portal <span id="versionBadge"></span></div>
+    <div class="sbver" style="cursor:pointer" onclick="openModal('changelogOv')" title="Changelog anzeigen">LSt Portal <span id="versionBadge"></span> <span style="font-size:9px;color:var(--acc)">&#9432;</span></div>
   </aside>
   <main id="main"></main>
 </div>
@@ -433,17 +434,7 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
   </div>
 </div>
 
-<!-- ABRECHNUNG EINSPRINGER -->
-<div class="ov" id="einspOv">
-  <div class="modal sm">
-    <div class="mh"><h2>&#128203; Einspringerdienst eintragen</h2><button class="mc" onclick="closeModal(&#39;einspOv&#39;)">&#10005;</button></div>
-    <div class="mb2">
-      <div class="fg"><label>Datum *</label><input type="date" id="einspDate"></div>
-      <div class="fg"><label>Notiz</label><input type="text" id="einspNote" placeholder="z.B. Station 3, Nachtdienst"></div>
-    </div>
-    <div class="mf"><button class="btn-s" onclick="closeModal(&#39;einspOv&#39;)">Abbrechen</button><button class="btn-p" onclick="saveEinspringer()">&#128190; Speichern</button></div>
-  </div>
-</div>
+<!-- einspOv removed - inline in Abrechnung -->
 
 <!-- MESSAGE FORM -->
 <div class="ov" id="msgFormOv">
@@ -481,7 +472,7 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
 <div class="ov" id="tfOv"><div class="modal sm"><div class="mh"><h2 id="tfT">Tag</h2><button class="mc" onclick="backToAdmin(&#39;tags&#39;)">&#10005;</button></div><div class="mb2"><input type="hidden" id="tfId"><div class="fg"><label>Bezeichnung *</label><input type="text" id="tfLb"></div><div class="fg"><label>Farbe</label><div class="cr" id="tfCR"></div></div><div id="tfErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div></div><div class="mf"><button class="btn-s" onclick="backToAdmin(&#39;tags&#39;)">Abbrechen</button><button class="btn-p" onclick="saveTag()">&#128190; Speichern</button></div></div></div>
 
 <script>
-const APP_VERSION='1.4.0';
+const APP_VERSION='1.5.0';
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
@@ -629,7 +620,7 @@ function loginOK(){
   document.getElementById('pillNm').textContent=u?.name||'?';
   const pa=document.getElementById('pillAv');pa.textContent=u?.initials||'?';
   pa.style.background=(u?.color||'#888')+'22';pa.style.color=u?.color||'#888';
-  document.getElementById('ni-admin').style.display=S.p.manageUsers?'flex':'none';
+  const adminBtn=document.getElementById('adminBtn');if(adminBtn)adminBtn.style.display=S.p.manageUsers?'flex':'none';
   setView('home');
   toast(`\uD83D\uDC4B Willkommen, ${u?.name||''}!`);
 }
@@ -653,7 +644,7 @@ function toggleSidebar(){const sb=document.getElementById('sidebar'),ov=document
 function toggleNS(id){document.getElementById(id+'Hdr').classList.toggle('open');document.getElementById(id+'Sub').classList.toggle('open');}
 function setView(v){
   S.view=v;
-  ['home','schedule','allw','abrechnung','tickets','tickets_closed','checklists','messages'].forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
+  ['home','schedule','allw','abrechnung','tickets','tickets_closed','checklists','messages','messages_sent'].forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
   document.getElementById('sidebar').classList.remove('open');document.getElementById('sbOv').classList.remove('open');
   renderSBF();renderMain();
 }
@@ -711,7 +702,7 @@ function renderMain(){
   else if(S.view==='abrechnung')renderAbrechnung();
   else if(S.view==='tickets'||S.view==='tickets_closed')renderTickets();
   else if(S.view==='checklists')renderChecklists();
-  else if(S.view==='messages')renderMessages();
+  else if(S.view==='messages'||S.view==='messages_sent')renderMessages();
 }
 
 // ── HOME ──────────────────────────────────────────────────────────────────────
@@ -719,7 +710,8 @@ function renderHome(){
   const u=getU(S.currentUser);
   const online=S.users.filter(x=>x.isOnline&&x.id!==S.currentUser);
   const unreadMsg=S.messages.filter(m=>!m.isRead);
-  const unreadNotif=S.notifications.filter(n=>!n.isRead);
+  const unreadNotif=S.notifications.filter(n=>!n.isRead&&n.type!=='event_added'&&n.type!=='event_changed');
+  const eventNotifs=S.notifications.filter(n=>!n.isRead&&(n.type==='event_added'||n.type==='event_changed'));
   const myDepts=S.tp.myDepts;
   const relevantTks=S.tickets.filter(tk=>
     tk.status!=='closed'&&(
@@ -735,6 +727,16 @@ function renderHome(){
         <div><div style="font-weight:600;font-size:13px">${m.title}</div><div style="font-size:11px;color:var(--mu)">von ${getU(m.senderId)?.name||'?'} &middot; ${fdt(m.createdAt)}</div></div>
         <button class="btn-p" onclick="readMsg('${m.id}')">&#10003; Best&#228;tigen</button>
       </div>`).join('')}
+    </div>`:''}
+    ${eventNotifs.length?`<div style="background:color-mix(in srgb,var(--warn) 5%,var(--sf));border:1px solid color-mix(in srgb,var(--warn) 25%,transparent);border-radius:var(--r);padding:14px;margin-bottom:14px">
+      <div style="font-size:13px;font-weight:700;color:var(--warn);margin-bottom:10px">&#128197; ${eventNotifs.length} neue/ge&#228;nderte Eintr&#228;ge f&#252;r dich</div>
+      ${eventNotifs.map(n=>{const ev=S.events.find(e=>e.id===n.eventId);return`<div style="padding:8px 12px;background:var(--sf);border-radius:6px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div>
+          <div style="font-weight:600;font-size:13px">${n.title}</div>
+          ${ev?`<div style="font-size:11px;color:var(--mu)">${fd(ev.dateFrom)}${ev.dateTo&&ev.dateTo!==ev.dateFrom?' – '+fd(ev.dateTo):''} &middot; ${ev.reason||'Eintrag'}</div>`:''}
+        </div>
+        <button class="btn-ok" onclick="confirmEventNotif('${n.id}')">&#10003; Zur Kenntnis genommen</button>
+      </div>`;}).join('')}
     </div>`:''}
     ${unreadNotif.length?`<div style="background:color-mix(in srgb,var(--acc) 4%,var(--sf));border:1px solid color-mix(in srgb,var(--acc) 18%,transparent);border-radius:var(--r);padding:14px;margin-bottom:14px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -771,6 +773,10 @@ function renderHome(){
       </div>
     </div>`;
 }
+async function confirmEventNotif(notifId){
+  try{await api('POST','/notifications/'+notifId+'/read');await fetchData();renderHome();}
+  catch(e){toast('⚠️ '+e.message,'err');}
+}
 async function openNotif(notifId,ticketId){
   try{await api('POST','/notifications/'+notifId+'/read');}catch(e){}
   await fetchData();
@@ -785,7 +791,7 @@ async function readAllNotifs(){
 // ── SCHEDULE ──────────────────────────────────────────────────────────────────
 function getVisEvts(){
   let evs=[...S.events];
-  if(!S.seeAllEntries)evs=evs.filter(ev=>ev.isGeneral||ev.userId===S.currentUser);
+  // Server already sends all events; just apply frontend filters
   if(S.filterUser)evs=evs.filter(ev=>!ev.isGeneral&&ev.userId===S.filterUser);
   if(S.month!==null)evs=evs.filter(ev=>{const d=new Date(ev.dateFrom);return d.getFullYear()===S.year&&d.getMonth()===S.month;});
   else evs=evs.filter(ev=>new Date(ev.dateFrom).getFullYear()===S.year);
@@ -814,22 +820,29 @@ function renderSchedule(){
 }
 function buildEvRows(evs){
   return evs.map(ev=>{
-    const bl=ev._blurred||false;
+    const anon=ev._anonymized||false;
     const cat=getCat(ev.category)||{label:'?',color:'#888',emoji:'&#128204;'};
-    const emp=ev.isGeneral?null:(getU(ev.userId)||{name:'?',color:'#888',initials:'?'});
-    const ds=ev.dateTo&&ev.dateTo!==ev.dateFrom?`${fd(ev.dateFrom)} &#8211; ${fd(ev.dateTo)}`:fd(ev.dateFrom);
-    const ts=ev.timeFrom?(ev.timeTo?`${ev.timeFrom}&#8211;${ev.timeTo}`:ev.timeFrom):'&#8212;';
-    const canDel=(ev.isGeneral&&S.seeAllEntries)||ev.createdBy===S.currentUser;
+    const emp=ev.isGeneral?null:anon?null:(getU(ev.userId)||{name:'?',color:'#888',initials:'?'});
+    const ds=ev.dateTo&&ev.dateTo!==ev.dateFrom?`${fd(ev.dateFrom)} \u2013 ${fd(ev.dateTo)}`:fd(ev.dateFrom);
+    const ts=ev.timeFrom?(ev.timeTo?`${ev.timeFrom}\u2013${ev.timeTo}`:ev.timeFrom):'\u2014';
+    const canDel=(ev.isGeneral&&S.p.addGeneral)||ev._canEdit;
     const canEdit=ev._canEdit;
-    const empCell=ev.isGeneral?`<span class="bdg" style="background:color-mix(in srgb,var(--ok) 12%,transparent);color:var(--ok)">&#127760; Allgemein</span>`
+    const empCell=ev.isGeneral
+      ?`<span class="bdg" style="background:color-mix(in srgb,var(--ok) 12%,transparent);color:var(--ok)">&#127760; Allgemein</span>`
+      :anon
+      ?`<span class="bdg" style="background:var(--sf2);color:var(--di)">&#128274; Anonym</span>`
       :`<div style="display:flex;align-items:center;gap:5px">${avHtml(emp.initials,emp.color,20,9)}<span>${emp.name}</span></div>`;
-    const catCell=bl?`<span class="bdg blur-cell">&#128274;</span>`:`<span class="bdg" style="background:${cat.color}1a;color:${cat.color}">${cat.emoji} ${cat.label}</span>`;
-    const apActions=(!ev.isGeneral&&S.p.canApproveEvents&&ev.approvalStatus!=='approved'&&ev.approvalStatus!=='rejected')?
+    const catCell=anon
+      ?`<span style="color:var(--di)">&#8212;</span>`
+      :`<span class="bdg" style="background:${cat.color}1a;color:${cat.color}">${cat.emoji} ${cat.label}</span>`;
+    const reasonCell=anon?`<span style="color:var(--di);font-style:italic">Anonymisiert</span>`:(ev.reason||'').slice(0,50);
+    const apActions=(!ev.isGeneral&&S.p.canApproveEvents&&ev.approvalStatus!=='approved'&&ev.approvalStatus!=='rejected'&&!anon)?
       `<button class="btn-ok" onclick="approveEvt('${ev.id}','approved')" title="Genehmigen">&#10003;</button><button class="btn-d" onclick="approveEvt('${ev.id}','rejected')" title="Ablehnen">&#10007;</button>`:'';
-    return`<tr${ev.isGeneral?' style="background:color-mix(in srgb,var(--ok) 3%,var(--sf))"':''}>
+    return`<tr${ev.isGeneral?' style="background:color-mix(in srgb,var(--ok) 3%,var(--sf))"':anon?' style="opacity:.7"':''}>
       <td style="white-space:nowrap;font-size:12px;color:var(--mu)">${ds}</td>
-      <td style="font-size:11px;color:var(--mu)">${ts}</td><td>${empCell}</td><td>${catCell}</td>
-      <td style="max-width:170px;font-size:12px">${bl?'<span class="blur-cell">&#8226;&#8226;&#8226;</span>':ev.reason.slice(0,50)}</td>
+      <td style="font-size:11px;color:var(--mu)">${ts}</td>
+      <td>${empCell}</td><td>${catCell}</td>
+      <td style="max-width:170px;font-size:12px">${reasonCell}</td>
       <td>${ev.isGeneral?'':apBdg(ev.approvalStatus||'pending')}</td>
       <td><div style="display:flex;gap:4px">${apActions}${canEdit?`<button class="btn-e" onclick="openEditEvt('${ev.id}')">&#9998;</button>`:''}${canDel?`<button class="btn-d" onclick="deleteEvt('${ev.id}')">&#10005;</button>`:''}</div></td>
     </tr>`;
@@ -933,75 +946,97 @@ function renderAbrechnung(){
   const yr=S.abrYear, mo=S.abrMonth;
   const filterUid=S.p.seeAllAbrechnung?(S.abrUser||null):S.currentUser;
   const showUsers=S.p.seeAllAbrechnung
-    ?(S.abrUser?[getU(S.abrUser)].filter(Boolean):S.users.filter(u=>!(u.roles||[]).includes('admin')))
+    ?(S.abrUser?[getU(S.abrUser)].filter(Boolean):S.users.filter(u=>!(u.roles||[]).includes('admin')).sort((a,b)=>a.name.localeCompare(b.name,'de')))
     :[getU(S.currentUser)].filter(Boolean);
 
-  const einsp=S.abrechnung.einspringer.filter(e=>{
+  const filterEinsp=e=>{
     if(filterUid&&e.userId!==filterUid)return false;
     const d=new Date(e.date); const ey=d.getFullYear(),em=d.getMonth()+1;
-    if(d.getFullYear()!==yr)return false;
+    if(ey!==yr)return false;
     if(mo&&em!==mo)return false;
     return true;
-  });
-  const ho=S.abrechnung.homeoffice.filter(h=>{
-    if(filterUid&&h.userId!==filterUid)return false;
-    if(h.year!==yr)return false;
-    if(mo&&h.month!==mo)return false;
+  };
+  const filterHO=h2=>{
+    if(filterUid&&h2.userId!==filterUid)return false;
+    if(h2.year!==yr)return false;
+    if(mo&&h2.month!==mo)return false;
     return true;
-  });
+  };
 
   const moLabel=mo?MONTHS[mo-1]:'Ganzes Jahr';
+  const months=mo?[mo]:Array.from({length:12},(_,i)=>i+1);
+
   document.getElementById('main').innerHTML=`
-    <div class="ph"><div class="pt">Abrechnung <span>${moLabel} ${yr}</span></div>
-      <button class="btn-p" onclick="openEinspModal()">&#65291; Einspringer eintragen</button>
-    </div>
+    <div class="ph"><div class="pt">Abrechnung <span>${moLabel} ${yr}</span></div></div>
     <div class="abr-grid">
-      <div class="tw">
-        <div class="tt"><h2>&#128203; Einspringerdienste (${einsp.length})</h2></div>
-        ${einsp.length?`<table><thead><tr><th>Datum</th><th>Mitarbeiter</th><th>Notiz</th><th></th></tr></thead><tbody>
-          ${einsp.map(e=>{const u=getU(e.userId);return`<tr>
-            <td style="font-size:12px;white-space:nowrap">${fd(e.date)}</td>
-            <td><div style="display:flex;align-items:center;gap:5px">${avHtml(u?.initials||'?',u?.color||'#888',20,8)}<span style="font-size:12px">${u?.name||'?'}</span></div></td>
-            <td style="font-size:12px;color:var(--mu)">${e.note||''}</td>
-            <td>${e.userId===S.currentUser||S.p.manageUsers?`<button class="btn-d" onclick="deleteEinspringer('${e.id}')">&#10005;</button>`:''}</td>
-          </tr>`;}).join('')}
-        </tbody></table>`:`<div class="empty">Keine Einspringerdienste</div>`}
+      <div>
+        <div class="tw" style="margin-bottom:14px">
+          <div class="tt"><h2>&#128203; Einspringerdienste</h2></div>
+          <div style="padding:14px;display:flex;flex-direction:column;gap:12px">
+            ${months.map(m=>{
+              const einspMonth=S.abrechnung.einspringer.filter(e=>filterUid?e.userId===filterUid:e.userId===S.currentUser).filter(e=>{const d=new Date(e.date);return d.getFullYear()===yr&&d.getMonth()+1===m;});
+              const def=new Date(yr,m-1,15).toISOString().slice(0,10);
+              return`<div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                  <span style="font-size:12px;font-weight:700;color:var(--mu)">${MONTHS[m-1]} ${yr}</span>
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="font-size:11px;color:var(--di)">${einspMonth.length} Dienst${einspMonth.length!==1?'e':''}</span>
+                    <button class="btn-p" style="padding:4px 10px;font-size:12px" onclick="addInlineEinsp(${m},${yr},'${def}')">&#65291;</button>
+                  </div>
+                </div>
+                <div id="einsp-${m}-${yr}" style="display:flex;flex-direction:column;gap:5px">
+                  ${einspMonth.map(e=>`<div class="item-row" id="einsprow-${e.id}">
+                    <input type="date" value="${e.date}" onchange="updateEinsp('${e.id}','date',this.value)" style="width:130px;font-size:12px;flex:0 0 auto">
+                    <input type="text" value="${(e.note||'').replace(/"/g,'&quot;')}" placeholder="Notiz" onchange="updateEinsp('${e.id}','note',this.value)" style="flex:1;font-size:12px">
+                    <button class="btn-d" onclick="deleteEinspringer('${e.id}')" style="padding:5px 7px">&#10005;</button>
+                  </div>`).join('')}
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
       </div>
       <div>
         <div class="tw" style="margin-bottom:14px">
           <div class="tt"><h2>&#127968; Home Office</h2></div>
           <div style="padding:14px">
-            <p style="font-size:12px;color:var(--mu);margin-bottom:12px">Tage pro Monat eintragen:</p>
+            <p style="font-size:12px;color:var(--mu);margin-bottom:12px">Tage pro Monat (eigene Eintr&#228;ge):</p>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-              ${(mo?[mo]:Array.from({length:12},(_,i)=>i+1)).map(m=>{
-                const existing=S.abrechnung.homeoffice.find(h=>h.userId===S.currentUser&&h.year===yr&&h.month===m);
-                return`<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:var(--sf2);border:1px solid var(--border);border-radius:6px">
+              ${months.map(m=>{
+                const existing=S.abrechnung.homeoffice.find(h2=>h2.userId===S.currentUser&&h2.year===yr&&h2.month===m);
+                return`<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--sf2);border:1px solid var(--border);border-radius:6px">
                   <span style="font-size:11px;color:var(--mu);flex:1">${MONTHS[m-1].slice(0,3)}</span>
                   <input type="number" min="0" max="31" value="${existing?.days||0}" style="width:50px;font-size:12px;padding:3px 5px;text-align:center" onchange="saveHO(${yr},${m},this.value)">
+                  <span style="font-size:10px;color:var(--di)">Tage</span>
                 </div>`;}).join('')}
             </div>
           </div>
         </div>
         ${S.p.seeAllAbrechnung?`<div class="tw">
-          <div class="tt"><h2>&#127968; HO &#220;bersicht</h2></div>
-          ${ho.length?`<table><thead><tr><th>Mitarbeiter</th><th>Monat</th><th>Tage</th></tr></thead><tbody>
-            ${ho.map(h=>{const u=getU(h.userId);return`<tr><td><div style="display:flex;align-items:center;gap:5px">${avHtml(u?.initials||'?',u?.color||'#888',20,8)}<span style="font-size:12px">${u?.name||'?'}</span></div></td><td style="font-size:12px">${MONTHS[h.month-1].slice(0,3)} ${h.year}</td><td style="text-align:center;font-weight:600">${h.days}</td></tr>`;}).join('')}
+          <div class="tt"><h2>&#127968; HO &#220;bersicht alle MA</h2></div>
+          ${S.abrechnung.homeoffice.filter(filterHO).length?`<table><thead><tr><th>Mitarbeiter</th><th>Monat</th><th style="text-align:center">Tage</th></tr></thead><tbody>
+            ${S.abrechnung.homeoffice.filter(filterHO).sort((a,b)=>{const na=getU(a.userId)?.name||'',nb=getU(b.userId)?.name||'';return na.localeCompare(nb,'de');}).map(h2=>{const u=getU(h2.userId);return`<tr><td><div style="display:flex;align-items:center;gap:5px">${avHtml(u?.initials||'?',u?.color||'#888',20,8)}<span style="font-size:12px">${u?.name||'?'}</span></div></td><td style="font-size:12px">${MONTHS[h2.month-1].slice(0,3)} ${h2.year}</td><td style="text-align:center;font-weight:600">${h2.days}</td></tr>`;}).join('')}
           </tbody></table>`:`<div class="empty">Keine HO-Eintr&#228;ge</div>`}
         </div>`:''}
       </div>
     </div>`;
 }
-function openEinspModal(){
-  document.getElementById('einspDate').value=new Date().toISOString().slice(0,10);
-  document.getElementById('einspNote').value='';
-  openModal('einspOv');
+async function addInlineEinsp(month,year,defDate){
+  try{
+    const r=await api('POST','/abrechnung/einspringer',{date:defDate,note:''});
+    await fetchData();
+    renderMain();
+  }catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
 }
-async function saveEinspringer(){
-  const date=document.getElementById('einspDate').value,note=document.getElementById('einspNote').value.trim();
-  if(!date){toast('\u26A0\uFE0F Datum erforderlich!');return;}
-  try{await api('POST','/abrechnung/einspringer',{date,note});await fetchData();closeModal('einspOv');renderMain();toast('\u2705 Gespeichert!');}
-  catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
+async function updateEinsp(id,field,value){
+  try{
+    await api('PUT','/abrechnung/einspringer/'+id,{[field]:value});
+    // update local state without full re-render to avoid losing focus
+    const entry=S.abrechnung.einspringer.find(e=>e.id===id);
+    if(entry){if(field==='date')entry.date=value;else entry.note=value;}
+  }catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
 }
+// openEinspModal replaced by inline addInlineEinsp
 async function deleteEinspringer(id){
   if(!confirm('Eintrag l&#246;schen?'))return;
   try{await api('DELETE','/abrechnung/einspringer/'+id);await fetchData();renderMain();}
@@ -1300,35 +1335,37 @@ async function saveClItemNote(tkId,clId,iId,note){
 
 // ── MESSAGES ──────────────────────────────────────────────────────────────────
 function renderMessages(){
-  const msgs=S.messages.sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
-  const unread=msgs.filter(m=>!m.isRead);
+  const isSent=S.view==='messages_sent';
+  const msgs=isSent
+    ? S.messages.filter(m=>m.senderId===S.currentUser).sort((a,b)=>b.createdAt.localeCompare(a.createdAt))
+    : S.messages.filter(m=>m.senderId!==S.currentUser||m.targetType==='all').sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+  const unread=msgs.filter(m=>!m.isRead&&!isSent);
   document.getElementById('main').innerHTML=`
-    <div class="ph"><div class="pt">Nachrichten <span>(${msgs.length})</span></div>
+    <div class="ph"><div class="pt">Nachrichten</div>
       ${S.p.canSendMessages?`<button class="btn-p" onclick="openMsgForm()">&#9993;&#65039; Verfassen</button>`:''}
     </div>
-    ${unread.length?`<div class="ib3" style="margin-bottom:12px;border-color:color-mix(in srgb,var(--danger) 25%,transparent);background:color-mix(in srgb,var(--danger) 4%,var(--sf));color:var(--danger)">&#128276; ${unread.length} unbest&#228;tigte Nachricht${unread.length>1?'en':''}</div>`:''}
-    ${msgs.length?msgs.map(m=>{const from=getU(m.senderId);return`<div class="msg-card${!m.isRead?' unread':''}">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap">
-        <div>
-          <div class="msg-title">${!m.isRead?'&#128276; ':''}${m.title}</div>
-          <div class="msg-meta">von ${from?.name||'?'} &middot; ${fdt(m.createdAt)} ${m.targetType==='user'?`&rarr; ${getU(m.targetValue)?.name||'?'}`:''}</div>
+    <div class="atabs" style="margin-bottom:14px;border-bottom:1px solid var(--border)">
+      <button class="tb ${!isSent?'on':''}" onclick="setView('messages')">&#128235; Eingang</button>
+      <button class="tb ${isSent?'on':''}" onclick="setView('messages_sent')">&#128228; Gesendet</button>
+    </div>
+    ${!isSent&&unread.length?`<div class="ib3" style="margin-bottom:12px;border-color:color-mix(in srgb,var(--danger) 25%,transparent);background:color-mix(in srgb,var(--danger) 4%,var(--sf));color:var(--danger)">&#128276; ${unread.length} unbest&#228;tigte Nachricht${unread.length>1?'en':''}</div>`:''}
+    ${msgs.length?msgs.map(m=>{
+      const from=getU(m.senderId);
+      const to=m.targetType==='user'?getU(m.targetValue):null;
+      return`<div class="msg-card${!isSent&&!m.isRead?' unread':''}">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <div>
+            <div class="msg-title">${!isSent&&!m.isRead?'&#128276; ':''}${m.title}</div>
+            <div class="msg-meta">${isSent?`An: ${to?to.name:'Alle Mitarbeiter'} &middot;`:'von '+from?.name+' &middot;'} ${fdt(m.createdAt)}</div>
+          </div>
+          <div style="display:flex;gap:5px;flex-shrink:0">
+            ${!isSent&&!m.isRead?`<button class="btn-p" onclick="readMsg('${m.id}')">&#10003; Best&#228;tigen</button>`:''}
+            ${isSent||m.isRead?`<span class="bdg ap-bdg-${m.isRead?'approved':'pending'}">${m.isRead?'&#10003; Best&#228;tigt':'&#8987; Ausstehend'}</span>`:''}
+            ${m.senderId===S.currentUser||S.p.manageUsers?`<button class="btn-d" onclick="deleteMsg('${m.id}')">&#10005;</button>`:''}
+          </div>
         </div>
-        <div style="display:flex;gap:5px;flex-shrink:0">
-          ${!m.isRead?`<button class="btn-p" onclick="readMsg('${m.id}')">&#10003; Best&#228;tigen</button>`:`<span class="bdg ap-bdg-approved">&#10003; Best&#228;tigt</span>`}
-          ${m.senderId===S.currentUser||S.p.manageUsers?`<button class="btn-d" onclick="deleteMsg('${m.id}')">&#10005;</button>`:''}
-        </div>
-      </div>
-      <div class="msg-body" style="margin-top:8px">${m.body}</div>
-    </div>`;}).join(''):`<div class="empty">&#128235; Keine Nachrichten</div>`}`;
-}
-async function readMsg(id){
-  try{await api('POST','/messages/'+id+'/read');await fetchData();renderMain();toast('\u2705 Best\u00e4tigt!');}
-  catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
-}
-async function deleteMsg(id){
-  if(!confirm('Nachricht l\u00f6schen?'))return;
-  try{await api('DELETE','/messages/'+id);await fetchData();renderMain();}
-  catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
+        <div class="msg-body" style="margin-top:8px">${m.body}</div>
+      </div>`;}).join(''):`<div class="empty">&#128235; Keine Nachrichten</div>`}`;
 }
 function openMsgForm(){
   document.getElementById('msgTo').innerHTML='<option value="">Alle Mitarbeiter</option>'+S.users.map(u=>`<option value="${u.id}">${u.name}</option>`).join('');
@@ -1395,7 +1432,7 @@ function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 function eyeToggle(inputId,btn){const inp=document.getElementById(inputId);const show=inp.type==='password';inp.type=show?'text':'password';btn.textContent=show?'\uD83D\uDE48':'\uD83D\uDC41';}
 function toast(msg,type=''){const t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3200);}
-const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOv','clFormOv','attachClOv','einspOv','msgFormOv'];
+const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOv','clFormOv','attachClOv','changelogOv','msgFormOv'];
 document.addEventListener('keydown',e=>{if(e.key==='Escape')ALL_MODALS.forEach(closeModal);});
 ALL_MODALS.forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('click',e=>{if(e.target===el)closeModal(id);});});
 document.addEventListener('click',e=>{if(!e.target.closest('.note-input-wrap'))document.getElementById('mentionSug')?.classList.remove('open');});
@@ -1415,5 +1452,68 @@ document.addEventListener('click',e=>{if(!e.target.closest('.note-input-wrap'))d
   }catch(e){loading(false);}
 })();
 </script>
+
+<!-- CHANGELOG -->
+<div class="ov" id="changelogOv">
+  <div class="modal lg">
+    <div class="mh"><h2>&#128203; Changelog &amp; Versionen</h2><button class="mc" onclick="closeModal(&#39;changelogOv&#39;)">&#10005;</button></div>
+    <div class="mb2" style="gap:0">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div style="padding:12px;background:color-mix(in srgb,var(--acc) 6%,var(--sf));border:1px solid color-mix(in srgb,var(--acc) 20%,transparent);border-radius:8px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v1.5.0</span>
+            <span style="font-size:11px;color:var(--mu)">Aktuell</span>
+          </div>
+          <ul style="font-size:12px;line-height:1.7;padding-left:18px">
+            <li>Abrechnung: Einspringerdienste als inline-Liste (&#43; Button &#8594; Datum &#43; Notiz-Felder)</li>
+            <li>Abrechnung: Home Office Monatsauswahl &#252;ber Sidebar-Filter</li>
+            <li>Abrechnung: Fachbereich-&#220;bersicht nach Namen sortiert</li>
+            <li>Nachrichten: Tab &#8222;Gesendet&#8220; &#8211; eigene versendete Nachrichten sichtbar</li>
+            <li>Navigation: Nachrichten aus Sidebar entfernt (Glocken-Button oben rechts)</li>
+            <li>Administration als Zahnrad-Button oben rechts</li>
+            <li>Ereignisse: Alle Eintr&#228;ge f&#252;r alle sichtbar, fremde anonymisiert</li>
+            <li>Ereignisse: Nur eigene (selbst erstellt) sind bearbeitbar</li>
+            <li>Ereignisse: Neue/ge&#228;nderte Eintr&#228;ge f&#252;r mich &#8594; Best&#228;tigung in &#220;bersicht</li>
+            <li>Changelog-Seite (diese Ansicht)</li>
+          </ul>
+        </div>
+        <div style="padding:12px;background:var(--sf2);border:1px solid var(--border);border-radius:8px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--sf3);color:var(--mu);padding:2px 8px;border-radius:4px">v1.4.0</span>
+          </div>
+          <ul style="font-size:12px;line-height:1.7;padding-left:18px">
+            <li>Benachrichtigungen: @Mentions in Ticket-Notizen</li>
+            <li>Benachrichtigungen: Neue Tickets im Fachbereich / Zuweisung</li>
+            <li>Abrechnung: Einspringer-Dienste und Home Office</li>
+            <li>Checklisten: Zwei Item-Typen (Checkbox / Checkbox + Notizfeld)</li>
+            <li>Bug-Fix: Online-Benutzer nicht sichtbar</li>
+          </ul>
+        </div>
+        <div style="padding:12px;background:var(--sf2);border:1px solid var(--border);border-radius:8px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--sf3);color:var(--mu);padding:2px 8px;border-radius:4px">v1.3.x</span>
+          </div>
+          <ul style="font-size:12px;line-height:1.7;padding-left:18px">
+            <li>Checklisten: Vorlagen pro Fachbereich, an Tickets anh&#228;ngbar</li>
+            <li>Nachrichten: Senden an alle / Einzelpersonen, Best&#228;tigung</li>
+            <li>Ticketsystem: Untertickets, Audit-Trail, Statusverlauf</li>
+            <li>Bug-Fixes: Permission-Keys, Login-Dropdown, Admin-Modal</li>
+          </ul>
+        </div>
+        <div style="padding:12px;background:var(--sf2);border:1px solid var(--border);border-radius:8px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--sf3);color:var(--mu);padding:2px 8px;border-radius:4px">v1.0&#8211;1.2</span>
+          </div>
+          <ul style="font-size:12px;line-height:1.7;padding-left:18px">
+            <li>Grundversion: Dienstplan, Zulagendienste, Ticketsystem</li>
+            <li>Rollen &amp; Berechtigungen, Benutzerverwaltung</li>
+            <li>Hell/Dunkel-Theme, Mobile-Responsive</li>
+            <li>Kategorien, Tags, Genehmigungssystem</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 </body>
 </html>
