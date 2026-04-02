@@ -640,6 +640,15 @@ app.put('/api/abrechnung/einspringer/:id/reject', auth, async (req,res) => {
       if (!reason?.trim()) return bad(res,'Begründung erforderlich');
       await pool.query('UPDATE abrechnung_einspringer SET rejected_by=$1,rejected_reason=$2,rejected_at=NOW() WHERE id=$3',
         [req.uid, reason.trim(), req.params.id]);
+      // Notify the affected employee
+      const rejector = await getUser(req.uid);
+      const dateStr = row.edate || '?';
+      await createNotification(
+        row.user_id,
+        'einspringer_rejected',
+        `${rejector?.name||'?'} hat deinen Einspringerdienst vom ${dateStr} abgelehnt: ${reason.trim()}`,
+        null, null, req.uid
+      );
     }
     ok(res);
   } catch(e) { bad(res,e.message,500); }
