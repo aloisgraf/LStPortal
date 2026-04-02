@@ -6,6 +6,7 @@
 <title>LSt Portal</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
+
 :root{
   --bg:#f0f2f6;--sf:#fff;--sf2:#f5f7fa;--sf3:#eef0f5;--border:#e2e6ef;
   --acc:#3b6dd4;--ach:#2d5ab8;--act:#fff;
@@ -22,7 +23,7 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:"Inter",system-ui,sans-serif;font-size:14px;background:var(--bg);color:var(--tx);min-height:100vh}
-.hdr{height:var(--hdr);background:var(--sf);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:10px;position:sticky;top:0;z-index:100;box-shadow:var(--sh)}
+.hdr{height:var(--hdr);background:var(--sf);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:8px;position:sticky;top:0;z-index:100;box-shadow:var(--sh)}
 .logo{display:flex;align-items:center;gap:9px;width:var(--nav);flex-shrink:0}
 .lm{width:32px;height:32px;background:var(--acc);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--act);font-size:15px;font-weight:800}
 .ln{font-size:17px;font-weight:800;letter-spacing:-.4px}.ln em{color:var(--acc);font-style:normal}
@@ -55,8 +56,8 @@ body{font-family:"Inter",system-ui,sans-serif;font-size:14px;background:var(--bg
 .mgrid{display:grid;grid-template-columns:1fr 1fr;gap:4px}
 .mb{padding:5px 4px;background:var(--sf2);border:1px solid var(--border);border-radius:5px;color:var(--mu);font-size:11px;font-weight:500;cursor:pointer;text-align:center;transition:.15s}
 .mb:hover{border-color:var(--acc);color:var(--tx)}.mb.on{background:var(--acc);color:var(--act);border-color:var(--acc);font-weight:700}
-.sbver{padding:8px 12px;border-top:1px solid var(--border);flex-shrink:0;font-size:10px;color:var(--di);font-weight:600;letter-spacing:.5px}
-.sbver span{background:var(--sf2);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-family:monospace}
+.sbver{padding:8px 12px;border-top:1px solid var(--border);flex-shrink:0;font-size:10px;color:var(--di);font-weight:600;letter-spacing:.5px;cursor:pointer}
+.sbver:hover{color:var(--acc)}.sbver span{background:var(--sf2);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-family:monospace}
 main{padding:20px 22px;overflow-y:auto;max-height:calc(100vh - var(--hdr))}
 .ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:10px;flex-wrap:wrap}
 .pt{font-size:20px;font-weight:800;letter-spacing:-.3px}.pt span{color:var(--acc)}
@@ -64,8 +65,8 @@ main{padding:20px 22px;overflow-y:auto;max-height:calc(100vh - var(--hdr))}
 .btn-s{padding:7px 14px;background:var(--sf2);color:var(--tx);border:1px solid var(--border);border-radius:var(--r);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;transition:.15s}.btn-s:hover{border-color:var(--mu)}
 .btn-d{padding:4px 8px;background:color-mix(in srgb,var(--danger) 8%,transparent);color:var(--danger);border:1px solid color-mix(in srgb,var(--danger) 20%,transparent);border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;transition:.15s;font-family:inherit}
 .btn-e{padding:4px 8px;background:color-mix(in srgb,var(--info) 8%,transparent);color:var(--info);border:1px solid color-mix(in srgb,var(--info) 20%,transparent);border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;transition:.15s;font-family:inherit}
-.btn-ok{padding:4px 8px;background:color-mix(in srgb,var(--ok) 8%,transparent);color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 20%,transparent);border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s}
-.btn-warn{padding:4px 8px;background:color-mix(in srgb,var(--warn) 8%,transparent);color:var(--warn);border:1px solid color-mix(in srgb,var(--warn) 20%,transparent);border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s}
+.btn-ok{padding:4px 8px;background:color-mix(in srgb,var(--ok) 8%,transparent);color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 25%,transparent);border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s}
+.btn-warn{padding:4px 8px;background:color-mix(in srgb,var(--warn) 8%,transparent);color:var(--warn);border:1px solid color-mix(in srgb,var(--warn) 25%,transparent);border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s}
 .sr{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
 .sc{background:var(--sf);border:1px solid var(--border);border-radius:var(--r);padding:14px;box-shadow:var(--sh)}
 .sv{font-size:26px;font-weight:800;line-height:1;margin-bottom:3px}.sl{font-size:11px;font-weight:500;color:var(--mu)}
@@ -159,16 +160,13 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
 .notif-card{background:var(--sf);border:1px solid var(--border);border-radius:var(--r);padding:12px 15px;margin-bottom:8px;cursor:pointer;transition:.15s;display:flex;align-items:flex-start;gap:10px}
 .notif-card:hover{border-color:var(--acc);background:var(--sf2)}
 .notif-card.unread{border-left:3px solid var(--acc)}
-.notif-card.mention{border-left-color:var(--info)}
-.notif-card.assigned{border-left-color:var(--ok)}
 .online-list{display:flex;flex-wrap:wrap;gap:7px}
 .online-user{display:flex;align-items:center;gap:6px;padding:5px 9px;background:var(--sf2);border:1px solid var(--border);border-radius:100px;font-size:12px;font-weight:500}
 .msg-card{background:var(--sf);border:1px solid var(--border);border-left:3px solid var(--acc);border-radius:var(--r);padding:14px;margin-bottom:10px}
 .msg-card.unread{border-left-color:var(--danger);background:color-mix(in srgb,var(--danger) 2%,var(--sf))}
 .msg-title{font-size:14px;font-weight:700;margin-bottom:3px}
-.msg-meta{font-size:11px;color:var(--mu);margin-bottom:8px}
+.msg-meta{font-size:11px;color:var(--mu);margin-bottom:4px}
 .msg-body{font-size:13px;line-height:1.55;white-space:pre-wrap}
-.msg-acks{font-size:11px;color:var(--mu);margin-top:8px;padding-top:6px;border-top:1px solid var(--border)}
 .cl-items{display:flex;flex-direction:column;gap:6px;margin-top:8px}
 .cl-item{padding:8px 10px;background:var(--sf2);border:1px solid var(--border);border-radius:6px}
 .cl-item.done{opacity:.7}
@@ -203,12 +201,12 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
 }
 @media(max-width:480px){
   .sr{grid-template-columns:1fr}.fr{grid-template-columns:1fr}.aer{grid-template-columns:1fr 1fr}
-  .modal{max-width:100vw;border-radius:12px 12px 0 0;position:fixed;bottom:0;left:0;right:0;margin:0;animation:slideup .2s ease}
-  @keyframes slideup{from{transform:translateY(100%)}to{transform:translateY(0)}}
 }
+
 </style>
 </head>
 <body>
+
 <div class="loading-ov" id="loadingOv"><div class="spinner"></div></div>
 
 <!-- LOGIN -->
@@ -216,14 +214,11 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
   <div class="lc">
     <div class="ll"><div class="llm">&#128203;</div><div class="lln">LSt <em>Portal</em></div></div>
     <p class="lsub">Anmelden</p>
-    <div class="fg" style="margin-bottom:10px">
-      <label>Benutzer</label>
-      <select id="lsel" style="font-size:14px;padding:9px"><option value="">&#8212; Benutzer w&#228;hlen &#8212;</option></select>
-    </div>
-    <div class="fg" style="margin-bottom:6px">
-      <label>Passwort</label>
-      <div class="pw-w"><input type="password" id="lpw" placeholder="Passwort &#8230;" onkeydown="if(event.key===&#39;Enter&#39;)doLogin()"><button class="eye" onclick="eyeToggle(&#39;lpw&#39;,this)">&#128065;</button></div>
-    </div>
+    <div class="fg" style="margin-bottom:10px"><label>Benutzer</label>
+      <select id="lsel" style="font-size:14px;padding:9px"><option value="">&#8212; Benutzer w&#228;hlen &#8212;</option></select></div>
+    <div class="fg" style="margin-bottom:6px"><label>Passwort</label>
+      <div class="pw-w"><input type="password" id="lpw" placeholder="Passwort &#8230;" onkeydown="if(event.key==='Enter')doLogin()">
+      <button class="eye" onclick="eyeToggle('lpw',this)">&#128065;</button></div></div>
     <div class="lerr" id="lerr">Falsches Passwort.</div>
     <button class="btn-p" style="width:100%;justify-content:center;margin-top:10px" onclick="doLogin()">Anmelden &#8594;</button>
   </div>
@@ -235,8 +230,8 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
     <div class="mh"><h2>&#128272; Passwort setzen</h2></div>
     <div class="mb2">
       <div class="wb">&#9888;&#65039; Erstes Login &#8211; bitte neues Passwort vergeben.</div>
-      <div class="fg"><label>Neues Passwort (min. 6)</label><div class="pw-w"><input type="password" id="np1"><button class="eye" onclick="eyeToggle(&#39;np1&#39;,this)">&#128065;</button></div></div>
-      <div class="fg"><label>Best&#228;tigen</label><div class="pw-w"><input type="password" id="np2"><button class="eye" onclick="eyeToggle(&#39;np2&#39;,this)">&#128065;</button></div></div>
+      <div class="fg"><label>Neues Passwort (min. 6)</label><div class="pw-w"><input type="password" id="np1"><button class="eye" onclick="eyeToggle('np1',this)">&#128065;</button></div></div>
+      <div class="fg"><label>Best&#228;tigen</label><div class="pw-w"><input type="password" id="np2"><button class="eye" onclick="eyeToggle('np2',this)">&#128065;</button></div></div>
     </div>
     <div class="mf"><button class="btn-p" onclick="doForcePW()">&#10003; Speichern &amp; Anmelden</button></div>
   </div>
@@ -250,14 +245,14 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
   <button class="ib2" id="thBtn" onclick="toggleTheme()">&#127769;</button>
   <button class="ib2" id="adminBtn" onclick="openAdminModal()" title="Administration" style="display:none">&#9881;&#65039;</button>
   <div class="ibw">
-    <button class="ib2" onclick="setView(&#39;messages&#39;)" title="Nachrichten">&#9993;&#65039;</button>
+    <button class="ib2" onclick="setView('messages')" title="Nachrichten">&#9993;&#65039;</button>
     <div class="notif-dot" id="msgDot" style="display:none"></div>
   </div>
   <div class="ibw">
-    <button class="ib2" onclick="setView(&#39;home&#39;)" title="Benachrichtigungen">&#128276;</button>
+    <button class="ib2" onclick="setView('home')" title="Benachrichtigungen">&#128276;</button>
     <div class="notif-dot" id="notifDot" style="display:none"></div>
   </div>
-  <div class="upill" onclick="openModal(&#39;pwModal&#39;)">
+  <div class="upill" onclick="openModal('pwModal')">
     <div class="pav" id="pillAv"></div><span id="pillNm">&#8212;</span>
   </div>
   <button class="ib2" onclick="logout()" title="Abmelden">&#9211;</button>
@@ -268,32 +263,31 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
 <div class="app" id="APP" style="display:none">
   <aside class="sb" id="sidebar">
     <div class="nav-area">
-      <div class="ni top active" id="ni-home" onclick="setView(&#39;home&#39;)">&#127968; &#220;bersicht</div>
+      <div class="ni top active" id="ni-home" onclick="setView('home')">&#127968; &#220;bersicht</div>
       <div class="ndiv"></div>
-      <div class="nsh open" id="dpHdr" onclick="toggleNS(&#39;dp&#39;)"><span>&#128203; Dienstplan</span><span class="arr">&#9660;</span></div>
+      <div class="nsh open" id="dpHdr" onclick="toggleNS('dp')"><span>&#128203; Dienstplan</span><span class="arr">&#9660;</span></div>
       <div class="nsub open" id="dpSub">
-        <div class="ni" id="ni-schedule" onclick="setView(&#39;schedule&#39;)">&#128197; Eintrags&#252;bersicht</div>
-        <div class="ni" id="ni-allw" onclick="setView(&#39;allw&#39;)">&#128202; Zulagendienste</div>
-        <div class="ni" id="ni-abrechnung" onclick="setView(&#39;abrechnung&#39;)">&#129534; Abrechnung</div>
-        <div class="ni" id="ni-dienstplaene" onclick="setView(&#39;dienstplaene&#39;)">&#128196; Dienstpl&#228;ne</div>
+        <div class="ni" id="ni-schedule" onclick="setView('schedule')">&#128197; Eintrags&#252;bersicht</div>
+        <div class="ni" id="ni-allw" onclick="setView('allw')">&#128202; Zulagendienste</div>
+        <div class="ni" id="ni-abrechnung" onclick="setView('abrechnung')">&#129534; Abrechnung</div>
+        <div class="ni" id="ni-dienstplaene" onclick="setView('dienstplaene')">&#128196; Dienstpl&#228;ne</div>
       </div>
       <div class="ndiv"></div>
-      <div class="nsh open" id="tkHdr" onclick="toggleNS(&#39;tk&#39;)"><span>&#127931; Ticketsystem</span><span class="arr">&#9660;</span></div>
+      <div class="nsh open" id="tkHdr" onclick="toggleNS('tk')"><span>&#127931; Ticketsystem</span><span class="arr">&#9660;</span></div>
       <div class="nsub open" id="tkSub">
-        <div class="ni" id="ni-tickets" onclick="setView(&#39;tickets&#39;)">&#128203; Offene Tickets</div>
-        <div class="ni" id="ni-tickets_closed" onclick="setView(&#39;tickets_closed&#39;)">&#9989; Abgeschlossene</div>
-        <div class="ni" id="ni-checklists" onclick="setView(&#39;checklists&#39;)">&#9745;&#65039; Checklisten</div>
+        <div class="ni" id="ni-tickets" onclick="setView('tickets')">&#128203; Offene Tickets</div>
+        <div class="ni" id="ni-tickets_closed" onclick="setView('tickets_closed')">&#9989; Abgeschlossene</div>
+        <div class="ni" id="ni-checklists" onclick="setView('checklists')">&#9745;&#65039; Checklisten</div>
       </div>
       <div class="ndiv"></div>
-      <div class="ndiv"></div>
-      <div class="nsh open" id="msgHdr" onclick="toggleNS(&#39;msg&#39;)"><span>&#9993;&#65039; Nachrichten <span class="nbdg" id="navMsgBdg" style="display:none">0</span></span><span class="arr">&#9660;</span></div>
+      <div class="nsh open" id="msgHdr" onclick="toggleNS('msg')"><span>&#9993;&#65039; Nachrichten <span class="nbdg" id="navMsgBdg" style="display:none">0</span></span><span class="arr">&#9660;</span></div>
       <div class="nsub open" id="msgSub">
-        <div class="ni" id="ni-messages" onclick="setView(&#39;messages&#39;)">&#128235; Eingang</div>
-        <div class="ni" id="ni-messages_sent" onclick="setView(&#39;messages_sent&#39;)">&#128228; Gesendet</div>
+        <div class="ni" id="ni-messages" onclick="setView('messages')">&#128235; Eingang</div>
+        <div class="ni" id="ni-messages_sent" onclick="setView('messages_sent')">&#128228; Gesendet</div>
       </div>
     </div>
     <div class="sbf" id="sbf"></div>
-    <div class="sbver" style="cursor:pointer" onclick="openModal('changelogOv')" title="Changelog anzeigen">LSt Portal <span id="versionBadge"></span> <span style="font-size:9px;color:var(--acc)">&#9432;</span></div>
+    <div class="sbver" onclick="openModal('changelogOv')" title="Changelog">LSt Portal <span id="versionBadge"></span> &#9432;</div>
   </aside>
   <main id="main"></main>
 </div>
@@ -301,20 +295,20 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
 <!-- PW MODAL -->
 <div class="ov" id="pwModal">
   <div class="modal sm">
-    <div class="mh"><h2>&#128272; Passwort &#228;ndern</h2><button class="mc" onclick="closeModal(&#39;pwModal&#39;)">&#10005;</button></div>
+    <div class="mh"><h2>&#128272; Passwort &#228;ndern</h2><button class="mc" onclick="closeModal('pwModal')">&#10005;</button></div>
     <div class="mb2">
-      <div class="fg"><label>Aktuelles Passwort</label><div class="pw-w"><input type="password" id="cpw0"><button class="eye" onclick="eyeToggle(&#39;cpw0&#39;,this)">&#128065;</button></div></div>
-      <div class="fg"><label>Neues Passwort</label><div class="pw-w"><input type="password" id="cpw1"><button class="eye" onclick="eyeToggle(&#39;cpw1&#39;,this)">&#128065;</button></div></div>
-      <div class="fg"><label>Best&#228;tigen</label><div class="pw-w"><input type="password" id="cpw2"><button class="eye" onclick="eyeToggle(&#39;cpw2&#39;,this)">&#128065;</button></div></div>
+      <div class="fg"><label>Aktuelles Passwort</label><div class="pw-w"><input type="password" id="cpw0"><button class="eye" onclick="eyeToggle('cpw0',this)">&#128065;</button></div></div>
+      <div class="fg"><label>Neues Passwort</label><div class="pw-w"><input type="password" id="cpw1"><button class="eye" onclick="eyeToggle('cpw1',this)">&#128065;</button></div></div>
+      <div class="fg"><label>Best&#228;tigen</label><div class="pw-w"><input type="password" id="cpw2"><button class="eye" onclick="eyeToggle('cpw2',this)">&#128065;</button></div></div>
     </div>
-    <div class="mf"><button class="btn-s" onclick="closeModal(&#39;pwModal&#39;)">Abbrechen</button><button class="btn-p" onclick="doChangePW()">&#10003; &#196;ndern</button></div>
+    <div class="mf"><button class="btn-s" onclick="closeModal('pwModal')">Abbrechen</button><button class="btn-p" onclick="doChangePW()">&#10003; &#196;ndern</button></div>
   </div>
 </div>
 
 <!-- EVENT MODAL -->
 <div class="ov" id="evtOv">
   <div class="modal">
-    <div class="mh"><h2 id="evtOvT">Neuer Eintrag</h2><button class="mc" onclick="closeModal(&#39;evtOv&#39;)">&#10005;</button></div>
+    <div class="mh"><h2 id="evtOvT">Neuer Eintrag</h2><button class="mc" onclick="closeModal('evtOv')">&#10005;</button></div>
     <div class="mb2">
       <input type="hidden" id="fEvId">
       <div class="fg full" id="genRow" style="display:none"><label style="display:flex;align-items:center;gap:7px;cursor:pointer"><input type="checkbox" id="fGen" onchange="onGenToggle()"> Allgemeiner Eintrag</label></div>
@@ -324,14 +318,14 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
       <div class="fg full"><label>Kategorie</label><select id="fCat"></select></div>
       <div class="fg full"><label>Beschreibung *</label><textarea id="fRsn" rows="3"></textarea></div>
     </div>
-    <div class="mf"><button class="btn-s" onclick="closeModal(&#39;evtOv&#39;)">Abbrechen</button><button class="btn-p" onclick="saveEvent()">&#128190; Speichern</button></div>
+    <div class="mf"><button class="btn-s" onclick="closeModal('evtOv')">Abbrechen</button><button class="btn-p" onclick="saveEvent()">&#128190; Speichern</button></div>
   </div>
 </div>
 
 <!-- ALLOWANCE MODAL -->
 <div class="ov" id="allwOv">
   <div class="modal sm">
-    <div class="mh"><h2 id="allwT">Zulagen</h2><button class="mc" onclick="closeModal(&#39;allwOv&#39;)">&#10005;</button></div>
+    <div class="mh"><h2 id="allwT">Zulagen</h2><button class="mc" onclick="closeModal('allwOv')">&#10005;</button></div>
     <div class="mb2">
       <input type="hidden" id="aUid"><input type="hidden" id="aYr"><input type="hidden" id="aMo">
       <div class="ib3" id="allwInfo"></div>
@@ -342,14 +336,14 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
         <div class="fg"><label>&#128203; C10</label><input type="number" id="aC10" min="0"></div>
       </div>
     </div>
-    <div class="mf"><button class="btn-s" onclick="closeModal(&#39;allwOv&#39;)">Abbrechen</button><button class="btn-p" onclick="saveAllw()">&#128190; Speichern</button></div>
+    <div class="mf"><button class="btn-s" onclick="closeModal('allwOv')">Abbrechen</button><button class="btn-p" onclick="saveAllw()">&#128190; Speichern</button></div>
   </div>
 </div>
 
 <!-- TICKET FORM -->
 <div class="ov" id="tkFormOv">
   <div class="modal wide">
-    <div class="mh"><h2 id="tkFT">Neues Ticket</h2><button class="mc" onclick="closeModal(&#39;tkFormOv&#39;)">&#10005;</button></div>
+    <div class="mh"><h2 id="tkFT">Neues Ticket</h2><button class="mc" onclick="closeModal('tkFormOv')">&#10005;</button></div>
     <div class="mb2">
       <input type="hidden" id="tkFId">
       <div class="fg full"><label>Ticketname *</label><input type="text" id="tkFNm"></div>
@@ -377,7 +371,7 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
       </div>
       <div class="fg full"><label>Elternticket</label><select id="tkFPar"><option value="">&#8212; kein &#8212;</option></select></div>
     </div>
-    <div class="mf"><button class="btn-s" onclick="closeModal(&#39;tkFormOv&#39;)">Abbrechen</button><button class="btn-p" onclick="saveTicket()">&#128190; Speichern</button></div>
+    <div class="mf"><button class="btn-s" onclick="closeModal('tkFormOv')">Abbrechen</button><button class="btn-p" onclick="saveTicket()">&#128190; Speichern</button></div>
   </div>
 </div>
 
@@ -392,7 +386,7 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0;margin-left:8px">
         <button id="tkDetEditBtn" class="btn-e" onclick="editCurrentTicket()">&#10000;</button>
-        <button class="mc" onclick="closeModal(&#39;tkDetOv&#39;)">&#10005;</button>
+        <button class="mc" onclick="closeModal('tkDetOv')">&#10005;</button>
       </div>
     </div>
     <div class="tk-body">
@@ -405,7 +399,7 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
 <!-- CHECKLIST FORM -->
 <div class="ov" id="clFormOv">
   <div class="modal lg">
-    <div class="mh"><h2 id="clFT">Neue Checkliste</h2><button class="mc" onclick="closeModal(&#39;clFormOv&#39;)">&#10005;</button></div>
+    <div class="mh"><h2 id="clFT">Neue Checkliste</h2><button class="mc" onclick="closeModal('clFormOv')">&#10005;</button></div>
     <div class="mb2">
       <input type="hidden" id="clFId">
       <div class="fr">
@@ -416,55 +410,95 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
           <option value="qm">&#9989; QM</option>
         </select></div>
       </div>
-      <div class="fg full">
-        <label>Punkte</label>
+      <div class="fg full"><label>Punkte</label>
         <div class="item-list-edit" id="clFItems"></div>
         <button class="btn-s" style="margin-top:6px;font-size:12px" onclick="addClItem()">&#65291; Punkt hinzuf&#252;gen</button>
       </div>
       <div id="clFErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div>
     </div>
-    <div class="mf"><button class="btn-s" onclick="closeModal(&#39;clFormOv&#39;)">Abbrechen</button><button class="btn-p" onclick="saveChecklist()">&#128190; Speichern</button></div>
+    <div class="mf"><button class="btn-s" onclick="closeModal('clFormOv')">Abbrechen</button><button class="btn-p" onclick="saveChecklist()">&#128190; Speichern</button></div>
   </div>
 </div>
 
 <!-- ATTACH CHECKLIST -->
 <div class="ov" id="attachClOv">
   <div class="modal sm">
-    <div class="mh"><h2>&#9745;&#65039; Checkliste anh&#228;ngen</h2><button class="mc" onclick="closeModal(&#39;attachClOv&#39;)">&#10005;</button></div>
+    <div class="mh"><h2>&#9745;&#65039; Checkliste anh&#228;ngen</h2><button class="mc" onclick="closeModal('attachClOv')">&#10005;</button></div>
     <div class="mb2">
       <input type="hidden" id="attachTkId">
       <div class="fg"><label>Vorlage w&#228;hlen</label><select id="attachClSel"><option value="">&#8212; w&#228;hlen &#8212;</option></select></div>
     </div>
-    <div class="mf"><button class="btn-s" onclick="closeModal(&#39;attachClOv&#39;)">Abbrechen</button><button class="btn-p" onclick="doAttachCl()">&#10003; Anh&#228;ngen</button></div>
+    <div class="mf"><button class="btn-s" onclick="closeModal('attachClOv')">Abbrechen</button><button class="btn-p" onclick="doAttachCl()">&#10003; Anh&#228;ngen</button></div>
   </div>
 </div>
 
-<!-- einspOv removed - inline in Abrechnung -->
+<!-- EINSPRINGER ABLEHNEN -->
+<div class="ov" id="rejectEinspOv">
+  <div class="modal sm">
+    <div class="mh"><h2>&#10007; Einspringerdienst ablehnen</h2><button class="mc" onclick="closeModal('rejectEinspOv')">&#10005;</button></div>
+    <div class="mb2">
+      <input type="hidden" id="rejEinspId">
+      <div class="fg full"><label>Begr&#252;ndung *</label><textarea id="rejReason" rows="3" placeholder="Bitte Grund angeben &#8230;"></textarea></div>
+      <div id="rejErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div>
+    </div>
+    <div class="mf"><button class="btn-s" onclick="closeModal('rejectEinspOv')">Abbrechen</button><button class="btn-d" onclick="submitRejectEinsp()">&#10007; Ablehnen</button></div>
+  </div>
+</div>
+
+<!-- DIENSTPLAN UPLOAD -->
+<div class="ov" id="dpOv">
+  <div class="modal sm">
+    <div class="mh"><h2>&#128228; Dienstplan hochladen</h2><button class="mc" onclick="closeModal('dpOv')">&#10005;</button></div>
+    <div class="mb2">
+      <div class="fr">
+        <div class="fg"><label>Monat *</label><select id="dpMonth">
+          <option value="1">J&#228;nner</option><option value="2">Februar</option><option value="3">M&#228;rz</option>
+          <option value="4">April</option><option value="5">Mai</option><option value="6">Juni</option>
+          <option value="7">Juli</option><option value="8">August</option><option value="9">September</option>
+          <option value="10">Oktober</option><option value="11">November</option><option value="12">Dezember</option>
+        </select></div>
+        <div class="fg"><label>Jahr *</label><input type="number" id="dpYear" min="2020" max="2099"></div>
+      </div>
+      <div class="fg full"><label>Bezeichnung *</label><input type="text" id="dpLabel" placeholder="z.B. M&#228;rz 2025 Endversion"></div>
+      <div class="fg full">
+        <label>PDF-Datei * (max. 15 MB)</label>
+        <label style="display:flex;align-items:center;gap:9px;padding:9px 12px;background:var(--sf2);border:1px solid var(--border);border-radius:7px;cursor:pointer">
+          <span>&#128196;</span>
+          <span id="dpFileName" style="font-size:12px;color:var(--mu)">Keine Datei ausgew&#228;hlt</span>
+          <input type="file" id="dpFile" accept=".pdf,application/pdf" style="display:none" onchange="document.getElementById('dpFileName').textContent=this.files[0]?.name||'Keine Datei'">
+        </label>
+      </div>
+      <div class="ib3" style="font-size:11px">&#8505;&#65039; Wenn ein Plan f&#252;r diesen Monat bereits existiert, wird er automatisch archiviert.</div>
+      <div id="dpErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div>
+    </div>
+    <div class="mf"><button class="btn-s" onclick="closeModal('dpOv')">Abbrechen</button><button class="btn-p" onclick="uploadDienstplan()">&#128228; Hochladen</button></div>
+  </div>
+</div>
 
 <!-- MESSAGE FORM -->
 <div class="ov" id="msgFormOv">
   <div class="modal lg">
-    <div class="mh"><h2>&#9993;&#65039; Nachricht verfassen</h2><button class="mc" onclick="closeModal(&#39;msgFormOv&#39;)">&#10005;</button></div>
+    <div class="mh"><h2>&#9993;&#65039; Nachricht verfassen</h2><button class="mc" onclick="closeModal('msgFormOv')">&#10005;</button></div>
     <div class="mb2">
       <div class="fg full"><label>Empf&#228;nger</label><select id="msgTo"><option value="">Alle Mitarbeiter</option></select></div>
       <div class="fg full"><label>Betreff *</label><input type="text" id="msgTitle"></div>
       <div class="fg full"><label>Nachricht *</label><textarea id="msgBody" rows="5"></textarea></div>
+      <div id="msgErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div>
     </div>
-    <div class="mb2" style="padding-top:0;gap:4px"><div id="msgErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div></div>
-    <div class="mf"><button class="btn-s" onclick="closeModal(&#39;msgFormOv&#39;)">Abbrechen</button><button class="btn-p" onclick="sendMessage()">&#128228; Senden</button></div>
+    <div class="mf"><button class="btn-s" onclick="closeModal('msgFormOv')">Abbrechen</button><button class="btn-p" onclick="sendMessage()">&#128228; Senden</button></div>
   </div>
 </div>
 
 <!-- ADMIN MODAL -->
 <div class="ov" id="admOv">
   <div class="modal wide">
-    <div class="mh"><h2>&#9881;&#65039; Administration</h2><button class="mc" onclick="closeModal(&#39;admOv&#39;)">&#10005;</button></div>
+    <div class="mh"><h2>&#9881;&#65039; Administration</h2><button class="mc" onclick="closeModal('admOv')">&#10005;</button></div>
     <div class="mb2">
       <div class="atabs">
-        <button class="tb on" id="atb-users" onclick="swTab(&#39;users&#39;)">&#128100; Benutzer</button>
-        <button class="tb" id="atb-cats" onclick="swTab(&#39;cats&#39;)">&#127912; Kategorien</button>
-        <button class="tb" id="atb-tags" onclick="swTab(&#39;tags&#39;)">&#127991;&#65039; Tags</button>
-        <button class="tb" id="atb-rights" onclick="swTab(&#39;rights&#39;)">&#128272; Rechte</button>
+        <button class="tb on" id="atb-users" onclick="swTab('users')">&#128100; Benutzer</button>
+        <button class="tb" id="atb-cats" onclick="swTab('cats')">&#127912; Kategorien</button>
+        <button class="tb" id="atb-tags" onclick="swTab('tags')">&#127991;&#65039; Tags</button>
+        <button class="tb" id="atb-rights" onclick="swTab('rights')">&#128272; Rechte</button>
       </div>
       <div class="tp on" id="atp-users"><div class="al" id="usrList"></div><button class="btn-p" style="width:100%;justify-content:center" onclick="openUF(null)">&#65291; Benutzer</button></div>
       <div class="tp" id="atp-cats"><div class="al" id="catList"></div><button class="btn-p" style="width:100%;justify-content:center" onclick="openCF(null)">&#65291; Kategorie</button></div>
@@ -473,12 +507,59 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
     </div>
   </div>
 </div>
-<div class="ov" id="ufOv"><div class="modal"><div class="mh"><h2 id="ufT">Benutzer</h2><button class="mc" onclick="backToAdmin(&#39;users&#39;)">&#10005;</button></div><div class="mb2"><input type="hidden" id="ufId"><div class="fr"><div class="fg"><label>Name *</label><input type="text" id="ufNm"></div><div class="fg"><label>K&#252;rzel *</label><input type="text" id="ufIn" maxlength="3"></div></div><div class="fg full"><label>Rollen</label><div class="role-chks" id="ufRoles"></div></div><div class="fg" id="ufPWRR" style="display:none"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="ufPWRst"> PW zur&#252;cksetzen auf <b>Passwort1</b></label></div><div class="fg"><label>Farbe</label><div class="cr" id="ufCR"></div></div><div id="ufErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div></div><div class="mf"><button class="btn-s" onclick="backToAdmin(&#39;users&#39;)">Abbrechen</button><button class="btn-p" onclick="saveUser()">&#128190; Speichern</button></div></div></div>
-<div class="ov" id="cfOv"><div class="modal sm"><div class="mh"><h2 id="cfT">Kategorie</h2><button class="mc" onclick="backToAdmin(&#39;cats&#39;)">&#10005;</button></div><div class="mb2"><input type="hidden" id="cfId"><div class="fr"><div class="fg"><label>Bezeichnung *</label><input type="text" id="cfLb"></div><div class="fg"><label>Emoji</label><input type="text" id="cfEm" maxlength="4"></div></div><div class="fg"><label>Farbe</label><div class="cr" id="cfCR"></div></div><div id="cfErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div></div><div class="mf"><button class="btn-s" onclick="backToAdmin(&#39;cats&#39;)">Abbrechen</button><button class="btn-p" onclick="saveCategory()">&#128190; Speichern</button></div></div></div>
-<div class="ov" id="tfOv"><div class="modal sm"><div class="mh"><h2 id="tfT">Tag</h2><button class="mc" onclick="backToAdmin(&#39;tags&#39;)">&#10005;</button></div><div class="mb2"><input type="hidden" id="tfId"><div class="fg"><label>Bezeichnung *</label><input type="text" id="tfLb"></div><div class="fg"><label>Farbe</label><div class="cr" id="tfCR"></div></div><div id="tfErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div></div><div class="mf"><button class="btn-s" onclick="backToAdmin(&#39;tags&#39;)">Abbrechen</button><button class="btn-p" onclick="saveTag()">&#128190; Speichern</button></div></div></div>
+<div class="ov" id="ufOv"><div class="modal"><div class="mh"><h2 id="ufT">Benutzer</h2><button class="mc" onclick="backToAdmin('users')">&#10005;</button></div><div class="mb2"><input type="hidden" id="ufId"><div class="fr"><div class="fg"><label>Name *</label><input type="text" id="ufNm"></div><div class="fg"><label>K&#252;rzel *</label><input type="text" id="ufIn" maxlength="3"></div></div><div class="fg full"><label>Rollen</label><div class="role-chks" id="ufRoles"></div></div><div class="fg" id="ufPWRR" style="display:none"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="ufPWRst"> PW zur&#252;cksetzen auf <b>Passwort1</b></label></div><div class="fg"><label>Farbe</label><div class="cr" id="ufCR"></div></div><div id="ufErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div></div><div class="mf"><button class="btn-s" onclick="backToAdmin('users')">Abbrechen</button><button class="btn-p" onclick="saveUser()">&#128190; Speichern</button></div></div></div>
+<div class="ov" id="cfOv"><div class="modal sm"><div class="mh"><h2 id="cfT">Kategorie</h2><button class="mc" onclick="backToAdmin('cats')">&#10005;</button></div><div class="mb2"><input type="hidden" id="cfId"><div class="fr"><div class="fg"><label>Bezeichnung *</label><input type="text" id="cfLb"></div><div class="fg"><label>Emoji</label><input type="text" id="cfEm" maxlength="4"></div></div><div class="fg"><label>Farbe</label><div class="cr" id="cfCR"></div></div><div id="cfErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div></div><div class="mf"><button class="btn-s" onclick="backToAdmin('cats')">Abbrechen</button><button class="btn-p" onclick="saveCategory()">&#128190; Speichern</button></div></div></div>
+<div class="ov" id="tfOv"><div class="modal sm"><div class="mh"><h2 id="tfT">Tag</h2><button class="mc" onclick="backToAdmin('tags')">&#10005;</button></div><div class="mb2"><input type="hidden" id="tfId"><div class="fg"><label>Bezeichnung *</label><input type="text" id="tfLb"></div><div class="fg"><label>Farbe</label><div class="cr" id="tfCR"></div></div><div id="tfErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div></div><div class="mf"><button class="btn-s" onclick="backToAdmin('tags')">Abbrechen</button><button class="btn-p" onclick="saveTag()">&#128190; Speichern</button></div></div></div>
+
+<!-- CHANGELOG -->
+<div class="ov" id="changelogOv">
+  <div class="modal lg">
+    <div class="mh"><h2>&#128203; Changelog</h2><button class="mc" onclick="closeModal('changelogOv')">&#10005;</button></div>
+    <div class="mb2" style="gap:10px">
+      <div style="padding:12px;background:color-mix(in srgb,var(--acc) 6%,var(--sf));border:1px solid color-mix(in srgb,var(--acc) 20%,transparent);border-radius:8px">
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v1.7.0</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
+        <ul style="font-size:12px;line-height:1.8;padding-left:18px">
+          <li>Bug-Fix: Bestätigen-Button in Übersicht und Nachrichten funktioniert wieder</li>
+          <li>Bug-Fix: Gesendet-Tab zeigt jetzt eigene versendete Nachrichten korrekt</li>
+          <li>Bug-Fix: readMsg / deleteMsg Funktionen wieder vorhanden</li>
+          <li>Abrechnung: Einspringer-Übersicht für Dienstplanung (alle MA, nach Name+Datum sortiert)</li>
+          <li>Abrechnung: Einspringer ablehnen mit Begründung; Begründung beim MA sichtbar</li>
+          <li>Abrechnung: Nur der Ersteller kann eigene Einspringer löschen</li>
+          <li>Auto-Refresh alle 60s: Toast bei neuer Nachricht / neuem Ticket</li>
+        </ul>
+      </div>
+      <div style="padding:12px;background:var(--sf2);border:1px solid var(--border);border-radius:8px">
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--sf3);color:var(--mu);padding:2px 8px;border-radius:4px">v1.6.0</span></div>
+        <ul style="font-size:12px;line-height:1.8;padding-left:18px">
+          <li>Dienstpläne: PDF-Upload pro Monat mit automatischer Versionierung + Archiv</li>
+          <li>Zulagendienste: Alle MA gleichzeitig im Monats-Bulk-Edit bearbeitbar</li>
+          <li>Nachrichten als Untermenü (Eingang / Gesendet)</li>
+          <li>Bug-Fix: PDF-Upload (JSON-Limit auf 20 MB erhöht)</li>
+        </ul>
+      </div>
+      <div style="padding:12px;background:var(--sf2);border:1px solid var(--border);border-radius:8px">
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--sf3);color:var(--mu);padding:2px 8px;border-radius:4px">v1.5.0</span></div>
+        <ul style="font-size:12px;line-height:1.8;padding-left:18px">
+          <li>Abrechnung: Einspringerdienste inline, Home Office Monatsauswahl</li>
+          <li>Ereignisse: Alle sichtbar, fremde anonymisiert, Bestätigung bei eigenen</li>
+          <li>Administration als Zahnrad-Button oben rechts</li>
+          <li>@Mentions in Ticket-Notizen mit Benachrichtigung</li>
+        </ul>
+      </div>
+      <div style="padding:12px;background:var(--sf2);border:1px solid var(--border);border-radius:8px">
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--sf3);color:var(--mu);padding:2px 8px;border-radius:4px">v1.0&#8211;1.4</span></div>
+        <ul style="font-size:12px;line-height:1.8;padding-left:18px">
+          <li>Grundversion: Dienstplan, Zulagendienste, Ticketsystem, Nachrichten</li>
+          <li>Rollen &amp; Berechtigungen, Checklisten, Untertickets, Audit-Trail</li>
+          <li>Hell/Dunkel-Theme, Mobile-Responsive, Benutzerverwaltung</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
-const APP_VERSION='1.6.0';
+const APP_VERSION='1.7.0';
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
@@ -498,50 +579,46 @@ const RM=[
   ['Nachrichten senden',{admin:1,leitung:1,dienstplanung:1,technik:1,ausbildung:1,qm:1,standard:0}],
   ['Abrechnung alle sehen',{admin:1,leitung:0,dienstplanung:1,technik:0,ausbildung:0,qm:0,standard:0}],
 ];
-
 let S={
   year:new Date().getFullYear(),month:new Date().getMonth(),
-  currentUser:null,loginSel:null,view:'home',filterUser:null,
+  currentUser:null,view:'home',filterUser:null,
   tkFiltDept:'',tkFiltPrio:'',tkFiltBucket:'',tkFiltTag:'',tkFiltAssignee:'',tkSearch:'',tkFiltStatus:'',
   allwYear:new Date().getFullYear(),allwPeriod:'month',allwMonth:new Date().getMonth()+1,
   abrYear:new Date().getFullYear(),abrMonth:new Date().getMonth()+1,abrUser:null,
   events:[],users:[],categories:[],tags:[],allowances:[],tickets:[],
-  checklists:[],messages:[],notifications:[],abrechnung:{einspringer:[],homeoffice:[]},
-  p:{},tp:{seeAll:false,editAll:false,myDepts:[],canSetPublic:false,canAssign:false},
-  ufColor:PALETTE[0],cfColor:PALETTE[2],tfColor:PALETTE[0],
-  currentTicketId:null,
+  checklists:[],messages:[],notifications:[],abrechnung:{einspringer:[],homeoffice:[]},dienstplaene:[],
+  p:{canApproveEvents:false,canSendMessages:false,seeAllEntries:true,editAllPersonal:false,addForOthers:false,addGeneral:false,manageUsers:false,seeAllAllw:false,editAllw:false,seeAllAbrechnung:false},
+  tp:{seeAll:false,editAll:false,myDepts:[],canSetPublic:false,canAssign:false},
+  ufColor:PALETTE[0],cfColor:PALETTE[2],tfColor:PALETTE[0],currentTicketId:null,
 };
-
 async function api(method,path2,body){
   const opts={method,credentials:'include',headers:{}};
   if(body){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body);}
   const res=await fetch('/api'+path2,opts);
+  if(!res.ok&&res.headers.get('content-type')?.includes('text/html')){throw new Error('Server-Fehler '+res.status);}
   const data=await res.json();
   if(!data.success)throw new Error(data.error||'Fehler');
   return data.data;
 }
 function loading(show){document.getElementById('loadingOv').classList.toggle('open',show);}
-
 async function fetchData(){
   loading(true);
   try{
     const data=await api('GET','/data');
-    S.users=data.users||[]; S.categories=data.categories||[]; S.tags=data.tags||[];
-    S.events=data.events||[]; S.tickets=data.tickets||[]; S.allowances=data.allowances||[];
-    S.checklists=data.checklists||[]; S.messages=data.messages||[];
-    S.notifications=data.notifications||[]; S.abrechnung=data.abrechnung||{einspringer:[],homeoffice:[]};
+    S.users=data.users||[];S.categories=data.categories||[];S.tags=data.tags||[];
+    S.events=data.events||[];S.tickets=data.tickets||[];S.allowances=data.allowances||[];
+    S.checklists=data.checklists||[];S.messages=data.messages||[];
+    S.notifications=data.notifications||[];S.abrechnung=data.abrechnung||{einspringer:[],homeoffice:[]};
     S.dienstplaene=data.dienstplaene||[];
-    S.currentUser=data.currentUser; S.p=data.permissions||{};
-    const u=getU(S.currentUser); const roles=u?.roles||['standard'];
+    S.currentUser=data.currentUser;S.p=data.permissions||{};
+    const u=getU(S.currentUser);const roles=u?.roles||['standard'];
     const has=(...r)=>r.some(x=>roles.includes(x));
-    S.seeAllEntries=has('admin','leitung','dienstplanung','ausbildung','qm');
     S.tp={seeAll:has('admin','leitung'),editAll:has('admin','leitung'),
       myDepts:DEPTS.filter(d=>roles.includes(d)),
       canSetPublic:!has('standard'),canAssign:!has('standard')};
     updateBadges();
   }finally{loading(false);}
 }
-
 const getU=id=>S.users.find(u=>u.id===id);
 const getCat=id=>S.categories.find(c=>c.id===id);
 const getTag=id=>S.tags.find(t=>t.id===id);
@@ -559,50 +636,40 @@ const tagChips=tgs=>(tgs||[]).map(tid=>{const t=getTag(tid);if(!t)return'';retur
 const apBdg=s=>s==='approved'?'<span class="bdg ap-bdg-approved">\u2713 Genehmigt</span>':s==='rejected'?'<span class="bdg ap-bdg-rejected">\u2717 Abgelehnt</span>':'<span class="bdg ap-bdg-pending">\u23F3 Ausstehend</span>';
 const pal=()=>document.documentElement.getAttribute('data-theme')==='dark'?PAL_DARK:PALETTE;
 const h2r=hex=>{const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return`rgb(${r}, ${g}, ${b})`;};
-
 function updateBadges(){
-  const unreadMsg=S.messages.filter(m=>!m.isRead).length;
+  const unreadMsg=S.messages.filter(m=>!m.isRead&&m.senderId!==S.currentUser).length;
   const unreadNotif=S.notifications.filter(n=>!n.isRead).length;
-  const msgDot=document.getElementById('msgDot'); if(msgDot)msgDot.style.display=unreadMsg?'block':'none';
-  const notifDot=document.getElementById('notifDot'); if(notifDot)notifDot.style.display=unreadNotif?'block':'none';
-  const nb=document.getElementById('navMsgBdg'); if(nb){nb.style.display=unreadMsg?'flex':'none';nb.textContent=unreadMsg;}
+  const md=document.getElementById('msgDot');if(md)md.style.display=unreadMsg?'block':'none';
+  const nd=document.getElementById('notifDot');if(nd)nd.style.display=unreadNotif?'block':'none';
+  const nb=document.getElementById('navMsgBdg');if(nb){nb.style.display=unreadMsg?'flex':'none';nb.textContent=unreadMsg;}
 }
-
-// ── AUTH ──────────────────────────────────────────────────────────────────────
+// AUTH
 let _loginUsers=[];
 async function loadLoginUsers(){
-  const sel=document.getElementById('lsel');
-  if(!sel)return;
-  sel.innerHTML='<option value="">\u23F3 Lade Benutzer \u2026</option>';
-  sel.disabled=true;
+  const sel=document.getElementById('lsel');if(!sel)return;
+  sel.innerHTML='<option value="">\u23F3 Lade...\u2026</option>';sel.disabled=true;
   for(let i=1;i<=5;i++){
     try{
       _loginUsers=await api('GET','/auth/users');
       if(Array.isArray(_loginUsers)&&_loginUsers.length>0){
         sel.disabled=false;
-        sel.innerHTML='<option value="">\u2014 Benutzer w\u00e4hlen \u2014</option>'+
-          _loginUsers.map(u=>`<option value="${u.id}">${u.name}</option>`).join('');
+        sel.innerHTML='<option value="">\u2014 Benutzer w\u00e4hlen \u2014</option>'+_loginUsers.map(u=>`<option value="${u.id}">${u.name}</option>`).join('');
         return;
       }
-    }catch(e){ console.warn('Login Versuch',i,e.message); }
-    if(i<5){sel.innerHTML=`<option value="">\u23F3 Verbinde \u2026 (${i}/5)</option>`;await new Promise(r=>setTimeout(r,i*2000));}
+    }catch(e){console.warn('Login retry',i,e.message);}
+    if(i<5){sel.innerHTML=`<option value="">\u23F3 Verbinde\u2026 (${i}/5)</option>`;await new Promise(r=>setTimeout(r,i*2000));}
   }
-  sel.disabled=false;
-  sel.innerHTML='<option value="">\u274C Fehler \u2013 Seite neu laden</option>';
+  sel.disabled=false;sel.innerHTML='<option value="">\u274C Fehler \u2013 Seite neu laden</option>';
 }
-
 async function doLogin(){
-  S.loginSel=document.getElementById('lsel').value;
-  if(!S.loginSel){toast('\u26A0\uFE0F Bitte Benutzer ausw\u00e4hlen!');return;}
+  const userId=document.getElementById('lsel').value;
+  if(!userId){toast('\u26A0\uFE0F Bitte Benutzer ausw\u00e4hlen!');return;}
   loading(true);
   try{
-    const res=await api('POST','/auth/login',{userId:S.loginSel,password:document.getElementById('lpw').value});
+    const res=await api('POST','/auth/login',{userId,password:document.getElementById('lpw').value});
     S.currentUser=res.userId;
-    if(res.mustChangePW){
-      document.getElementById('LS').classList.remove('open');
-      document.getElementById('np1').value='';document.getElementById('np2').value='';
-      document.getElementById('CPWS').classList.add('open');
-    }else{await fetchData();loginOK();}
+    if(res.mustChangePW){document.getElementById('LS').classList.remove('open');document.getElementById('np1').value='';document.getElementById('np2').value='';document.getElementById('CPWS').classList.add('open');}
+    else{await fetchData();loginOK();}
   }catch(e){document.getElementById('lerr').style.display='block';document.getElementById('lpw').value='';}
   finally{loading(false);}
 }
@@ -611,32 +678,25 @@ async function doForcePW(){
   if(p1.length<6){toast('\u26A0\uFE0F Mindestens 6 Zeichen!');return;}
   if(p1!==p2){toast('\u26A0\uFE0F Passw\u00f6rter stimmen nicht \u00fcberein!');return;}
   loading(true);
-  try{
-    await fetch('/api/auth/change-password',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({currentPassword:'',newPassword:p1})});
-    document.getElementById('CPWS').classList.remove('open');
-    await fetchData();loginOK();
-  }catch(e){toast('\u26A0\uFE0F '+e.message);}
-  finally{loading(false);}
+  try{await fetch('/api/auth/change-password',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({currentPassword:'',newPassword:p1})});document.getElementById('CPWS').classList.remove('open');await fetchData();loginOK();}
+  catch(e){toast('\u26A0\uFE0F '+e.message);}finally{loading(false);}
 }
 function loginOK(){
   document.getElementById('LS').classList.remove('open');
-  document.getElementById('hdr').style.display='flex';
-  document.getElementById('APP').style.display='grid';
+  document.getElementById('hdr').style.display='flex';document.getElementById('APP').style.display='grid';
   const vb=document.getElementById('versionBadge');if(vb)vb.textContent='v'+APP_VERSION;
   const u=getU(S.currentUser);
   document.getElementById('pillNm').textContent=u?.name||'?';
-  const pa=document.getElementById('pillAv');pa.textContent=u?.initials||'?';
-  pa.style.background=(u?.color||'#888')+'22';pa.style.color=u?.color||'#888';
-  const adminBtn=document.getElementById('adminBtn');if(adminBtn)adminBtn.style.display=S.p.manageUsers?'flex':'none';
-  setView('home');
-  toast(`\uD83D\uDC4B Willkommen, ${u?.name||''}!`);
+  const pa=document.getElementById('pillAv');pa.textContent=u?.initials||'?';pa.style.background=(u?.color||'#888')+'22';pa.style.color=u?.color||'#888';
+  const ab=document.getElementById('adminBtn');if(ab)ab.style.display=S.p.manageUsers?'flex':'none';
+  setView('home');startAutoRefresh();
+  toast('\uD83D\uDC4B Willkommen, '+(u?.name||'')+'!');
 }
 async function logout(){
   loading(true);try{await api('POST','/auth/logout');}catch(e){}finally{loading(false);}
-  S.currentUser=null;
-  document.getElementById('hdr').style.display='none';document.getElementById('APP').style.display='none';
-  await loadLoginUsers();
-  document.getElementById('LS').classList.add('open');
+  if(_refreshTimer)clearInterval(_refreshTimer);
+  S.currentUser=null;document.getElementById('hdr').style.display='none';document.getElementById('APP').style.display='none';
+  await loadLoginUsers();document.getElementById('LS').classList.add('open');
 }
 async function doChangePW(){
   const c=document.getElementById('cpw0').value,n=document.getElementById('cpw1').value,n2=document.getElementById('cpw2').value;
@@ -645,8 +705,7 @@ async function doChangePW(){
   try{await api('POST','/auth/change-password',{currentPassword:c,newPassword:n});closeModal('pwModal');toast('\u2705 Passwort ge\u00e4ndert!');}
   catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
 }
-
-// ── NAVIGATION ────────────────────────────────────────────────────────────────
+// NAVIGATION
 function toggleSidebar(){const sb=document.getElementById('sidebar'),ov=document.getElementById('sbOv');sb.classList.toggle('open');ov.classList.toggle('open');}
 function toggleNS(id){document.getElementById(id+'Hdr').classList.toggle('open');document.getElementById(id+'Sub').classList.toggle('open');}
 function setView(v){
@@ -655,39 +714,30 @@ function setView(v){
   document.getElementById('sidebar').classList.remove('open');document.getElementById('sbOv').classList.remove('open');
   renderSBF();renderMain();
 }
-
 function renderSBF(){
-  const el=document.getElementById('sbf');
+  const el=document.getElementById('sbf');if(!el)return;
   if(S.view==='schedule'){
-    const empOpts=S.seeAllEntries?`<select class="flt" style="width:100%" onchange="S.filterUser=this.value||null;renderMain()"><option value="">Alle Mitarbeiter</option>${S.users.filter(u=>!(u.roles||[]).includes('admin')).map(u=>`<option value="${u.id}"${S.filterUser===u.id?'selected':''}>${u.name}</option>`).join('')}</select>`:'';
     el.innerHTML=`<div><div class="sfl">Jahr &amp; Monat</div>
-      <div class="yr-row"><button class="yb" onclick="S.year--;renderSBF();renderMain()">&#8249;</button><span class="yv">${S.year}</span><button class="yb" onclick="S.year++;renderSBF();renderMain()">&#8250;</button></div>
-      <div class="mgrid"><button class="mb ${S.month===null?'on':''}" onclick="S.month=null;renderSBF();renderMain()">Alle</button>${MONTHS.map((m,i)=>`<button class="mb ${S.month===i?'on':''}" onclick="S.month=${i};renderSBF();renderMain()">${m.slice(0,3)}</button>`).join('')}</div>
-    </div>
-    ${S.seeAllEntries?`<div><div class="sfl">Mitarbeiter</div>${empOpts}</div>`:''}`;
+      <div class="yr-row"><button class="yb" onclick="S.year--;renderSBF();renderMain()">&lsaquo;</button><span class="yv">${S.year}</span><button class="yb" onclick="S.year++;renderSBF();renderMain()">&rsaquo;</button></div>
+      <div class="mgrid"><button class="mb ${S.month===null?'on':''}" onclick="S.month=null;renderSBF();renderMain()">Alle</button>${MONTHS.map((m,i)=>`<button class="mb ${S.month===i?'on':''}" onclick="S.month=${i};renderSBF();renderMain()">${m.slice(0,3)}</button>`).join('')}</div></div>
+      ${S.p.seeAllEntries?`<div><div class="sfl">Mitarbeiter</div><select class="flt" style="width:100%" onchange="S.filterUser=this.value||null;renderMain()"><option value="">Alle Mitarbeiter</option>${S.users.filter(u=>!(u.roles||[]).includes('admin')).map(u=>`<option value="${u.id}"${S.filterUser===u.id?'selected':''}>${u.name}</option>`).join('')}</select></div>`:''}`;
   }else if(S.view==='allw'){
     el.innerHTML=`<div><div class="sfl">Jahr</div>
-      <div class="yr-row"><button class="yb" onclick="S.allwYear--;renderSBF();renderMain()">&#8249;</button><span class="yv">${S.allwYear}</span><button class="yb" onclick="S.allwYear++;renderSBF();renderMain()">&#8250;</button></div>
+      <div class="yr-row"><button class="yb" onclick="S.allwYear--;renderSBF();renderMain()">&lsaquo;</button><span class="yv">${S.allwYear}</span><button class="yb" onclick="S.allwYear++;renderSBF();renderMain()">&rsaquo;</button></div>
       <div class="sfl" style="margin-top:10px">Zeitraum</div>
-      <div style="display:flex;flex-direction:column;gap:3px">${['month','h1','h2','year'].map(p=>`<button class="mb ${S.allwPeriod===p?'on':''}" style="text-align:left;padding:5px 8px" onclick="S.allwPeriod='${p}';renderSBF();renderMain()">${p==='month'?'Monatlich':p==='h1'?'1. Halbjahr':p==='h2'?'2. Halbjahr':'Gesamtjahr'}</button>`).join('')}</div>
+      <div style="display:flex;flex-direction:column;gap:3px">${['month','h1','h2','year'].map(p2=>`<button class="mb ${S.allwPeriod===p2?'on':''}" style="text-align:left;padding:5px 8px" onclick="S.allwPeriod='${p2}';renderSBF();renderMain()">${p2==='month'?'Monatlich':p2==='h1'?'1. Halbjahr':p2==='h2'?'2. Halbjahr':'Gesamtjahr'}</button>`).join('')}</div>
       ${S.allwPeriod==='month'?`<div style="margin-top:8px"><div class="sfl">Monat</div><div class="mgrid">${MONTHS.map((m,i)=>`<button class="mb ${S.allwMonth===i+1?'on':''}" onclick="S.allwMonth=${i+1};renderSBF();renderMain()">${m.slice(0,3)}</button>`).join('')}</div></div>`:''}
     </div>`;
   }else if(S.view==='abrechnung'){
-    const showAll=S.p.seeAllAbrechnung;
     el.innerHTML=`<div><div class="sfl">Jahr</div>
-      <div class="yr-row"><button class="yb" onclick="S.abrYear--;renderMain()">&#8249;</button><span class="yv">${S.abrYear}</span><button class="yb" onclick="S.abrYear++;renderMain()">&#8250;</button></div>
+      <div class="yr-row"><button class="yb" onclick="S.abrYear--;renderMain()">&lsaquo;</button><span class="yv">${S.abrYear}</span><button class="yb" onclick="S.abrYear++;renderMain()">&rsaquo;</button></div>
       <div class="sfl" style="margin-top:8px">Monat</div>
       <div class="mgrid"><button class="mb ${!S.abrMonth?'on':''}" onclick="S.abrMonth=null;renderMain()">Alle</button>${MONTHS.map((m,i)=>`<button class="mb ${S.abrMonth===i+1?'on':''}" onclick="S.abrMonth=${i+1};renderMain()">${m.slice(0,3)}</button>`).join('')}</div>
-      ${showAll?`<div style="margin-top:8px"><div class="sfl">Mitarbeiter</div>
-      <select class="flt" style="width:100%" onchange="S.abrUser=this.value||null;renderMain()">
-        <option value="">Alle Mitarbeiter</option>
-        ${S.users.filter(u=>!(u.roles||[]).includes('admin')).map(u=>`<option value="${u.id}"${S.abrUser===u.id?'selected':''}>${u.name}</option>`).join('')}
-      </select></div>`:''}
+      ${S.p.seeAllAbrechnung?`<div style="margin-top:8px"><div class="sfl">Mitarbeiter</div><select class="flt" style="width:100%" onchange="S.abrUser=this.value||null;renderMain()"><option value="">Alle Mitarbeiter</option>${S.users.filter(u=>!(u.roles||[]).includes('admin')).sort((a,b)=>a.name.localeCompare(b.name,'de')).map(u=>`<option value="${u.id}"${S.abrUser===u.id?'selected':''}>${u.name}</option>`).join('')}</select></div>`:''}
     </div>`;
   }else if(S.view==='tickets'||S.view==='tickets_closed'){
     const myD=S.tp.seeAll?DEPTS:S.tp.myDepts;
-    el.innerHTML=`
-    <div><div class="sfl">Status</div><div style="display:flex;flex-direction:column;gap:3px">
+    el.innerHTML=`<div><div class="sfl">Status</div><div style="display:flex;flex-direction:column;gap:3px">
       <button class="mb ${!S.tkFiltStatus?'on':''}" onclick="S.tkFiltStatus='';renderMain()" style="text-align:left;padding:5px 8px">Alle</button>
       ${STATUSES.filter(s=>S.view==='tickets_closed'?(s.id==='closed'):(s.id!=='closed')).map(s=>`<button class="mb ${S.tkFiltStatus===s.id?'on':''}" onclick="S.tkFiltStatus='${s.id}';renderMain()" style="text-align:left;padding:5px 8px;font-size:11px">${s.label}</button>`).join('')}
     </div></div>
@@ -695,135 +745,96 @@ function renderSBF(){
       <button class="mb ${!S.tkFiltDept?'on':''}" onclick="S.tkFiltDept='';renderMain()" style="text-align:left;padding:5px 8px">Alle</button>
       ${myD.map(d=>`<button class="mb ${S.tkFiltDept===d?'on':''}" onclick="S.tkFiltDept='${d}';renderMain()" style="text-align:left;padding:5px 8px;font-size:11px">${DEPT_LABELS[d]}</button>`).join('')}
     </div></div>
-    <div><div class="sfl">Priorit&#228;t</div><div style="display:flex;flex-direction:column;gap:3px">
+    <div><div class="sfl">Priorit\u00e4t</div><div style="display:flex;flex-direction:column;gap:3px">
       <button class="mb ${!S.tkFiltPrio?'on':''}" onclick="S.tkFiltPrio='';renderMain()" style="text-align:left;padding:5px 8px">Alle</button>
-      ${PRIORITIES.map(p=>`<button class="mb ${S.tkFiltPrio===p.id?'on':''}" onclick="S.tkFiltPrio='${p.id}';renderMain()" style="text-align:left;padding:5px 8px;font-size:11px">${p.label}</button>`).join('')}
+      ${PRIORITIES.map(p2=>`<button class="mb ${S.tkFiltPrio===p2.id?'on':''}" onclick="S.tkFiltPrio='${p2.id}';renderMain()" style="text-align:left;padding:5px 8px;font-size:11px">${p2.label}</button>`).join('')}
     </div></div>`;
   }else el.innerHTML='';
 }
-
 function renderMain(){
   if(S.view==='home')renderHome();
   else if(S.view==='schedule')renderSchedule();
   else if(S.view==='allw')renderAllw();
   else if(S.view==='abrechnung')renderAbrechnung();
+  else if(S.view==='dienstplaene')renderDienstplaene();
   else if(S.view==='tickets'||S.view==='tickets_closed')renderTickets();
   else if(S.view==='checklists')renderChecklists();
   else if(S.view==='messages'||S.view==='messages_sent')renderMessages();
-  else if(S.view==='dienstplaene')renderDienstplaene();
 }
-
-// ── HOME ──────────────────────────────────────────────────────────────────────
+// HOME
 function renderHome(){
   const u=getU(S.currentUser);
   const online=S.users.filter(x=>x.isOnline&&x.id!==S.currentUser);
-  const unreadMsg=S.messages.filter(m=>!m.isRead);
+  const unreadMsg=S.messages.filter(m=>!m.isRead&&m.senderId!==S.currentUser);
   const unreadNotif=S.notifications.filter(n=>!n.isRead&&n.type!=='event_added'&&n.type!=='event_changed');
   const eventNotifs=S.notifications.filter(n=>!n.isRead&&(n.type==='event_added'||n.type==='event_changed'));
   const myDepts=S.tp.myDepts;
-  const relevantTks=S.tickets.filter(tk=>
-    tk.status!=='closed'&&(
-      (myDepts.includes(tk.department)&&tk.assigneeId===null)||
-      tk.assigneeId===S.currentUser
-    )
-  ).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,8);
+  const relevantTks=S.tickets.filter(tk=>tk.status!=='closed'&&((myDepts.includes(tk.department)&&!tk.assigneeId)||tk.assigneeId===S.currentUser)).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,8);
   document.getElementById('main').innerHTML=`
-    <div class="ph"><div class="pt">&#128196; &#220;bersicht <span>${u?.name||''}</span></div></div>
+    <div class="ph"><div class="pt">&#128196; \u00dcbersicht <span>${u?.name||''}</span></div></div>
     ${unreadMsg.length?`<div style="background:color-mix(in srgb,var(--danger) 5%,var(--sf));border:1px solid color-mix(in srgb,var(--danger) 20%,transparent);border-radius:var(--r);padding:14px;margin-bottom:14px">
       <div style="font-size:13px;font-weight:700;color:var(--danger);margin-bottom:10px">&#128276; ${unreadMsg.length} ungelesene Nachricht${unreadMsg.length>1?'en':''}</div>
       ${unreadMsg.map(m=>`<div style="padding:8px 12px;background:var(--sf);border-radius:6px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
         <div><div style="font-weight:600;font-size:13px">${m.title}</div><div style="font-size:11px;color:var(--mu)">von ${getU(m.senderId)?.name||'?'} &middot; ${fdt(m.createdAt)}</div></div>
-        <button class="btn-p" onclick="readMsg('${m.id}')">&#10003; Best&#228;tigen</button>
+        <button class="btn-p" onclick="readMsg('${m.id}')">&#10003; Best\u00e4tigen</button>
       </div>`).join('')}
     </div>`:''}
     ${eventNotifs.length?`<div style="background:color-mix(in srgb,var(--warn) 5%,var(--sf));border:1px solid color-mix(in srgb,var(--warn) 25%,transparent);border-radius:var(--r);padding:14px;margin-bottom:14px">
-      <div style="font-size:13px;font-weight:700;color:var(--warn);margin-bottom:10px">&#128197; ${eventNotifs.length} neue/ge&#228;nderte Eintr&#228;ge f&#252;r dich</div>
+      <div style="font-size:13px;font-weight:700;color:var(--warn);margin-bottom:10px">&#128197; ${eventNotifs.length} neue/ge\u00e4nderte Eintr\u00e4ge f\u00fcr dich</div>
       ${eventNotifs.map(n=>{const ev=S.events.find(e=>e.id===n.eventId);return`<div style="padding:8px 12px;background:var(--sf);border-radius:6px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-        <div>
-          <div style="font-weight:600;font-size:13px">${n.title}</div>
-          ${ev?`<div style="font-size:11px;color:var(--mu)">${fd(ev.dateFrom)}${ev.dateTo&&ev.dateTo!==ev.dateFrom?' – '+fd(ev.dateTo):''} &middot; ${ev.reason||'Eintrag'}</div>`:''}
-        </div>
-        <button class="btn-ok" onclick="confirmEventNotif('${n.id}')">&#10003; Zur Kenntnis genommen</button>
+        <div><div style="font-weight:600;font-size:13px">${n.title}</div>${ev?`<div style="font-size:11px;color:var(--mu)">${fd(ev.dateFrom)} &middot; ${ev.reason||'Eintrag'}</div>`:''}</div>
+        <button class="btn-ok" onclick="confirmEventNotif('${n.id}')">&#10003; Zur Kenntnis</button>
       </div>`;}).join('')}
     </div>`:''}
     ${unreadNotif.length?`<div style="background:color-mix(in srgb,var(--acc) 4%,var(--sf));border:1px solid color-mix(in srgb,var(--acc) 18%,transparent);border-radius:var(--r);padding:14px;margin-bottom:14px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div style="font-size:13px;font-weight:700;color:var(--acc)">&#128276; ${unreadNotif.length} neue Benachrichtigung${unreadNotif.length>1?'en':''}</div>
+        <div style="font-size:13px;font-weight:700;color:var(--acc)">&#128276; ${unreadNotif.length} Benachrichtigung${unreadNotif.length>1?'en':''}</div>
         <button class="btn-s" style="font-size:11px" onclick="readAllNotifs()">Alle gelesen</button>
       </div>
       ${unreadNotif.slice(0,5).map(n=>{const icon=n.type==='mention'?'&#128172;':n.type==='assigned'?'&#128100;':'&#127931;';return`<div class="notif-card unread ${n.type}" onclick="openNotif('${n.id}','${n.ticketId||''}')">
         <div style="font-size:18px;flex-shrink:0">${icon}</div>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:12px;font-weight:600">${n.title}</div>
-          <div style="font-size:10px;color:var(--mu)">von ${getU(n.createdBy)?.name||'?'} &middot; ${fdt(n.createdAt)}</div>
-        </div>
+        <div><div style="font-size:12px;font-weight:600">${n.title}</div><div style="font-size:10px;color:var(--mu)">${fdt(n.createdAt)}</div></div>
       </div>`;}).join('')}
     </div>`:''}
     <div class="dash-grid">
-      <div class="dash-card">
-        <h3>&#128101; Derzeit online (${online.length+1})</h3>
-        <div class="online-list">
-          <div class="online-user">${avHtml(u?.initials||'?',u?.color||'#888',22,9,true)}<span>${u?.name} (du)</span></div>
-          ${online.map(x=>`<div class="online-user">${avHtml(x.initials,x.color,22,9,true)}<span>${x.name}</span></div>`).join('')}
-          ${online.length===0?'<span style="font-size:12px;color:var(--mu)">Keine anderen online</span>':''}
-        </div>
-      </div>
-      <div class="dash-card">
-        <h3>&#127931; Relevante Tickets (${relevantTks.length})</h3>
-        ${relevantTks.length?relevantTks.map(tk=>`
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);cursor:pointer;gap:8px" onclick="openTkDetail('${tk.id}')">
-            <div style="min-width:0;flex:1">
-              <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${tk.number}: ${tk.title}</div>
-              <div style="font-size:10px;color:var(--mu)">${tk.assigneeId===S.currentUser?'&#128100; Dir zugewiesen':'&#128202; '+DEPT_LABELS[tk.department]}</div>
-            </div>
-            ${prioBdg(tk.priority)}
-          </div>`).join(''):'<div style="color:var(--mu);font-size:12px">Keine relevanten Tickets</div>'}
+      <div class="dash-card"><h3>&#128101; Online (${online.length+1})</h3><div class="online-list">
+        <div class="online-user">${avHtml(u?.initials||'?',u?.color||'#888',22,9,true)}<span>${u?.name} (du)</span></div>
+        ${online.map(x=>`<div class="online-user">${avHtml(x.initials,x.color,22,9,true)}<span>${x.name}</span></div>`).join('')}
+        ${!online.length?'<span style="font-size:12px;color:var(--mu)">Keine anderen online</span>':''}
+      </div></div>
+      <div class="dash-card"><h3>&#127931; Relevante Tickets (${relevantTks.length})</h3>
+        ${relevantTks.length?relevantTks.map(tk=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);cursor:pointer;gap:8px" onclick="openTkDetail('${tk.id}')">
+          <div style="min-width:0;flex:1"><div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${tk.number}: ${tk.title}</div>
+          <div style="font-size:10px;color:var(--mu)">${tk.assigneeId===S.currentUser?'&#128100; Dir zugewiesen':'&#128202; '+DEPT_LABELS[tk.department]}</div></div>
+          ${prioBdg(tk.priority)}</div>`).join(''):'<div style="color:var(--mu);font-size:12px">Keine relevanten Tickets</div>'}
       </div>
     </div>`;
 }
-async function confirmEventNotif(notifId){
-  try{await api('POST','/notifications/'+notifId+'/read');await fetchData();renderHome();}
-  catch(e){toast('⚠️ '+e.message,'err');}
-}
-async function openNotif(notifId,ticketId){
-  try{await api('POST','/notifications/'+notifId+'/read');}catch(e){}
-  await fetchData();
-  if(ticketId){openTkDetail(ticketId);setView('tickets');}
-  else renderHome();
-}
-async function readAllNotifs(){
-  try{await api('POST','/notifications/read-all');await fetchData();renderHome();}
-  catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
-}
-
-// ── SCHEDULE ──────────────────────────────────────────────────────────────────
+async function confirmEventNotif(notifId){try{await api('POST','/notifications/'+notifId+'/read');await fetchData();renderHome();}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}}
+async function openNotif(notifId,ticketId){try{await api('POST','/notifications/'+notifId+'/read');}catch(e){}await fetchData();if(ticketId){openTkDetail(ticketId);setView('tickets');}else renderHome();}
+async function readAllNotifs(){try{await api('POST','/notifications/read-all');await fetchData();renderHome();}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}}
+// SCHEDULE
 function getVisEvts(){
   let evs=[...S.events];
-  // Server already sends all events; just apply frontend filters
   if(S.filterUser)evs=evs.filter(ev=>!ev.isGeneral&&ev.userId===S.filterUser);
   if(S.month!==null)evs=evs.filter(ev=>{const d=new Date(ev.dateFrom);return d.getFullYear()===S.year&&d.getMonth()===S.month;});
   else evs=evs.filter(ev=>new Date(ev.dateFrom).getFullYear()===S.year);
   return evs.sort((a,b)=>a.dateFrom.localeCompare(b.dateFrom));
 }
 function renderSchedule(){
-  const evs=getVisEvts(); const ml=S.month!==null?MONTHS[S.month]:'Alle';
+  const evs=getVisEvts();const ml=S.month!==null?MONTHS[S.month]:'Alle';
   const filterU=S.filterUser?getU(S.filterUser):null;
   document.getElementById('main').innerHTML=`
-    <div class="ph">
-      <div><div class="pt">Eintrags&#252;bersicht <span>${ml} ${S.year}</span></div>
-      ${filterU?`<div style="margin-top:5px"><span class="filter-hint">&#128100; Ansicht von ${filterU.name}</span></div>`:''}</div>
-      <button class="btn-p" onclick="openEvtModal()">&#65291; Eintrag</button>
+    <div class="ph"><div><div class="pt">Eintrags\u00fcbersicht <span>${ml} ${S.year}</span></div>${filterU?`<div style="margin-top:5px"><span class="filter-hint">&#128100; Ansicht von ${filterU.name}</span></div>`:''}</div>
+      <button class="btn-p" onclick="openEvtModal()">&#65291; Eintrag</button></div>
+    <div class="tw"><div class="tt"><h2>Eintr\u00e4ge (${evs.length})</h2>
+      <input class="srch" type="text" placeholder="Suchen \u2026" oninput="filtSched(this.value)">
+      <select class="flt" onchange="filtSched(undefined,this.value)" id="scFlt"><option value="">Alle Kategorien</option>${S.categories.map(c=>`<option value="${c.id}">${c.emoji} ${c.label}</option>`).join('')}</select>
+      <select class="flt" onchange="_scApFilt=this.value;filtSched()"><option value="">Alle Status</option><option value="pending">\u23f3 Ausstehend</option><option value="approved">\u2713 Genehmigt</option><option value="rejected">\u2717 Abgelehnt</option></select>
     </div>
-    <div class="tw">
-      <div class="tt"><h2>Eintr&#228;ge (${evs.length})</h2>
-        <input class="srch" type="text" placeholder="Suchen &#8230;" oninput="filtSched(this.value)">
-        <select class="flt" onchange="filtSched(undefined,this.value)" id="scFlt"><option value="">Alle Kategorien</option>${S.categories.map(c=>`<option value="${c.id}">${c.emoji} ${c.label}</option>`).join('')}</select>
-        <select class="flt" onchange="_scApFilt=this.value;filtSched()"><option value="">Alle Status</option><option value="pending">&#8987; Ausstehend</option><option value="approved">&#10003; Genehmigt</option><option value="rejected">&#10007; Abgelehnt</option></select>
-      </div>
-      <div style="overflow-x:auto">
-      <table><thead><tr><th>Datum</th><th>Zeit</th><th>Mitarbeiter</th><th>Kategorie</th><th>Beschreibung</th><th>Status</th><th>Aktionen</th></tr></thead>
-      <tbody id="scTb">${buildEvRows(evs)}</tbody></table>
-      </div>${!evs.length?'<div class="empty">&#128235; Keine Eintr&#228;ge</div>':''}
+    <div style="overflow-x:auto"><table><thead><tr><th>Datum</th><th>Zeit</th><th>Mitarbeiter</th><th>Kategorie</th><th>Beschreibung</th><th>Status</th><th>Aktionen</th></tr></thead>
+    <tbody id="scTb">${buildEvRows(evs)}</tbody></table></div>
+    ${!evs.length?'<div class="empty">&#128235; Keine Eintr\u00e4ge</div>':''}
     </div>`;
 }
 function buildEvRows(evs){
@@ -834,25 +845,18 @@ function buildEvRows(evs){
     const ds=ev.dateTo&&ev.dateTo!==ev.dateFrom?`${fd(ev.dateFrom)} \u2013 ${fd(ev.dateTo)}`:fd(ev.dateFrom);
     const ts=ev.timeFrom?(ev.timeTo?`${ev.timeFrom}\u2013${ev.timeTo}`:ev.timeFrom):'\u2014';
     const canDel=(ev.isGeneral&&S.p.addGeneral)||ev._canEdit;
-    const canEdit=ev._canEdit;
-    const empCell=ev.isGeneral
-      ?`<span class="bdg" style="background:color-mix(in srgb,var(--ok) 12%,transparent);color:var(--ok)">&#127760; Allgemein</span>`
-      :anon
-      ?`<span class="bdg" style="background:var(--sf2);color:var(--di)">&#128274; Anonym</span>`
+    const empCell=ev.isGeneral?`<span class="bdg" style="background:color-mix(in srgb,var(--ok) 12%,transparent);color:var(--ok)">&#127760; Allgemein</span>`
+      :anon?`<span class="bdg" style="background:var(--sf2);color:var(--di)">&#128274; Anonym</span>`
       :`<div style="display:flex;align-items:center;gap:5px">${avHtml(emp.initials,emp.color,20,9)}<span>${emp.name}</span></div>`;
-    const catCell=anon
-      ?`<span style="color:var(--di)">&#8212;</span>`
-      :`<span class="bdg" style="background:${cat.color}1a;color:${cat.color}">${cat.emoji} ${cat.label}</span>`;
-    const reasonCell=anon?`<span style="color:var(--di);font-style:italic">Anonymisiert</span>`:(ev.reason||'').slice(0,50);
-    const apActions=(!ev.isGeneral&&S.p.canApproveEvents&&ev.approvalStatus!=='approved'&&ev.approvalStatus!=='rejected'&&!anon)?
-      `<button class="btn-ok" onclick="approveEvt('${ev.id}','approved')" title="Genehmigen">&#10003;</button><button class="btn-d" onclick="approveEvt('${ev.id}','rejected')" title="Ablehnen">&#10007;</button>`:'';
+    const catCell=anon?`<span style="color:var(--di)">\u2014</span>`:`<span class="bdg" style="background:${cat.color}1a;color:${cat.color}">${cat.emoji} ${cat.label}</span>`;
+    const apActions=(!ev.isGeneral&&S.p.canApproveEvents&&!anon&&ev.approvalStatus!=='approved'&&ev.approvalStatus!=='rejected')?
+      `<button class="btn-ok" onclick="approveEvt('${ev.id}','approved')">\u2713</button><button class="btn-d" onclick="approveEvt('${ev.id}','rejected')">\u2717</button>`:'';
     return`<tr${ev.isGeneral?' style="background:color-mix(in srgb,var(--ok) 3%,var(--sf))"':anon?' style="opacity:.7"':''}>
-      <td style="white-space:nowrap;font-size:12px;color:var(--mu)">${ds}</td>
-      <td style="font-size:11px;color:var(--mu)">${ts}</td>
+      <td style="white-space:nowrap;font-size:12px;color:var(--mu)">${ds}</td><td style="font-size:11px;color:var(--mu)">${ts}</td>
       <td>${empCell}</td><td>${catCell}</td>
-      <td style="max-width:170px;font-size:12px">${reasonCell}</td>
+      <td style="max-width:170px;font-size:12px">${anon?'<span style="color:var(--di);font-style:italic">Anonymisiert</span>':(ev.reason||'').slice(0,50)}</td>
       <td>${ev.isGeneral?'':apBdg(ev.approvalStatus||'pending')}</td>
-      <td><div style="display:flex;gap:4px">${apActions}${canEdit?`<button class="btn-e" onclick="openEditEvt('${ev.id}')">&#9998;</button>`:''}${canDel?`<button class="btn-d" onclick="deleteEvt('${ev.id}')">&#10005;</button>`:''}</div></td>
+      <td><div style="display:flex;gap:4px">${apActions}${ev._canEdit?`<button class="btn-e" onclick="openEditEvt('${ev.id}')">\u270e</button>`:''}${canDel?`<button class="btn-d" onclick="deleteEvt('${ev.id}')">\u2715</button>`:''}</div></td>
     </tr>`;
   }).join('');
 }
@@ -862,34 +866,32 @@ function filtSched(srch,cat){
   const s=(srch!==undefined?srch:document.querySelector('#main .srch')?.value||'').toLowerCase();
   const c=cat!==undefined?cat:(document.getElementById('scFlt')?.value||'');
   let evs=getVisEvts();
-  if(s)evs=evs.filter(ev=>{const un=getU(ev.userId)?.name.toLowerCase()||'';return ev.reason.toLowerCase().includes(s)||un.includes(s);});
+  if(s)evs=evs.filter(ev=>{const un=getU(ev.userId)?.name.toLowerCase()||'';return(ev.reason||'').toLowerCase().includes(s)||un.includes(s);});
   if(c)evs=evs.filter(ev=>ev.category===c);
   if(_scApFilt)evs=evs.filter(ev=>(ev.approvalStatus||'pending')===_scApFilt);
   tb.innerHTML=buildEvRows(evs);
 }
 function openEvtModal(){
-  document.getElementById('fEvId').value='';
-  document.getElementById('evtOvT').textContent='Neuer Eintrag';
+  document.getElementById('fEvId').value='';document.getElementById('evtOvT').textContent='Neuer Eintrag';
   const u=getU(S.currentUser);
   document.getElementById('genRow').style.display=S.p.addGeneral?'block':'none';
   document.getElementById('fGen').checked=false;document.getElementById('empRow').style.display='block';
   const empSel=document.getElementById('fEmp');empSel.innerHTML='';
   const addable=S.p.addForOthers?S.users.filter(u2=>!(u2.roles||[]).includes('admin')):[u].filter(Boolean);
   addable.forEach(u2=>{const opt=document.createElement('option');opt.value=u2.id;opt.textContent=u2.name;empSel.appendChild(opt);});
-  empSel.value=u.id;
-  document.getElementById('fCat').innerHTML='<option value="">&#8212; w&#228;hlen &#8212;</option>'+S.categories.map(c=>`<option value="${c.id}">${c.emoji} ${c.label}</option>`).join('');
+  empSel.value=u?.id||'';
+  document.getElementById('fCat').innerHTML='<option value="">\u2014 w\u00e4hlen \u2014</option>'+S.categories.map(c=>`<option value="${c.id}">${c.emoji} ${c.label}</option>`).join('');
   ['fD1','fD2','fT1','fT2','fRsn'].forEach(id=>document.getElementById(id).value='');
   openModal('evtOv');
 }
 function openEditEvt(id){
   const ev=S.events.find(e=>e.id===id);if(!ev)return;
-  document.getElementById('fEvId').value=id;
-  document.getElementById('evtOvT').textContent='Eintrag bearbeiten';
+  document.getElementById('fEvId').value=id;document.getElementById('evtOvT').textContent='Eintrag bearbeiten';
   document.getElementById('genRow').style.display='none';document.getElementById('empRow').style.display='none';
-  document.getElementById('fCat').innerHTML='<option value="">&#8212; w&#228;hlen &#8212;</option>'+S.categories.map(c=>`<option value="${c.id}">${c.emoji} ${c.label}</option>`).join('');
+  document.getElementById('fCat').innerHTML='<option value="">\u2014 w\u00e4hlen \u2014</option>'+S.categories.map(c=>`<option value="${c.id}">${c.emoji} ${c.label}</option>`).join('');
   document.getElementById('fD1').value=ev.dateFrom;document.getElementById('fD2').value=ev.dateTo;
   document.getElementById('fT1').value=ev.timeFrom||'';document.getElementById('fT2').value=ev.timeTo||'';
-  document.getElementById('fCat').value=ev.category||'';document.getElementById('fRsn').value=ev.reason;
+  document.getElementById('fCat').value=ev.category||'';document.getElementById('fRsn').value=ev.reason||'';
   openModal('evtOv');
 }
 function onGenToggle(){document.getElementById('empRow').style.display=document.getElementById('fGen').checked?'none':'block';}
@@ -897,8 +899,7 @@ async function saveEvent(){
   const editId=document.getElementById('fEvId').value;
   const isGeneral=!editId&&document.getElementById('fGen').checked;
   const d1=document.getElementById('fD1').value,rsn=document.getElementById('fRsn').value.trim();
-  if(!d1){toast('\u26A0\uFE0F Datum von erforderlich!');return;}
-  if(!rsn){toast('\u26A0\uFE0F Beschreibung erforderlich!');return;}
+  if(!d1){toast('\u26A0\uFE0F Datum erforderlich!');return;}if(!rsn){toast('\u26A0\uFE0F Beschreibung erforderlich!');return;}
   const body={dateFrom:d1,dateTo:document.getElementById('fD2').value||d1,timeFrom:document.getElementById('fT1').value,timeTo:document.getElementById('fT2').value,category:document.getElementById('fCat').value,reason:rsn};
   try{
     if(editId)await api('PUT','/events/'+editId,body);
@@ -907,78 +908,62 @@ async function saveEvent(){
   }catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
 }
 async function approveEvt(id,status){
-  try{await api('PUT','/events/'+id+'/approval',{status});await fetchData();renderMain();toast(status==='approved'?'\u2705 Genehmigt!':'\u274C Abgelehnt.');}
-  catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
+  try{await api('PUT','/events/'+id+'/approval',{status});await fetchData();renderMain();}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
 }
 async function deleteEvt(id){
-  if(!confirm('Eintrag l&#246;schen?'))return;
-  try{await api('DELETE','/events/'+id);await fetchData();renderMain();toast('\uD83D\uDDD1\uFE0F Gel\u00f6scht.');}
-  catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
+  if(!confirm('Eintrag l\u00f6schen?'))return;
+  try{await api('DELETE','/events/'+id);await fetchData();renderMain();}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
 }
-
-// ── ALLOWANCES ────────────────────────────────────────────────────────────────
+// ALLOWANCES
 function getPeriodMonths(){if(S.allwPeriod==='month')return[S.allwMonth];if(S.allwPeriod==='h1')return[1,2,3,4,5,6];if(S.allwPeriod==='h2')return[7,8,9,10,11,12];return[1,2,3,4,5,6,7,8,9,10,11,12];}
 function sumAllw(uid,year,months){return months.reduce((a,m)=>{const r=getAllw(uid,year,m);return{nd:a.nd+r.nd,fd:a.fd+r.fd,fw:a.fw+r.fw,c10:a.c10+r.c10};},{nd:0,fd:0,fw:0,c10:0});}
-function numCell(n,color){if(!n)return`<td style="text-align:center;color:var(--di)">&#8211;</td>`;return`<td style="text-align:center"><span class="anum" style="background:${color}18;color:${color}">${n}</span></td>`;}
+function numCell(n,color){if(!n)return`<td style="text-align:center;color:var(--di)">\u2013</td>`;return`<td style="text-align:center"><span class="anum" style="background:${color}18;color:${color}">${n}</span></td>`;}
 function renderAllw(){
   const months=getPeriodMonths(),yr=S.allwYear;
   const pLbl=S.allwPeriod==='month'?MONTHS[S.allwMonth-1]:S.allwPeriod==='h1'?'1. Halbjahr':S.allwPeriod==='h2'?'2. Halbjahr':'Gesamtjahr';
   const showUsers=S.p.editAllw?S.users.filter(u=>!(u.roles||[]).includes('admin')):[getU(S.currentUser)].filter(Boolean);
-  const isBulk=S.p.editAllw&&S.allwPeriod==='month'; // bulk-editable when month view + has rights
+  const isBulk=S.p.editAllw&&S.allwPeriod==='month';
   document.getElementById('main').innerHTML=`
     <div class="ph"><div class="pt">Zulagendienste <span>${pLbl} ${yr}</span></div>
       ${isBulk?`<button class="btn-p" onclick="saveAllBulk()">&#128190; Alle speichern</button>`:''}
     </div>
-    <div class="tw"><div class="tt"><h2>&#220;bersicht</h2></div>
-      <div style="overflow-x:auto">
-      <table><thead><tr>
-        <th>Mitarbeiter</th>
-        <th style="text-align:center">&#127769; Nacht</th>
-        <th style="text-align:center">&#127881; Feiertag</th>
-        <th style="text-align:center">&#127958;&#65039; WE</th>
-        <th style="text-align:center">&#128203; C10</th>
+    <div class="tw"><div class="tt"><h2>\u00dcbersicht</h2></div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Mitarbeiter</th>
+        <th style="text-align:center">&#127769; Nacht</th><th style="text-align:center">&#127881; Feiertag</th>
+        <th style="text-align:center">&#127958;&#65039; WE</th><th style="text-align:center">&#128203; C10</th>
         ${!isBulk?'<th></th>':''}
       </tr></thead>
       <tbody>${showUsers.map(u=>{
+        if(isBulk){const a=getAllw(u.id,yr,S.allwMonth);return`<tr>
+          <td><div style="display:flex;align-items:center;gap:6px">${avHtml(u.initials,u.color,22,9)}<span>${u.name}</span></div></td>
+          <td style="text-align:center"><input type="number" min="0" class="bulk-nd" data-uid="${u.id}" value="${a.nd||0}" style="width:60px;text-align:center;font-size:12px;padding:4px"></td>
+          <td style="text-align:center"><input type="number" min="0" class="bulk-fd" data-uid="${u.id}" value="${a.fd||0}" style="width:60px;text-align:center;font-size:12px;padding:4px"></td>
+          <td style="text-align:center"><input type="number" min="0" class="bulk-fw" data-uid="${u.id}" value="${a.fw||0}" style="width:60px;text-align:center;font-size:12px;padding:4px"></td>
+          <td style="text-align:center"><input type="number" min="0" class="bulk-c10" data-uid="${u.id}" value="${a.c10||0}" style="width:60px;text-align:center;font-size:12px;padding:4px"></td>
+        </tr>`;}
         const sv=sumAllw(u.id,yr,months);
-        if(isBulk){
-          const a=getAllw(u.id,yr,S.allwMonth);
-          return`<tr>
-            <td><div style="display:flex;align-items:center;gap:6px">${avHtml(u.initials,u.color,22,9)}<span>${u.name}</span></div></td>
-            <td style="text-align:center"><input type="number" min="0" class="bulk-nd" data-uid="${u.id}" value="${a.nd||0}" style="width:60px;text-align:center;font-size:12px;padding:4px"></td>
-            <td style="text-align:center"><input type="number" min="0" class="bulk-fd" data-uid="${u.id}" value="${a.fd||0}" style="width:60px;text-align:center;font-size:12px;padding:4px"></td>
-            <td style="text-align:center"><input type="number" min="0" class="bulk-fw" data-uid="${u.id}" value="${a.fw||0}" style="width:60px;text-align:center;font-size:12px;padding:4px"></td>
-            <td style="text-align:center"><input type="number" min="0" class="bulk-c10" data-uid="${u.id}" value="${a.c10||0}" style="width:60px;text-align:center;font-size:12px;padding:4px"></td>
-          </tr>`;
-        }
-        return`<tr><td><div style="display:flex;align-items:center;gap:6px">${avHtml(u.initials,u.color,22,9)}<span>${u.name}</span></div></td>${numCell(sv.nd,'#3b6dd4')}${numCell(sv.fd,'#10b981')}${numCell(sv.fw,'#f59e0b')}${numCell(sv.c10,'#7c3aed')}<td><button class="btn-e" onclick="openAllwM('${u.id}',${yr},${months[0]})">&#9998;</button></td></tr>`;
-      }).join('')}</tbody>
-      </table></div>
+        return`<tr><td><div style="display:flex;align-items:center;gap:6px">${avHtml(u.initials,u.color,22,9)}<span>${u.name}</span></div></td>${numCell(sv.nd,'#3b6dd4')}${numCell(sv.fd,'#10b981')}${numCell(sv.fw,'#f59e0b')}${numCell(sv.c10,'#7c3aed')}<td><button class="btn-e" onclick="openAllwM('${u.id}',${yr},${months[0]})">\u270e</button></td></tr>`;
+      }).join('')}</tbody></table></div>
       ${isBulk?`<div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;justify-content:flex-end"><button class="btn-p" onclick="saveAllBulk()">&#128190; Alle speichern</button></div>`:''}
     </div>`;
 }
 async function saveAllBulk(){
   loading(true);
   try{
-    const rows=document.querySelectorAll('tbody tr');
     const saves=[];
     document.querySelectorAll('.bulk-nd').forEach(inp=>{
       const uid=inp.dataset.uid;
-      const nd=+inp.value||0;
-      const fd=+document.querySelector(`.bulk-fd[data-uid="${uid}"]`)?.value||0;
-      const fw=+document.querySelector(`.bulk-fw[data-uid="${uid}"]`)?.value||0;
-      const c10=+document.querySelector(`.bulk-c10[data-uid="${uid}"]`)?.value||0;
+      const nd=+inp.value||0,fd=+document.querySelector(`.bulk-fd[data-uid="${uid}"]`)?.value||0;
+      const fw=+document.querySelector(`.bulk-fw[data-uid="${uid}"]`)?.value||0,c10=+document.querySelector(`.bulk-c10[data-uid="${uid}"]`)?.value||0;
       saves.push(api('PUT','/allowances',{userId:uid,year:S.allwYear,month:S.allwMonth,nd,fd,fw,c10}));
     });
-    await Promise.all(saves);
-    await fetchData();renderMain();toast('\u2705 Alle Zulagen gespeichert!');
-  }catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
-  finally{loading(false);}
+    await Promise.all(saves);await fetchData();renderMain();toast('\u2705 Alle Zulagen gespeichert!');
+  }catch(e){toast('\u26A0\uFE0F '+e.message,'err');}finally{loading(false);}
 }
 function openAllwM(uid,year,month){
   const u=getU(uid),a=getAllw(uid,year,month);
-  document.getElementById('allwT').textContent=`${u?.name} &#8211; ${MONTHS[month-1]} ${year}`;
-  document.getElementById('allwInfo').textContent=`Zulagen f&#252;r ${MONTHS[month-1]} ${year}`;
+  document.getElementById('allwT').textContent=`${u?.name} \u2013 ${MONTHS[month-1]} ${year}`;
+  document.getElementById('allwInfo').textContent=`Zulagen f\u00fcr ${MONTHS[month-1]} ${year}`;
   ['aUid','aYr','aMo'].forEach((id,i)=>document.getElementById(id).value=[uid,year,month][i]);
   document.getElementById('aND').value=a.nd||'';document.getElementById('aFD').value=a.fd||'';
   document.getElementById('aFW').value=a.fw||'';document.getElementById('aC10').value=a.c10||'';
@@ -990,125 +975,184 @@ async function saveAllw(){
     await fetchData();closeModal('allwOv');renderMain();toast('\u2705 Gespeichert!');}
   catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
 }
-
-// ── ABRECHNUNG ────────────────────────────────────────────────────────────────
+// ABRECHNUNG
 function renderAbrechnung(){
-  const yr=S.abrYear, mo=S.abrMonth;
-  const filterUid=S.p.seeAllAbrechnung?(S.abrUser||null):S.currentUser;
-  const showUsers=S.p.seeAllAbrechnung
-    ?(S.abrUser?[getU(S.abrUser)].filter(Boolean):S.users.filter(u=>!(u.roles||[]).includes('admin')).sort((a,b)=>a.name.localeCompare(b.name,'de')))
-    :[getU(S.currentUser)].filter(Boolean);
-
-  const filterEinsp=e=>{
-    if(filterUid&&e.userId!==filterUid)return false;
-    const d=new Date(e.date); const ey=d.getFullYear(),em=d.getMonth()+1;
-    if(ey!==yr)return false;
-    if(mo&&em!==mo)return false;
-    return true;
-  };
-  const filterHO=h2=>{
-    if(!S.p.seeAllAbrechnung&&h2.userId!==S.currentUser)return false;
-    if(S.p.seeAllAbrechnung&&S.abrUser&&h2.userId!==S.abrUser)return false;
-    if(h2.year!==yr)return false;
-    if(mo&&h2.month!==mo)return false;
-    return true;
-  };
-
-  const moLabel=mo?MONTHS[mo-1]:'Ganzes Jahr';
+  const yr=S.abrYear,mo=S.abrMonth,myUid=S.currentUser;
   const months=mo?[mo]:Array.from({length:12},(_,i)=>i+1);
-
+  const moLabel=mo?MONTHS[mo-1]:'Ganzes Jahr';
+  const canSeeAll=S.p.seeAllAbrechnung;
+  const myEinsp=S.abrechnung.einspringer.filter(e=>e.userId===myUid&&(()=>{const d=new Date(e.date);return d.getFullYear()===yr&&(mo?d.getMonth()+1===mo:true);})()).sort((a,b)=>a.date.localeCompare(b.date));
+  const allEinsp=canSeeAll?S.abrechnung.einspringer.filter(e=>{const d=new Date(e.date);return d.getFullYear()===yr&&(mo?d.getMonth()+1===mo:true)&&(!S.abrUser||e.userId===S.abrUser);}).sort((a,b)=>{const na=getU(a.userId)?.name||'',nb=getU(b.userId)?.name||'';return na.localeCompare(nb,'de')||a.date.localeCompare(b.date);}):[];
+  const allHO=S.abrechnung.homeoffice.filter(h2=>h2.year===yr&&(mo?h2.month===mo:true)&&(!S.abrUser||h2.userId===S.abrUser)&&(canSeeAll||h2.userId===myUid)).sort((a,b)=>{const na=getU(a.userId)?.name||'',nb=getU(b.userId)?.name||'';return na.localeCompare(nb,'de')||a.month-b.month;});
   document.getElementById('main').innerHTML=`
     <div class="ph"><div class="pt">Abrechnung <span>${moLabel} ${yr}</span></div></div>
     <div class="abr-grid">
       <div>
         <div class="tw" style="margin-bottom:14px">
-          <div class="tt"><h2>&#128203; Einspringerdienste</h2></div>
+          <div class="tt"><h2>&#128203; Meine Einspringerdienste</h2></div>
           <div style="padding:14px;display:flex;flex-direction:column;gap:12px">
             ${months.map(m=>{
-              const einspMonth=S.abrechnung.einspringer.filter(e=>{
-                if(!S.p.seeAllAbrechnung)return e.userId===S.currentUser;
-                if(S.abrUser)return e.userId===S.abrUser;
-                return true;
-              }).filter(e=>{const d=new Date(e.date);return d.getFullYear()===yr&&d.getMonth()+1===m;});
-              const def=new Date(yr,m-1,15).toISOString().slice(0,10);
+              const mineMonth=myEinsp.filter(e=>new Date(e.date).getMonth()+1===m);
+              const defDate=new Date(yr,m-1,15).toISOString().slice(0,10);
               return`<div>
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
                   <span style="font-size:12px;font-weight:700;color:var(--mu)">${MONTHS[m-1]} ${yr}</span>
                   <div style="display:flex;align-items:center;gap:8px">
-                    <span style="font-size:11px;color:var(--di)">${einspMonth.length} Dienst${einspMonth.length!==1?'e':''}</span>
-                    <button class="btn-p" style="padding:4px 10px;font-size:12px" onclick="addInlineEinsp(${m},${yr},'${def}')">&#65291;</button>
+                    <span style="font-size:11px;color:var(--di)">${mineMonth.length} Dienst${mineMonth.length!==1?'e':''}</span>
+                    <button class="btn-p" style="padding:4px 10px;font-size:12px" onclick="addInlineEinsp(${m},${yr},'${defDate}')">&#65291;</button>
                   </div>
                 </div>
-                <div id="einsp-${m}-${yr}" style="display:flex;flex-direction:column;gap:5px">
-                  ${einspMonth.map(e=>`<div class="item-row" id="einsprow-${e.id}">
-                    <input type="date" value="${e.date}" onchange="updateEinsp('${e.id}','date',this.value)" style="width:130px;font-size:12px;flex:0 0 auto">
-                    <input type="text" value="${(e.note||'').replace(/"/g,'&quot;')}" placeholder="Notiz" onchange="updateEinsp('${e.id}','note',this.value)" style="flex:1;font-size:12px">
-                    <button class="btn-d" onclick="deleteEinspringer('${e.id}')" style="padding:5px 7px">&#10005;</button>
+                <div style="display:flex;flex-direction:column;gap:5px">
+                  ${mineMonth.map(e=>`<div style="padding:7px 10px;background:${e.rejectedBy?'color-mix(in srgb,var(--danger) 6%,var(--sf))':'var(--sf2)'};border:1px solid ${e.rejectedBy?'color-mix(in srgb,var(--danger) 25%,transparent)':'var(--border)'};border-radius:6px">
+                    <div style="display:flex;gap:6px;align-items:center">
+                      <input type="date" value="${e.date}" onchange="updateEinsp('${e.id}','date',this.value)" style="width:130px;font-size:12px;flex:0 0 auto">
+                      <input type="text" value="${(e.note||'').replace(/"/g,'&quot;')}" placeholder="Notiz" onchange="updateEinsp('${e.id}','note',this.value)" style="flex:1;font-size:12px">
+                      <button class="btn-d" onclick="deleteEinspringer('${e.id}')" style="padding:5px 7px">\u2715</button>
+                    </div>
+                    ${e.rejectedBy?`<div style="margin-top:5px;font-size:11px;color:var(--danger);font-weight:600">\u2717 Abgelehnt: ${e.rejectedReason||''}</div>`:''}
                   </div>`).join('')}
                 </div>
               </div>`;
             }).join('')}
           </div>
         </div>
+        ${canSeeAll?`<div class="tw">
+          <div class="tt"><h2>&#128203; Alle Einspringerdienste (${allEinsp.length})</h2></div>
+          ${allEinsp.length?`<table><thead><tr><th>Mitarbeiter</th><th>Datum</th><th>Notiz</th><th>Status</th><th></th></tr></thead><tbody>
+            ${allEinsp.map(e=>{const u=getU(e.userId);const rej=!!e.rejectedBy;return`<tr style="${rej?'opacity:.75':''}">
+              <td><div style="display:flex;align-items:center;gap:5px">${avHtml(u?.initials||'?',u?.color||'#888',20,8)}<span style="font-size:12px;font-weight:600">${u?.name||'?'}</span></div></td>
+              <td style="font-size:12px;white-space:nowrap">${fd(e.date)}</td>
+              <td style="font-size:12px;color:var(--mu)">${e.note||''}</td>
+              <td>${rej?`<span class="bdg pr-high" title="${e.rejectedReason||''}">\u2717 Abgelehnt</span>`:'<span class="bdg ap-bdg-approved">\u2713</span>'}</td>
+              <td><div style="display:flex;gap:4px">
+                ${!rej?`<button class="btn-warn" onclick="openRejectEinsp('${e.id}')" style="font-size:10px;padding:3px 7px">Ablehnen</button>`:''}
+                ${rej?`<button class="btn-ok" onclick="undoRejectEinsp('${e.id}')" style="font-size:10px;padding:3px 7px">R\u00fccksetzen</button>`:''}
+              </div></td>
+            </tr>`;}).join('')}
+          </tbody></table>`:`<div class="empty">Keine Einspringerdienste</div>`}
+        </div>`:``}
       </div>
       <div>
         <div class="tw" style="margin-bottom:14px">
           <div class="tt"><h2>&#127968; Home Office</h2></div>
           <div style="padding:14px">
-            <p style="font-size:12px;color:var(--mu);margin-bottom:12px">Tage pro Monat (eigene Eintr&#228;ge):</p>
+            <p style="font-size:12px;color:var(--mu);margin-bottom:12px">Tage pro Monat (eigene Eintr\u00e4ge):</p>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-              ${months.map(m=>{
-                const existing=S.abrechnung.homeoffice.find(h2=>h2.userId===S.currentUser&&h2.year===yr&&h2.month===m);
+              ${months.map(m=>{const ex=S.abrechnung.homeoffice.find(h=>h.userId===myUid&&h.year===yr&&h.month===m);
                 return`<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--sf2);border:1px solid var(--border);border-radius:6px">
                   <span style="font-size:11px;color:var(--mu);flex:1">${MONTHS[m-1].slice(0,3)}</span>
-                  <input type="number" min="0" max="31" value="${existing?.days||0}" style="width:50px;font-size:12px;padding:3px 5px;text-align:center" onchange="saveHO(${yr},${m},this.value)">
+                  <input type="number" min="0" max="31" value="${ex?.days||0}" style="width:50px;font-size:12px;padding:3px 5px;text-align:center" onchange="saveHO(${yr},${m},this.value)">
                   <span style="font-size:10px;color:var(--di)">Tage</span>
                 </div>`;}).join('')}
             </div>
           </div>
         </div>
-        ${S.p.seeAllAbrechnung?`<div class="tw">
-          <div class="tt"><h2>&#127968; HO &#220;bersicht alle MA</h2></div>
-          ${S.abrechnung.homeoffice.filter(filterHO).length?`<table><thead><tr><th>Mitarbeiter</th><th>Monat</th><th style="text-align:center">Tage</th></tr></thead><tbody>
-            ${S.abrechnung.homeoffice.filter(filterHO).sort((a,b)=>{const na=getU(a.userId)?.name||'',nb=getU(b.userId)?.name||'';return na.localeCompare(nb,'de');}).map(h2=>{const u=getU(h2.userId);return`<tr><td><div style="display:flex;align-items:center;gap:5px">${avHtml(u?.initials||'?',u?.color||'#888',20,8)}<span style="font-size:12px">${u?.name||'?'}</span></div></td><td style="font-size:12px">${MONTHS[h2.month-1].slice(0,3)} ${h2.year}</td><td style="text-align:center;font-weight:600">${h2.days}</td></tr>`;}).join('')}
-          </tbody></table>`:`<div class="empty">Keine HO-Eintr&#228;ge</div>`}
-        </div>`:''}
+        ${canSeeAll?`<div class="tw">
+          <div class="tt"><h2>&#127968; HO \u00dcbersicht alle MA</h2></div>
+          ${allHO.length?`<table><thead><tr><th>Mitarbeiter</th><th>Monat</th><th style="text-align:center">Tage</th></tr></thead><tbody>
+            ${allHO.map(h=>{const u=getU(h.userId);return`<tr><td><div style="display:flex;align-items:center;gap:5px">${avHtml(u?.initials||'?',u?.color||'#888',20,8)}<span style="font-size:12px">${u?.name||'?'}</span></div></td><td style="font-size:12px">${MONTHS[h.month-1].slice(0,3)} ${h.year}</td><td style="text-align:center;font-weight:600">${h.days}</td></tr>`;}).join('')}
+          </tbody></table>`:`<div class="empty">Keine HO-Eintr\u00e4ge</div>`}
+        </div>`:``}
       </div>
     </div>`;
 }
 async function addInlineEinsp(month,year,defDate){
-  try{
-    const r=await api('POST','/abrechnung/einspringer',{date:defDate,note:''});
-    await fetchData();
-    renderMain();
-  }catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
+  try{await api('POST','/abrechnung/einspringer',{date:defDate,note:''});await fetchData();renderMain();}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
 }
 async function updateEinsp(id,field,value){
-  try{
-    await api('PUT','/abrechnung/einspringer/'+id,{[field]:value});
-    // update local state without full re-render to avoid losing focus
-    const entry=S.abrechnung.einspringer.find(e=>e.id===id);
-    if(entry){if(field==='date')entry.date=value;else entry.note=value;}
-  }catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
+  try{await api('PUT','/abrechnung/einspringer/'+id,{[field]:value});const e=S.abrechnung.einspringer.find(x=>x.id===id);if(e){if(field==='date')e.date=value;else e.note=value;}}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
 }
-// openEinspModal replaced by inline addInlineEinsp
 async function deleteEinspringer(id){
-  if(!confirm('Eintrag l&#246;schen?'))return;
-  try{await api('DELETE','/abrechnung/einspringer/'+id);await fetchData();renderMain();}
-  catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
+  if(!confirm('Einspringerdienst l\u00f6schen?'))return;
+  try{await api('DELETE','/abrechnung/einspringer/'+id);await fetchData();renderMain();}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
 }
 async function saveHO(year,month,days){
-  try{await api('PUT','/abrechnung/homeoffice',{year,month,days:parseInt(days)||0});await fetchData();}
+  try{await api('PUT','/abrechnung/homeoffice',{year,month,days:parseInt(days)||0});await fetchData();}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
+}
+function openRejectEinsp(id){document.getElementById('rejEinspId').value=id;document.getElementById('rejReason').value='';document.getElementById('rejErr').textContent='';openModal('rejectEinspOv');}
+async function submitRejectEinsp(){
+  const id=document.getElementById('rejEinspId').value,reason=document.getElementById('rejReason').value.trim();
+  const errEl=document.getElementById('rejErr');
+  if(!reason){errEl.textContent='\u26A0\uFE0F Begr\u00fcndung erforderlich!';return;}
+  loading(true);
+  try{await api('PUT','/abrechnung/einspringer/'+id+'/reject',{reason});await fetchData();closeModal('rejectEinspOv');renderMain();toast('\u2705 Abgelehnt.');}
+  catch(e){errEl.textContent='\u26A0\uFE0F '+e.message;}finally{loading(false);}
+}
+async function undoRejectEinsp(id){
+  try{await api('PUT','/abrechnung/einspringer/'+id+'/reject',{undo:true});await fetchData();renderMain();toast('\u2705 Ablehnung zur\u00fcckgesetzt.');}
   catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
 }
-
-// ── TICKETS ──────────────────────────────────────────────────────────────────
+// DIENSTPLAENE
+function renderDienstplaene(){
+  const active=S.dienstplaene.filter(d=>!d.isArchived).sort((a,b)=>a.year!==b.year?b.year-a.year:b.month-a.month);
+  const archived=S.dienstplaene.filter(d=>d.isArchived).sort((a,b)=>a.year!==b.year?b.year-a.year:b.month-a.month);
+  const canUp=S.p.addGeneral;
+  document.getElementById('main').innerHTML=`
+    <div class="ph"><div class="pt">&#128196; Dienstpl\u00e4ne</div>${canUp?`<button class="btn-p" onclick="openDpUpload()">&#128228; PDF hochladen</button>`:''}</div>
+    <div class="tw" style="margin-bottom:14px">
+      <div class="tt"><h2>&#128196; Aktuelle Pl\u00e4ne (${active.length})</h2></div>
+      ${active.length?`<table><thead><tr><th>Monat</th><th>Bezeichnung</th><th>Version</th><th>Hochgeladen</th><th>Von</th><th></th></tr></thead><tbody>
+        ${active.map(d=>`<tr>
+          <td style="font-weight:600;white-space:nowrap">${MONTHS[d.month-1]} ${d.year}</td>
+          <td>${d.label}</td><td><span class="bdg st-open">v${d.version}</span></td>
+          <td style="font-size:11px;color:var(--mu)">${fdt(d.createdAt)}</td>
+          <td style="font-size:12px">${getU(d.createdBy)?.name||'?'}</td>
+          <td><div style="display:flex;gap:5px">
+            <a href="/api/dienstplaene/${d.id}/file" target="_blank" class="btn-ok" style="text-decoration:none;font-size:11px;padding:4px 8px">&#128065; \u00d6ffnen</a>
+            ${canUp?`<button class="btn-d" onclick="deleteDp('${d.id}')" style="padding:4px 8px">\u2715</button>`:''}
+          </div></td>
+        </tr>`).join('')}
+      </tbody></table>`:`<div class="empty">Noch keine Dienstpl\u00e4ne hochgeladen</div>`}
+    </div>
+    ${archived.length?`<div class="tw">
+      <div class="tt" style="cursor:pointer" onclick="toggleArchiv()"><h2>&#128230; Archiv (${archived.length})</h2><span id="archivBtn" style="font-size:11px;color:var(--mu)">Einblenden</span></div>
+      <div id="archivContent" style="display:none"><table><thead><tr><th>Monat</th><th>Bezeichnung</th><th>Version</th><th>Archiviert</th><th></th></tr></thead><tbody>
+        ${archived.map(d=>`<tr style="opacity:.75">
+          <td style="font-weight:600;white-space:nowrap">${MONTHS[d.month-1]} ${d.year}</td>
+          <td>${d.label}</td><td><span class="bdg st-on_hold">v${d.version}</span></td>
+          <td style="font-size:11px;color:var(--mu)">${fdt(d.archivedAt)}</td>
+          <td><div style="display:flex;gap:5px">
+            <a href="/api/dienstplaene/${d.id}/file" target="_blank" class="btn-s" style="text-decoration:none;font-size:11px;padding:4px 8px">&#128065;</a>
+            ${canUp?`<button class="btn-d" onclick="deleteDp('${d.id}')" style="padding:4px 8px;font-size:10px">\u2715</button>`:''}
+          </div></td>
+        </tr>`).join('')}
+      </tbody></table></div>
+    </div>`:``}`;
+}
+function toggleArchiv(){const c=document.getElementById('archivContent'),b=document.getElementById('archivBtn');if(!c)return;const s=c.style.display==='none';c.style.display=s?'block':'none';if(b)b.textContent=s?'Ausblenden':'Einblenden';}
+function openDpUpload(){
+  document.getElementById('dpMonth').value=new Date().getMonth()+1;
+  document.getElementById('dpYear').value=new Date().getFullYear();
+  document.getElementById('dpLabel').value='';document.getElementById('dpFile').value='';
+  document.getElementById('dpErr').textContent='';document.getElementById('dpFileName').textContent='Keine Datei ausgew\u00e4hlt';
+  openModal('dpOv');
+}
+async function uploadDienstplan(){
+  const month=+document.getElementById('dpMonth').value,year=+document.getElementById('dpYear').value;
+  const label=document.getElementById('dpLabel').value.trim(),fileInput=document.getElementById('dpFile');
+  const errEl=document.getElementById('dpErr');errEl.textContent='';
+  if(!month||!year||!label){errEl.textContent='\u26A0\uFE0F Alle Felder ausf\u00fcllen!';return;}
+  if(!fileInput.files.length){errEl.textContent='\u26A0\uFE0F Bitte PDF ausw\u00e4hlen!';return;}
+  const file=fileInput.files[0];
+  if(file.size>15*1024*1024){errEl.textContent='\u26A0\uFE0F Datei zu gro\u00df (max. 15 MB)!';return;}
+  loading(true);
+  try{
+    const fileData=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(new Error('Lesefehler'));r.readAsDataURL(file);});
+    const result=await api('POST','/dienstplaene',{month,year,label,filename:file.name,fileData});
+    await fetchData();closeModal('dpOv');renderDienstplaene();
+    toast(`\u2705 Dienstplan v${result.version} hochgeladen!${result.version>1?' Vorherige Version archiviert.':''}`);
+  }catch(e){errEl.textContent='\u26A0\uFE0F '+e.message;}finally{loading(false);}
+}
+async function deleteDp(id){
+  if(!confirm('Dienstplan-Eintrag l\u00f6schen?'))return;
+  loading(true);try{await api('DELETE','/dienstplaene/'+id);await fetchData();renderDienstplaene();}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}finally{loading(false);}
+}
+// TICKETS
 function getVisTks(closed=false){
   return S.tickets.filter(tk=>{
     if(closed!=(tk.status==='closed'))return false;
     if(S.tkFiltDept&&tk.department!==S.tkFiltDept)return false;
     if(S.tkFiltPrio&&tk.priority!==S.tkFiltPrio)return false;
-    if(S.tkFiltBucket&&tk.bucket!==S.tkFiltBucket)return false;
     if(S.tkFiltTag&&!tk.tags.includes(S.tkFiltTag))return false;
     if(S.tkFiltAssignee&&tk.assigneeId!==S.tkFiltAssignee)return false;
     if(S.tkFiltStatus&&tk.status!==S.tkFiltStatus)return false;
@@ -1117,55 +1161,48 @@ function getVisTks(closed=false){
   }).sort((a,b)=>{const po={high:0,medium:1,low:2};return(po[a.priority]||1)-(po[b.priority]||1)||b.createdAt.localeCompare(a.createdAt);});
 }
 function renderTickets(){
-  const closed=S.view==='tickets_closed'; const tks=getVisTks(closed);
+  const closed=S.view==='tickets_closed';const tks=getVisTks(closed);
   document.getElementById('main').innerHTML=`
     <div class="ph"><div class="pt">${closed?'Abgeschlossene':'Offene'} Tickets <span style="font-size:16px;color:var(--mu)">(${tks.length})</span></div>
       <button class="btn-p" onclick="openTkForm(null)">&#65291; Ticket</button></div>
     <div class="fbar">
-      <input class="srch" type="text" placeholder="Suchen &#8230;" value="${S.tkSearch}" oninput="S.tkSearch=this.value;renderMain()" style="width:180px">
+      <input class="srch" type="text" placeholder="Suchen \u2026" value="${S.tkSearch}" oninput="S.tkSearch=this.value;renderMain()" style="width:180px">
       <select class="flt" onchange="S.tkFiltTag=this.value;renderMain()"><option value="">Alle Tags</option>${S.tags.map(t=>`<option value="${t.id}"${S.tkFiltTag===t.id?' selected':''}>${t.label}</option>`).join('')}</select>
       <select class="flt" onchange="S.tkFiltAssignee=this.value;renderMain()"><option value="">Alle Bearbeiter</option>${S.users.map(u=>`<option value="${u.id}"${S.tkFiltAssignee===u.id?' selected':''}>${u.name}</option>`).join('')}</select>
     </div>
     <div class="tw"><div class="tt"><h2>Tickets</h2></div>
-      <div style="overflow-x:auto">
-      <table><thead><tr><th>#</th><th>Titel</th><th>Bereich</th><th>Prio</th><th>Status</th><th>Tags</th><th>Zust&#228;ndig</th><th>Datum</th></tr></thead>
+      <div style="overflow-x:auto"><table><thead><tr><th>#</th><th>Titel</th><th>Bereich</th><th>Prio</th><th>Status</th><th>Tags</th><th>Zust\u00e4ndig</th><th>Datum</th></tr></thead>
       <tbody>${tks.length?tks.map(tk=>{
-        const asn=getU(tk.assigneeId); const par=tk.parentTicketId?getTk(tk.parentTicketId):null;
-        const noteCount=tk.notes.filter(n=>n.noteType==='note').length;
+        const asn=getU(tk.assigneeId);const par=tk.parentTicketId?getTk(tk.parentTicketId):null;
+        const nc=tk.notes.filter(n=>n.noteType==='note').length;
         return`<tr class="clickable" onclick="openTkDetail('${tk.id}')">
-          <td style="font-family:monospace;font-size:11px;color:var(--mu);white-space:nowrap">${tk.number}${par?`<div style="font-size:9px;color:var(--di)">&#8618;${par.number}</div>`:''}</td>
-          <td style="max-width:220px"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${tk.title}</div>${noteCount?`<div style="font-size:10px;color:var(--mu)">&#128172; ${noteCount}</div>`:''}</td>
+          <td style="font-family:monospace;font-size:11px;color:var(--mu);white-space:nowrap">${tk.number}${par?`<div style="font-size:9px;color:var(--di)">\u21b8${par.number}</div>`:''}</td>
+          <td style="max-width:220px"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${tk.title}</div>${nc?`<div style="font-size:10px;color:var(--mu)">&#128172; ${nc}</div>`:''}</td>
           <td>${deptBdg(tk.department)}</td><td>${prioBdg(tk.priority)}</td><td>${stBdg(tk.status)}</td>
           <td>${tagChips(tk.tags)}</td>
-          <td>${asn?`<div style="display:flex;align-items:center;gap:4px">${avHtml(asn.initials,asn.color,18,8)}<span style="font-size:11px">${asn.name}</span></div>`:'<span style="color:var(--di);font-size:11px">&#8212;</span>'}</td>
+          <td>${asn?`<div style="display:flex;align-items:center;gap:4px">${avHtml(asn.initials,asn.color,18,8)}<span style="font-size:11px">${asn.name}</span></div>`:'<span style="color:var(--di);font-size:11px">\u2014</span>'}</td>
           <td style="font-size:11px;color:var(--mu);white-space:nowrap">${fd(tk.createdAt)}</td>
         </tr>`;}).join(''):`<tr><td colspan="8"><div class="empty">&#128235; Keine Tickets</div></td></tr>`}
       </tbody></table></div></div>`;
 }
 function openTkDetail(id){S.currentTicketId=id;renderTkDetail();openModal('tkDetOv');}
-function highlightMentions(text){
-  return text.replace(/@(\S+)/g,(match,name)=>{
-    const u=S.users.find(u=>u.name.toLowerCase()===name.toLowerCase());
-    return u?`<span class="mention">@${u.name}</span>`:match;
-  });
-}
+function highlightMentions(text){return text.replace(/@(\S+)/g,(match,name)=>{const u=S.users.find(u=>u.name.toLowerCase()===name.toLowerCase());return u?`<span class="mention">@${u.name}</span>`:match;});}
 function renderTkDetail(){
   const tk=getTk(S.currentTicketId);if(!tk)return;
-  const canEdit=tk._canEdit; const bkt=BUCKETS.find(b=>b.id===tk.bucket); const par=tk.parentTicketId?getTk(tk.parentTicketId):null;
+  const canEdit=tk._canEdit;const bkt=BUCKETS.find(b=>b.id===tk.bucket);const par=tk.parentTicketId?getTk(tk.parentTicketId):null;
   const subs=S.tickets.filter(t=>t.parentTicketId===tk.id);
   document.getElementById('tkDetNum').textContent=tk.number;
   document.getElementById('tkDetTitle').textContent=tk.title;
   document.getElementById('tkDetPrio').innerHTML=prioBdg(tk.priority);
   document.getElementById('tkDetSt').innerHTML=stBdg(tk.status);
   document.getElementById('tkDetEditBtn').style.display=canEdit?'':'none';
-
   const notes=tk.notes||[];
   document.getElementById('tkDetMain').innerHTML=`
     <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di);margin-bottom:6px">BESCHREIBUNG</div>
       <div style="font-size:13px;line-height:1.6;color:${tk.description?'var(--tx)':'var(--di)'}">${tk.description||'Keine Beschreibung.'}</div></div>
     ${subs.length||canEdit?`<div>
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di);margin-bottom:8px">UNTERTICKETS (${subs.length})</div>
-      <div class="subl">${subs.map(st=>`<div class="subi" onclick="S.currentTicketId='${st.id}';renderTkDetail()">&#8618;<span style="font-family:monospace;font-size:11px;color:var(--mu)">${st.number}</span><span style="flex:1;font-size:12px">${st.title}</span>${stBdg(st.status)}</div>`).join('')}
+      <div class="subl">${subs.map(st=>`<div class="subi" onclick="S.currentTicketId='${st.id}';renderTkDetail()">\u21b8<span style="font-family:monospace;font-size:11px;color:var(--mu)">${st.number}</span><span style="flex:1;font-size:12px">${st.title}</span>${stBdg(st.status)}</div>`).join('')}
       ${canEdit?`<button class="btn-s" style="font-size:11px;margin-top:4px" onclick="openTkForm(null,'${tk.id}')">&#65291; Unterticket</button>`:''}
       </div></div>`:''}
     ${tk.checklists.length?`<div>
@@ -1175,7 +1212,7 @@ function renderTkDetail(){
           <span style="font-size:12px;font-weight:700">${cl.name}</span>
           <div style="display:flex;gap:5px;align-items:center">
             <span style="font-size:10px;color:var(--mu)">${cl.items.filter(i=>i.completedBy).length}/${cl.items.length}</span>
-            ${canEdit?`<button class="btn-d" style="padding:2px 6px;font-size:10px" onclick="removeCl('${tk.id}','${cl.id}')">&#10005;</button>`:''}
+            ${canEdit?`<button class="btn-d" style="padding:2px 6px;font-size:10px" onclick="removeCl('${tk.id}','${cl.id}')">\u2715</button>`:''}
           </div>
         </div>
         <div class="cl-items">${cl.items.map(it=>`<div class="cl-item${it.completedBy?' done':''}" id="cli-${it.id}">
@@ -1184,7 +1221,7 @@ function renderTkDetail(){
             <span class="cl-item-text">${it.text}</span>
             ${it.completedBy?`<span class="cl-done-by">&#128100; ${getU(it.completedBy)?.name||'?'}</span>`:''}
           </div>
-          ${it.itemType==='check_text'?`<div class="cl-user-note"><input type="text" placeholder="Notiz &#8230;" value="${(it.userNote||'').replace(/"/g,'&quot;')}" onchange="saveClItemNote('${tk.id}','${cl.id}','${it.id}',this.value)"></div>`:''}
+          ${it.itemType==='check_text'?`<div class="cl-user-note"><input type="text" placeholder="Notiz \u2026" value="${(it.userNote||'').replace(/"/g,'&quot;')}" onchange="saveClItemNote('${tk.id}','${cl.id}','${it.id}',this.value)"></div>`:''}
         </div>`).join('')}</div>
       </div>`).join('')}
     </div>`:''}
@@ -1200,76 +1237,62 @@ function renderTkDetail(){
       ${canEdit?`<div style="margin-top:10px;display:flex;gap:7px;align-items:flex-end">
         <div class="note-input-wrap">
           <div class="mention-suggestions" id="mentionSug"></div>
-          <textarea id="noteInput" rows="2" placeholder="Notiz &#8230; @Name f&#252;r Erw&#228;hnung" style="flex:1;font-size:13px;width:100%" onkeyup="onNoteKey(event,'${tk.id}')"></textarea>
+          <textarea id="noteInput" rows="2" placeholder="Notiz \u2026 @Name f\u00fcr Erw\u00e4hnung" style="flex:1;font-size:13px;width:100%" onkeyup="onNoteKey(event,'${tk.id}')"></textarea>
         </div>
         <button class="btn-p" onclick="addNote('${tk.id}')" style="padding:8px 12px;flex-shrink:0">Senden</button>
       </div>`:''}
     </div>`;
-
   document.getElementById('tkDetSB').innerHTML=`
     ${canEdit?`
     <div class="tkf"><label>Status</label><select onchange="updateTkField('${tk.id}','status',this.value)">${STATUSES.map(s=>`<option value="${s.id}"${tk.status===s.id?' selected':''}>${s.label}</option>`).join('')}</select></div>
-    <div class="tkf"><label>Priorit&#228;t</label><select onchange="updateTkField('${tk.id}','priority',this.value)">${PRIORITIES.map(p=>`<option value="${p.id}"${tk.priority===p.id?' selected':''}>${p.label}</option>`).join('')}</select></div>
+    <div class="tkf"><label>Priorit\u00e4t</label><select onchange="updateTkField('${tk.id}','priority',this.value)">${PRIORITIES.map(p2=>`<option value="${p2.id}"${tk.priority===p2.id?' selected':''}>${p2.label}</option>`).join('')}</select></div>
     <div class="tkf"><label>Fachbereich</label><select onchange="updateTkField('${tk.id}','department',this.value)">${DEPTS.map(d=>`<option value="${d}"${tk.department===d?' selected':''}>${DEPT_LABELS[d]}</option>`).join('')}</select></div>
-    <div class="tkf"><label>Bucket</label><select onchange="updateTkField('${tk.id}','bucket',this.value)"><option value="">&#8212;</option>${BUCKETS.map(b=>`<option value="${b.id}"${tk.bucket===b.id?' selected':''}>${b.label}</option>`).join('')}</select></div>
-    <div class="tkf"><label>Zust&#228;ndig</label><div style="display:flex;gap:5px">
-      <select onchange="updateTkField('${tk.id}','assigneeId',this.value||null)" style="flex:1"><option value="">&#8212;</option>${S.users.map(u=>`<option value="${u.id}"${tk.assigneeId===u.id?' selected':''}>${u.name}</option>`).join('')}</select>
+    <div class="tkf"><label>Bucket</label><select onchange="updateTkField('${tk.id}','bucket',this.value)"><option value="">\u2014</option>${BUCKETS.map(b=>`<option value="${b.id}"${tk.bucket===b.id?' selected':''}>${b.label}</option>`).join('')}</select></div>
+    <div class="tkf"><label>Zust\u00e4ndig</label><div style="display:flex;gap:5px">
+      <select onchange="updateTkField('${tk.id}','assigneeId',this.value||null)" style="flex:1"><option value="">\u2014</option>${S.users.map(u=>`<option value="${u.id}"${tk.assigneeId===u.id?' selected':''}>${u.name}</option>`).join('')}</select>
       ${S.tp.canAssign&&tk.assigneeId!==S.currentUser?`<button class="btn-ok" onclick="updateTkField('${tk.id}','assigneeId','${S.currentUser}')">Ich</button>`:''}
     </div></div>
-    ${S.tp.canSetPublic?`<div class="tkf"><label>Sichtbarkeit</label><button class="bdg ${tk.isPublic?'pub-on':'pub-off'}" onclick="updateTkField('${tk.id}','isPublic',${!tk.isPublic})" style="cursor:pointer;padding:5px 10px;border-radius:6px;font-size:12px">${tk.isPublic?'&#127760; &#214;ffentlich':'&#128274; Privat'}</button></div>`:''}
-    <div class="tkf"><label>Elternticket</label><select onchange="updateTkField('${tk.id}','parentTicketId',this.value||null)"><option value="">&#8212;</option>${S.tickets.filter(t=>t.id!==tk.id).map(t=>`<option value="${t.id}"${tk.parentTicketId===t.id?' selected':''}>${t.number}: ${t.title.slice(0,25)}</option>`).join('')}</select></div>`
+    ${S.tp.canSetPublic?`<div class="tkf"><label>Sichtbarkeit</label><button class="bdg ${tk.isPublic?'pub-on':'pub-off'}" onclick="updateTkField('${tk.id}','isPublic',${!tk.isPublic})" style="cursor:pointer;padding:5px 10px;border-radius:6px;font-size:12px">${tk.isPublic?'&#127760; \u00d6ffentlich':'&#128274; Privat'}</button></div>`:''}
+    <div class="tkf"><label>Elternticket</label><select onchange="updateTkField('${tk.id}','parentTicketId',this.value||null)"><option value="">\u2014</option>${S.tickets.filter(t=>t.id!==tk.id).map(t=>`<option value="${t.id}"${tk.parentTicketId===t.id?' selected':''}>${t.number}: ${t.title.slice(0,25)}</option>`).join('')}</select></div>`
     :`<div class="tkf"><label>Status</label><div class="val">${stBdg(tk.status)}</div></div>
-    <div class="tkf"><label>Priorit&#228;t</label><div class="val">${prioBdg(tk.priority)}</div></div>
+    <div class="tkf"><label>Priorit\u00e4t</label><div class="val">${prioBdg(tk.priority)}</div></div>
     <div class="tkf"><label>Fachbereich</label><div class="val">${deptBdg(tk.department)}</div></div>
-    <div class="tkf"><label>Zust&#228;ndig</label><div class="val">${getU(tk.assigneeId)?`<div style="display:flex;align-items:center;gap:5px">${avHtml(getU(tk.assigneeId).initials,getU(tk.assigneeId).color,18,8)}<span style="font-size:12px">${getU(tk.assigneeId).name}</span></div>`:'&#8212;'}</div></div>`}
+    <div class="tkf"><label>Zust\u00e4ndig</label><div class="val">${getU(tk.assigneeId)?`<div style="display:flex;align-items:center;gap:5px">${avHtml(getU(tk.assigneeId).initials,getU(tk.assigneeId).color,18,8)}<span style="font-size:12px">${getU(tk.assigneeId).name}</span></div>`:'\u2014'}</div></div>`}
     <div class="tkdiv"></div>
-    <div class="tkf"><label>Tags</label><div>${tagChips(tk.tags)||'<span style="color:var(--di);font-size:11px">&#8212;</span>'}</div></div>
+    <div class="tkf"><label>Tags</label><div>${tagChips(tk.tags)||'<span style="color:var(--di);font-size:11px">\u2014</span>'}</div></div>
     <div class="tkf"><label>Erstellt von</label><div style="font-size:12px">${getU(tk.createdBy)?.name||'?'}</div></div>
     <div class="tkf"><label>Erstellt am</label><div style="font-size:11px;color:var(--mu)">${fdt(tk.createdAt)}</div></div>
     ${par?`<div class="tkf"><label>Elternticket</label><div class="subi" onclick="S.currentTicketId='${par.id}';renderTkDetail()" style="margin-top:4px"><span style="font-family:monospace;font-size:11px">${par.number}</span><span style="font-size:12px;flex:1">${par.title.slice(0,22)}</span></div></div>`:''}
     ${canEdit?`<div class="tkdiv"></div>
-    <button class="btn-s" style="width:100%;justify-content:center;font-size:12px" onclick="openAttachCl('${tk.id}')">&#9745;&#65039; Checkliste anh&#228;ngen</button>
-    ${tk.status!=='closed'?`<button class="btn-ok" style="width:100%;justify-content:center;margin-top:4px" onclick="updateTkField('${tk.id}','status','closed')">&#10003; Abschlie&#223;en</button>`:''}`:''}`;
+    <button class="btn-s" style="width:100%;justify-content:center;font-size:12px" onclick="openAttachCl('${tk.id}')">&#9745;&#65039; Checkliste anh\u00e4ngen</button>
+    ${tk.status!=='closed'?`<button class="btn-ok" style="width:100%;justify-content:center;margin-top:4px" onclick="updateTkField('${tk.id}','status','closed')">\u2713 Abschlie\u00dfen</button>`:''}`:''}`;
 }
-
-// @mention
-let _mentionQuery='', _mentionActive=false;
+let _mentionActive=false;
 function onNoteKey(e,tkId){
-  const ta=document.getElementById('noteInput');
-  if(!ta)return;
+  const ta=document.getElementById('noteInput');if(!ta)return;
   if(e.key==='Enter'&&!e.shiftKey&&!_mentionActive){e.preventDefault();addNote(tkId);return;}
-  const val=ta.value, pos=ta.selectionStart;
-  const before=val.slice(0,pos);
+  const val=ta.value,pos=ta.selectionStart,before=val.slice(0,pos);
   const match=before.match(/@(\w*)$/);
   if(match){
-    _mentionQuery=match[1].toLowerCase();
-    const suggestions=S.users.filter(u=>u.name.toLowerCase().includes(_mentionQuery)&&u.id!==S.currentUser).slice(0,5);
+    const q=match[1].toLowerCase();
+    const sugs=S.users.filter(u=>u.name.toLowerCase().includes(q)&&u.id!==S.currentUser).slice(0,5);
     const sug=document.getElementById('mentionSug');
-    if(suggestions.length){
-      sug.innerHTML=suggestions.map((u,i)=>`<div class="mention-opt${i===0?' active':''}" onclick="insertMention('${u.name}')" data-name="${u.name}">${avHtml(u.initials,u.color,20,8)} ${u.name}</div>`).join('');
-      sug.classList.add('open');_mentionActive=true;
-    }else{sug.classList.remove('open');_mentionActive=false;}
-  }else{
-    document.getElementById('mentionSug')?.classList.remove('open');
-    _mentionActive=false;
-  }
+    if(sugs.length){sug.innerHTML=sugs.map((u,i)=>`<div class="mention-opt${i===0?' active':''}" onclick="insertMention('${u.name}')">${avHtml(u.initials,u.color,20,8)} ${u.name}</div>`).join('');sug.classList.add('open');_mentionActive=true;}
+    else{sug.classList.remove('open');_mentionActive=false;}
+  }else{document.getElementById('mentionSug')?.classList.remove('open');_mentionActive=false;}
 }
 function insertMention(name){
   const ta=document.getElementById('noteInput');if(!ta)return;
-  const val=ta.value, pos=ta.selectionStart;
-  const before=val.slice(0,pos).replace(/@\w*$/,'');
+  const val=ta.value,pos=ta.selectionStart,before=val.slice(0,pos).replace(/@\w*$/,'');
   ta.value=before+'@'+name+' '+val.slice(pos);
-  document.getElementById('mentionSug')?.classList.remove('open');
-  _mentionActive=false; ta.focus();
+  document.getElementById('mentionSug')?.classList.remove('open');_mentionActive=false;ta.focus();
 }
 async function updateTkField(id,field,value){
-  try{await api('PUT','/tickets/'+id,{[field]:value});await fetchData();renderMain();const tk=getTk(id);if(tk){S.currentTicketId=id;renderTkDetail();}}
-  catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
+  try{await api('PUT','/tickets/'+id,{[field]:value});await fetchData();renderMain();const tk=getTk(id);if(tk){S.currentTicketId=id;renderTkDetail();}}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
 }
 async function addNote(tkId){
   const inp=document.getElementById('noteInput');if(!inp?.value.trim())return;
-  try{await api('POST','/tickets/'+tkId+'/notes',{text:inp.value.trim()});inp.value='';await fetchData();renderTkDetail();}
-  catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
+  try{await api('POST','/tickets/'+tkId+'/notes',{text:inp.value.trim()});inp.value='';await fetchData();renderTkDetail();}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
 }
 function editCurrentTicket(){openTkForm(S.currentTicketId);}
 function openTkForm(id,parentId){
@@ -1281,11 +1304,11 @@ function openTkForm(id,parentId){
   document.getElementById('tkFDept').value=tk?.department||'technik';
   document.getElementById('tkFPrio').value=tk?.priority||'medium';
   document.getElementById('tkFSt').value=tk?.status||'open';
-  document.getElementById('tkFBkt').innerHTML='<option value="">&#8212;</option>'+BUCKETS.map(b=>`<option value="${b.id}"${tk?.bucket===b.id?' selected':''}>${b.label}</option>`).join('');
+  document.getElementById('tkFBkt').innerHTML='<option value="">\u2014</option>'+BUCKETS.map(b=>`<option value="${b.id}"${tk?.bucket===b.id?' selected':''}>${b.label}</option>`).join('');
   document.getElementById('tkFTags').innerHTML=S.tags.map(t=>`<option value="${t.id}"${tk?.tags?.includes(t.id)?' selected':''}>${t.label}</option>`).join('');
-  document.getElementById('tkFAsgn').innerHTML='<option value="">&#8212; niemand &#8212;</option>'+S.users.map(u=>`<option value="${u.id}"${tk?.assigneeId===u.id?' selected':''}>${u.name}</option>`).join('');
+  document.getElementById('tkFAsgn').innerHTML='<option value="">\u2014 niemand \u2014</option>'+S.users.map(u=>`<option value="${u.id}"${tk?.assigneeId===u.id?' selected':''}>${u.name}</option>`).join('');
   const pid=parentId||tk?.parentTicketId||'';
-  document.getElementById('tkFPar').innerHTML='<option value="">&#8212;</option>'+S.tickets.filter(t=>!id||t.id!==id).map(t=>`<option value="${t.id}"${t.id===pid?' selected':''}>${t.number}: ${t.title.slice(0,35)}</option>`).join('');
+  document.getElementById('tkFPar').innerHTML='<option value="">\u2014</option>'+S.tickets.filter(t=>!id||t.id!==id).map(t=>`<option value="${t.id}"${t.id===pid?' selected':''}>${t.number}: ${t.title.slice(0,35)}</option>`).join('');
   closeModal('tkDetOv');openModal('tkFormOv');
 }
 async function saveTicket(){
@@ -1298,152 +1321,47 @@ async function saveTicket(){
     await fetchData();closeModal('tkFormOv');renderMain();toast(id?'\u2705 Aktualisiert!':'\u2705 Erstellt!');
   }catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
 }
-
-// ── CHECKLISTS ────────────────────────────────────────────────────────────────
-function renderDienstplaene(){
-  const active=S.dienstplaene.filter(d=>!d.isArchived).sort((a,b)=>a.year!==b.year?b.year-a.year:b.month-a.month);
-  const archived=S.dienstplaene.filter(d=>d.isArchived).sort((a,b)=>a.year!==b.year?b.year-a.year:b.month-a.month);
-  const canUpload=S.p.addGeneral;
-  document.getElementById('main').innerHTML=`
-    <div class="ph">
-      <div class="pt">&#128196; Dienstpl&#228;ne</div>
-      ${canUpload?`<button class="btn-p" onclick="openDpUpload()">&#128228; PDF hochladen</button>`:''}
-    </div>
-    <div class="tw" style="margin-bottom:14px">
-      <div class="tt"><h2>&#128196; Aktuelle Pl&#228;ne (${active.length})</h2></div>
-      ${active.length?`<table><thead><tr><th>Monat</th><th>Bezeichnung</th><th>Version</th><th>Hochgeladen</th><th>Hochgeladen von</th><th></th></tr></thead><tbody>
-        ${active.map(d=>`<tr>
-          <td style="font-weight:600;white-space:nowrap">${MONTHS[d.month-1]} ${d.year}</td>
-          <td>${d.label}</td>
-          <td><span class="bdg st-open">v${d.version}</span></td>
-          <td style="font-size:11px;color:var(--mu)">${fdt(d.createdAt)}</td>
-          <td style="font-size:12px">${getU(d.createdBy)?.name||'?'}</td>
-          <td><div style="display:flex;gap:5px">
-            <a href="/api/dienstplaene/${d.id}/file" target="_blank" class="btn-ok" style="text-decoration:none;font-size:11px;padding:4px 8px">&#128065; Ansehen</a>
-            ${canUpload?`<button class="btn-d" onclick="deleteDp('${d.id}')" style="padding:4px 8px">&#10005;</button>`:''}
-          </div></td>
-        </tr>`).join('')}
-      </tbody></table>`:`<div class="empty">Noch keine Dienstpl&#228;ne</div>`}
-    </div>
-    ${archived.length?`<div class="tw">
-      <div class="tt" style="cursor:pointer" onclick="toggleArchiv()">
-        <h2>&#128230; Archiv (${archived.length})</h2>
-        <span id="archivToggleBtn" style="font-size:11px;color:var(--mu)">Einblenden</span>
-      </div>
-      <div id="archivContent" style="display:none">
-        <table><thead><tr><th>Monat</th><th>Bezeichnung</th><th>Version</th><th>Archiviert am</th><th></th></tr></thead><tbody>
-          ${archived.map(d=>`<tr style="opacity:.75">
-            <td style="font-weight:600;white-space:nowrap">${MONTHS[d.month-1]} ${d.year}</td>
-            <td>${d.label}</td>
-            <td><span class="bdg st-on_hold">v${d.version} archiviert</span></td>
-            <td style="font-size:11px;color:var(--mu)">${fdt(d.archivedAt)}</td>
-            <td><div style="display:flex;gap:5px">
-              <a href="/api/dienstplaene/${d.id}/file" target="_blank" class="btn-s" style="text-decoration:none;font-size:11px;padding:4px 8px">&#128065; Ansehen</a>
-              ${canUpload?`<button class="btn-d" onclick="deleteDp('${d.id}')" style="padding:4px 8px;font-size:10px">&#10005;</button>`:''}
-            </div></td>
-          </tr>`).join('')}
-        </tbody></table>
-      </div>
-    </div>`:``}`;
-}
-function toggleArchiv(){
-  const c=document.getElementById('archivContent');
-  const b=document.getElementById('archivToggleBtn');
-  if(!c)return;
-  const show=c.style.display==='none';
-  c.style.display=show?'block':'none';
-  if(b)b.textContent=show?'Ausblenden':'Einblenden';
-}
-function openDpUpload(){
-  document.getElementById('dpMonth').value=new Date().getMonth()+1;
-  document.getElementById('dpYear').value=new Date().getFullYear();
-  document.getElementById('dpLabel').value='';
-  document.getElementById('dpFile').value='';
-  document.getElementById('dpErr').textContent='';
-  document.getElementById('dpFileName').textContent='';
-  openModal('dpOv');
-}
-async function uploadDienstplan(){
-  const month=+document.getElementById('dpMonth').value;
-  const year=+document.getElementById('dpYear').value;
-  const label=document.getElementById('dpLabel').value.trim();
-  const fileInput=document.getElementById('dpFile');
-  const errEl=document.getElementById('dpErr');
-  errEl.textContent='';
-  if(!month||!year||!label){errEl.textContent='\u26A0\uFE0F Alle Felder ausf\u00fcllen!';return;}
-  if(!fileInput.files.length){errEl.textContent='\u26A0\uFE0F Bitte PDF ausw\u00e4hlen!';return;}
-  const file=fileInput.files[0];
-  if(!file.name.toLowerCase().endsWith('.pdf')&&file.type!=='application/pdf'){errEl.textContent='\u26A0\uFE0F Nur PDF-Dateien erlaubt!';return;}
-  if(file.size>10*1024*1024){errEl.textContent='\u26A0\uFE0F Datei zu gro\u00df (max. 10 MB)!';return;}
-  loading(true);
-  try{
-    const fileData=await new Promise((res,rej)=>{
-      const r=new FileReader();
-      r.onload=()=>res(r.result);
-      r.onerror=()=>rej(new Error('Lesefehler'));
-      r.readAsDataURL(file);
-    });
-    const result=await api('POST','/dienstplaene',{month,year,label,filename:file.name,fileData});
-    await fetchData();closeModal('dpOv');renderDienstplaene();
-    toast(`\u2705 Dienstplan v${result.version} hochgeladen! ${result.version>1?'Vorherige Version archiviert.':''}`);
-  }catch(e){errEl.textContent='\u26A0\uFE0F '+e.message;}
-  finally{loading(false);}
-}
-async function deleteDp(id){
-  if(!confirm('Dienstplan-Eintrag l\u00f6schen?'))return;
-  loading(true);
-  try{await api('DELETE','/dienstplaene/'+id);await fetchData();renderDienstplaene();toast('\uD83D\uDDD1\uFE0F Gel\u00f6scht.');}
-  catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
-  finally{loading(false);}
-}
+// CHECKLISTS
 function renderChecklists(){
   const visible=S.p.manageUsers?S.checklists:S.checklists.filter(c=>S.tp.myDepts.includes(c.department)||c.createdBy===S.currentUser);
   document.getElementById('main').innerHTML=`
-    <div class="ph"><div class="pt">Checklisten <span>Vorlagen</span></div>
-      <button class="btn-p" onclick="openClForm(null)">&#65291; Neue Vorlage</button></div>
+    <div class="ph"><div class="pt">Checklisten <span>Vorlagen</span></div><button class="btn-p" onclick="openClForm(null)">&#65291; Neue Vorlage</button></div>
     <div class="tw"><div class="tt"><h2>Vorlagen (${visible.length})</h2></div>
-      ${visible.length?visible.map(cl=>`
-        <div style="padding:12px 15px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:10px">
-          <div style="flex:1">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
-              <span style="font-weight:700;font-size:13px">${cl.name}</span>${deptBdg(cl.department)}
-            </div>
-            <div style="font-size:11px;color:var(--mu);margin-bottom:6px">${cl.items.length} Punkte &middot; ${getU(cl.createdBy)?.name||'?'}</div>
-            <div style="display:flex;flex-wrap:wrap;gap:3px">${cl.items.map(it=>`<span style="font-size:11px;background:var(--sf2);border:1px solid var(--border);border-radius:4px;padding:2px 7px">${it.itemType==='check_text'?'&#128065;&#65039;':'&#9745;&#65039;'} ${it.text}</span>`).join('')}</div>
-          </div>
-          <div style="display:flex;gap:5px;flex-shrink:0">
-            <button class="btn-e" onclick="openClForm('${cl.id}')">&#9998;</button>
-            <button class="btn-d" onclick="deleteCl('${cl.id}')">&#10005;</button>
-          </div>
-        </div>`).join(''):`<div class="empty">&#128235; Keine Vorlagen</div>`}
+      ${visible.length?visible.map(cl=>`<div style="padding:12px 15px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:10px">
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px"><span style="font-weight:700;font-size:13px">${cl.name}</span>${deptBdg(cl.department)}</div>
+          <div style="font-size:11px;color:var(--mu);margin-bottom:6px">${cl.items.length} Punkte &middot; ${getU(cl.createdBy)?.name||'?'}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:3px">${cl.items.map(it=>`<span style="font-size:11px;background:var(--sf2);border:1px solid var(--border);border-radius:4px;padding:2px 7px">${it.itemType==='check_text'?'&#128065;&#65039;':'&#9745;&#65039;'} ${it.text}</span>`).join('')}</div>
+        </div>
+        <div style="display:flex;gap:5px;flex-shrink:0">
+          <button class="btn-e" onclick="openClForm('${cl.id}')">\u270e</button>
+          <button class="btn-d" onclick="deleteCl('${cl.id}')">\u2715</button>
+        </div>
+      </div>`).join(''):`<div class="empty">&#128235; Keine Vorlagen</div>`}
     </div>`;
 }
 let _clItems=[];
 function openClForm(id){
   const cl=id?S.checklists.find(c=>c.id===id):null;
   document.getElementById('clFT').textContent=cl?'Vorlage bearbeiten':'Neue Checkliste';
-  document.getElementById('clFId').value=cl?.id||'';
-  document.getElementById('clFNm').value=cl?.name||'';
-  document.getElementById('clFDept').value=cl?.department||'technik';
-  document.getElementById('clFErr').textContent='';
+  document.getElementById('clFId').value=cl?.id||'';document.getElementById('clFNm').value=cl?.name||'';
+  document.getElementById('clFDept').value=cl?.department||'technik';document.getElementById('clFErr').textContent='';
   _clItems=(cl?.items||[]).map(i=>({text:i.text,itemType:i.itemType||'check'}));
-  renderClItems();
-  openModal('clFormOv');
+  renderClItems();openModal('clFormOv');
 }
 function renderClItems(){
   document.getElementById('clFItems').innerHTML=_clItems.map((it,i)=>`<div class="item-row">
     <select class="item-type-sel" onchange="_clItems[${i}].itemType=this.value">
-      <option value="check"${it.itemType==='check'?' selected':''}>&#9745; Checkbox</option>
-      <option value="check_text"${it.itemType==='check_text'?' selected':''}>&#9745; + Notizfeld</option>
+      <option value="check"${it.itemType==='check'?' selected':''}>\u2611 Checkbox</option>
+      <option value="check_text"${it.itemType==='check_text'?' selected':''}>\u2611 + Notizfeld</option>
     </select>
     <input type="text" value="${(it.text||'').replace(/"/g,'&quot;')}" placeholder="Punkt ${i+1}" oninput="_clItems[${i}].text=this.value">
-    <button class="btn-d" onclick="_clItems.splice(${i},1);renderClItems()" style="padding:6px 9px">&#10005;</button>
+    <button class="btn-d" onclick="_clItems.splice(${i},1);renderClItems()" style="padding:6px 9px">\u2715</button>
   </div>`).join('');
 }
 function addClItem(){_clItems.push({text:'',itemType:'check'});renderClItems();setTimeout(()=>{const ins=document.querySelectorAll('#clFItems .item-row input[type=text]');if(ins.length)ins[ins.length-1].focus();},50);}
 async function saveChecklist(){
-  const name=document.getElementById('clFNm').value.trim();
-  document.getElementById('clFErr').textContent='';
+  const name=document.getElementById('clFNm').value.trim();document.getElementById('clFErr').textContent='';
   if(!name){document.getElementById('clFErr').textContent='\u26A0\uFE0F Name erforderlich!';return;}
   const id=document.getElementById('clFId').value;
   const items=_clItems.filter(it=>it.text.trim()).map(it=>({text:it.text.trim(),itemType:it.itemType}));
@@ -1452,93 +1370,92 @@ async function saveChecklist(){
     if(id)await api('PUT','/checklists/'+id,{name,department:document.getElementById('clFDept').value,items});
     else await api('POST','/checklists',{name,department:document.getElementById('clFDept').value,items});
     await fetchData();closeModal('clFormOv');renderMain();toast('\u2705 Checkliste gespeichert!');
-  }catch(e){document.getElementById('clFErr').textContent='\u26A0\uFE0F '+e.message;}
-  finally{loading(false);}
+  }catch(e){document.getElementById('clFErr').textContent='\u26A0\uFE0F '+e.message;}finally{loading(false);}
 }
-async function deleteCl(id){
-  if(!confirm('Vorlage l\u00f6schen?'))return;
-  try{await api('DELETE','/checklists/'+id);await fetchData();renderMain();toast('\uD83D\uDDD1\uFE0F Gel\u00f6scht.');}
-  catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
-}
+async function deleteCl(id){if(!confirm('Vorlage l\u00f6schen?'))return;try{await api('DELETE','/checklists/'+id);await fetchData();renderMain();}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}}
 function openAttachCl(tkId){
   document.getElementById('attachTkId').value=tkId;
-  document.getElementById('attachClSel').innerHTML='<option value="">&#8212; w&#228;hlen &#8212;</option>'+S.checklists.map(cl=>`<option value="${cl.id}">${cl.name} (${DEPT_LABELS[cl.department]||cl.department})</option>`).join('');
+  document.getElementById('attachClSel').innerHTML='<option value="">\u2014 w\u00e4hlen \u2014</option>'+S.checklists.map(cl=>`<option value="${cl.id}">${cl.name} (${DEPT_LABELS[cl.department]||cl.department})</option>`).join('');
   openModal('attachClOv');
 }
 async function doAttachCl(){
-  const tkId=document.getElementById('attachTkId').value, tplId=document.getElementById('attachClSel').value;
+  const tkId=document.getElementById('attachTkId').value,tplId=document.getElementById('attachClSel').value;
   if(!tplId){toast('\u26A0\uFE0F Vorlage w\u00e4hlen!');return;}
   try{await api('POST','/tickets/'+tkId+'/checklists',{templateId:tplId});await fetchData();closeModal('attachClOv');renderTkDetail();toast('\u2705 Checkliste angeh\u00e4ngt!');}
   catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
 }
-async function removeCl(tkId,clId){
-  try{await api('DELETE','/tickets/'+tkId+'/checklists/'+clId);await fetchData();renderTkDetail();}
-  catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
-}
-async function toggleClItem(tkId,clId,iId,checked){
-  try{await api('PUT','/tickets/'+tkId+'/checklists/'+clId+'/items/'+iId,{completed:checked});await fetchData();renderTkDetail();}
-  catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
-}
-async function saveClItemNote(tkId,clId,iId,note){
-  try{await api('PUT','/tickets/'+tkId+'/checklists/'+clId+'/items/'+iId,{userNote:note});await fetchData();}
-  catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
-}
-
-// ── MESSAGES ──────────────────────────────────────────────────────────────────
+async function removeCl(tkId,clId){try{await api('DELETE','/tickets/'+tkId+'/checklists/'+clId);await fetchData();renderTkDetail();}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}}
+async function toggleClItem(tkId,clId,iId,checked){try{await api('PUT','/tickets/'+tkId+'/checklists/'+clId+'/items/'+iId,{completed:checked});await fetchData();renderTkDetail();}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}}
+async function saveClItemNote(tkId,clId,iId,note){try{await api('PUT','/tickets/'+tkId+'/checklists/'+clId+'/items/'+iId,{userNote:note});}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}}
+// MESSAGES
 function renderMessages(){
   const isSent=S.view==='messages_sent';
   const msgs=isSent
-    ? S.messages.filter(m=>m.senderId===S.currentUser).sort((a,b)=>b.createdAt.localeCompare(a.createdAt))
-    : S.messages.filter(m=>m.senderId!==S.currentUser||m.targetType==='all').sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
-  const unread=msgs.filter(m=>!m.isRead&&!isSent);
+    ?S.messages.filter(m=>m.senderId===S.currentUser).sort((a,b)=>b.createdAt.localeCompare(a.createdAt))
+    :S.messages.filter(m=>m.senderId!==S.currentUser||m.targetType==='all').sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+  const unread=isSent?[]:msgs.filter(m=>!m.isRead);
   document.getElementById('main').innerHTML=`
-    <div class="ph"><div class="pt">Nachrichten</div>
-      ${S.p.canSendMessages?`<button class="btn-p" onclick="openMsgForm()">&#9993;&#65039; Verfassen</button>`:''}
-    </div>
+    <div class="ph"><div class="pt">Nachrichten</div>${S.p.canSendMessages?`<button class="btn-p" onclick="openMsgForm()">&#9993;&#65039; Verfassen</button>`:''}</div>
     <div class="atabs" style="margin-bottom:14px;border-bottom:1px solid var(--border)">
-      <button class="tb ${!isSent?'on':''}" onclick="setView('messages')">&#128235; Eingang</button>
-      <button class="tb ${isSent?'on':''}" onclick="setView('messages_sent')">&#128228; Gesendet</button>
+      <button class="tb ${!isSent?'on':''}" onclick="setView('messages')">&#128235; Eingang ${S.messages.filter(m=>m.senderId!==S.currentUser&&!m.isRead).length?`<span class="nbdg" style="display:inline-flex">${S.messages.filter(m=>m.senderId!==S.currentUser&&!m.isRead).length}</span>`:''}</button>
+      <button class="tb ${isSent?'on':''}" onclick="setView('messages_sent')">&#128228; Gesendet (${S.messages.filter(m=>m.senderId===S.currentUser).length})</button>
     </div>
-    ${!isSent&&unread.length?`<div class="ib3" style="margin-bottom:12px;border-color:color-mix(in srgb,var(--danger) 25%,transparent);background:color-mix(in srgb,var(--danger) 4%,var(--sf));color:var(--danger)">&#128276; ${unread.length} unbest&#228;tigte Nachricht${unread.length>1?'en':''}</div>`:''}
+    ${!isSent&&unread.length?`<div style="padding:10px 14px;margin-bottom:12px;background:color-mix(in srgb,var(--danger) 4%,var(--sf));border:1px solid color-mix(in srgb,var(--danger) 20%,transparent);border-radius:var(--r);font-size:12px;font-weight:600;color:var(--danger)">&#128276; ${unread.length} unbest\u00e4tigte Nachricht${unread.length>1?'en':''}</div>`:''}
     ${msgs.length?msgs.map(m=>{
-      const from=getU(m.senderId);
-      const to=m.targetType==='user'?getU(m.targetValue):null;
+      const from=getU(m.senderId);const toUser=m.targetType==='user'?getU(m.targetValue):null;
       return`<div class="msg-card${!isSent&&!m.isRead?' unread':''}">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap">
           <div>
             <div class="msg-title">${!isSent&&!m.isRead?'&#128276; ':''}${m.title}</div>
-            <div class="msg-meta">${isSent?`An: ${to?to.name:'Alle Mitarbeiter'} &middot;`:'von '+from?.name+' &middot;'} ${fdt(m.createdAt)}</div>
+            <div class="msg-meta">${isSent?`An: <strong>${toUser?toUser.name:'Alle Mitarbeiter'}</strong> &middot; `:`Von: <strong>${from?.name||'?'}</strong> &middot; `}${fdt(m.createdAt)}</div>
           </div>
-          <div style="display:flex;gap:5px;flex-shrink:0">
-            ${!isSent&&!m.isRead?`<button class="btn-p" onclick="readMsg('${m.id}')">&#10003; Best&#228;tigen</button>`:''}
-            ${isSent||m.isRead?`<span class="bdg ap-bdg-${m.isRead?'approved':'pending'}">${m.isRead?'&#10003; Best&#228;tigt':'&#8987; Ausstehend'}</span>`:''}
-            ${m.senderId===S.currentUser||S.p.manageUsers?`<button class="btn-d" onclick="deleteMsg('${m.id}')">&#10005;</button>`:''}
+          <div style="display:flex;gap:5px;flex-shrink:0;align-items:center">
+            ${!isSent&&!m.isRead?`<button class="btn-p" onclick="readMsg('${m.id}')">\u2713 Best\u00e4tigen</button>`:''}
+            ${!isSent&&m.isRead?`<span class="bdg ap-bdg-approved" style="font-size:10px">\u2713 Best\u00e4tigt</span>`:''}
+            ${isSent?`<span class="bdg ${m.isRead?'ap-bdg-approved':'ap-bdg-pending'}" style="font-size:10px">${m.isRead?'\u2713 Gelesen':'\u23f3 Ausstehend'}</span>`:''}
+            ${m.senderId===S.currentUser||S.p.manageUsers?`<button class="btn-d" onclick="deleteMsg('${m.id}')" style="padding:4px 8px;font-size:11px">\u2715</button>`:''}
           </div>
         </div>
         <div class="msg-body" style="margin-top:8px">${m.body}</div>
-      </div>`;}).join(''):`<div class="empty">&#128235; Keine Nachrichten</div>`}`;
+      </div>`;
+    }).join(''):`<div class="empty" style="padding:30px">&#128235; ${isSent?'Keine gesendeten Nachrichten':'Keine Nachrichten'}</div>`}`;
+}
+async function readMsg(id){
+  try{await api('POST','/messages/'+id+'/read');await fetchData();renderMain();toast('\u2705 Best\u00e4tigt!');}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
+}
+async function deleteMsg(id){
+  if(!confirm('Nachricht l\u00f6schen?'))return;
+  try{await api('DELETE','/messages/'+id);await fetchData();renderMain();}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
 }
 function openMsgForm(){
-  document.getElementById('msgTo').innerHTML='<option value="">Alle Mitarbeiter</option>'+S.users.map(u=>`<option value="${u.id}">${u.name}</option>`).join('');
-  document.getElementById('msgTitle').value='';document.getElementById('msgBody').value='';
+  const sel=document.getElementById('msgTo');
+  if(sel)sel.innerHTML='<option value="">Alle Mitarbeiter</option>'+S.users.filter(u=>u.id!==S.currentUser).map(u=>`<option value="${u.id}">${u.name}</option>`).join('');
+  const t=document.getElementById('msgTitle');if(t)t.value='';
+  const b=document.getElementById('msgBody');if(b)b.value='';
+  const e=document.getElementById('msgErr');if(e)e.textContent='';
   openModal('msgFormOv');
 }
 async function sendMessage(){
-  const title=document.getElementById('msgTitle').value.trim(),body=document.getElementById('msgBody').value.trim();
-  if(!title||!body){toast('\u26A0\uFE0F Betreff und Text erforderlich!');return;}
-  const toUser=document.getElementById('msgTo').value;
-  try{await api('POST','/messages',{title,body,targetType:toUser?'user':'all',targetValue:toUser||null});await fetchData();closeModal('msgFormOv');renderMain();toast('\u2705 Gesendet!');}
-  catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
+  const title=document.getElementById('msgTitle')?.value.trim()||'';
+  const body=document.getElementById('msgBody')?.value.trim()||'';
+  const errEl=document.getElementById('msgErr');if(errEl)errEl.textContent='';
+  if(!title||!body){const msg='\u26A0\uFE0F Betreff und Text sind erforderlich!';if(errEl)errEl.textContent=msg;else toast(msg);return;}
+  const toUser=document.getElementById('msgTo')?.value||'';
+  loading(true);
+  try{
+    await api('POST','/messages',{title,body,targetType:toUser?'user':'all',targetValue:toUser||null});
+    await fetchData();closeModal('msgFormOv');renderMain();toast('\u2705 Nachricht gesendet!');
+  }catch(e){const msg='\u26A0\uFE0F '+e.message;if(errEl)errEl.textContent=msg;else toast(msg,'err');console.error('sendMessage:',e);}
+  finally{loading(false);}
 }
-
-// ── ADMIN ─────────────────────────────────────────────────────────────────────
+// ADMIN
 function openAdminModal(){renderUsrList();renderCatList();renderTagList();renderRightsMatrix();openModal('admOv');}
 function swTab(t){['users','cats','tags','rights'].forEach(x=>{document.getElementById('atb-'+x).classList.toggle('on',x===t);document.getElementById('atp-'+x).classList.toggle('on',x===t);});}
 function backToAdmin(tab='users'){['ufOv','cfOv','tfOv'].forEach(closeModal);openAdminModal();swTab(tab);}
-function renderUsrList(){document.getElementById('usrList').innerHTML=S.users.map(u=>`<div class="ai">${avHtml(u.initials,u.color,34,13,u.isOnline)}<div class="aii"><div class="ain">${u.name} ${roleBadges(u.id)}${u.isOnline?'<span style="font-size:10px;color:var(--ok)">&#9679; online</span>':''}</div><div class="ais">${u.mustChangePW?'\u26A0\uFE0F PW ausstehend':'\u2713 Aktiv'}</div></div><div class="aia"><button class="btn-e" onclick="openUF('${u.id}')">&#9998;</button>${S.users.length>1&&u.id!==S.currentUser?`<button class="btn-d" onclick="delUser('${u.id}')">&#10005;</button>`:''}</div></div>`).join('');}
-function renderCatList(){document.getElementById('catList').innerHTML=S.categories.map(c=>`<div class="ai"><div style="width:14px;height:14px;border-radius:3px;background:${c.color};flex-shrink:0"></div><div class="aii"><div class="ain">${c.emoji} ${c.label}</div></div><div class="aia"><button class="btn-e" onclick="openCF('${c.id}')">&#9998;</button>${S.categories.length>1?`<button class="btn-d" onclick="delCat('${c.id}')">&#10005;</button>`:''}</div></div>`).join('');}
-function renderTagList(){document.getElementById('tagList').innerHTML=S.tags.map(t=>`<div class="ai"><div style="width:14px;height:14px;border-radius:3px;background:${t.color};flex-shrink:0"></div><div class="aii"><div class="ain"><span class="tag-chip" style="background:${t.color}1a;color:${t.color}">${t.label}</span></div></div><div class="aia"><button class="btn-e" onclick="openTF('${t.id}')">&#9998;</button>${S.tags.length>1?`<button class="btn-d" onclick="delTag('${t.id}')">&#10005;</button>`:''}</div></div>`).join('');}
-function renderRightsMatrix(){const rids=ROLES.map(r=>r.id);document.getElementById('rightsMatrix').innerHTML=`<table class="rm-table"><thead><tr><th style="text-align:left">Berechtigung</th>${ROLES.map(r=>`<th>${r.icon}<br>${r.label}</th>`).join('')}</tr></thead><tbody>${RM.map(([p,v])=>`<tr><td style="text-align:left">${p}</td>${rids.map(r=>`<td>${v[r]===1?'<span class="rm-yes">\u2713</span>':v[r]===2?'<span class="rm-part">\u3030</span>':'<span class="rm-no">\u2013</span>'}</td>`).join('')}</tr>`).join('')}</tbody></table>`;}
+function renderUsrList(){document.getElementById('usrList').innerHTML=S.users.map(u=>`<div class="ai">${avHtml(u.initials,u.color,34,13,u.isOnline)}<div class="aii"><div class="ain">${u.name} ${roleBadges(u.id)}${u.isOnline?'<span style="font-size:10px;color:var(--ok)">\u25cf online</span>':''}</div><div class="ais">${u.mustChangePW?'\u26A0\uFE0F PW ausstehend':'\u2713 Aktiv'}</div></div><div class="aia"><button class="btn-e" onclick="openUF('${u.id}')">\u270e</button>${S.users.length>1&&u.id!==S.currentUser?`<button class="btn-d" onclick="delUser('${u.id}')">\u2715</button>`:''}</div></div>`).join('');}
+function renderCatList(){document.getElementById('catList').innerHTML=S.categories.map(c=>`<div class="ai"><div style="width:14px;height:14px;border-radius:3px;background:${c.color};flex-shrink:0"></div><div class="aii"><div class="ain">${c.emoji} ${c.label}</div></div><div class="aia"><button class="btn-e" onclick="openCF('${c.id}')">\u270e</button>${S.categories.length>1?`<button class="btn-d" onclick="delCat('${c.id}')">\u2715</button>`:''}</div></div>`).join('');}
+function renderTagList(){document.getElementById('tagList').innerHTML=S.tags.map(t=>`<div class="ai"><div style="width:14px;height:14px;border-radius:3px;background:${t.color};flex-shrink:0"></div><div class="aii"><div class="ain"><span class="tag-chip" style="background:${t.color}1a;color:${t.color}">${t.label}</span></div></div><div class="aia"><button class="btn-e" onclick="openTF('${t.id}')">\u270e</button>${S.tags.length>1?`<button class="btn-d" onclick="delTag('${t.id}')">\u2715</button>`:''}</div></div>`).join('');}
+function renderRightsMatrix(){const rids=ROLES.map(r=>r.id);document.getElementById('rightsMatrix').innerHTML=`<table class="rm-table"><thead><tr><th style="text-align:left">Berechtigung</th>${ROLES.map(r=>`<th>${r.icon}<br>${r.label}</th>`).join('')}</tr></thead><tbody>${RM.map(([p2,v])=>`<tr><td style="text-align:left">${p2}</td>${rids.map(r=>`<td>${v[r]===1?'<span class="rm-yes">\u2713</span>':v[r]===2?'<span class="rm-part">\u3030</span>':'<span class="rm-no">\u2013</span>'}</td>`).join('')}</tr>`).join('')}</tbody></table>`;}
 function buildCP(cid,sel,fn){document.getElementById(cid).innerHTML=pal().map(col=>`<div class="cp ${col===sel?'on':''}" style="background:${col}" onclick="${fn}('${col}','${cid}')"></div>`).join('');}
 function pickU(col,cid){S.ufColor=col;document.querySelectorAll('#'+cid+' .cp').forEach(el=>el.classList.toggle('on',el.style.backgroundColor===h2r(col)));}
 function pickC(col,cid){S.cfColor=col;document.querySelectorAll('#'+cid+' .cp').forEach(el=>el.classList.toggle('on',el.style.backgroundColor===h2r(col)));}
@@ -1548,160 +1465,75 @@ function openUF(id){
   document.getElementById('ufT').textContent=u?'Benutzer bearbeiten':'Benutzer anlegen';
   document.getElementById('ufId').value=u?.id||'';document.getElementById('ufNm').value=u?.name||'';document.getElementById('ufIn').value=u?.initials||'';
   document.getElementById('ufPWRR').style.display=u?'block':'none';document.getElementById('ufPWRst').checked=false;
-  document.getElementById('ufErr').textContent='';
-  S.ufColor=u?.color||pal()[0];
-  const defaultRoles=u?.roles||['standard'];
-  document.getElementById('ufRoles').innerHTML=ROLES.map(r=>`<label class="rck"><input type="checkbox" value="${r.id}" ${defaultRoles.includes(r.id)?'checked':''}><span>${r.icon} ${r.label}</span></label>`).join('');
+  document.getElementById('ufErr').textContent='';S.ufColor=u?.color||pal()[0];
+  document.getElementById('ufRoles').innerHTML=ROLES.map(r=>`<label class="rck"><input type="checkbox" value="${r.id}" ${(u?.roles||['standard']).includes(r.id)?'checked':''}><span>${r.icon} ${r.label}</span></label>`).join('');
   buildCP('ufCR',S.ufColor,'pickU');closeModal('admOv');openModal('ufOv');
 }
 async function saveUser(){
   const name=document.getElementById('ufNm').value.trim(),initials=document.getElementById('ufIn').value.trim().toUpperCase();
-  const errEl=document.getElementById('ufErr'); errEl.textContent='';
+  const errEl=document.getElementById('ufErr');errEl.textContent='';
   if(!name||!initials){errEl.textContent='\u26A0\uFE0F Name und K\u00fcrzel erforderlich!';return;}
   const roles=Array.from(document.querySelectorAll('#ufRoles input:checked')).map(cb=>cb.value);
-  if(!roles.length){errEl.textContent='\u26A0\uFE0F Mindestens eine Rolle ausw\u00e4hlen!';return;}
-  const id=document.getElementById('ufId').value;
-  loading(true);
+  if(!roles.length){errEl.textContent='\u26A0\uFE0F Mindestens eine Rolle!';return;}
+  const id=document.getElementById('ufId').value;loading(true);
   try{
     if(id)await api('PUT','/users/'+id,{name,initials,roles,color:S.ufColor,resetPassword:document.getElementById('ufPWRst').checked});
     else await api('POST','/users',{name,initials,roles,color:S.ufColor});
     await fetchData();loadLoginUsers();backToAdmin('users');toast('\u2705 Benutzer gespeichert!');
-  }catch(e){errEl.textContent='\u26A0\uFE0F '+e.message;}
-  finally{loading(false);}
+  }catch(e){errEl.textContent='\u26A0\uFE0F '+e.message;}finally{loading(false);}
 }
-async function delUser(id){if(!confirm('Benutzer l\u00f6schen?'))return;loading(true);try{await api('DELETE','/users/'+id);await fetchData();loadLoginUsers();backToAdmin('users');toast('\uD83D\uDDD1\uFE0F Gel\u00f6scht.');}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}finally{loading(false);}}
+async function delUser(id){if(!confirm('Benutzer l\u00f6schen?'))return;loading(true);try{await api('DELETE','/users/'+id);await fetchData();loadLoginUsers();backToAdmin('users');}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}finally{loading(false);}}
 function openCF(id){const c=id?getCat(id):null;document.getElementById('cfT').textContent=c?'Kategorie bearbeiten':'Kategorie anlegen';document.getElementById('cfId').value=c?.id||'';document.getElementById('cfLb').value=c?.label||'';document.getElementById('cfEm').value=c?.emoji||'\uD83D\uDCCC';document.getElementById('cfErr').textContent='';S.cfColor=c?.color||pal()[2];buildCP('cfCR',S.cfColor,'pickC');closeModal('admOv');openModal('cfOv');}
 async function saveCategory(){const label=document.getElementById('cfLb').value.trim();const errEl=document.getElementById('cfErr');errEl.textContent='';if(!label){errEl.textContent='\u26A0\uFE0F Bezeichnung erforderlich!';return;}const id=document.getElementById('cfId').value;loading(true);try{if(id)await api('PUT','/categories/'+id,{label,emoji:document.getElementById('cfEm').value.trim()||'\uD83D\uDCCC',color:S.cfColor});else await api('POST','/categories',{label,emoji:document.getElementById('cfEm').value.trim()||'\uD83D\uDCCC',color:S.cfColor});await fetchData();backToAdmin('cats');toast('\u2705 Gespeichert!');}catch(e){errEl.textContent='\u26A0\uFE0F '+e.message;}finally{loading(false);}}
 async function delCat(id){if(!confirm('Kategorie l\u00f6schen?'))return;loading(true);try{await api('DELETE','/categories/'+id);await fetchData();backToAdmin('cats');}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}finally{loading(false);}}
 function openTF(id){const t=id?getTag(id):null;document.getElementById('tfT').textContent=t?'Tag bearbeiten':'Tag anlegen';document.getElementById('tfId').value=t?.id||'';document.getElementById('tfLb').value=t?.label||'';document.getElementById('tfErr').textContent='';S.tfColor=t?.color||pal()[0];buildCP('tfCR',S.tfColor,'pickT');closeModal('admOv');openModal('tfOv');}
 async function saveTag(){const label=document.getElementById('tfLb').value.trim();const errEl=document.getElementById('tfErr');errEl.textContent='';if(!label){errEl.textContent='\u26A0\uFE0F Bezeichnung erforderlich!';return;}const id=document.getElementById('tfId').value;loading(true);try{if(id)await api('PUT','/tags/'+id,{label,color:S.tfColor});else await api('POST','/tags',{label,color:S.tfColor});await fetchData();backToAdmin('tags');toast('\u2705 Gespeichert!');}catch(e){errEl.textContent='\u26A0\uFE0F '+e.message;}finally{loading(false);}}
 async function delTag(id){if(!confirm('Tag l\u00f6schen?'))return;loading(true);try{await api('DELETE','/tags/'+id);await fetchData();backToAdmin('tags');}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}finally{loading(false);}}
-
-// ── UTILS ─────────────────────────────────────────────────────────────────────
+// UTILS
 function toggleTheme(){const dark=document.documentElement.getAttribute('data-theme')==='dark';document.documentElement.setAttribute('data-theme',dark?'light':'dark');document.getElementById('thBtn').textContent=dark?'\uD83C\uDF19':'\u2600\uFE0F';localStorage.setItem('lst_theme',dark?'light':'dark');}
-function openModal(id){document.getElementById(id).classList.add('open');}
-function closeModal(id){document.getElementById(id).classList.remove('open');}
+function openModal(id){document.getElementById(id)?.classList.add('open');}
+function closeModal(id){document.getElementById(id)?.classList.remove('open');}
 function eyeToggle(inputId,btn){const inp=document.getElementById(inputId);const show=inp.type==='password';inp.type=show?'text':'password';btn.textContent=show?'\uD83D\uDE48':'\uD83D\uDC41';}
 function toast(msg,type=''){const t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3200);}
-const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOv','clFormOv','attachClOv','changelogOv','dpOv','msgFormOv'];
+const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOv','clFormOv','attachClOv','changelogOv','dpOv','rejectEinspOv','msgFormOv'];
 document.addEventListener('keydown',e=>{if(e.key==='Escape')ALL_MODALS.forEach(closeModal);});
 ALL_MODALS.forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('click',e=>{if(e.target===el)closeModal(id);});});
 document.addEventListener('click',e=>{if(!e.target.closest('.note-input-wrap'))document.getElementById('mentionSug')?.classList.remove('open');});
-
-// ── BOOT ─────────────────────────────────────────────────────────────────────
+// AUTO-REFRESH
+let _lastMsgCount=-1,_lastTkCount=-1,_refreshTimer=null;
+function startAutoRefresh(){
+  if(_refreshTimer)clearInterval(_refreshTimer);
+  _lastMsgCount=S.messages.filter(m=>!m.isRead&&m.senderId!==S.currentUser).length;
+  _lastTkCount=S.tickets.filter(tk=>tk.status!=='closed'&&((S.tp.myDepts.includes(tk.department)&&!tk.assigneeId)||tk.assigneeId===S.currentUser)).length;
+  _refreshTimer=setInterval(async()=>{
+    if(!S.currentUser)return;
+    try{
+      const data=await api('GET','/data');
+      const newMsgCount=(data.messages||[]).filter(m=>!m.isRead&&m.senderId!==S.currentUser).length;
+      const myD=S.tp?.myDepts||[];
+      const newTkCount=(data.tickets||[]).filter(tk=>tk.status!=='closed'&&((myD.includes(tk.department)&&!tk.assigneeId)||tk.assigneeId===S.currentUser)).length;
+      S.users=data.users||[];S.events=data.events||[];S.tickets=data.tickets||[];
+      S.messages=data.messages||[];S.notifications=data.notifications||[];
+      S.allowances=data.allowances||[];S.checklists=data.checklists||[];
+      S.abrechnung=data.abrechnung||{einspringer:[],homeoffice:[]};S.dienstplaene=data.dienstplaene||[];
+      updateBadges();
+      if(_lastMsgCount>=0&&newMsgCount>_lastMsgCount)toast('\uD83D\uDCEC Neue Nachricht eingegangen!');
+      if(_lastTkCount>=0&&newTkCount>_lastTkCount)toast('\uD83C\uDFAB Neues Ticket in deinem Bereich!');
+      _lastMsgCount=newMsgCount;_lastTkCount=newTkCount;
+      if(S.view==='home')renderHome();
+    }catch(e){}
+  },60000);
+}
+// BOOT
 (async()=>{
   const theme=localStorage.getItem('lst_theme')||'light';
   document.documentElement.setAttribute('data-theme',theme);
   document.getElementById('thBtn').textContent=theme==='dark'?'\u2600\uFE0F':'\uD83C\uDF19';
   await loadLoginUsers();
-  try{
-    const me=await api('GET','/auth/me');
-    if(me?.userId){
-      S.currentUser=me.userId;loading(true);
-      await fetchData();loading(false);loginOK();
-    }
-  }catch(e){loading(false);}
+  try{const me=await api('GET','/auth/me');if(me?.userId){S.currentUser=me.userId;loading(true);await fetchData();loading(false);loginOK();}}
+  catch(e){loading(false);}
 })();
-</script>
 
-<!-- DIENSTPLAN UPLOAD -->
-<div class="ov" id="dpOv">
-  <div class="modal sm">
-    <div class="mh"><h2>&#128228; Dienstplan hochladen</h2><button class="mc" onclick="closeModal(&#39;dpOv&#39;)">&#10005;</button></div>
-    <div class="mb2">
-      <div class="fr">
-        <div class="fg"><label>Monat *</label><select id="dpMonth">
-          <option value="1">J&#228;nner</option><option value="2">Februar</option><option value="3">M&#228;rz</option>
-          <option value="4">April</option><option value="5">Mai</option><option value="6">Juni</option>
-          <option value="7">Juli</option><option value="8">August</option><option value="9">September</option>
-          <option value="10">Oktober</option><option value="11">November</option><option value="12">Dezember</option>
-        </select></div>
-        <div class="fg"><label>Jahr *</label><input type="number" id="dpYear" min="2020" max="2099" value="2025"></div>
-      </div>
-      <div class="fg full"><label>Bezeichnung *</label><input type="text" id="dpLabel" placeholder="z.B. M&#228;rz 2025 &#8211; Endversion"></div>
-      <div class="fg full">
-        <label>PDF-Datei * (max. 10 MB)</label>
-        <label style="display:flex;align-items:center;gap:9px;padding:9px 12px;background:var(--sf2);border:1px solid var(--border);border-radius:7px;cursor:pointer">
-          <span>&#128196;</span>
-          <span id="dpFileName" style="font-size:12px;color:var(--mu)">Keine Datei ausgew&#228;hlt</span>
-          <input type="file" id="dpFile" accept=".pdf,application/pdf" style="display:none" onchange="document.getElementById(&#39;dpFileName&#39;).textContent=this.files[0]?.name||&#39;Keine Datei&#39;">
-        </label>
-      </div>
-      <div class="ib3" style="font-size:11px">&#8505;&#65039; Wenn ein Plan f&#252;r diesen Monat bereits existiert, wird er automatisch archiviert.</div>
-      <div id="dpErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div>
-    </div>
-    <div class="mf"><button class="btn-s" onclick="closeModal(&#39;dpOv&#39;)">Abbrechen</button><button class="btn-p" onclick="uploadDienstplan()">&#128228; Hochladen</button></div>
-  </div>
-</div>
-<!-- CHANGELOG -->
-<div class="ov" id="changelogOv">
-  <div class="modal lg">
-    <div class="mh"><h2>&#128203; Changelog &amp; Versionen</h2><button class="mc" onclick="closeModal(&#39;changelogOv&#39;)">&#10005;</button></div>
-    <div class="mb2" style="gap:0">
-      <div style="display:flex;flex-direction:column;gap:14px">
-        <div style="padding:12px;background:color-mix(in srgb,var(--acc) 6%,var(--sf));border:1px solid color-mix(in srgb,var(--acc) 20%,transparent);border-radius:8px">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-            <span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v1.6.0</span>
-            <span style="font-size:11px;color:var(--mu)">Aktuell</span>
-          </div>
-          <ul style="font-size:12px;line-height:1.7;padding-left:18px">
-            <li>Dienstpl&#228;ne: Neue Seite zum Ablegen von Dienstplan-PDFs pro Monat</li>
-            <li>Dienstpl&#228;ne: Automatische Versionierung &#8211; alte Version wird ins Archiv verschoben</li>
-            <li>Dienstpl&#228;ne: Archiv ein-/ausblendbar, direktes &#214;ffnen im Browser</li>
-            <li>Zulagendienste: Alle Mitarbeiter auf einmal im aktuellen Monat bearbeitbar</li>
-            <li>Abrechnung: Einspringer-&#220;bersicht jetzt auch f&#252;r Dienstplanung-Rolle sichtbar</li>
-            <li>Navigation: Nachrichten als klappbares Untermen&#252; (Eingang / Gesendet)</li>
-            <li>Bug-Fix: Nachricht senden &#8211; Fehler direkt im Formular angezeigt</li>
-          </ul>
-        </div>
-        <div style="padding:12px;background:var(--sf2);border:1px solid var(--border);border-radius:8px">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-            <span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--sf3);color:var(--mu);padding:2px 8px;border-radius:4px">v1.5.0</span>
-          </div>
-          <ul style="font-size:12px;line-height:1.7;padding-left:18px">
-            <li>Abrechnung: Einspringerdienste als inline-Liste, Ereignis-Best&#228;tigungen</li>
-            <li>Ereignisse: Alle Eintr&#228;ge sichtbar, fremde anonymisiert</li>
-            <li>Administration als Zahnrad-Button oben rechts</li>
-            <li>Nachrichten: Tab &#8222;Gesendet&#8220;</li>
-          </ul>
-        </div>
-        <div style="padding:12px;background:var(--sf2);border:1px solid var(--border);border-radius:8px">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-            <span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--sf3);color:var(--mu);padding:2px 8px;border-radius:4px">v1.4.0</span>
-          </div>
-          <ul style="font-size:12px;line-height:1.7;padding-left:18px">
-            <li>Benachrichtigungen: @Mentions in Ticket-Notizen</li>
-            <li>Benachrichtigungen: Neue Tickets im Fachbereich / Zuweisung</li>
-            <li>Abrechnung: Einspringer-Dienste und Home Office</li>
-            <li>Checklisten: Zwei Item-Typen (Checkbox / Checkbox + Notizfeld)</li>
-            <li>Bug-Fix: Online-Benutzer nicht sichtbar</li>
-          </ul>
-        </div>
-        <div style="padding:12px;background:var(--sf2);border:1px solid var(--border);border-radius:8px">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-            <span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--sf3);color:var(--mu);padding:2px 8px;border-radius:4px">v1.3.x</span>
-          </div>
-          <ul style="font-size:12px;line-height:1.7;padding-left:18px">
-            <li>Checklisten: Vorlagen pro Fachbereich, an Tickets anh&#228;ngbar</li>
-            <li>Nachrichten: Senden an alle / Einzelpersonen, Best&#228;tigung</li>
-            <li>Ticketsystem: Untertickets, Audit-Trail, Statusverlauf</li>
-            <li>Bug-Fixes: Permission-Keys, Login-Dropdown, Admin-Modal</li>
-          </ul>
-        </div>
-        <div style="padding:12px;background:var(--sf2);border:1px solid var(--border);border-radius:8px">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-            <span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--sf3);color:var(--mu);padding:2px 8px;border-radius:4px">v1.0&#8211;1.2</span>
-          </div>
-          <ul style="font-size:12px;line-height:1.7;padding-left:18px">
-            <li>Grundversion: Dienstplan, Zulagendienste, Ticketsystem</li>
-            <li>Rollen &amp; Berechtigungen, Benutzerverwaltung</li>
-            <li>Hell/Dunkel-Theme, Mobile-Responsive</li>
-            <li>Kategorien, Tags, Genehmigungssystem</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
+</script>
 </body>
 </html>
