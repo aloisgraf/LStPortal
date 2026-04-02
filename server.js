@@ -601,7 +601,7 @@ app.post('/api/abrechnung/einspringer', auth, async (req,res) => {
     ok(res,{id});
   } catch(e) { bad(res,e.message,500); }
 });
-app.put('/api/abrechnung/einspringer/:id', auth, async (req,res) => {
+app.put('/api/abrechnung/einspringer/:id', auth, async (req, res) => {
   try {
     const row = await q1('SELECT * FROM abrechnung_einspringer WHERE id=$1',[req.params.id]);
     if (!row) return bad(res,'Nicht gefunden',404);
@@ -611,7 +611,7 @@ app.put('/api/abrechnung/einspringer/:id', auth, async (req,res) => {
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
-
+app.delete('/api/abrechnung/einspringer/:id', auth, async (req,res) => {
   try {
     const row = await q1('SELECT * FROM abrechnung_einspringer WHERE id=$1',[req.params.id]);
     if (!row) return bad(res,'Nicht gefunden',404);
