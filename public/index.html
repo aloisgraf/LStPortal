@@ -203,6 +203,24 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
   .sr{grid-template-columns:1fr}.fr{grid-template-columns:1fr}.aer{grid-template-columns:1fr 1fr}
 }
 
+
+/* Help overlay */
+#helpOv { padding: 0; }
+#helpOv > div { border-radius: 0; }
+@media(max-width:768px){
+  #helpOv > div > div:last-child { flex-direction: column; }
+  #helpOv > div > div:last-child > div:first-child { width:100%;height:auto;border-right:none;border-bottom:1px solid var(--border);display:flex;overflow-x:auto;white-space:nowrap; }
+}
+#helpContent h4 { font-size:13px;font-weight:700;margin:14px 0 6px;color:var(--tx); }
+#helpContent p { font-size:13px;line-height:1.65;margin-bottom:10px;color:var(--tx); }
+#helpContent ul, #helpContent ol { font-size:13px;line-height:1.75;padding-left:20px;margin-bottom:10px; }
+#helpContent li { margin-bottom:3px; }
+#helpContent code { background:var(--sf2);border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-family:monospace;font-size:12px; }
+#helpContent kbd { background:var(--sf3);border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-family:monospace;font-size:11px;box-shadow:0 1px 0 var(--border); }
+#helpContent strong { font-weight:700; }
+#helpContent em { color:var(--mu);font-style:italic; }
+#helpContent svg text { font-family: 'Inter', system-ui, sans-serif; }
+
 </style>
 </head>
 <body>
@@ -243,6 +261,7 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
   <div class="logo"><div class="lm">&#128203;</div><div class="ln">LSt <em>Portal</em></div></div>
   <div class="hsp"></div>
   <button class="ib2" id="thBtn" onclick="toggleTheme()">&#127769;</button>
+  <button class="ib2" onclick="openModal('helpOv')" title="Hilfe / Anleitung" style="font-weight:700;font-size:13px">?</button>
   <button class="ib2" id="adminBtn" onclick="openAdminModal()" title="Administration" style="display:none">&#9881;&#65039;</button>
   <div class="ibw">
     <button class="ib2" onclick="setView('messages')" title="Nachrichten">&#9993;&#65039;</button>
@@ -511,14 +530,709 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
 <div class="ov" id="cfOv"><div class="modal sm"><div class="mh"><h2 id="cfT">Kategorie</h2><button class="mc" onclick="backToAdmin('cats')">&#10005;</button></div><div class="mb2"><input type="hidden" id="cfId"><div class="fr"><div class="fg"><label>Bezeichnung *</label><input type="text" id="cfLb"></div><div class="fg"><label>Emoji</label><input type="text" id="cfEm" maxlength="4"></div></div><div class="fg"><label>Farbe</label><div class="cr" id="cfCR"></div></div><div id="cfErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div></div><div class="mf"><button class="btn-s" onclick="backToAdmin('cats')">Abbrechen</button><button class="btn-p" onclick="saveCategory()">&#128190; Speichern</button></div></div></div>
 <div class="ov" id="tfOv"><div class="modal sm"><div class="mh"><h2 id="tfT">Tag</h2><button class="mc" onclick="backToAdmin('tags')">&#10005;</button></div><div class="mb2"><input type="hidden" id="tfId"><div class="fg"><label>Bezeichnung *</label><input type="text" id="tfLb"></div><div class="fg"><label>Farbe</label><div class="cr" id="tfCR"></div></div><div id="tfErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div></div><div class="mf"><button class="btn-s" onclick="backToAdmin('tags')">Abbrechen</button><button class="btn-p" onclick="saveTag()">&#128190; Speichern</button></div></div></div>
 
+
+<!-- HILFE OVERLAY -->
+<div class="ov" id="helpOv" style="align-items:stretch;padding:0">
+  <div style="background:var(--sf);width:100%;max-width:100%;height:100%;display:flex;flex-direction:column;overflow:hidden">
+    <!-- Header -->
+    <div style="background:var(--acc);color:var(--act);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:34px;height:34px;background:rgba(255,255,255,.2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800">?</div>
+        <div>
+          <div style="font-size:17px;font-weight:800">LSt Portal &ndash; Benutzerhandbuch</div>
+          <div style="font-size:11px;opacity:.8">Vollständige Anleitung aller Funktionen</div>
+        </div>
+      </div>
+      <button onclick="closeModal('helpOv')" style="width:32px;height:32px;background:rgba(255,255,255,.2);border:none;border-radius:8px;color:inherit;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">&times;</button>
+    </div>
+    <!-- Body -->
+    <div style="display:flex;flex:1;min-height:0;overflow:hidden">
+      <!-- Sidebar TOC -->
+      <div style="width:220px;flex-shrink:0;background:var(--sf2);border-right:1px solid var(--border);overflow-y:auto;padding:10px 0">
+        <div id="helpToc"><div onclick="showHelpSection('login')" id="htoc-login" style="padding:8px 14px;cursor:pointer;font-size:12px;font-weight:600;border-radius:0;transition:.15s;color:var(--mu)" onmouseover="if(this.id!=='htoc-'+window._helpActive)this.style.background='var(--sf3)'" onmouseout="if(this.id!=='htoc-'+window._helpActive)this.style.background=''">🔐 Anmeldung</div>
+<div onclick="showHelpSection('uebersicht')" id="htoc-uebersicht" style="padding:8px 14px;cursor:pointer;font-size:12px;font-weight:600;border-radius:0;transition:.15s;color:var(--mu)" onmouseover="if(this.id!=='htoc-'+window._helpActive)this.style.background='var(--sf3)'" onmouseout="if(this.id!=='htoc-'+window._helpActive)this.style.background=''">→ 🏠 Übersicht</div>
+<div onclick="showHelpSection('dienstplan')" id="htoc-dienstplan" style="padding:8px 14px;cursor:pointer;font-size:12px;font-weight:600;border-radius:0;transition:.15s;color:var(--mu)" onmouseover="if(this.id!=='htoc-'+window._helpActive)this.style.background='var(--sf3)'" onmouseout="if(this.id!=='htoc-'+window._helpActive)this.style.background=''">→ 📅 Dienstplan</div>
+<div onclick="showHelpSection('zulagen')" id="htoc-zulagen" style="padding:8px 14px;cursor:pointer;font-size:12px;font-weight:600;border-radius:0;transition:.15s;color:var(--mu)" onmouseover="if(this.id!=='htoc-'+window._helpActive)this.style.background='var(--sf3)'" onmouseout="if(this.id!=='htoc-'+window._helpActive)this.style.background=''">→ 📊 Zulagendienste</div>
+<div onclick="showHelpSection('abrechnung')" id="htoc-abrechnung" style="padding:8px 14px;cursor:pointer;font-size:12px;font-weight:600;border-radius:0;transition:.15s;color:var(--mu)" onmouseover="if(this.id!=='htoc-'+window._helpActive)this.style.background='var(--sf3)'" onmouseout="if(this.id!=='htoc-'+window._helpActive)this.style.background=''">→ 🧾 Abrechnung</div>
+<div onclick="showHelpSection('dienstplaene')" id="htoc-dienstplaene" style="padding:8px 14px;cursor:pointer;font-size:12px;font-weight:600;border-radius:0;transition:.15s;color:var(--mu)" onmouseover="if(this.id!=='htoc-'+window._helpActive)this.style.background='var(--sf3)'" onmouseout="if(this.id!=='htoc-'+window._helpActive)this.style.background=''">→ 📄 Dienstpläne</div>
+<div onclick="showHelpSection('tickets')" id="htoc-tickets" style="padding:8px 14px;cursor:pointer;font-size:12px;font-weight:600;border-radius:0;transition:.15s;color:var(--mu)" onmouseover="if(this.id!=='htoc-'+window._helpActive)this.style.background='var(--sf3)'" onmouseout="if(this.id!=='htoc-'+window._helpActive)this.style.background=''">→ 🎫 Ticketsystem</div>
+<div onclick="showHelpSection('checklisten')" id="htoc-checklisten" style="padding:8px 14px;cursor:pointer;font-size:12px;font-weight:600;border-radius:0;transition:.15s;color:var(--mu)" onmouseover="if(this.id!=='htoc-'+window._helpActive)this.style.background='var(--sf3)'" onmouseout="if(this.id!=='htoc-'+window._helpActive)this.style.background=''">→ ✅ Checklisten</div>
+<div onclick="showHelpSection('nachrichten')" id="htoc-nachrichten" style="padding:8px 14px;cursor:pointer;font-size:12px;font-weight:600;border-radius:0;transition:.15s;color:var(--mu)" onmouseover="if(this.id!=='htoc-'+window._helpActive)this.style.background='var(--sf3)'" onmouseout="if(this.id!=='htoc-'+window._helpActive)this.style.background=''">→ ✉️ Nachrichten</div>
+<div onclick="showHelpSection('rollen')" id="htoc-rollen" style="padding:8px 14px;cursor:pointer;font-size:12px;font-weight:600;border-radius:0;transition:.15s;color:var(--mu)" onmouseover="if(this.id!=='htoc-'+window._helpActive)this.style.background='var(--sf3)'" onmouseout="if(this.id!=='htoc-'+window._helpActive)this.style.background=''">→ 🔐 Rollen & Berechtigungen</div>
+<div onclick="showHelpSection('admin')" id="htoc-admin" style="padding:8px 14px;cursor:pointer;font-size:12px;font-weight:600;border-radius:0;transition:.15s;color:var(--mu)" onmouseover="if(this.id!=='htoc-'+window._helpActive)this.style.background='var(--sf3)'" onmouseout="if(this.id!=='htoc-'+window._helpActive)this.style.background=''">→ ⚙️ Administration</div>
+<div onclick="showHelpSection('tipps')" id="htoc-tipps" style="padding:8px 14px;cursor:pointer;font-size:12px;font-weight:600;border-radius:0;transition:.15s;color:var(--mu)" onmouseover="if(this.id!=='htoc-'+window._helpActive)this.style.background='var(--sf3)'" onmouseout="if(this.id!=='htoc-'+window._helpActive)this.style.background=''">→ 💡 Tipps & Tastenkürzel</div>
+</div>
+      </div>
+      <!-- Content -->
+      <div style="flex:1;overflow-y:auto;padding:28px 32px" id="helpContent"><div id="hsec-login" style="display:block">
+<h2 style="font-size:18px;font-weight:800;margin-bottom:6px;color:var(--acc)">🔐 Anmeldung</h2>
+<div style="height:2px;background:var(--border);margin-bottom:18px"></div>
+
+<p>Das LSt Portal ist passwortgeschützt. Beim ersten Aufruf erscheint der Login-Bildschirm.</p>
+<svg viewBox="0 0 500 220" style="width:100%;max-width:500px;border-radius:10px;margin:14px 0">
+  <rect width="500" height="220" rx="12" fill="var(--sf2)" stroke="var(--border)" stroke-width="1.5"/>
+  <rect x="150" y="20" width="200" height="180" rx="10" fill="var(--sf)" stroke="var(--border)" stroke-width="1.5"/>
+  <rect x="165" y="35" width="170" height="30" rx="6" fill="var(--acc)" opacity=".15"/>
+  <text x="250" y="55" text-anchor="middle" fill="var(--acc)" font-size="12" font-weight="700">LSt Portal</text>
+  <text x="165" y="90" fill="var(--mu)" font-size="9">Benutzer</text>
+  <rect x="165" y="95" width="170" height="24" rx="5" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <text x="175" y="111" fill="var(--di)" font-size="9">— Benutzer wählen —</text>
+  <text x="165" y="135" fill="var(--mu)" font-size="9">Passwort</text>
+  <rect x="165" y="140" width="170" height="24" rx="5" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <text x="175" y="156" fill="var(--di)" font-size="9">••••••••</text>
+  <rect x="165" y="172" width="170" height="22" rx="5" fill="var(--acc)"/>
+  <text x="250" y="186" text-anchor="middle" fill="white" font-size="10" font-weight="700">Anmelden →</text>
+</svg>
+<h4>So meldest du dich an:</h4>
+<ol>
+<li><strong>Benutzer auswählen</strong> – Klicke auf das Dropdown und wähle deinen Namen.</li>
+<li><strong>Passwort eingeben</strong> – Gib dein Passwort ein. Das Standard-Passwort lautet <code>Passwort1</code> (muss beim ersten Login geändert werden).</li>
+<li><strong>Passwort ändern</strong> – Beim ersten Login wirst du automatisch aufgefordert, ein neues Passwort (min. 6 Zeichen) zu vergeben.</li>
+</ol>
+<p>Du kannst dein Passwort jederzeit über dein <strong>Benutzerkürzel oben rechts</strong> ändern. Nach 10 Stunden Inaktivität wirst du automatisch abgemeldet.</p>
+
+</div>
+<div id="hsec-uebersicht" style="display:none">
+<h2 style="font-size:18px;font-weight:800;margin-bottom:6px;color:var(--acc)">🏠 Übersicht</h2>
+<div style="height:2px;background:var(--border);margin-bottom:18px"></div>
+
+<p>Die Übersicht ist deine persönliche Startseite. Sie bündelt alle wichtigen Informationen auf einen Blick.</p>
+<svg viewBox="0 0 520 260" style="width:100%;max-width:520px;border-radius:10px;margin:14px 0">
+  <rect width="520" height="260" rx="10" fill="var(--sf2)" stroke="var(--border)" stroke-width="1.5"/>
+  <!-- Ungelesene Nachrichten -->
+  <rect x="14" y="14" width="492" height="50" rx="7" fill="color-mix(in srgb,var(--danger) 8%,var(--sf))" stroke="color-mix(in srgb,var(--danger) 25%,transparent)" stroke-width="1"/>
+  <text x="26" y="34" fill="var(--danger)" font-size="10" font-weight="700">🔔 1 ungelesene Nachricht</text>
+  <text x="26" y="50" fill="var(--mu)" font-size="9">Betreff · von Absender · Datum</text>
+  <rect x="400" y="25" width="90" height="20" rx="5" fill="var(--acc)"/>
+  <text x="445" y="38" text-anchor="middle" fill="white" font-size="9" font-weight="700">✓ Bestätigen</text>
+  <!-- Zwei Karten -->
+  <rect x="14" y="76" width="238" height="80" rx="7" fill="var(--sf)" stroke="var(--border)" stroke-width="1"/>
+  <text x="26" y="93" fill="var(--tx)" font-size="10" font-weight="700">👥 Derzeit online</text>
+  <circle cx="36" cy="118" r="12" fill="var(--acc)" opacity=".2"/>
+  <text x="36" y="122" text-anchor="middle" fill="var(--acc)" font-size="8" font-weight="700">AB</text>
+  <circle cx="8" cy="130" r="4" fill="var(--ok)" cx="44" cy="126"/>
+  <text x="60" y="118" fill="var(--tx)" font-size="9">Anna Berger (du)</text>
+  <circle cx="36" cy="140" r="12" fill="var(--ok)" opacity=".2" cx="56"/>
+  <text x="90" y="138" fill="var(--mu)" font-size="9">+ 2 weitere online</text>
+  <rect x="268" y="76" width="238" height="80" rx="7" fill="var(--sf)" stroke="var(--border)" stroke-width="1"/>
+  <text x="280" y="93" fill="var(--tx)" font-size="10" font-weight="700">🎫 Relevante Tickets</text>
+  <rect x="280" y="100" width="215" height="18" rx="4" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <text x="288" y="112" fill="var(--tx)" font-size="8">TK-1003: Drucker defekt</text>
+  <rect x="280" y="122" width="215" height="18" rx="4" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <text x="288" y="134" fill="var(--tx)" font-size="8">TK-1007: Neue Dienstkleidung</text>
+  <!-- Benachrichtigungen -->
+  <rect x="14" y="168" width="492" height="76" rx="7" fill="color-mix(in srgb,var(--acc) 5%,var(--sf))" stroke="color-mix(in srgb,var(--acc) 20%,transparent)" stroke-width="1"/>
+  <text x="26" y="186" fill="var(--acc)" font-size="10" font-weight="700">🔔 2 neue Benachrichtigungen</text>
+  <text x="26" y="205" fill="var(--mu)" font-size="9">💬 Maier hat dich in TK-1003 erwähnt</text>
+  <text x="26" y="222" fill="var(--mu)" font-size="9">👤 TK-1005 wurde dir zugewiesen</text>
+  <text x="410" y="186" fill="var(--acc)" font-size="9" text-decoration="underline" cursor="pointer">Alle gelesen</text>
+</svg>
+<h4>Bereiche der Übersicht:</h4>
+<ul>
+<li><strong>Ungelesene Nachrichten</strong> – Nachrichten die noch nicht bestätigt wurden, werden prominently rot hervorgehoben. Mit <em>Bestätigen</em> quittierst du den Empfang.</li>
+<li><strong>Neue/geänderte Einträge</strong> – Wenn jemand einen Dienstplan-Eintrag für dich angelegt oder geändert hat, erscheint ein oranger Banner bis du auf <em>Zur Kenntnis genommen</em> klickst.</li>
+<li><strong>Online-Benutzer</strong> – Zeigt alle Kollegen, die in den letzten 5 Minuten aktiv waren (grüner Punkt).</li>
+<li><strong>Relevante Tickets</strong> – Tickets aus deinem Fachbereich ohne Zuständigen + dir direkt zugewiesene Tickets.</li>
+<li><strong>Benachrichtigungen</strong> – @Mentions in Notizen, Ticketzuweisungen und neue Tickets im Fachbereich.</li>
+</ul>
+<p>💡 <em>Die Übersicht aktualisiert sich alle 60 Sekunden automatisch. Bei neuen Nachrichten oder Tickets erscheint ein Toast-Hinweis.</em></p>
+
+</div>
+<div id="hsec-dienstplan" style="display:none">
+<h2 style="font-size:18px;font-weight:800;margin-bottom:6px;color:var(--acc)">📅 Dienstplan</h2>
+<div style="height:2px;background:var(--border);margin-bottom:18px"></div>
+
+<p>Hier siehst du alle Einträge des Dienstplans – eigene und allgemeine. Fremde Einträge erscheinen anonymisiert (kein Name, keine Kategorie).</p>
+<svg viewBox="0 0 520 200" style="width:100%;max-width:520px;border-radius:10px;margin:14px 0">
+  <rect width="520" height="200" rx="10" fill="var(--sf2)" stroke="var(--border)" stroke-width="1.5"/>
+  <rect x="14" y="14" width="492" height="36" rx="6" fill="var(--sf)" stroke="var(--border)" stroke-width="1"/>
+  <text x="26" y="36" fill="var(--tx)" font-size="11" font-weight="700">Eintragsübersicht April 2025</text>
+  <rect x="420" y="20" width="80" height="24" rx="5" fill="var(--acc)"/>
+  <text x="460" y="35" text-anchor="middle" fill="white" font-size="9" font-weight="700">+ Eintrag</text>
+  <rect x="14" y="58" width="492" height="28" rx="0" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <text x="26" y="76" fill="var(--mu)" font-size="9" font-weight="600">DATUM</text>
+  <text x="130" y="76" fill="var(--mu)" font-size="9" font-weight="600">MITARBEITER</text>
+  <text x="250" y="76" fill="var(--mu)" font-size="9" font-weight="600">KATEGORIE</text>
+  <text x="360" y="76" fill="var(--mu)" font-size="9" font-weight="600">STATUS</text>
+  <text x="440" y="76" fill="var(--mu)" font-size="9" font-weight="600">AKTIONEN</text>
+  <rect x="14" y="86" width="492" height="28" rx="0" fill="var(--sf)"/>
+  <text x="26" y="104" fill="var(--tx)" font-size="9">01.04.2025</text>
+  <rect x="130" y="92" width="16" height="16" rx="8" fill="var(--acc)" opacity=".2"/>
+  <text x="138" y="103" text-anchor="middle" fill="var(--acc)" font-size="7" font-weight="700">AB</text>
+  <text x="152" y="104" fill="var(--tx)" font-size="9">Anna Berger</text>
+  <rect x="250" y="92" width="60" height="14" rx="7" fill="color-mix(in srgb,var(--info) 15%,transparent)"/>
+  <text x="280" y="102" text-anchor="middle" fill="var(--info)" font-size="8">📚 Ausbildung</text>
+  <rect x="360" y="92" width="55" height="14" rx="7" fill="color-mix(in srgb,var(--ok) 15%,transparent)"/>
+  <text x="387" y="102" text-anchor="middle" fill="var(--ok)" font-size="8">✓ Genehmigt</text>
+  <rect x="14" y="114" width="492" height="28" rx="0" fill="var(--sf2)" style="opacity:.7"/>
+  <text x="26" y="132" fill="var(--tx)" font-size="9">02.04.2025</text>
+  <rect x="130" y="120" width="80" height="14" rx="7" fill="var(--sf3)"/>
+  <text x="170" y="130" text-anchor="middle" fill="var(--di)" font-size="8">🔒 Anonym</text>
+  <text x="250" y="132" fill="var(--di)" font-size="9">—</text>
+  <rect x="14" y="142" width="492" height="28" rx="0" fill="color-mix(in srgb,var(--ok) 3%,var(--sf))"/>
+  <text x="26" y="160" fill="var(--tx)" font-size="9">03.04.2025</text>
+  <rect x="130" y="148" width="60" height="14" rx="7" fill="color-mix(in srgb,var(--ok) 15%,transparent)"/>
+  <text x="160" y="158" text-anchor="middle" fill="var(--ok)" font-size="8">🌐 Allgemein</text>
+  <rect x="250" y="148" width="60" height="14" rx="7" fill="color-mix(in srgb,var(--warn) 15%,transparent)"/>
+  <text x="280" y="158" text-anchor="middle" fill="var(--warn)" font-size="8">🌴 Urlaub</text>
+</svg>
+<h4>Eintrag anlegen:</h4>
+<ol>
+<li>Klicke auf <strong>+ Eintrag</strong> oben rechts.</li>
+<li>Wähle ob es ein <em>allgemeiner Eintrag</em> (für alle sichtbar, z.B. Betriebsferien) oder ein persönlicher Eintrag ist.</li>
+<li>Wähle <strong>Mitarbeiter</strong>, <strong>Datum von/bis</strong>, optional Uhrzeit.</li>
+<li>Wähle eine <strong>Kategorie</strong> (z.B. Urlaub, Krankenstand, Kurs).</li>
+<li>Füge eine <strong>Beschreibung</strong> hinzu und speichere.</li>
+</ol>
+<h4>Genehmigung:</h4>
+<ul>
+<li>Einträge von Mitarbeitern starten mit Status <em>Ausstehend</em>.</li>
+<li>Benutzer mit Rolle <strong>Dienstplanung</strong> oder <strong>Admin</strong> können Einträge mit ✓ genehmigen oder ✗ ablehnen.</li>
+<li>Allgemeine Einträge werden automatisch genehmigt.</li>
+<li>Nur der Ersteller kann seinen eigenen Eintrag bearbeiten (solange noch nicht genehmigt).</li>
+</ul>
+<h4>Filter & Suche:</h4>
+<p>Über die <strong>Sidebar links</strong> kannst du Jahr und Monat wählen. Mit dem Mitarbeiter-Dropdown (nur für berechtigte Rollen) kannst du nach einzelnen Personen filtern. In der Tabellenleiste gibt es eine Textsuche und Filter nach Kategorie und Genehmigungsstatus.</p>
+
+</div>
+<div id="hsec-zulagen" style="display:none">
+<h2 style="font-size:18px;font-weight:800;margin-bottom:6px;color:var(--acc)">📊 Zulagendienste</h2>
+<div style="height:2px;background:var(--border);margin-bottom:18px"></div>
+
+<p>Hier werden Nachtdienste, Feiertagsdienste, freie Wochenenden und C10-Dienste pro Mitarbeiter und Monat eingetragen.</p>
+<svg viewBox="0 0 520 190" style="width:100%;max-width:520px;border-radius:10px;margin:14px 0">
+  <rect width="520" height="190" rx="10" fill="var(--sf2)" stroke="var(--border)" stroke-width="1.5"/>
+  <rect x="14" y="14" width="492" height="36" rx="6" fill="var(--sf)" stroke="var(--border)" stroke-width="1"/>
+  <text x="26" y="36" fill="var(--tx)" font-size="11" font-weight="700">Zulagendienste April 2025</text>
+  <rect x="380" y="20" width="120" height="24" rx="5" fill="var(--acc)"/>
+  <text x="440" y="35" text-anchor="middle" fill="white" font-size="9" font-weight="700">💾 Alle speichern</text>
+  <rect x="14" y="58" width="492" height="22" rx="0" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <text x="26" y="73" fill="var(--mu)" font-size="9" font-weight="600">MITARBEITER</text>
+  <text x="180" y="73" fill="var(--mu)" font-size="9" font-weight="600">🌙 NACHT</text>
+  <text x="260" y="73" fill="var(--mu)" font-size="9" font-weight="600">🎉 FEIERTAG</text>
+  <text x="350" y="73" fill="var(--mu)" font-size="9" font-weight="600">🏕️ WE</text>
+  <text x="430" y="73" fill="var(--mu)" font-size="9" font-weight="600">📋 C10</text>
+  <rect x="14" y="80" width="492" height="28" rx="0" fill="var(--sf)"/>
+  <text x="26" y="98" fill="var(--tx)" font-size="9">Anna Berger</text>
+  <rect x="172" y="84" width="50" height="18" rx="4" fill="var(--sf2)" stroke="var(--acc)" stroke-width="1"/>
+  <text x="197" y="96" text-anchor="middle" fill="var(--tx)" font-size="10">3</text>
+  <rect x="252" y="84" width="50" height="18" rx="4" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <text x="277" y="96" text-anchor="middle" fill="var(--tx)" font-size="10">1</text>
+  <rect x="332" y="84" width="50" height="18" rx="4" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <text x="357" y="96" text-anchor="middle" fill="var(--tx)" font-size="10">2</text>
+  <rect x="422" y="84" width="50" height="18" rx="4" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <text x="447" y="96" text-anchor="middle" fill="var(--tx)" font-size="10">0</text>
+  <rect x="14" y="108" width="492" height="28" rx="0" fill="var(--sf2)"/>
+  <text x="26" y="126" fill="var(--tx)" font-size="9">Max Müller</text>
+  <rect x="172" y="112" width="50" height="18" rx="4" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <text x="197" y="124" text-anchor="middle" fill="var(--tx)" font-size="10">2</text>
+  <rect x="252" y="112" width="50" height="18" rx="4" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <text x="277" y="124" text-anchor="middle" fill="var(--tx)" font-size="10">0</text>
+  <rect x="332" y="112" width="50" height="18" rx="4" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <text x="357" y="124" text-anchor="middle" fill="var(--tx)" font-size="10">1</text>
+  <rect x="422" y="112" width="50" height="18" rx="4" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <text x="447" y="124" text-anchor="middle" fill="var(--tx)" font-size="10">0</text>
+  <rect x="14" y="150" width="492" height="30" rx="6" fill="color-mix(in srgb,var(--acc) 6%,var(--sf))" stroke="color-mix(in srgb,var(--acc) 20%,transparent)" stroke-width="1"/>
+  <text x="26" y="169" fill="var(--acc)" font-size="9">ℹ️ Im Monats-Modus: Alle Felder direkt editierbar. Sidebar: Jahr, Zeitraum und Monat wählen.</text>
+</svg>
+<h4>Funktionen:</h4>
+<ul>
+<li><strong>Monatsansicht</strong> – Alle Mitarbeiter mit direkten Eingabefeldern. Werte ändern und mit <em>Alle speichern</em> übernehmen.</li>
+<li><strong>Halbjahres-/Jahresansicht</strong> – Aggregierte Summen, schreibgeschützt (nur zur Auswertung).</li>
+<li><strong>Zeitraum wählen</strong> – In der Sidebar: Jahr, Zeitraum (Monat / 1. Halbjahr / 2. Halbjahr / Gesamt) und bei Monatsansicht den Monat.</li>
+</ul>
+<h4>Wer kann bearbeiten?</h4>
+<p>Nur Benutzer mit den Rollen <strong>Admin, Leitung</strong> oder <strong>Dienstplanung</strong> können Werte eintragen. Andere Rollen sehen die Übersicht nur lesend.</p>
+
+</div>
+<div id="hsec-abrechnung" style="display:none">
+<h2 style="font-size:18px;font-weight:800;margin-bottom:6px;color:var(--acc)">🧾 Abrechnung</h2>
+<div style="height:2px;background:var(--border);margin-bottom:18px"></div>
+
+<p>Jeder Mitarbeiter kann eigene Einspringerdienste und Home-Office-Tage eintragen. Dienstplanung sieht alle Einträge.</p>
+<svg viewBox="0 0 520 220" style="width:100%;max-width:520px;border-radius:10px;margin:14px 0">
+  <rect width="520" height="220" rx="10" fill="var(--sf2)" stroke="var(--border)" stroke-width="1.5"/>
+  <!-- Einspringer Seite -->
+  <rect x="14" y="14" width="238" height="192" rx="7" fill="var(--sf)" stroke="var(--border)" stroke-width="1"/>
+  <text x="26" y="34" fill="var(--tx)" font-size="10" font-weight="700">📋 Meine Einspringerdienste</text>
+  <text x="26" y="52" fill="var(--mu)" font-size="9" font-weight="600">April 2025</text>
+  <text x="160" y="52" fill="var(--acc)" font-size="9">1 Dienst</text>
+  <rect x="190" y="42" width="50" height="18" rx="4" fill="var(--acc)"/>
+  <text x="215" y="54" text-anchor="middle" fill="white" font-size="10" font-weight="700">+</text>
+  <rect x="26" y="60" width="210" height="40" rx="5" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <rect x="30" y="68" width="90" height="16" rx="3" fill="var(--sf)" stroke="var(--border)" stroke-width="1"/>
+  <text x="75" y="79" text-anchor="middle" fill="var(--tx)" font-size="7">15.04.2025</text>
+  <rect x="126" y="68" width="80" height="16" rx="3" fill="var(--sf)" stroke="var(--border)" stroke-width="1"/>
+  <text x="166" y="79" text-anchor="middle" fill="var(--mu)" font-size="7">Notiz...</text>
+  <rect x="208" y="70" width="20" height="14" rx="3" fill="color-mix(in srgb,var(--danger) 10%,transparent)"/>
+  <text x="218" y="80" text-anchor="middle" fill="var(--danger)" font-size="10">✕</text>
+  <text x="26" y="120" fill="var(--mu)" font-size="9" font-weight="600">Mai 2025</text>
+  <text x="180" y="120" fill="var(--di)" font-size="9">0 Dienste</text>
+  <rect x="190" y="110" width="50" height="18" rx="4" fill="var(--acc)" opacity=".6"/>
+  <text x="215" y="122" text-anchor="middle" fill="white" font-size="10" font-weight="700">+</text>
+  <!-- HO Seite -->
+  <rect x="268" y="14" width="238" height="192" rx="7" fill="var(--sf)" stroke="var(--border)" stroke-width="1"/>
+  <text x="280" y="34" fill="var(--tx)" font-size="10" font-weight="700">🏠 Home Office</text>
+  <text x="280" y="52" fill="var(--mu)" font-size="9">Tage pro Monat:</text>
+  <rect x="280" y="58" width="105" height="22" rx="4" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <text x="286" y="72" fill="var(--mu)" font-size="8">Jän</text>
+  <rect x="336" y="62" width="40" height="14" rx="3" fill="var(--sf)" stroke="var(--border)" stroke-width="1"/>
+  <text x="356" y="72" text-anchor="middle" fill="var(--tx)" font-size="9">2</text>
+  <text x="382" y="72" fill="var(--di)" font-size="8">Tage</text>
+  <rect x="280" y="84" width="105" height="22" rx="4" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <text x="286" y="98" fill="var(--mu)" font-size="8">Feb</text>
+  <rect x="336" y="88" width="40" height="14" rx="3" fill="var(--sf)" stroke="var(--acc)" stroke-width="1"/>
+  <text x="356" y="98" text-anchor="middle" fill="var(--tx)" font-size="9">3</text>
+  <text x="382" y="98" fill="var(--di)" font-size="8">Tage</text>
+  <rect x="280" y="110" width="105" height="22" rx="4" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <text x="286" y="124" fill="var(--mu)" font-size="8">Mär</text>
+  <rect x="336" y="114" width="40" height="14" rx="3" fill="var(--sf)" stroke="var(--border)" stroke-width="1"/>
+  <text x="356" y="124" text-anchor="middle" fill="var(--tx)" font-size="9">0</text>
+  <text x="382" y="124" fill="var(--di)" font-size="8">Tage</text>
+</svg>
+<h4>Einspringerdienste:</h4>
+<ul>
+<li>Pro Monat siehst du wie viele Dienste du eingetragen hast.</li>
+<li>Klicke auf <strong>+</strong> um einen neuen Einspringerdienst hinzuzufügen. Es erscheint automatisch eine neue Zeile mit Datum und Notizfeld.</li>
+<li>Datum und Notiz sind direkt in der Zeile bearbeitbar.</li>
+<li>Löschen nur für den <strong>Ersteller</strong> möglich (✕-Button).</li>
+<li><strong>Dienstplanung</strong> kann einzelne Einträge ablehnen und muss eine Begründung angeben. Die Begründung erscheint rot beim Mitarbeiter.</li>
+</ul>
+<h4>Home Office:</h4>
+<ul>
+<li>Trage die Anzahl der HO-Tage pro Monat direkt in das Zahlenfeld ein.</li>
+<li>Die Änderung wird sofort gespeichert.</li>
+<li>Dienstplanung sieht eine Übersichtstabelle aller Mitarbeiter rechts daneben.</li>
+</ul>
+<p>💡 <em>In der Sidebar kannst du Jahr und Monat filtern. Bei „Alle" werden alle Monate des Jahres angezeigt.</em></p>
+
+</div>
+<div id="hsec-dienstplaene" style="display:none">
+<h2 style="font-size:18px;font-weight:800;margin-bottom:6px;color:var(--acc)">📄 Dienstpläne</h2>
+<div style="height:2px;background:var(--border);margin-bottom:18px"></div>
+
+<p>PDFs der aktuellen und archivierten Dienstpläne werden hier abgelegt. Beim Upload eines neuen Plans für denselben Monat wird der alte automatisch archiviert.</p>
+<svg viewBox="0 0 520 200" style="width:100%;max-width:520px;border-radius:10px;margin:14px 0">
+  <rect width="520" height="200" rx="10" fill="var(--sf2)" stroke="var(--border)" stroke-width="1.5"/>
+  <rect x="14" y="14" width="492" height="36" rx="6" fill="var(--sf)" stroke="var(--border)" stroke-width="1"/>
+  <text x="26" y="36" fill="var(--tx)" font-size="11" font-weight="700">📄 Dienstpläne</text>
+  <rect x="380" y="20" width="120" height="24" rx="5" fill="var(--acc)"/>
+  <text x="440" y="35" text-anchor="middle" fill="white" font-size="9" font-weight="700">📤 PDF hochladen</text>
+  <rect x="14" y="58" width="492" height="28" rx="0" fill="var(--sf)" stroke="var(--border)" stroke-width="1"/>
+  <text x="26" y="76" fill="var(--mu)" font-size="9" font-weight="600">MONAT</text>
+  <text x="120" y="76" fill="var(--mu)" font-size="9" font-weight="600">BEZEICHNUNG</text>
+  <text x="300" y="76" fill="var(--mu)" font-size="9" font-weight="600">VERSION</text>
+  <text x="380" y="76" fill="var(--mu)" font-size="9" font-weight="600">AKTIONEN</text>
+  <rect x="14" y="86" width="492" height="26" rx="0" fill="var(--sf)"/>
+  <text x="26" y="102" fill="var(--tx)" font-size="9" font-weight="600">April 2025</text>
+  <text x="120" y="102" fill="var(--tx)" font-size="9">April 2025 – Endversion</text>
+  <rect x="300" y="90" width="45" height="14" rx="7" fill="color-mix(in srgb,var(--acc) 12%,transparent)"/>
+  <text x="322" y="100" text-anchor="middle" fill="var(--acc)" font-size="8" font-weight="700">v2</text>
+  <rect x="375" y="90" width="60" height="14" rx="5" fill="color-mix(in srgb,var(--ok) 12%,transparent)"/>
+  <text x="405" y="100" text-anchor="middle" fill="var(--ok)" font-size="8">👁 Ansehen</text>
+  <rect x="14" y="124" width="492" height="26" rx="0" fill="var(--sf2)"/>
+  <text x="26" y="140" fill="var(--tx)" font-size="9">März 2025</text>
+  <text x="120" y="140" fill="var(--tx)" font-size="9">März 2025 – V1</text>
+  <rect x="300" y="128" width="80" height="14" rx="7" fill="color-mix(in srgb,var(--info) 12%,transparent)"/>
+  <text x="340" y="138" text-anchor="middle" fill="var(--info)" font-size="8">v1 archiviert</text>
+  <!-- Upload Modal sketch -->
+  <rect x="160" y="152" width="200" height="34" rx="7" fill="var(--sf)" stroke="var(--acc)" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text x="260" y="168" text-anchor="middle" fill="var(--acc)" font-size="9">📎 PDF auswählen</text>
+  <text x="260" y="180" text-anchor="middle" fill="var(--di)" font-size="8">(max. 10 MB)</text>
+</svg>
+<h4>PDF hochladen:</h4>
+<ol>
+<li>Klicke auf <strong>📤 PDF hochladen</strong>.</li>
+<li>Wähle <strong>Monat und Jahr</strong> (z.B. April 2025).</li>
+<li>Vergib eine <strong>Bezeichnung</strong> (z.B. „April 2025 – Endversion").</li>
+<li>Wähle die <strong>PDF-Datei</strong> (max. 10 MB).</li>
+<li>Klicke <em>Hochladen</em>.</li>
+</ol>
+<h4>Versionierung & Archiv:</h4>
+<ul>
+<li>Wenn für denselben Monat bereits ein Plan vorhanden ist, wird dieser automatisch <strong>archiviert</strong>. Der neue Plan erhält die nächste Versionsnummer (v2, v3, …).</li>
+<li>Das <strong>Archiv</strong> ist ein-/ausklappbar und zeigt alle alten Versionen.</li>
+<li>Alle Pläne können direkt im Browser geöffnet werden (👁 Ansehen).</li>
+</ul>
+<p>🔐 <em>Hochladen und Löschen ist nur für Rollen mit „Allgemeine Einträge" (Admin, Leitung, Dienstplanung, Technik, Ausbildung, QM) möglich. Lesen können alle.</em></p>
+
+</div>
+<div id="hsec-tickets" style="display:none">
+<h2 style="font-size:18px;font-weight:800;margin-bottom:6px;color:var(--acc)">🎫 Ticketsystem</h2>
+<div style="height:2px;background:var(--border);margin-bottom:18px"></div>
+
+<p>Das Ticketsystem dient zur strukturierten Bearbeitung von Aufgaben, Anfragen und Problemen. Jedes Ticket hat eine eindeutige Nummer (TK-XXXX).</p>
+<svg viewBox="0 0 520 250" style="width:100%;max-width:520px;border-radius:10px;margin:14px 0">
+  <rect width="520" height="250" rx="10" fill="var(--sf2)" stroke="var(--border)" stroke-width="1.5"/>
+  <!-- Ticket Zeile -->
+  <rect x="14" y="14" width="492" height="40" rx="6" fill="var(--sf)" stroke="var(--border)" stroke-width="1"/>
+  <text x="30" y="32" fill="var(--mu)" font-size="8" font-family="monospace">TK-1003</text>
+  <text x="30" y="46" fill="var(--di)" font-size="7">↳ TK-1001</text>
+  <text x="110" y="38" fill="var(--tx)" font-size="10" font-weight="600">Drucker im Stationszimmer defekt</text>
+  <rect x="290" y="20" width="50" height="14" rx="7" fill="color-mix(in srgb,var(--teal) 15%,transparent)"/>
+  <text x="315" y="30" text-anchor="middle" fill="var(--teal)" font-size="8">🔧 Technik</text>
+  <rect x="346" y="20" width="45" height="14" rx="7" fill="color-mix(in srgb,var(--danger) 12%,transparent)"/>
+  <text x="368" y="30" text-anchor="middle" fill="var(--danger)" font-size="8">🔴 Hoch</text>
+  <rect x="398" y="20" width="55" height="14" rx="7" fill="color-mix(in srgb,var(--warn) 12%,transparent)"/>
+  <text x="425" y="30" text-anchor="middle" fill="var(--warn)" font-size="8">In Bearbeitung</text>
+  <!-- Ticket Detail Split -->
+  <rect x="14" y="66" width="320" height="172" rx="7" fill="var(--sf)" stroke="var(--border)" stroke-width="1"/>
+  <text x="26" y="84" fill="var(--mu)" font-size="8" font-weight="700" letter-spacing="1">BESCHREIBUNG</text>
+  <text x="26" y="100" fill="var(--tx)" font-size="9">Drucker HP LaserJet gibt Papierstau-Fehler,</text>
+  <text x="26" y="114" fill="var(--tx)" font-size="9">obwohl kein Papier eingeklemmt ist.</text>
+  <text x="26" y="132" fill="var(--mu)" font-size="8" font-weight="700" letter-spacing="1">NOTIZEN</text>
+  <rect x="26" y="138" width="295" height="32" rx="5" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <text x="34" y="150" fill="var(--mu)" font-size="8">@MaxMüller bitte vor Ort prüfen</text>
+  <text x="34" y="162" fill="var(--di)" font-size="7">Anna B. · 14:32</text>
+  <rect x="26" y="180" width="240" height="20" rx="4" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <text x="34" y="193" fill="var(--mu)" font-size="8">Notiz eingeben... @Name für Erwähnung</text>
+  <rect x="276" y="180" width="40" height="20" rx="4" fill="var(--acc)"/>
+  <text x="296" y="193" text-anchor="middle" fill="white" font-size="9">Send</text>
+  <!-- Sidebar -->
+  <rect x="346" y="66" width="160" height="172" rx="7" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <text x="358" y="84" fill="var(--mu)" font-size="8">Status</text>
+  <rect x="358" y="88" width="136" height="18" rx="4" fill="var(--sf)" stroke="var(--border)" stroke-width="1"/>
+  <text x="370" y="100" fill="var(--warn)" font-size="8">In Bearbeitung ▾</text>
+  <text x="358" y="122" fill="var(--mu)" font-size="8">Zuständig</text>
+  <rect x="358" y="126" width="136" height="18" rx="4" fill="var(--sf)" stroke="var(--border)" stroke-width="1"/>
+  <text x="370" y="138" fill="var(--tx)" font-size="8">Max Müller ▾</text>
+  <rect x="358" y="190" width="136" height="18" rx="4" fill="color-mix(in srgb,var(--ok) 12%,transparent)"/>
+  <text x="426" y="202" text-anchor="middle" fill="var(--ok)" font-size="9">✓ Abschließen</text>
+  <rect x="358" y="212" width="136" height="18" rx="4" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <text x="426" y="224" text-anchor="middle" fill="var(--mu)" font-size="9">☑ Checkliste anhängen</text>
+</svg>
+<h4>Ticket erstellen:</h4>
+<ol>
+<li>Klicke auf <strong>+ Ticket</strong>.</li>
+<li>Fülle Titel, Beschreibung, Fachbereich, Priorität, Status aus.</li>
+<li>Optional: Tags, Zuständigen, Bucket (Kategorie) und Elternticket zuweisen.</li>
+</ol>
+<h4>Ticket bearbeiten (Detailansicht):</h4>
+<ul>
+<li><strong>Status</strong>, <strong>Priorität</strong>, <strong>Fachbereich</strong>, <strong>Bucket</strong> und <strong>Zuständigkeit</strong> sind direkt in der rechten Seitenleiste änderbar.</li>
+<li>Mit <em>Ich</em> (Ich-Button) übernimmst du das Ticket direkt selbst.</li>
+<li><strong>Sichtbarkeit</strong>: Öffentliche Tickets sehen alle, private nur der eigene Fachbereich.</li>
+<li><strong>Abschließen</strong>: Der grüne Button setzt den Status auf „Abgeschlossen".</li>
+</ul>
+<h4>Notizen & @Mentions:</h4>
+<ul>
+<li>Tippe eine Notiz und klicke <em>Senden</em>.</li>
+<li>Schreibe <strong>@Name</strong> in einer Notiz – ein Autocomplete erscheint. Der erwähnte Benutzer erhält eine Benachrichtigung in der Übersicht.</li>
+<li>Systemnotizen (grau, kursiv) werden automatisch bei Statusänderungen, Prioritätsänderungen etc. generiert.</li>
+</ul>
+<h4>Untertickets:</h4>
+<p>Ein Ticket kann einem anderen als „Elternticket" zugeordnet werden. Im Elternticket erscheinen alle Untertickets mit direktem Link.</p>
+<h4>Filter:</h4>
+<p>In der Sidebar: Filter nach Status, Fachbereich und Priorität. In der Titelleiste: Textsuche, Tags, Bearbeiter-Filter.</p>
+
+</div>
+<div id="hsec-checklisten" style="display:none">
+<h2 style="font-size:18px;font-weight:800;margin-bottom:6px;color:var(--acc)">✅ Checklisten</h2>
+<div style="height:2px;background:var(--border);margin-bottom:18px"></div>
+
+<p>Checklisten sind Vorlagen mit Aufgabenpunkten, die an beliebige Tickets angehängt werden können.</p>
+<svg viewBox="0 0 520 200" style="width:100%;max-width:520px;border-radius:10px;margin:14px 0">
+  <rect width="520" height="200" rx="10" fill="var(--sf2)" stroke="var(--border)" stroke-width="1.5"/>
+  <!-- Vorlage -->
+  <rect x="14" y="14" width="230" height="172" rx="7" fill="var(--sf)" stroke="var(--border)" stroke-width="1"/>
+  <text x="26" y="33" fill="var(--tx)" font-size="10" font-weight="700">Aufnahme-Checkliste</text>
+  <rect x="140" y="21" width="55" height="14" rx="7" fill="color-mix(in srgb,var(--ausbildung,var(--info)) 12%,transparent)"/>
+  <text x="167" y="31" text-anchor="middle" fill="var(--info)" font-size="8">🎓 Ausbildung</text>
+  <rect x="26" y="42" width="210" height="20" rx="4" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <rect x="30" y="46" width="14" height="14" rx="2" fill="var(--ok)" opacity=".4"/>
+  <text x="50" y="55" fill="var(--tx)" font-size="8">Anmeldeformular ausgefüllt</text>
+  <rect x="26" y="66" width="210" height="20" rx="4" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <rect x="30" y="70" width="14" height="14" rx="2" fill="var(--border)"/>
+  <text x="50" y="79" fill="var(--tx)" font-size="8">Unterlagen geprüft</text>
+  <rect x="26" y="90" width="210" height="30" rx="4" fill="var(--sf2)" stroke="var(--acc)" stroke-width="1"/>
+  <rect x="30" y="95" width="14" height="14" rx="2" fill="var(--border)"/>
+  <text x="50" y="104" fill="var(--tx)" font-size="8">Bemerkungen:</text>
+  <rect x="50" y="108" width="180" height="10" rx="2" fill="var(--sf3)"/>
+  <text x="26" y="140" fill="var(--di)" font-size="8">☑ = Checkbox | ☑+Notiz = Checkbox + Freitextfeld</text>
+  <!-- Ticket mit Checkliste -->
+  <rect x="260" y="14" width="246" height="172" rx="7" fill="var(--sf)" stroke="var(--border)" stroke-width="1"/>
+  <text x="272" y="33" fill="var(--tx)" font-size="10" font-weight="700">In einem Ticket:</text>
+  <text x="272" y="50" fill="var(--mu)" font-size="9">Aufnahme-Checkliste</text>
+  <text x="440" y="50" fill="var(--mu)" font-size="8">2/3</text>
+  <rect x="272" y="58" width="220" height="20" rx="4" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <rect x="276" y="62" width="12" height="12" rx="2" fill="var(--ok)" opacity=".6"/>
+  <text x="293" y="71" fill="var(--mu)" font-size="8" text-decoration="line-through">Anmeldeformular ausgefüllt</text>
+  <text x="400" y="71" fill="var(--mu)" font-size="7">👤 A.B.</text>
+  <rect x="272" y="82" width="220" height="20" rx="4" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <rect x="276" y="86" width="12" height="12" rx="2" fill="var(--border)"/>
+  <text x="293" y="95" fill="var(--tx)" font-size="8">Unterlagen geprüft</text>
+  <rect x="272" y="106" width="220" height="34" rx="4" fill="var(--sf2)" stroke="var(--acc)" stroke-width="1"/>
+  <rect x="276" y="110" width="12" height="12" rx="2" fill="var(--border)"/>
+  <text x="293" y="119" fill="var(--tx)" font-size="8">Bemerkungen:</text>
+  <rect x="293" y="124" width="190" height="12" rx="2" fill="var(--sf)" stroke="var(--border)" stroke-width="1"/>
+  <text x="297" y="133" fill="var(--mu)" font-size="7">Freitextfeld für Notiz...</text>
+  <rect x="272" y="156" width="220" height="20" rx="5" fill="var(--sf2)" stroke="var(--border)" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="382" y="169" text-anchor="middle" fill="var(--acc)" font-size="8">☑ Checkliste anhängen</text>
+</svg>
+<h4>Vorlage erstellen:</h4>
+<ol>
+<li>Navigiere zu <em>Ticketsystem → Checklisten</em>.</li>
+<li>Klicke auf <strong>+ Neue Vorlage</strong>.</li>
+<li>Vergib einen Namen und wähle den Fachbereich.</li>
+<li>Füge Punkte hinzu. Jeder Punkt ist entweder:<ul>
+<li><strong>☑ Checkbox</strong> – nur Checkbox (ja/nein)</li>
+<li><strong>☑ + Notizfeld</strong> – Checkbox mit einem Freitextfeld für Bemerkungen</li>
+</ul></li>
+</ol>
+<h4>Checkliste an Ticket anhängen:</h4>
+<ol>
+<li>Öffne ein Ticket.</li>
+<li>Klicke rechts unten auf <em>☑ Checkliste anhängen</em>.</li>
+<li>Wähle eine Vorlage aus.</li>
+<li>Die Punkte erscheinen im Ticket. Erledigte Punkte abhaken (mit Benutzer-Tracking).</li>
+<li>Freitextfelder können direkt ausgefüllt werden.</li>
+</ol>
+
+</div>
+<div id="hsec-nachrichten" style="display:none">
+<h2 style="font-size:18px;font-weight:800;margin-bottom:6px;color:var(--acc)">✉️ Nachrichten</h2>
+<div style="height:2px;background:var(--border);margin-bottom:18px"></div>
+
+<p>Das Nachrichtensystem ermöglicht direkte Kommunikation zwischen Mitarbeitern. Alle Nachrichten müssen bestätigt werden.</p>
+<svg viewBox="0 0 520 200" style="width:100%;max-width:520px;border-radius:10px;margin:14px 0">
+  <rect width="520" height="200" rx="10" fill="var(--sf2)" stroke="var(--border)" stroke-width="1.5"/>
+  <!-- Tabs -->
+  <rect x="14" y="14" width="492" height="30" rx="5" fill="var(--sf)" stroke="var(--border)" stroke-width="1"/>
+  <rect x="14" y="14" width="120" height="30" rx="5" fill="var(--sf2)" stroke="var(--acc)" stroke-width="1.5"/>
+  <text x="74" y="33" text-anchor="middle" fill="var(--acc)" font-size="9" font-weight="700">📥 Eingang  ❶</text>
+  <text x="200" y="33" text-anchor="middle" fill="var(--mu)" font-size="9">📤 Gesendet (3)</text>
+  <!-- Unread msg -->
+  <rect x="14" y="52" width="492" height="60" rx="6" fill="color-mix(in srgb,var(--danger) 4%,var(--sf))" stroke="color-mix(in srgb,var(--danger) 20%,transparent)" stroke-width="1.5"/>
+  <text x="26" y="70" fill="var(--danger)" font-size="8">🔔</text>
+  <text x="40" y="70" fill="var(--tx)" font-size="10" font-weight="700">Wichtige Info: Neue Dienstkleidung</text>
+  <text x="26" y="84" fill="var(--mu)" font-size="8">Von: <strong>Dienstplanung</strong> · 12.04.2025, 09:15</text>
+  <text x="26" y="98" fill="var(--tx)" font-size="9">Bitte bis Freitag Größe bekanntgeben...</text>
+  <rect x="390" y="58" width="100" height="22" rx="5" fill="var(--acc)"/>
+  <text x="440" y="72" text-anchor="middle" fill="white" font-size="9" font-weight="700">✓ Bestätigen</text>
+  <!-- Read msg -->
+  <rect x="14" y="120" width="492" height="60" rx="6" fill="var(--sf)" stroke="var(--border)" stroke-width="1"/>
+  <text x="26" y="138" fill="var(--tx)" font-size="10" font-weight="700">Urlaubsplanung Q3</text>
+  <text x="26" y="152" fill="var(--mu)" font-size="8">Von: <strong>Leitung</strong> · 10.04.2025, 16:00</text>
+  <text x="26" y="166" fill="var(--tx)" font-size="9">Bitte gewünschte Urlaubswochen einreichen...</text>
+  <rect x="390" y="126" width="90" height="22" rx="5" fill="color-mix(in srgb,var(--ok) 12%,transparent)"/>
+  <text x="435" y="140" text-anchor="middle" fill="var(--ok)" font-size="8">✓ Bestätigt</text>
+</svg>
+<h4>Nachricht verfassen:</h4>
+<ol>
+<li>Klicke auf <strong>✉️ Verfassen</strong>.</li>
+<li>Wähle den <strong>Empfänger</strong>: Alle Mitarbeiter oder eine bestimmte Person.</li>
+<li>Fülle <strong>Betreff</strong> und <strong>Nachrichtentext</strong> aus.</li>
+<li>Klicke auf <em>Senden</em>.</li>
+</ol>
+<h4>Eingang vs. Gesendet:</h4>
+<ul>
+<li><strong>Eingang</strong> – Alle Nachrichten die für dich bestimmt sind. Ungelesene werden orange/rot hervorgehoben und auch auf der Übersicht angezeigt.</li>
+<li><strong>Gesendet</strong> – Alle von dir versendeten Nachrichten mit Lesestatus (Gelesen/Ausstehend).</li>
+</ul>
+<h4>Bestätigen:</h4>
+<p>Jede Nachricht muss mit dem <strong>✓ Bestätigen</strong>-Button quittiert werden. Erst dann gilt sie als gelesen. Unbestätigte Nachrichten erscheinen auch auf der Startseite als roter Banner.</p>
+<p>🔐 <em>Standard-Benutzer können keine Nachrichten senden, aber empfangen und bestätigen.</em></p>
+
+</div>
+<div id="hsec-rollen" style="display:none">
+<h2 style="font-size:18px;font-weight:800;margin-bottom:6px;color:var(--acc)">🔐 Rollen & Berechtigungen</h2>
+<div style="height:2px;background:var(--border);margin-bottom:18px"></div>
+
+<p>Jeder Benutzer hat eine oder mehrere Rollen. Die Kombination der Rollen bestimmt welche Funktionen sichtbar und editierbar sind.</p>
+<svg viewBox="0 0 520 240" style="width:100%;max-width:520px;border-radius:10px;margin:14px 0">
+  <rect width="520" height="240" rx="10" fill="var(--sf2)" stroke="var(--border)" stroke-width="1.5"/>
+  <text x="20" y="30" fill="var(--tx)" font-size="10" font-weight="700">Rollenübersicht</text>
+  <!-- Header -->
+  <text x="20" y="50" fill="var(--mu)" font-size="8" font-weight="600">BERECHTIGUNG</text>
+  <text x="200" y="50" fill="var(--mu)" font-size="7" font-weight="600">ADM</text>
+  <text x="245" y="50" fill="var(--mu)" font-size="7" font-weight="600">LEI</text>
+  <text x="285" y="50" fill="var(--mu)" font-size="7" font-weight="600">DP</text>
+  <text x="325" y="50" fill="var(--mu)" font-size="7" font-weight="600">TECH</text>
+  <text x="370" y="50" fill="var(--mu)" font-size="7" font-weight="600">AUS</text>
+  <text x="415" y="50" fill="var(--mu)" font-size="7" font-weight="600">QM</text>
+  <text x="455" y="50" fill="var(--mu)" font-size="7" font-weight="600">STD</text>
+  <!-- Rows -->
+  <rect x="14" y="55" width="492" height="20" rx="0" fill="var(--sf)"/>
+  <text x="20" y="68" fill="var(--tx)" font-size="8">Benutzer verwalten</text>
+  <text x="203" y="68" fill="var(--ok)" font-size="9" font-weight="700">✓</text>
+  <text x="245" y="68" fill="var(--di)" font-size="9">–</text><text x="285" y="68" fill="var(--di)" font-size="9">–</text><text x="325" y="68" fill="var(--di)" font-size="9">–</text><text x="370" y="68" fill="var(--di)" font-size="9">–</text><text x="415" y="68" fill="var(--di)" font-size="9">–</text><text x="455" y="68" fill="var(--di)" font-size="9">–</text>
+  <rect x="14" y="75" width="492" height="20" rx="0" fill="var(--sf2)"/>
+  <text x="20" y="88" fill="var(--tx)" font-size="8">Alle Einträge sehen</text>
+  <text x="203" y="88" fill="var(--ok)" font-size="9" font-weight="700">✓</text><text x="245" y="88" fill="var(--ok)" font-size="9" font-weight="700">✓</text><text x="285" y="88" fill="var(--ok)" font-size="9" font-weight="700">✓</text>
+  <text x="325" y="88" fill="var(--di)" font-size="9">–</text>
+  <text x="365" y="88" fill="var(--warn)" font-size="8" font-weight="700">◌</text><text x="410" y="88" fill="var(--warn)" font-size="8" font-weight="700">◌</text>
+  <text x="455" y="88" fill="var(--di)" font-size="9">–</text>
+  <rect x="14" y="95" width="492" height="20" rx="0" fill="var(--sf)"/>
+  <text x="20" y="108" fill="var(--tx)" font-size="8">Einträge genehmigen</text>
+  <text x="203" y="108" fill="var(--ok)" font-size="9" font-weight="700">✓</text><text x="245" y="108" fill="var(--di)" font-size="9">–</text><text x="285" y="108" fill="var(--ok)" font-size="9" font-weight="700">✓</text><text x="325" y="108" fill="var(--di)" font-size="9">–</text><text x="370" y="108" fill="var(--di)" font-size="9">–</text><text x="415" y="108" fill="var(--di)" font-size="9">–</text><text x="455" y="108" fill="var(--di)" font-size="9">–</text>
+  <rect x="14" y="115" width="492" height="20" rx="0" fill="var(--sf2)"/>
+  <text x="20" y="128" fill="var(--tx)" font-size="8">Allg. Einträge anlegen</text>
+  <text x="203" y="128" fill="var(--ok)" font-size="9" font-weight="700">✓</text><text x="245" y="128" fill="var(--ok)" font-size="9" font-weight="700">✓</text><text x="285" y="128" fill="var(--ok)" font-size="9" font-weight="700">✓</text><text x="325" y="128" fill="var(--ok)" font-size="9" font-weight="700">✓</text><text x="370" y="128" fill="var(--ok)" font-size="9" font-weight="700">✓</text><text x="415" y="128" fill="var(--ok)" font-size="9" font-weight="700">✓</text><text x="455" y="128" fill="var(--di)" font-size="9">–</text>
+  <rect x="14" y="135" width="492" height="20" rx="0" fill="var(--sf)"/>
+  <text x="20" y="148" fill="var(--tx)" font-size="8">Alle Tickets sehen</text>
+  <text x="203" y="148" fill="var(--ok)" font-size="9" font-weight="700">✓</text><text x="245" y="148" fill="var(--ok)" font-size="9" font-weight="700">✓</text><text x="285" y="148" fill="var(--di)" font-size="9">–</text><text x="325" y="148" fill="var(--di)" font-size="9">–</text><text x="370" y="148" fill="var(--di)" font-size="9">–</text><text x="415" y="148" fill="var(--di)" font-size="9">–</text><text x="455" y="148" fill="var(--di)" font-size="9">–</text>
+  <rect x="14" y="155" width="492" height="20" rx="0" fill="var(--sf2)"/>
+  <text x="20" y="168" fill="var(--tx)" font-size="8">Nachrichten senden</text>
+  <text x="203" y="168" fill="var(--ok)" font-size="9" font-weight="700">✓</text><text x="245" y="168" fill="var(--ok)" font-size="9" font-weight="700">✓</text><text x="285" y="168" fill="var(--ok)" font-size="9" font-weight="700">✓</text><text x="325" y="168" fill="var(--ok)" font-size="9" font-weight="700">✓</text><text x="370" y="168" fill="var(--ok)" font-size="9" font-weight="700">✓</text><text x="415" y="168" fill="var(--ok)" font-size="9" font-weight="700">✓</text><text x="455" y="168" fill="var(--di)" font-size="9">–</text>
+  <rect x="14" y="175" width="492" height="20" rx="0" fill="var(--sf)"/>
+  <text x="20" y="188" fill="var(--tx)" font-size="8">Abrechnung alle sehen</text>
+  <text x="203" y="188" fill="var(--ok)" font-size="9" font-weight="700">✓</text><text x="245" y="188" fill="var(--di)" font-size="9">–</text><text x="285" y="188" fill="var(--ok)" font-size="9" font-weight="700">✓</text><text x="325" y="188" fill="var(--di)" font-size="9">–</text><text x="370" y="188" fill="var(--di)" font-size="9">–</text><text x="415" y="188" fill="var(--di)" font-size="9">–</text><text x="455" y="188" fill="var(--di)" font-size="9">–</text>
+  <text x="20" y="218" fill="var(--mu)" font-size="7">◌ = Anonymisiert (fremde Einträge verschleiert)</text>
+  <text x="20" y="230" fill="var(--mu)" font-size="7">ADM=Admin · LEI=Leitung · DP=Dienstplanung · TECH=Technik · AUS=Ausbildung · QM=QM · STD=Standard</text>
+</svg>
+<h4>Rollenbeschreibungen:</h4>
+<ul>
+<li><strong>🔑 Admin</strong> – Vollzugriff, Benutzerverwaltung, alle Einstellungen.</li>
+<li><strong>⭐ Leitung</strong> – Alle Einträge, alle Tickets sehen, Zulagen bearbeiten.</li>
+<li><strong>📋 Dienstplanung</strong> – Einträge genehmigen, Zulagen bearbeiten, Abrechnung aller sehen.</li>
+<li><strong>🔧 Technik / 🎓 Ausbildung / ✅ QM</strong> – Nur eigener Fachbereich + eigene Einträge. Ausbildung und QM sehen fremde Einträge anonymisiert.</li>
+<li><strong>👤 Standard</strong> – Nur eigene Einträge, eigene Tickets, Nachrichten empfangen.</li>
+</ul>
+<p>Ein Benutzer kann <strong>mehrere Rollen</strong> gleichzeitig haben. Die Berechtigungen addieren sich.</p>
+
+</div>
+<div id="hsec-admin" style="display:none">
+<h2 style="font-size:18px;font-weight:800;margin-bottom:6px;color:var(--acc)">⚙️ Administration</h2>
+<div style="height:2px;background:var(--border);margin-bottom:18px"></div>
+
+<p>Die Administration ist nur für Benutzer mit der Rolle <strong>Admin</strong> zugänglich. Sie wird über das <strong>⚙️-Symbol</strong> oben rechts im Header geöffnet.</p>
+<svg viewBox="0 0 520 210" style="width:100%;max-width:520px;border-radius:10px;margin:14px 0">
+  <rect width="520" height="210" rx="10" fill="var(--sf2)" stroke="var(--border)" stroke-width="1.5"/>
+  <!-- Tabs -->
+  <rect x="14" y="14" width="492" height="28" rx="5" fill="var(--sf)" stroke="var(--border)" stroke-width="1"/>
+  <rect x="14" y="14" width="90" height="28" rx="5" fill="var(--sf2)" stroke="var(--acc)" stroke-width="1.5"/>
+  <text x="59" y="31" text-anchor="middle" fill="var(--acc)" font-size="9" font-weight="700">👤 Benutzer</text>
+  <text x="150" y="31" text-anchor="middle" fill="var(--mu)" font-size="9">🎨 Kategorien</text>
+  <text x="240" y="31" text-anchor="middle" fill="var(--mu)" font-size="9">🏷️ Tags</text>
+  <text x="320" y="31" text-anchor="middle" fill="var(--mu)" font-size="9">🔐 Rechte</text>
+  <!-- User Card -->
+  <rect x="14" y="50" width="492" height="52" rx="6" fill="var(--sf)" stroke="var(--border)" stroke-width="1"/>
+  <circle cx="42" cy="76" r="16" fill="var(--acc)" opacity=".15"/>
+  <text x="42" y="80" text-anchor="middle" fill="var(--acc)" font-size="10" font-weight="700">AB</text>
+  <text x="68" y="68" fill="var(--tx)" font-size="10" font-weight="600">Anna Berger</text>
+  <rect x="68" y="72" width="55" height="13" rx="6" fill="color-mix(in srgb,var(--warn) 15%,transparent)"/>
+  <text x="95" y="82" text-anchor="middle" fill="var(--warn)" font-size="7">🔑 Admin</text>
+  <rect x="128" y="72" width="65" height="13" rx="6" fill="color-mix(in srgb,var(--acc) 12%,transparent)"/>
+  <text x="160" y="82" text-anchor="middle" fill="var(--acc)" font-size="7">📋 Dienstpl.</text>
+  <text x="68" y="94" fill="var(--ok)" font-size="7">✓ Aktiv</text>
+  <rect x="430" y="58" width="30" height="22" rx="4" fill="color-mix(in srgb,var(--info) 10%,transparent)"/>
+  <text x="445" y="72" text-anchor="middle" fill="var(--info)" font-size="11">✏</text>
+  <rect x="466" y="58" width="30" height="22" rx="4" fill="color-mix(in srgb,var(--danger) 10%,transparent)"/>
+  <text x="481" y="72" text-anchor="middle" fill="var(--danger)" font-size="11">✕</text>
+  <!-- User Form -->
+  <rect x="14" y="112" width="492" height="82" rx="6" fill="var(--sf)" stroke="var(--border)" stroke-width="1"/>
+  <text x="26" y="128" fill="var(--tx)" font-size="9" font-weight="700">Benutzer bearbeiten</text>
+  <text x="26" y="144" fill="var(--mu)" font-size="8">Name</text>
+  <rect x="26" y="148" width="140" height="18" rx="4" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <text x="34" y="160" fill="var(--tx)" font-size="8">Anna Berger</text>
+  <text x="180" y="144" fill="var(--mu)" font-size="8">Kürzel</text>
+  <rect x="180" y="148" width="50" height="18" rx="4" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <text x="188" y="160" fill="var(--tx)" font-size="8">AB</text>
+  <text x="26" y="180" fill="var(--mu)" font-size="8">Rollen (mehrere möglich)</text>
+  <rect x="26" y="184" width="70" height="16" rx="4" fill="color-mix(in srgb,var(--warn) 10%,transparent)" stroke="color-mix(in srgb,var(--warn) 25%,transparent)" stroke-width="1"/>
+  <text x="61" y="194" text-anchor="middle" fill="var(--warn)" font-size="7">✓ Admin</text>
+  <rect x="102" y="184" width="80" height="16" rx="4" fill="color-mix(in srgb,var(--acc) 10%,transparent)" stroke="color-mix(in srgb,var(--acc) 25%,transparent)" stroke-width="1"/>
+  <text x="142" y="194" text-anchor="middle" fill="var(--acc)" font-size="7">✓ Dienstplan.</text>
+</svg>
+<h4>Benutzer verwalten:</h4>
+<ul>
+<li><strong>Neuen Benutzer anlegen</strong> – Name, Kürzel (max. 3 Buchstaben), Rollen, Farbe. Startpasswort ist <code>Passwort1</code>, Benutzer muss es beim ersten Login ändern.</li>
+<li><strong>Benutzer bearbeiten</strong> – Alle Felder änderbar, inkl. Rollen (Mehrfachauswahl).</li>
+<li><strong>Passwort zurücksetzen</strong> – Checkbox „PW zurücksetzen" im Bearbeitungsformular.</li>
+<li><strong>Benutzer löschen</strong> – Eigenen Account kann man nicht löschen.</li>
+</ul>
+<h4>Kategorien verwalten:</h4>
+<p>Kategorien werden im Dienstplan-Eintrag verwendet (Urlaub, Krankenstand, Kurs, …). Jede Kategorie hat Emoji, Name und Farbe.</p>
+<h4>Tags verwalten:</h4>
+<p>Tags werden im Ticketsystem für Filterung und Kennzeichnung verwendet (Bug, Feature, Dringend, …).</p>
+<h4>Rechte-Matrix:</h4>
+<p>Zeigt eine Übersicht aller Berechtigungen je Rolle. Nur lesend, zur schnellen Orientierung.</p>
+
+</div>
+<div id="hsec-tipps" style="display:none">
+<h2 style="font-size:18px;font-weight:800;margin-bottom:6px;color:var(--acc)">💡 Tipps & Tastenkürzel</h2>
+<div style="height:2px;background:var(--border);margin-bottom:18px"></div>
+
+<p>Nützliche Hinweise für die effiziente Nutzung des LSt Portals.</p>
+<svg viewBox="0 0 520 180" style="width:100%;max-width:520px;border-radius:10px;margin:14px 0">
+  <rect width="520" height="180" rx="10" fill="var(--sf2)" stroke="var(--border)" stroke-width="1.5"/>
+  <!-- Header Icons -->
+  <text x="24" y="35" fill="var(--tx)" font-size="11" font-weight="700">Header-Leiste</text>
+  <rect x="14" y="45" width="492" height="50" rx="6" fill="var(--sf)" stroke="var(--border)" stroke-width="1"/>
+  <rect x="30" y="57" width="90" height="26" rx="6" fill="var(--acc)" opacity=".12" stroke="var(--acc)" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="75" y="73" text-anchor="middle" fill="var(--acc)" font-size="9">🌙/☀️ Theme</text>
+  <rect x="135" y="57" width="26" height="26" rx="6" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <text x="148" y="74" text-anchor="middle" fill="var(--tx)" font-size="10" font-weight="700">?</text>
+  <text x="148" y="90" text-anchor="middle" fill="var(--mu)" font-size="8">Hilfe</text>
+  <rect x="172" y="57" width="26" height="26" rx="6" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <text x="185" y="74" text-anchor="middle" fill="var(--tx)" font-size="10">✉</text>
+  <text x="185" y="90" text-anchor="middle" fill="var(--mu)" font-size="8">Nachr.</text>
+  <rect x="209" y="57" width="26" height="26" rx="6" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <text x="222" y="74" text-anchor="middle" fill="var(--tx)" font-size="10">🔔</text>
+  <text x="222" y="90" text-anchor="middle" fill="var(--mu)" font-size="8">Notifs</text>
+  <rect x="246" y="57" width="26" height="26" rx="6" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <text x="259" y="74" text-anchor="middle" fill="var(--tx)" font-size="10">⚙️</text>
+  <text x="259" y="90" text-anchor="middle" fill="var(--mu)" font-size="8">Admin</text>
+  <rect x="290" y="57" width="90" height="26" rx="100" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <text x="335" y="74" text-anchor="middle" fill="var(--tx)" font-size="9">AB Anna Berger</text>
+  <text x="335" y="90" text-anchor="middle" fill="var(--mu)" font-size="8">PW ändern</text>
+  <rect x="396" y="57" width="26" height="26" rx="6" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
+  <text x="409" y="74" text-anchor="middle" fill="var(--tx)" font-size="10">⏻</text>
+  <text x="409" y="90" text-anchor="middle" fill="var(--mu)" font-size="8">Logout</text>
+  <!-- Tips row -->
+  <rect x="14" y="108" width="238" height="58" rx="6" fill="var(--sf)" stroke="var(--border)" stroke-width="1"/>
+  <text x="26" y="124" fill="var(--tx)" font-size="9" font-weight="700">⌨️ Tastenkürzel</text>
+  <text x="26" y="138" fill="var(--mu)" font-size="8">Esc – Offenes Modal schließen</text>
+  <text x="26" y="150" fill="var(--mu)" font-size="8">Enter – Notiz absenden (Ticket)</text>
+  <text x="26" y="162" fill="var(--mu)" font-size="8">@Name – Erwähnung in Notiz</text>
+  <rect x="268" y="108" width="238" height="58" rx="6" fill="var(--sf)" stroke="var(--border)" stroke-width="1"/>
+  <text x="280" y="124" fill="var(--tx)" font-size="9" font-weight="700">🔄 Auto-Refresh</text>
+  <text x="280" y="138" fill="var(--mu)" font-size="8">Alle 60 Sekunden automatische</text>
+  <text x="280" y="150" fill="var(--mu)" font-size="8">Aktualisierung. Toast bei neuen</text>
+  <text x="280" y="162" fill="var(--mu)" font-size="8">Nachrichten / Tickets.</text>
+</svg>
+<h4>Allgemeine Tipps:</h4>
+<ul>
+<li><strong>Alle Modals</strong> können mit <kbd>Esc</kbd> geschlossen werden oder durch Klick außerhalb des Fensters.</li>
+<li><strong>Hell/Dunkel-Modus</strong> – Klicke auf 🌙/☀️ oben rechts. Die Einstellung wird im Browser gespeichert.</li>
+<li><strong>Mobile Ansicht</strong> – Das Portal ist vollständig responsive. Auf Smartphones öffnet das Hamburger-Menü ☰ die Sidebar.</li>
+<li><strong>Versionsnummer</strong> – Klicke auf die Versionsnummer unten links in der Sidebar, um das Changelog zu öffnen.</li>
+<li><strong>Auto-Refresh</strong> – Das Portal prüft alle 60 Sekunden ob neue Nachrichten oder Tickets eingegangen sind.</li>
+<li><strong>@Mentions</strong> – In Ticket-Notizen kannst du mit @Name Kollegen markieren. Ein Dropdown mit Vorschlägen erscheint automatisch.</li>
+<li><strong>Mehrfachrollen</strong> – Ein Benutzer kann mehrere Rollen gleichzeitig haben. Die Berechtigungen addieren sich.</li>
+</ul>
+<h4>Versionsinformationen:</h4>
+<p>Du findest alle Änderungen und neuen Funktionen im <strong>Changelog</strong> – klicke auf die Versionsnummer unten in der Sidebar.</p>
+
+</div>
+</div>
+    </div>
+  </div>
+</div>
+
+<script>
+window._helpActive = 'login';
+function showHelpSection(id){
+  document.querySelectorAll('[id^="hsec-"]').forEach(el=>el.style.display='none');
+  document.querySelectorAll('[id^="htoc-"]').forEach(el=>{el.style.background='';el.style.color='var(--mu)';});
+  var sec=document.getElementById('hsec-'+id);
+  var toc=document.getElementById('htoc-'+id);
+  if(sec)sec.style.display='block';
+  if(toc){toc.style.background='var(--acc)';toc.style.color='var(--act)';}
+  window._helpActive=id;
+  var c=document.getElementById('helpContent');
+  if(c)c.scrollTop=0;
+}
+</script>
 <!-- CHANGELOG -->
 <div class="ov" id="changelogOv">
   <div class="modal lg">
     <div class="mh"><h2>&#128203; Changelog</h2><button class="mc" onclick="closeModal('changelogOv')">&#10005;</button></div>
     <div class="mb2" style="gap:10px">
       <div style="padding:12px;background:color-mix(in srgb,var(--acc) 6%,var(--sf));border:1px solid color-mix(in srgb,var(--acc) 20%,transparent);border-radius:8px">
-        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v1.7.0</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v1.8.0</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
         <ul style="font-size:12px;line-height:1.8;padding-left:18px">
+          <li>Integriertes Benutzerhandbuch (? oben rechts) mit Grafiken für alle Funktionen</li>
           <li>Bug-Fix: Bestätigen-Button in Übersicht und Nachrichten funktioniert wieder</li>
           <li>Bug-Fix: Gesendet-Tab zeigt jetzt eigene versendete Nachrichten korrekt</li>
           <li>Bug-Fix: readMsg / deleteMsg Funktionen wieder vorhanden</li>
@@ -559,7 +1273,7 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
 </div>
 
 <script>
-const APP_VERSION='1.7.0';
+const APP_VERSION='1.8.0';
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
@@ -766,8 +1480,9 @@ function renderHome(){
   const u=getU(S.currentUser);
   const online=S.users.filter(x=>x.isOnline&&x.id!==S.currentUser);
   const unreadMsg=S.messages.filter(m=>!m.isRead&&m.senderId!==S.currentUser);
-  const unreadNotif=S.notifications.filter(n=>!n.isRead&&n.type!=='event_added'&&n.type!=='event_changed');
+  const unreadNotif=S.notifications.filter(n=>!n.isRead&&n.type!=='event_added'&&n.type!=='event_changed'&&n.type!=='einspringer_rejected');
   const eventNotifs=S.notifications.filter(n=>!n.isRead&&(n.type==='event_added'||n.type==='event_changed'));
+  const einspNotifs=S.notifications.filter(n=>!n.isRead&&n.type==='einspringer_rejected');
   const myDepts=S.tp.myDepts;
   const relevantTks=S.tickets.filter(tk=>tk.status!=='closed'&&((myDepts.includes(tk.department)&&!tk.assigneeId)||tk.assigneeId===S.currentUser)).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,8);
   document.getElementById('main').innerHTML=`
@@ -785,6 +1500,13 @@ function renderHome(){
         <div><div style="font-weight:600;font-size:13px">${n.title}</div>${ev?`<div style="font-size:11px;color:var(--mu)">${fd(ev.dateFrom)} &middot; ${ev.reason||'Eintrag'}</div>`:''}</div>
         <button class="btn-ok" onclick="confirmEventNotif('${n.id}')">&#10003; Zur Kenntnis</button>
       </div>`;}).join('')}
+    </div>`:''}
+    ${einspNotifs.length?`<div style="background:color-mix(in srgb,var(--danger) 5%,var(--sf));border:1px solid color-mix(in srgb,var(--danger) 22%,transparent);border-radius:var(--r);padding:14px;margin-bottom:14px">
+      <div style="font-size:13px;font-weight:700;color:var(--danger);margin-bottom:10px">&#10007; ${einspNotifs.length} abgelehnter Einspringerdienst${einspNotifs.length>1?'e':''}</div>
+      ${einspNotifs.map(n=>`<div style="padding:8px 12px;background:var(--sf);border-radius:6px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div><div style="font-weight:600;font-size:13px">${n.title}</div><div style="font-size:11px;color:var(--mu)">${fdt(n.createdAt)}</div></div>
+        <button class="btn-ok" onclick="confirmEventNotif('${n.id}')">&#10003; Zur Kenntnis</button>
+      </div>`).join('')}
     </div>`:''}
     ${unreadNotif.length?`<div style="background:color-mix(in srgb,var(--acc) 4%,var(--sf));border:1px solid color-mix(in srgb,var(--acc) 18%,transparent);border-radius:var(--r);padding:14px;margin-bottom:14px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -927,11 +1649,12 @@ function renderAllw(){
     <div class="ph"><div class="pt">Zulagendienste <span>${pLbl} ${yr}</span></div>
       ${isBulk?`<button class="btn-p" onclick="saveAllBulk()">&#128190; Alle speichern</button>`:''}
     </div>
+    ${!S.p.editAllw?`<div class="ib3" style="margin-bottom:12px">&#8505;&#65039; Nur Lesezugriff &ndash; Eintr&#228;ge k&#246;nnen nur von Dienstplanung/Leitung/Admin bearbeitet werden.</div>`:''}
     <div class="tw"><div class="tt"><h2>\u00dcbersicht</h2></div>
       <div style="overflow-x:auto"><table><thead><tr><th>Mitarbeiter</th>
         <th style="text-align:center">&#127769; Nacht</th><th style="text-align:center">&#127881; Feiertag</th>
         <th style="text-align:center">&#127958;&#65039; WE</th><th style="text-align:center">&#128203; C10</th>
-        ${!isBulk?'<th></th>':''}
+        ${isBulk?'<th></th>':''}
       </tr></thead>
       <tbody>${showUsers.map(u=>{
         if(isBulk){const a=getAllw(u.id,yr,S.allwMonth);return`<tr>
@@ -940,9 +1663,10 @@ function renderAllw(){
           <td style="text-align:center"><input type="number" min="0" class="bulk-fd" data-uid="${u.id}" value="${a.fd||0}" style="width:60px;text-align:center;font-size:12px;padding:4px"></td>
           <td style="text-align:center"><input type="number" min="0" class="bulk-fw" data-uid="${u.id}" value="${a.fw||0}" style="width:60px;text-align:center;font-size:12px;padding:4px"></td>
           <td style="text-align:center"><input type="number" min="0" class="bulk-c10" data-uid="${u.id}" value="${a.c10||0}" style="width:60px;text-align:center;font-size:12px;padding:4px"></td>
+          <td></td>
         </tr>`;}
         const sv=sumAllw(u.id,yr,months);
-        return`<tr><td><div style="display:flex;align-items:center;gap:6px">${avHtml(u.initials,u.color,22,9)}<span>${u.name}</span></div></td>${numCell(sv.nd,'#3b6dd4')}${numCell(sv.fd,'#10b981')}${numCell(sv.fw,'#f59e0b')}${numCell(sv.c10,'#7c3aed')}<td><button class="btn-e" onclick="openAllwM('${u.id}',${yr},${months[0]})">\u270e</button></td></tr>`;
+        return`<tr><td><div style="display:flex;align-items:center;gap:6px">${avHtml(u.initials,u.color,22,9)}<span>${u.name}</span></div></td>${numCell(sv.nd,'#3b6dd4')}${numCell(sv.fd,'#10b981')}${numCell(sv.fw,'#f59e0b')}${numCell(sv.c10,'#7c3aed')}</tr>`;
       }).join('')}</tbody></table></div>
       ${isBulk?`<div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;justify-content:flex-end"><button class="btn-p" onclick="saveAllBulk()">&#128190; Alle speichern</button></div>`:''}
     </div>`;
@@ -1495,7 +2219,7 @@ function openModal(id){document.getElementById(id)?.classList.add('open');}
 function closeModal(id){document.getElementById(id)?.classList.remove('open');}
 function eyeToggle(inputId,btn){const inp=document.getElementById(inputId);const show=inp.type==='password';inp.type=show?'text':'password';btn.textContent=show?'\uD83D\uDE48':'\uD83D\uDC41';}
 function toast(msg,type=''){const t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3200);}
-const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOv','clFormOv','attachClOv','changelogOv','dpOv','rejectEinspOv','msgFormOv'];
+const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOr','clFormOv','attachClOv','changelogOv','dpOv','rejectEinspOv','helpOv','msgFormOv'];
 document.addEventListener('keydown',e=>{if(e.key==='Escape')ALL_MODALS.forEach(closeModal);});
 ALL_MODALS.forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('click',e=>{if(e.target===el)closeModal(id);});});
 document.addEventListener('click',e=>{if(!e.target.closest('.note-input-wrap'))document.getElementById('mentionSug')?.classList.remove('open');});
