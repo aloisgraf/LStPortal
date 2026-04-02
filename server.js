@@ -106,6 +106,14 @@ async function initDB() {
       year INTEGER NOT NULL, month INTEGER NOT NULL, days INTEGER DEFAULT 0,
       UNIQUE(user_id, year, month)
     );
+    CREATE TABLE IF NOT EXISTS dienstplaene (
+      id TEXT PRIMARY KEY, month INTEGER NOT NULL, year INTEGER NOT NULL,
+      label TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1,
+      filename TEXT NOT NULL, file_data TEXT NOT NULL,
+      is_archived BOOLEAN NOT NULL DEFAULT false,
+      archived_at TIMESTAMPTZ,
+      created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
+    );
   `);
 
   const migs = [
@@ -246,7 +254,7 @@ app.get('/api/data', auth, async (req,res) => {
   try {
     const uid=req.uid, p=req.p, tp=req.tp, roles=p.roles;
     const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
-           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw] = await Promise.all([
+           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw] = await Promise.all([
       q('SELECT id,name,initials,roles,color,must_change_pw,last_seen FROM users ORDER BY name'),
       q('SELECT * FROM categories ORDER BY sort_order,label'),
       q('SELECT * FROM tags ORDER BY label'),
@@ -266,6 +274,7 @@ app.get('/api/data', auth, async (req,res) => {
         : q('SELECT * FROM abrechnung_einspringer WHERE user_id=$1 ORDER BY edate DESC',[uid]),
       p.seeAllAbrechnung ? q('SELECT * FROM abrechnung_homeoffice ORDER BY year DESC,month DESC')
         : q('SELECT * FROM abrechnung_homeoffice WHERE user_id=$1 ORDER BY year DESC,month DESC',[uid]),
+      q('SELECT id,month,year,label,version,filename,is_archived,archived_at,created_by,created_at FROM dienstplaene ORDER BY year DESC,month DESC,version DESC'),
     ]);
 
     const noteMap={}, clItemMap={}, tkClItemMap={}, tkClMap={};
@@ -340,6 +349,7 @@ app.get('/api/data', auth, async (req,res) => {
         einspringer: einspRaw.map(e=>({id:e.id,userId:e.user_id,date:e.edate,note:e.note||'',createdAt:e.created_at})),
         homeoffice:  hoRaw.map(h=>({id:h.id,userId:h.user_id,year:h.year,month:h.month,days:h.days})),
       },
+      dienstplaene: dpRaw.map(d=>({id:d.id,month:d.month,year:d.year,label:d.label,version:d.version,filename:d.filename,isArchived:d.is_archived,archivedAt:d.archived_at,createdBy:d.created_by,createdAt:d.created_at})),
     });
   } catch(e) { console.error(e); bad(res,e.message,500); }
 });
@@ -725,6 +735,43 @@ app.delete('/api/users/:id', auth, adminOnly, async (req,res) => {
   try {
     if (req.params.id===req.uid) return bad(res,'Eigenen Account nicht löschbar');
     await pool.query('DELETE FROM users WHERE id=$1',[req.params.id]); ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
+
+// ── DIENSTPLAENE ──────────────────────────────────────────────────────────────
+app.post('/api/dienstplaene', auth, async (req,res) => {
+  try {
+    if (!req.p.addGeneral) return bad(res,'Keine Berechtigung',403);
+    const {month,year,label,filename,fileData} = req.body;
+    if (!month||!year||!label?.trim()||!fileData) return bad(res,'Alle Felder erforderlich');
+    const existing = await q('SELECT id,version FROM dienstplaene WHERE month=$1 AND year=$2 AND is_archived=false',[month,year]);
+    let nextVersion = 1;
+    for (const ex of existing) {
+      await pool.query('UPDATE dienstplaene SET is_archived=true,archived_at=NOW() WHERE id=$1',[ex.id]);
+      if (ex.version >= nextVersion) nextVersion = ex.version + 1;
+    }
+    const id=newId();
+    await pool.query('INSERT INTO dienstplaene (id,month,year,label,version,filename,file_data,is_archived,created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,false,$8)',
+      [id,month,year,label.trim(),nextVersion,filename||'dienstplan.pdf',fileData,req.uid]);
+    ok(res,{id,version:nextVersion});
+  } catch(e) { bad(res,e.message,500); }
+});
+app.get('/api/dienstplaene/:id/file', auth, async (req,res) => {
+  try {
+    const row = await q1('SELECT filename,file_data FROM dienstplaene WHERE id=$1',[req.params.id]);
+    if (!row) return bad(res,'Nicht gefunden',404);
+    const base64 = row.file_data.replace(/^data:[^;]+;base64,/,'');
+    const buf = Buffer.from(base64,'base64');
+    res.setHeader('Content-Type','application/pdf');
+    res.setHeader('Content-Disposition',`inline; filename="${row.filename}"`);
+    res.send(buf);
+  } catch(e) { bad(res,e.message,500); }
+});
+app.delete('/api/dienstplaene/:id', auth, async (req,res) => {
+  try {
+    if (!req.p.addGeneral) return bad(res,'Keine Berechtigung',403);
+    await pool.query('DELETE FROM dienstplaene WHERE id=$1',[req.params.id]);
+    ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
 
