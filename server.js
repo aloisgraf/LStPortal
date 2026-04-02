@@ -99,6 +99,7 @@ async function initDB() {
     CREATE TABLE IF NOT EXISTS abrechnung_einspringer (
       id TEXT PRIMARY KEY, user_id TEXT NOT NULL,
       edate TEXT NOT NULL, note TEXT DEFAULT '',
+      rejected_by TEXT, rejected_reason TEXT, rejected_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS abrechnung_homeoffice (
@@ -121,6 +122,9 @@ async function initDB() {
     `ALTER TABLE checklist_template_items ADD COLUMN IF NOT EXISTS item_type TEXT NOT NULL DEFAULT 'check'`,
     `ALTER TABLE ticket_checklist_items ADD COLUMN IF NOT EXISTS item_type TEXT NOT NULL DEFAULT 'check'`,
     `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS event_id TEXT`,
+    `ALTER TABLE abrechnung_einspringer ADD COLUMN IF NOT EXISTS rejected_by TEXT`,
+    `ALTER TABLE abrechnung_einspringer ADD COLUMN IF NOT EXISTS rejected_reason TEXT`,
+    `ALTER TABLE abrechnung_einspringer ADD COLUMN IF NOT EXISTS rejected_at TIMESTAMPTZ`,
   ];
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }
 
@@ -193,10 +197,13 @@ function parseMentions(text, users) {
   return users.filter(u => new RegExp('@' + u.name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'i').test(text));
 }
 const canSeeMsg = (msg, uid, roles) =>
-  msg.target_type==='all' || (msg.target_type==='user' && msg.target_value===uid) || (msg.target_type==='department' && roles.includes(msg.target_value));
+  msg.sender_id === uid ||
+  msg.target_type==='all' ||
+  (msg.target_type==='user' && msg.target_value===uid) ||
+  (msg.target_type==='department' && roles.includes(msg.target_value));
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '20mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.set('trust proxy', 1);
 app.use(session({
@@ -346,7 +353,7 @@ app.get('/api/data', auth, async (req,res) => {
         isRead:!!n.read_at,
       })),
       abrechnung: {
-        einspringer: einspRaw.map(e=>({id:e.id,userId:e.user_id,date:e.edate,note:e.note||'',createdAt:e.created_at})),
+        einspringer: einspRaw.map(e=>({id:e.id,userId:e.user_id,date:e.edate,note:e.note||'',rejectedBy:e.rejected_by,rejectedReason:e.rejected_reason,rejectedAt:e.rejected_at,createdAt:e.created_at})),
         homeoffice:  hoRaw.map(h=>({id:h.id,userId:h.user_id,year:h.year,month:h.month,days:h.days})),
       },
       dienstplaene: dpRaw.map(d=>({id:d.id,month:d.month,year:d.year,label:d.label,version:d.version,filename:d.filename,isArchived:d.is_archived,archivedAt:d.archived_at,createdBy:d.created_by,createdAt:d.created_at})),
@@ -621,11 +628,28 @@ app.put('/api/abrechnung/einspringer/:id', auth, async (req, res) => {
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
+app.put('/api/abrechnung/einspringer/:id/reject', auth, async (req,res) => {
+  try {
+    if (!req.p.seeAllAbrechnung) return bad(res,'Keine Berechtigung',403);
+    const row = await q1('SELECT * FROM abrechnung_einspringer WHERE id=$1',[req.params.id]);
+    if (!row) return bad(res,'Nicht gefunden',404);
+    if (req.body.undo) {
+      await pool.query('UPDATE abrechnung_einspringer SET rejected_by=NULL,rejected_reason=NULL,rejected_at=NULL WHERE id=$1',[req.params.id]);
+    } else {
+      const {reason} = req.body;
+      if (!reason?.trim()) return bad(res,'Begründung erforderlich');
+      await pool.query('UPDATE abrechnung_einspringer SET rejected_by=$1,rejected_reason=$2,rejected_at=NOW() WHERE id=$3',
+        [req.uid, reason.trim(), req.params.id]);
+    }
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
 app.delete('/api/abrechnung/einspringer/:id', auth, async (req,res) => {
   try {
     const row = await q1('SELECT * FROM abrechnung_einspringer WHERE id=$1',[req.params.id]);
     if (!row) return bad(res,'Nicht gefunden',404);
-    if (row.user_id!==req.uid&&!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+    // Only the creator (user_id) can delete their own entry
+    if (row.user_id!==req.uid) return bad(res,'Nur der Ersteller kann löschen',403);
     await pool.query('DELETE FROM abrechnung_einspringer WHERE id=$1',[req.params.id]);
     ok(res);
   } catch(e) { bad(res,e.message,500); }
