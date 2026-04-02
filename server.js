@@ -42,6 +42,10 @@ async function initDB() {
       approval_status TEXT DEFAULT NULL,
       created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
     );
+    CREATE TABLE IF NOT EXISTS event_confirms (
+      id TEXT PRIMARY KEY, event_id TEXT NOT NULL, user_id TEXT NOT NULL,
+      confirmed_at TIMESTAMPTZ DEFAULT NOW(), UNIQUE(event_id, user_id)
+    );
     CREATE TABLE IF NOT EXISTS tickets (
       id TEXT PRIMARY KEY, number TEXT NOT NULL UNIQUE, title TEXT NOT NULL,
       description TEXT DEFAULT '', department TEXT NOT NULL,
@@ -89,7 +93,7 @@ async function initDB() {
     );
     CREATE TABLE IF NOT EXISTS notifications (
       id TEXT PRIMARY KEY, user_id TEXT NOT NULL, type TEXT NOT NULL,
-      title TEXT NOT NULL, ticket_id TEXT, note_id TEXT,
+      title TEXT NOT NULL, ticket_id TEXT, note_id TEXT, event_id TEXT,
       created_by TEXT NOT NULL, read_at TIMESTAMPTZ, created_at TIMESTAMPTZ DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS abrechnung_einspringer (
@@ -104,12 +108,11 @@ async function initDB() {
     );
   `);
 
-  // Safe column migrations
   const migs = [
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ`,
     `ALTER TABLE checklist_template_items ADD COLUMN IF NOT EXISTS item_type TEXT NOT NULL DEFAULT 'check'`,
     `ALTER TABLE ticket_checklist_items ADD COLUMN IF NOT EXISTS item_type TEXT NOT NULL DEFAULT 'check'`,
-    `ALTER TABLE ticket_checklist_items ADD COLUMN IF NOT EXISTS user_note TEXT DEFAULT ''`,
+    `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS event_id TEXT`,
   ];
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }
 
@@ -141,8 +144,8 @@ async function getP(uid) {
   const has = (...r) => r.some(x => roles.includes(x));
   const full = has('admin','leitung','dienstplanung');
   return {
-    manageUsers: has('admin'), seeAllEntries: has('admin','leitung','dienstplanung','ausbildung','qm'),
-    othersBlurred: !full && has('ausbildung','qm'), editAllPersonal: full,
+    manageUsers: has('admin'), seeAllEntries: true, // everyone sees all events now
+    othersBlurred: false, editAllPersonal: full,
     addForOthers: has('admin','leitung','dienstplanung','ausbildung','qm'),
     addGeneral: has('admin','leitung','dienstplanung','technik','ausbildung','qm'),
     manageGeneral: has('admin','leitung','dienstplanung','technik','ausbildung','qm'),
@@ -174,18 +177,12 @@ async function auditNote(ticketId, userId, text) {
     [newId(), ticketId, text, userId, 'audit']);
   await pool.query('UPDATE tickets SET updated_at=NOW() WHERE id=$1', [ticketId]);
 }
-async function createNotification(userId, type, title, ticketId, noteId, createdBy) {
-  await pool.query('INSERT INTO notifications (id,user_id,type,title,ticket_id,note_id,created_by) VALUES ($1,$2,$3,$4,$5,$6,$7)',
-    [newId(), userId, type, title, ticketId||null, noteId||null, createdBy]);
+async function createNotification(userId, type, title, ticketId, noteId, createdBy, eventId) {
+  await pool.query('INSERT INTO notifications (id,user_id,type,title,ticket_id,note_id,event_id,created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+    [newId(), userId, type, title, ticketId||null, noteId||null, eventId||null, createdBy]);
 }
 function parseMentions(text, users) {
-  const mentioned = [];
-  for (const u of users) {
-    // Match @Name (case-insensitive, word boundary)
-    const re = new RegExp('@' + u.name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'i');
-    if (re.test(text)) mentioned.push(u);
-  }
-  return mentioned;
+  return users.filter(u => new RegExp('@' + u.name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'i').test(text));
 }
 const canSeeMsg = (msg, uid, roles) =>
   msg.target_type==='all' || (msg.target_type==='user' && msg.target_value===uid) || (msg.target_type==='department' && roles.includes(msg.target_value));
@@ -213,7 +210,7 @@ const adminOnly = (req,res,next) => req.p.manageUsers ? next() : res.status(403)
 const ok  = (res,data) => res.json({success:true, data: data??null});
 const bad = (res,msg,code=400) => res.status(code).json({success:false, error:msg});
 
-// ── AUTH ─────────────────────────────────────────────────────────────────────
+// AUTH
 app.get('/api/auth/users', async (req,res) => {
   try {
     const users = await q('SELECT id,name,initials,color,roles FROM users ORDER BY name');
@@ -244,18 +241,17 @@ app.post('/api/auth/change-password', auth, async (req,res) => {
   } catch(e) { bad(res,e.message,500); }
 });
 
-// ── DATA ─────────────────────────────────────────────────────────────────────
+// DATA
 app.get('/api/data', auth, async (req,res) => {
   try {
     const uid=req.uid, p=req.p, tp=req.tp, roles=p.roles;
-    const [usersRaw,cats,tagsRaw,evRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
-           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,
-           einspRaw,hoRaw] = await Promise.all([
+    const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
+           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw] = await Promise.all([
       q('SELECT id,name,initials,roles,color,must_change_pw,last_seen FROM users ORDER BY name'),
       q('SELECT * FROM categories ORDER BY sort_order,label'),
       q('SELECT * FROM tags ORDER BY label'),
-      p.seeAllEntries ? q('SELECT * FROM events ORDER BY date_from')
-        : q('SELECT * FROM events WHERE is_general=true OR user_id=$1 ORDER BY date_from',[uid]),
+      q('SELECT * FROM events ORDER BY date_from'),
+      q('SELECT event_id FROM event_confirms WHERE user_id=$1',[uid]),
       q('SELECT * FROM tickets ORDER BY created_at DESC'),
       q('SELECT * FROM ticket_notes ORDER BY created_at'),
       p.seeAllAllw ? q('SELECT * FROM allowances') : q('SELECT * FROM allowances WHERE user_id=$1',[uid]),
@@ -280,12 +276,13 @@ app.get('/api/data', auth, async (req,res) => {
 
     const fiveMinAgo = new Date(Date.now() - 5*60*1000);
     const readIds = new Set(readsRaw.map(r=>r.message_id));
+    const confirmedEventIds = new Set(evConfirmsRaw.map(r=>r.event_id));
 
     ok(res, {
       currentUser: uid,
       permissions: {
         canApproveEvents:p.canApproveEvents, canSendMessages:p.canSendMessages,
-        seeAllEntries:p.seeAllEntries, editAllPersonal:p.editAllPersonal,
+        seeAllEntries:true, editAllPersonal:p.editAllPersonal,
         addForOthers:p.addForOthers, addGeneral:p.addGeneral,
         manageUsers:p.manageUsers, seeAllAllw:p.seeAllAllw, editAllw:p.editAllw,
         seeAllAbrechnung:p.seeAllAbrechnung,
@@ -299,14 +296,25 @@ app.get('/api/data', auth, async (req,res) => {
       })),
       categories: cats,
       tags: tagsRaw,
-      events: evRaw.map(ev=>({
-        id:ev.id, isGeneral:ev.is_general, dateFrom:ev.date_from, dateTo:ev.date_to,
-        timeFrom:ev.time_from||'', timeTo:ev.time_to||'', userId:ev.user_id,
-        category:ev.category, reason:ev.reason, approvalStatus:ev.approval_status,
-        createdBy:ev.created_by, createdAt:ev.created_at,
-        _blurred: p.othersBlurred && !ev.is_general && ev.user_id!==uid && ev.created_by!==uid,
-        _canEdit: !ev.is_general && ev.created_by===uid && !ev.approval_status,
-      })),
+      events: evRaw.map(ev=>{
+        const concernsMe = !ev.is_general && ev.user_id === uid;
+        const createdByMe = ev.created_by === uid;
+        const anonymize = !ev.is_general && ev.user_id !== uid && !createdByMe;
+        const confirmed = ev.is_general || createdByMe || confirmedEventIds.has(ev.id);
+        return {
+          id:ev.id, isGeneral:ev.is_general, dateFrom:ev.date_from, dateTo:ev.date_to,
+          timeFrom:ev.time_from||'', timeTo:ev.time_to||'',
+          userId: anonymize ? null : ev.user_id,
+          category:ev.category, reason: anonymize ? null : ev.reason,
+          approvalStatus:ev.approval_status,
+          createdBy: anonymize ? null : ev.created_by, createdAt:ev.created_at,
+          _anonymized: anonymize,
+          _concernsMe: concernsMe,
+          _confirmed: confirmed,
+          _isNew: concernsMe && !createdByMe && !confirmedEventIds.has(ev.id),
+          _canEdit: !ev.is_general && createdByMe && !ev.approval_status,
+        };
+      }),
       tickets: tkRaw.filter(tk=>canSeeTk(tp,tk,uid)).map(tk=>({
         id:tk.id, number:tk.number, title:tk.title, description:tk.description||'',
         department:tk.department, tags:parseTags(tk.tags), priority:tk.priority,
@@ -325,7 +333,7 @@ app.get('/api/data', auth, async (req,res) => {
       })),
       notifications: notifsRaw.map(n=>({
         id:n.id, type:n.type, title:n.title, ticketId:n.ticket_id,
-        noteId:n.note_id, createdBy:n.created_by, createdAt:n.created_at,
+        noteId:n.note_id, eventId:n.event_id, createdBy:n.created_by, createdAt:n.created_at,
         isRead:!!n.read_at,
       })),
       abrechnung: {
@@ -336,7 +344,7 @@ app.get('/api/data', auth, async (req,res) => {
   } catch(e) { console.error(e); bad(res,e.message,500); }
 });
 
-// ── EVENTS ───────────────────────────────────────────────────────────────────
+// EVENTS
 app.post('/api/events', auth, async (req,res) => {
   try {
     const {isGeneral,dateFrom,dateTo,timeFrom,timeTo,userId,category,reason} = req.body;
@@ -347,6 +355,11 @@ app.post('/api/events', auth, async (req,res) => {
     const id=newId();
     await pool.query('INSERT INTO events (id,is_general,date_from,date_to,time_from,time_to,user_id,category,reason,approval_status,created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
       [id,!!isGeneral,dateFrom,dateTo||dateFrom,timeFrom||'',timeTo||'',isGeneral?null:userId,category||'',reason.trim(),isGeneral?'approved':null,req.uid]);
+    // Notify target user if someone else added an event for them
+    if (!isGeneral && userId && userId !== req.uid) {
+      const author = await getUser(req.uid);
+      await createNotification(userId,'event_added',`${author?.name||'?'} hat einen Eintrag für dich eingetragen`,null,null,req.uid,id);
+    }
     ok(res,{id});
   } catch(e) { bad(res,e.message,500); }
 });
@@ -354,10 +367,15 @@ app.put('/api/events/:id', auth, async (req,res) => {
   try {
     const ev = await q1('SELECT * FROM events WHERE id=$1',[req.params.id]);
     if (!ev) return bad(res,'Nicht gefunden',404);
-    if (ev.created_by!==req.uid) return bad(res,'Nur der Ersteller kann bearbeiten',403);
+    if (ev.created_by!==req.uid) return bad(res,'Nur Ersteller kann bearbeiten',403);
     const {dateFrom,dateTo,timeFrom,timeTo,category,reason} = req.body;
     await pool.query('UPDATE events SET date_from=$1,date_to=$2,time_from=$3,time_to=$4,category=$5,reason=$6 WHERE id=$7',
       [dateFrom,dateTo||dateFrom,timeFrom||'',timeTo||'',category||'',reason.trim(),req.params.id]);
+    // Notify target if someone else edited their event
+    if (ev.user_id && ev.user_id !== req.uid) {
+      const author = await getUser(req.uid);
+      await createNotification(ev.user_id,'event_changed',`${author?.name||'?'} hat deinen Eintrag geändert`,null,null,req.uid,ev.id);
+    }
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
@@ -370,18 +388,26 @@ app.put('/api/events/:id/approval', auth, async (req,res) => {
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
+app.post('/api/events/:id/confirm', auth, async (req,res) => {
+  try {
+    await pool.query('INSERT INTO event_confirms (id,event_id,user_id) VALUES ($1,$2,$3) ON CONFLICT (event_id,user_id) DO NOTHING',
+      [newId(),req.params.id,req.uid]);
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
 app.delete('/api/events/:id', auth, async (req,res) => {
   try {
     const ev = await q1('SELECT * FROM events WHERE id=$1',[req.params.id]);
     if (!ev) return bad(res,'Nicht gefunden',404);
     const canDel = (ev.is_general&&req.p.manageGeneral)||(!ev.is_general&&(req.p.editAllPersonal||ev.created_by===req.uid));
     if (!canDel) return bad(res,'Keine Berechtigung',403);
+    await pool.query('DELETE FROM event_confirms WHERE event_id=$1',[req.params.id]);
     await pool.query('DELETE FROM events WHERE id=$1',[req.params.id]);
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
 
-// ── TICKETS ──────────────────────────────────────────────────────────────────
+// TICKETS
 app.post('/api/tickets', auth, async (req,res) => {
   try {
     const {title,description,department,tags,priority,status,bucket,assigneeId,parentTicketId} = req.body;
@@ -391,12 +417,10 @@ app.post('/api/tickets', auth, async (req,res) => {
       [id,number,title.trim(),description||'',department||'technik',JSON.stringify(tags||[]),priority||'medium',status||'open',bucket||'',assigneeId||null,parentTicketId||null,req.uid]);
     const uname = (await getUser(req.uid))?.name||'?';
     await auditNote(id,req.uid,`✅ Ticket erstellt von ${uname}`);
-    // Notify dept members (not creator)
     const deptUsers = await q('SELECT id FROM users WHERE roles @> $1::jsonb AND id != $2',
       [JSON.stringify([department]), req.uid]);
     for (const u of deptUsers)
       await createNotification(u.id,'new_ticket',`Neues Ticket in ${department}: ${title.trim()}`,id,null,req.uid);
-    // Notify assignee if different from creator
     if (assigneeId && assigneeId!==req.uid)
       await createNotification(assigneeId,'assigned',`Dir wurde zugewiesen: ${title.trim()}`,id,null,req.uid);
     ok(res,{id,number});
@@ -462,19 +486,18 @@ app.post('/api/tickets/:id/notes', auth, async (req,res) => {
     await pool.query('INSERT INTO ticket_notes (id,ticket_id,text,author_id,note_type,created_at) VALUES ($1,$2,$3,$4,$5,$6)',
       [id,req.params.id,text,req.uid,'note',now]);
     await pool.query('UPDATE tickets SET updated_at=$1 WHERE id=$2',[now,req.params.id]);
-    // Parse @mentions
     const allUsers = await q('SELECT id,name FROM users');
     const mentioned = parseMentions(text, allUsers);
     const author = await getUser(req.uid);
     for (const u of mentioned) {
       if (u.id === req.uid) continue;
-      await createNotification(u.id,'mention',`${author?.name||'?'} hat dich in Ticket ${tk.number} erwähnt`,tk.id,id,req.uid);
+      await createNotification(u.id,'mention',`${author?.name||'?'} erwähnte dich in ${tk.number}`,tk.id,id,req.uid);
     }
     ok(res,{id,createdAt:now});
   } catch(e) { bad(res,e.message,500); }
 });
 
-// ── TICKET CHECKLISTS ────────────────────────────────────────────────────────
+// TICKET CHECKLISTS
 app.post('/api/tickets/:id/checklists', auth, async (req,res) => {
   try {
     const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
@@ -518,7 +541,7 @@ app.put('/api/tickets/:id/checklists/:cid/items/:iid', auth, async (req,res) => 
   } catch(e) { bad(res,e.message,500); }
 });
 
-// ── CHECKLIST TEMPLATES ──────────────────────────────────────────────────────
+// CHECKLIST TEMPLATES
 app.post('/api/checklists', auth, async (req,res) => {
   try {
     const {name,department,items=[]} = req.body;
@@ -556,7 +579,7 @@ app.delete('/api/checklists/:id', auth, async (req,res) => {
   } catch(e) { bad(res,e.message,500); }
 });
 
-// ── ALLOWANCES ───────────────────────────────────────────────────────────────
+// ALLOWANCES
 app.put('/api/allowances', auth, async (req,res) => {
   try {
     if (!req.p.editAllw) return bad(res,'Keine Berechtigung',403);
@@ -567,7 +590,7 @@ app.put('/api/allowances', auth, async (req,res) => {
   } catch(e) { bad(res,e.message,500); }
 });
 
-// ── ABRECHNUNG ───────────────────────────────────────────────────────────────
+// ABRECHNUNG
 app.post('/api/abrechnung/einspringer', auth, async (req,res) => {
   try {
     const {date,note} = req.body;
@@ -578,7 +601,17 @@ app.post('/api/abrechnung/einspringer', auth, async (req,res) => {
     ok(res,{id});
   } catch(e) { bad(res,e.message,500); }
 });
-app.delete('/api/abrechnung/einspringer/:id', auth, async (req,res) => {
+app.put('/api/abrechnung/einspringer/:id', auth, async (req,res) => {
+  try {
+    const row = await q1('SELECT * FROM abrechnung_einspringer WHERE id=$1',[req.params.id]);
+    if (!row) return bad(res,'Nicht gefunden',404);
+    if (row.user_id!==req.uid&&!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+    const {date,note} = req.body;
+    await pool.query('UPDATE abrechnung_einspringer SET edate=$1,note=$2 WHERE id=$3',[date||row.edate,note??row.note,req.params.id]);
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
+
   try {
     const row = await q1('SELECT * FROM abrechnung_einspringer WHERE id=$1',[req.params.id]);
     if (!row) return bad(res,'Nicht gefunden',404);
@@ -596,7 +629,7 @@ app.put('/api/abrechnung/homeoffice', auth, async (req,res) => {
   } catch(e) { bad(res,e.message,500); }
 });
 
-// ── NOTIFICATIONS ─────────────────────────────────────────────────────────────
+// NOTIFICATIONS
 app.post('/api/notifications/:id/read', auth, async (req,res) => {
   try {
     await pool.query('UPDATE notifications SET read_at=NOW() WHERE id=$1 AND user_id=$2',[req.params.id,req.uid]);
@@ -610,7 +643,7 @@ app.post('/api/notifications/read-all', auth, async (req,res) => {
   } catch(e) { bad(res,e.message,500); }
 });
 
-// ── MESSAGES ─────────────────────────────────────────────────────────────────
+// MESSAGES
 app.post('/api/messages', auth, async (req,res) => {
   try {
     if (!req.p.canSendMessages) return bad(res,'Keine Berechtigung',403);
@@ -640,7 +673,7 @@ app.delete('/api/messages/:id', auth, async (req,res) => {
   } catch(e) { bad(res,e.message,500); }
 });
 
-// ── CATEGORIES / TAGS / USERS ─────────────────────────────────────────────────
+// CATEGORIES / TAGS / USERS
 app.post('/api/categories', auth, adminOnly, async (req,res) => {
   try {
     const {label,emoji,color}=req.body; if (!label?.trim()) return bad(res,'Bezeichnung erforderlich');
