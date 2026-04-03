@@ -44,7 +44,9 @@ router.get('/', auth, async (req,res) => {
     tkClRaw.forEach(c=>{ if(!tkClMap[c.ticket_id]) tkClMap[c.ticket_id]=[]; tkClMap[c.ticket_id].push({id:c.id,templateId:c.template_id,name:c.name,createdBy:c.created_by,items:tkClItemMap[c.id]||[]}); });
 
     const fiveMinAgo = new Date(Date.now() - 5*60*1000);
-    const readIds = new Set(readsRaw.map(r=>r.message_id));
+    const readIds  = new Set(readsRaw.map(r=>r.message_id));
+    const readSet   = new Set(readsRaw.filter(r=>r.read_at).map(r=>r.message_id));  // nur wirklich bestätigt
+    const pinnedSet = new Map(readsRaw.map(r=>[r.message_id, r.pinned||false]));
     const confirmedEventIds = new Set(evConfirmsRaw.map(r=>r.event_id));
 
     const dtSeenSet = new Set(dtReadsRaw.map(r=>r.diensttausch_id));
@@ -99,11 +101,11 @@ router.get('/', auth, async (req,res) => {
       allowances: allwRaw.map(a=>({id:a.id,userId:a.user_id,year:a.year,month:a.month,nd:a.nd,fd:a.fd,fw:a.fw,c10:a.c10})),
       checklists: clTmpls.map(t=>({id:t.id,name:t.name,department:t.department,createdBy:t.created_by,items:clItemMap[t.id]||[]})),
       messages: msgsRaw.filter(m=>{
-        // from_user_id=sender, to_department=null means all
-        if(!m.from_user_id)return false;
-        if(m.from_user_id===uid)return true; // eigene gesendeten
-        if(!m.to_department)return true;     // an alle
-        return roles.includes(m.to_department); // an Fachbereich
+        if(!m.from_user_id) return true;          // alte Nachrichten (kein Sender) → alle sehen
+        if(m.from_user_id===uid) return true;     // eigene gesendete
+        if(!m.to_department) return true;         // an alle
+        const isPriv=roles.includes('admin')||roles.includes('leitung');
+        return isPriv||roles.includes(m.to_department); // an Fachbereich (oder Admin)
       }).map(m=>({
         id:m.id, title:m.title, body:m.body,
         senderId:m.from_user_id,
