@@ -138,6 +138,12 @@ async function initDB() {
   )`).catch(()=>{});
   const migs2 = [
     `ALTER TABLE message_reads ADD COLUMN IF NOT EXISTS pinned BOOLEAN DEFAULT false`,
+    `CREATE TABLE IF NOT EXISTS ticket_views (
+      ticket_id TEXT NOT NULL,
+      user_id   TEXT NOT NULL,
+      viewed_at TIMESTAMPTZ DEFAULT NOW(),
+      PRIMARY KEY (ticket_id, user_id)
+    )`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }
