@@ -1287,8 +1287,9 @@ function showHelpSection(id){
     <div class="mh"><h2>&#128203; Changelog</h2><button class="mc" onclick="closeModal('changelogOv')">&#10005;</button></div>
     <div class="mb2" style="gap:10px">
       <div style="padding:12px;background:rgba(59,109,212,0.06));border:1px solid rgba(59,109,212,.20);border-radius:8px">
-        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v1.9.7</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v1.9.8</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
         <ul style="font-size:12px;line-height:1.8;padding-left:18px">
+          <li>Standard-User: Eigene Tickets &amp; Erw&auml;hnungen (@Name) in der &Uuml;bersicht</li>
           <li>Fix: Nachrichten, Abrechnung, Zulagendienste, Dienstpl&auml;ne wieder korrekt</li>
           <li>Fix: Ticket &ouml;ffnen entfernt Hervorhebung sofort (auch auf Home)</li>
           <li>Fix: Nach Seiten-Reload bleiben gesehene Tickets korrekt markiert</li>
@@ -1325,7 +1326,7 @@ function showHelpSection(id){
 </div>
 
 <script>
-const APP_VERSION='1.9.7';
+const APP_VERSION='1.9.8';
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
@@ -1547,11 +1548,15 @@ function renderHome(){
   const eventNotifs=S.notifications.filter(n=>!n.isRead&&(n.type==='event_added'||n.type==='event_changed'));
   const einspNotifs=S.notifications.filter(n=>!n.isRead&&n.type==='einspringer_rejected');
   const myDepts=S.tp.myDepts;
+  const myName=(getU(S.currentUser)?.name||'').toLowerCase();
   const relevantTks=S.tickets.filter(tk=>{
     if(tk.status==='closed')return false;
     if(tk.assigneeId===S.currentUser)return true; // mir zugewiesen
+    if(tk.createdBy===S.currentUser)return true;  // von mir erstellt
     if(myDepts.includes(tk.department))return true; // mein Fachbereich
-    if(tk.department==='frei')return myDepts.length>0||S.tp.seeAll; // Frei-Tickets für alle mit Fachbereich
+    if(tk.department==='frei')return myDepts.length>0||S.tp.seeAll; // Frei für alle mit Fachbereich
+    // Erwähnt in einer Notiz (@meinName)
+    if(myName&&(tk.notes||[]).some(n=>n.text&&n.text.toLowerCase().includes('@'+myName)))return true;
     return false;
   }).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,10);
   document.getElementById('main').innerHTML=`
