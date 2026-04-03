@@ -1,6 +1,6 @@
 'use strict';
 const router = require('express').Router();
-const { q, q1, newId, pool, canSeeTk, canEditTk, nextTicketNumber, auditNote, createNotification, parseMentions } = require('../db');
+const { q, q1, newId, pool, getUser, canSeeTk, canEditTk, nextTicketNumber, auditNote, createNotification, parseMentions } = require('../db');
 const { auth, ok, bad } = require('../middleware');
 
 async function logAct(pool, newId, uid, name, action, details={}) {
