@@ -3,7 +3,7 @@ const router = require('express').Router();
 const { q, q1, newId, pool, createNotification } = require('../db');
 const { auth, ok, bad } = require('../middleware');
 
-router.post('/api/events', auth, async (req,res) => {
+router.post('/', auth, async (req,res) => {
   try {
     const {isGeneral,dateFrom,dateTo,timeFrom,timeTo,userId,category,reason} = req.body;
     if (!dateFrom||!reason?.trim()) return bad(res,'Datum und Beschreibung erforderlich');
@@ -21,7 +21,7 @@ router.post('/api/events', auth, async (req,res) => {
     ok(res,{id});
   } catch(e) { bad(res,e.message,500); }
 });
-router.put('/api/events/:id', auth, async (req,res) => {
+router.put('/:id', auth, async (req,res) => {
   try {
     const ev = await q1('SELECT * FROM events WHERE id=$1',[req.params.id]);
     if (!ev) return bad(res,'Nicht gefunden',404);
@@ -37,7 +37,7 @@ router.put('/api/events/:id', auth, async (req,res) => {
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
-router.put('/api/events/:id/approval', auth, async (req,res) => {
+router.put('/:id/approval', auth, async (req,res) => {
   try {
     if (!req.p.canApproveEvents) return bad(res,'Keine Berechtigung',403);
     const {status} = req.body;
@@ -46,14 +46,14 @@ router.put('/api/events/:id/approval', auth, async (req,res) => {
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
-router.post('/api/events/:id/confirm', auth, async (req,res) => {
+router.post('/:id/confirm', auth, async (req,res) => {
   try {
     await pool.query('INSERT INTO event_confirms (id,event_id,user_id) VALUES ($1,$2,$3) ON CONFLICT (event_id,user_id) DO NOTHING',
       [newId(),req.params.id,req.uid]);
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
-router.delete('/api/events/:id', auth, async (req,res) => {
+router.delete('/:id', auth, async (req,res) => {
   try {
     const ev = await q1('SELECT * FROM events WHERE id=$1',[req.params.id]);
     if (!ev) return bad(res,'Nicht gefunden',404);

@@ -4,7 +4,7 @@ const { q, q1, parseRoles, parseTags, canSeeTk, canEditTk, canSeeMsg, pool } = r
 const { auth, ok, bad } = require('../middleware');
 
 // DATA
-router.get('/api/data', auth, async (req,res) => {
+router.get('/', auth, async (req,res) => {
   try {
     const uid=req.uid, p=req.p, tp=req.tp, roles=p.roles;
     const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,

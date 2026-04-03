@@ -4,7 +4,7 @@ const bcrypt  = require('bcryptjs');
 const { q, getUser, parseRoles, pool } = require('../db');
 const { auth, ok, bad } = require('../middleware');
 
-router.get('/api/auth/users', async (req,res) => {
+router.get('/users', async (req,res) => {
   try {
     const users = await q('SELECT id,name,initials,color,roles FROM users ORDER BY name');
     console.log('[auth/users] Benutzer gefunden:', users.length);
@@ -14,7 +14,7 @@ router.get('/api/auth/users', async (req,res) => {
     bad(res,e.message,500);
   }
 });
-router.post('/api/auth/login', async (req,res) => {
+router.post('/login', async (req,res) => {
   try {
     const {userId,password} = req.body;
     if (!userId||!password) return bad(res,'Benutzername und Passwort erforderlich');
@@ -25,9 +25,9 @@ router.post('/api/auth/login', async (req,res) => {
     ok(res, {userId:user.id, mustChangePW: user.must_change_pw===true});
   } catch(e) { bad(res,e.message,500); }
 });
-router.post('/api/auth/logout', (req,res) => req.session.destroy(()=>ok(res)));
-router.get('/api/auth/me', auth, (req,res) => ok(res, {userId:req.uid, mustChangePW:req.user.must_change_pw===true}));
-router.post('/api/auth/change-password', auth, async (req,res) => {
+router.post('/logout', (req,res) => req.session.destroy(()=>ok(res)));
+router.get('/me', auth, (req,res) => ok(res, {userId:req.uid, mustChangePW:req.user.must_change_pw===true}));
+router.post('/change-password', auth, async (req,res) => {
   try {
     const {currentPassword,newPassword} = req.body;
     if (!req.user.must_change_pw && !(await bcrypt.compare(currentPassword||'',req.user.pw_hash)))

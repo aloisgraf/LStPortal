@@ -3,7 +3,7 @@ const router = require('express').Router();
 const { q, q1, newId, pool, canSeeTk, canEditTk, nextTicketNumber, auditNote, createNotification, parseMentions } = require('../db');
 const { auth, ok, bad } = require('../middleware');
 
-router.post('/api/tickets', auth, async (req,res) => {
+router.post('/', auth, async (req,res) => {
   try {
     const {title,description,department,tags,priority,status,bucket,assigneeId,parentTicketId} = req.body;
     if (!title?.trim()) return bad(res,'Titel erforderlich');
@@ -21,7 +21,7 @@ router.post('/api/tickets', auth, async (req,res) => {
     ok(res,{id,number});
   } catch(e) { bad(res,e.message,500); }
 });
-router.put('/api/tickets/:id', auth, async (req,res) => {
+router.put('/:id', auth, async (req,res) => {
   try {
     const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
     if (!tk) return bad(res,'Nicht gefunden',404);
@@ -60,7 +60,7 @@ router.put('/api/tickets/:id', auth, async (req,res) => {
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
-router.delete('/api/tickets/:id', auth, async (req,res) => {
+router.delete('/:id', auth, async (req,res) => {
   try {
     const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
     if (!tk) return bad(res,'Nicht gefunden',404);
@@ -70,7 +70,7 @@ router.delete('/api/tickets/:id', auth, async (req,res) => {
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
-router.post('/api/tickets/:id/notes', auth, async (req,res) => {
+router.post('/:id/notes', auth, async (req,res) => {
   try {
     const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
     if (!tk) return bad(res,'Nicht gefunden',404);
@@ -93,7 +93,7 @@ router.post('/api/tickets/:id/notes', auth, async (req,res) => {
 });
 
 // TICKET CHECKLISTS
-router.post('/api/tickets/:id/checklists', auth, async (req,res) => {
+router.post('/:id/checklists', auth, async (req,res) => {
   try {
     const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
     if (!tk||!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
@@ -109,7 +109,7 @@ router.post('/api/tickets/:id/checklists', auth, async (req,res) => {
     ok(res,{id:clId});
   } catch(e) { bad(res,e.message,500); }
 });
-router.delete('/api/tickets/:id/checklists/:cid', auth, async (req,res) => {
+router.delete('/:id/checklists/:cid', auth, async (req,res) => {
   try {
     const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
     if (!tk||!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
@@ -118,7 +118,7 @@ router.delete('/api/tickets/:id/checklists/:cid', auth, async (req,res) => {
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
-router.put('/api/tickets/:id/checklists/:cid/items/:iid', auth, async (req,res) => {
+router.put('/:id/checklists/:cid/items/:iid', auth, async (req,res) => {
   try {
     const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
     if (!tk||!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
@@ -137,7 +137,7 @@ router.put('/api/tickets/:id/checklists/:cid/items/:iid', auth, async (req,res) 
 });
 
 // CHECKLIST TEMPLATES
-router.post('/api/checklists', auth, async (req,res) => {
+router.post('/checklists', auth, async (req,res) => {
   try {
     const {name,department,items=[]} = req.body;
     if (!name?.trim()) return bad(res,'Name erforderlich');
@@ -149,7 +149,7 @@ router.post('/api/checklists', auth, async (req,res) => {
     ok(res,{id});
   } catch(e) { bad(res,e.message,500); }
 });
-router.put('/api/checklists/:id', auth, async (req,res) => {
+router.put('/checklists/:id', auth, async (req,res) => {
   try {
     const tmpl = await q1('SELECT * FROM checklist_templates WHERE id=$1',[req.params.id]);
     if (!tmpl) return bad(res,'Nicht gefunden',404);
@@ -163,7 +163,7 @@ router.put('/api/checklists/:id', auth, async (req,res) => {
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
-router.delete('/api/checklists/:id', auth, async (req,res) => {
+router.delete('/checklists/:id', auth, async (req,res) => {
   try {
     const tmpl = await q1('SELECT * FROM checklist_templates WHERE id=$1',[req.params.id]);
     if (!tmpl) return bad(res,'Nicht gefunden',404);

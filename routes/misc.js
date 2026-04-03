@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const { q, q1, newId, pool, parseRoles, canSeeMsg } = require('../db');
 const { auth, adminOnly, ok, bad } = require('../middleware');
 
-router.put('/api/allowances', auth, async (req,res) => {
+router.put('/allowances', auth, async (req,res) => {
   try {
     if (!req.p.editAllw) return bad(res,'Keine Berechtigung',403);
     const {userId,year,month,nd,fd,fw,c10} = req.body;
@@ -15,7 +15,7 @@ router.put('/api/allowances', auth, async (req,res) => {
 });
 
 // ABRECHNUNG
-router.post('/api/abrechnung/einspringer', auth, async (req,res) => {
+router.post('/abrechnung/einspringer', auth, async (req,res) => {
   try {
     const {date,note} = req.body;
     if (!date) return bad(res,'Datum erforderlich');
@@ -25,7 +25,7 @@ router.post('/api/abrechnung/einspringer', auth, async (req,res) => {
     ok(res,{id});
   } catch(e) { bad(res,e.message,500); }
 });
-router.put('/api/abrechnung/einspringer/:id', auth, async (req, res) => {
+router.put('/abrechnung/einspringer/:id', auth, async (req, res) => {
   try {
     const row = await q1('SELECT * FROM abrechnung_einspringer WHERE id=$1',[req.params.id]);
     if (!row) return bad(res,'Nicht gefunden',404);
@@ -35,7 +35,7 @@ router.put('/api/abrechnung/einspringer/:id', auth, async (req, res) => {
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
-router.put('/api/abrechnung/einspringer/:id/reject', auth, async (req,res) => {
+router.put('/abrechnung/einspringer/:id/reject', auth, async (req,res) => {
   try {
     if (!req.p.seeAllAbrechnung) return bad(res,'Keine Berechtigung',403);
     const row = await q1('SELECT * FROM abrechnung_einspringer WHERE id=$1',[req.params.id]);
@@ -60,7 +60,7 @@ router.put('/api/abrechnung/einspringer/:id/reject', auth, async (req,res) => {
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
-router.delete('/api/abrechnung/einspringer/:id', auth, async (req,res) => {
+router.delete('/abrechnung/einspringer/:id', auth, async (req,res) => {
   try {
     const row = await q1('SELECT * FROM abrechnung_einspringer WHERE id=$1',[req.params.id]);
     if (!row) return bad(res,'Nicht gefunden',404);
@@ -70,7 +70,7 @@ router.delete('/api/abrechnung/einspringer/:id', auth, async (req,res) => {
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
-router.put('/api/abrechnung/homeoffice', auth, async (req,res) => {
+router.put('/abrechnung/homeoffice', auth, async (req,res) => {
   try {
     const {year,month,days} = req.body;
     await pool.query(`INSERT INTO abrechnung_homeoffice (id,user_id,year,month,days) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (user_id,year,month) DO UPDATE SET days=EXCLUDED.days`,
@@ -80,13 +80,13 @@ router.put('/api/abrechnung/homeoffice', auth, async (req,res) => {
 });
 
 // NOTIFICATIONS
-router.post('/api/notifications/:id/read', auth, async (req,res) => {
+router.post('/notifications/:id/read', auth, async (req,res) => {
   try {
     await pool.query('UPDATE notifications SET read_at=NOW() WHERE id=$1 AND user_id=$2',[req.params.id,req.uid]);
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
-router.post('/api/notifications/read-all', auth, async (req,res) => {
+router.post('/notifications/read-all', auth, async (req,res) => {
   try {
     await pool.query('UPDATE notifications SET read_at=NOW() WHERE user_id=$1 AND read_at IS NULL',[req.uid]);
     ok(res);
@@ -94,7 +94,7 @@ router.post('/api/notifications/read-all', auth, async (req,res) => {
 });
 
 // MESSAGES
-router.post('/api/messages', auth, async (req,res) => {
+router.post('/messages', auth, async (req,res) => {
   try {
     if (!req.p.canSendMessages) return bad(res,'Keine Berechtigung',403);
     const {title,body,targetType,targetValue} = req.body;
@@ -105,14 +105,14 @@ router.post('/api/messages', auth, async (req,res) => {
     ok(res,{id});
   } catch(e) { bad(res,e.message,500); }
 });
-router.post('/api/messages/:id/read', auth, async (req,res) => {
+router.post('/messages/:id/read', auth, async (req,res) => {
   try {
     await pool.query('INSERT INTO message_reads (id,message_id,user_id) VALUES ($1,$2,$3) ON CONFLICT (message_id,user_id) DO NOTHING',
       [newId(),req.params.id,req.uid]);
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
-router.delete('/api/messages/:id', auth, async (req,res) => {
+router.delete('/messages/:id', auth, async (req,res) => {
   try {
     const msg=await q1('SELECT * FROM messages WHERE id=$1',[req.params.id]);
     if (!msg) return bad(res,'Nicht gefunden',404);
@@ -124,7 +124,7 @@ router.delete('/api/messages/:id', auth, async (req,res) => {
 });
 
 // CATEGORIES / TAGS / USERS
-router.post('/api/categories', auth, adminOnly, async (req,res) => {
+router.post('/categories', auth, adminOnly, async (req,res) => {
   try {
     const {label,emoji,color}=req.body; if (!label?.trim()) return bad(res,'Bezeichnung erforderlich');
     const maxR=await q1('SELECT MAX(sort_order) as m FROM categories'); const id=newId();
@@ -132,25 +132,25 @@ router.post('/api/categories', auth, adminOnly, async (req,res) => {
     ok(res,{id});
   } catch(e) { bad(res,e.message,500); }
 });
-router.put('/api/categories/:id', auth, adminOnly, async (req,res) => {
+router.put('/categories/:id', auth, adminOnly, async (req,res) => {
   try { await pool.query('UPDATE categories SET label=$1,emoji=$2,color=$3 WHERE id=$4',[req.body.label,req.body.emoji||'📌',req.body.color||'#64748b',req.params.id]); ok(res); } catch(e) { bad(res,e.message,500); }
 });
-router.delete('/api/categories/:id', auth, adminOnly, async (req,res) => {
+router.delete('/categories/:id', auth, adminOnly, async (req,res) => {
   try { await pool.query('DELETE FROM categories WHERE id=$1',[req.params.id]); ok(res); } catch(e) { bad(res,e.message,500); }
 });
-router.post('/api/tags', auth, adminOnly, async (req,res) => {
+router.post('/tags', auth, adminOnly, async (req,res) => {
   try {
     const {label,color}=req.body; if (!label?.trim()) return bad(res,'Bezeichnung erforderlich');
     const id=newId(); await pool.query('INSERT INTO tags (id,label,color) VALUES ($1,$2,$3)',[id,label.trim(),color||'#3b6dd4']); ok(res,{id});
   } catch(e) { bad(res,e.message,500); }
 });
-router.put('/api/tags/:id', auth, adminOnly, async (req,res) => {
+router.put('/tags/:id', auth, adminOnly, async (req,res) => {
   try { await pool.query('UPDATE tags SET label=$1,color=$2 WHERE id=$3',[req.body.label,req.body.color||'#3b6dd4',req.params.id]); ok(res); } catch(e) { bad(res,e.message,500); }
 });
-router.delete('/api/tags/:id', auth, adminOnly, async (req,res) => {
+router.delete('/tags/:id', auth, adminOnly, async (req,res) => {
   try { await pool.query('DELETE FROM tags WHERE id=$1',[req.params.id]); ok(res); } catch(e) { bad(res,e.message,500); }
 });
-router.post('/api/users', auth, adminOnly, async (req,res) => {
+router.post('/users', auth, adminOnly, async (req,res) => {
   try {
     const {name,initials,roles,color}=req.body;
     if (!name?.trim()||!initials?.trim()) return bad(res,'Name und Kürzel erforderlich');
@@ -160,7 +160,7 @@ router.post('/api/users', auth, adminOnly, async (req,res) => {
     ok(res,{id});
   } catch(e) { bad(res,e.message,500); }
 });
-router.put('/api/users/:id', auth, adminOnly, async (req,res) => {
+router.put('/users/:id', auth, adminOnly, async (req,res) => {
   try {
     const {name,initials,roles,color,resetPassword}=req.body;
     if (!name?.trim()||!initials?.trim()) return bad(res,'Name und Kürzel erforderlich');
@@ -171,7 +171,7 @@ router.put('/api/users/:id', auth, adminOnly, async (req,res) => {
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
-router.delete('/api/users/:id', auth, adminOnly, async (req,res) => {
+router.delete('/users/:id', auth, adminOnly, async (req,res) => {
   try {
     if (req.params.id===req.uid) return bad(res,'Eigenen Account nicht löschbar');
     await pool.query('DELETE FROM users WHERE id=$1',[req.params.id]); ok(res);
@@ -179,7 +179,7 @@ router.delete('/api/users/:id', auth, adminOnly, async (req,res) => {
 });
 
 // ── DIENSTPLAENE ──────────────────────────────────────────────────────────────
-router.post('/api/dienstplaene', auth, async (req,res) => {
+router.post('/dienstplaene', auth, async (req,res) => {
   try {
     if (!req.p.addGeneral) return bad(res,'Keine Berechtigung',403);
     const {month,year,label,filename,fileData} = req.body;
@@ -196,7 +196,7 @@ router.post('/api/dienstplaene', auth, async (req,res) => {
     ok(res,{id,version:nextVersion});
   } catch(e) { bad(res,e.message,500); }
 });
-router.get('/api/dienstplaene/:id/file', auth, async (req,res) => {
+router.get('/dienstplaene/:id/file', auth, async (req,res) => {
   try {
     const row = await q1('SELECT filename,file_data FROM dienstplaene WHERE id=$1',[req.params.id]);
     if (!row) return bad(res,'Nicht gefunden',404);
@@ -207,7 +207,7 @@ router.get('/api/dienstplaene/:id/file', auth, async (req,res) => {
     res.send(buf);
   } catch(e) { bad(res,e.message,500); }
 });
-router.delete('/api/dienstplaene/:id', auth, async (req,res) => {
+router.delete('/dienstplaene/:id', auth, async (req,res) => {
   try {
     if (!req.p.addGeneral) return bad(res,'Keine Berechtigung',403);
     await pool.query('DELETE FROM dienstplaene WHERE id=$1',[req.params.id]);
