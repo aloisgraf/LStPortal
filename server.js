@@ -101,6 +101,13 @@ async function initDB() {
     `ALTER TABLE events ADD COLUMN IF NOT EXISTS approved TEXT DEFAULT 'pending'`,
     `ALTER TABLE ticket_notes ADD COLUMN IF NOT EXISTS is_system BOOLEAN DEFAULT false`,
     `ALTER TABLE ticket_notes ALTER COLUMN author_id DROP NOT NULL`,
+    `ALTER TABLE messages ADD COLUMN IF NOT EXISTS to_department TEXT`,
+    `CREATE TABLE IF NOT EXISTS checklist_templates (id TEXT PRIMARY KEY, name TEXT NOT NULL, department TEXT NOT NULL, created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW())`,
+    `CREATE TABLE IF NOT EXISTS checklist_template_items (id TEXT PRIMARY KEY, template_id TEXT NOT NULL REFERENCES checklist_templates(id) ON DELETE CASCADE, text TEXT NOT NULL, sort_order INTEGER DEFAULT 0)`,
+    `CREATE TABLE IF NOT EXISTS ticket_checklists (id TEXT PRIMARY KEY, ticket_id TEXT NOT NULL REFERENCES tickets(id) ON DELETE CASCADE, template_id TEXT REFERENCES checklist_templates(id), name TEXT NOT NULL, created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW())`,
+    `CREATE TABLE IF NOT EXISTS ticket_checklist_items (id TEXT PRIMARY KEY, checklist_id TEXT NOT NULL REFERENCES ticket_checklists(id) ON DELETE CASCADE, text TEXT NOT NULL, checked BOOLEAN DEFAULT false, checked_by TEXT, checked_at TIMESTAMPTZ, sort_order INTEGER DEFAULT 0)`,
+    `CREATE TABLE IF NOT EXISTS message_acks (id TEXT PRIMARY KEY, message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE, user_id TEXT NOT NULL, acked_at TIMESTAMPTZ DEFAULT NOW(), UNIQUE(message_id, user_id))`,
+    `CREATE TABLE IF NOT EXISTS activity_log (id TEXT PRIMARY KEY, user_id TEXT, user_name TEXT, action TEXT NOT NULL, details JSONB DEFAULT '{}', ip TEXT, created_at TIMESTAMPTZ DEFAULT NOW())`,
   ]) await pool.query(m).catch(() => {});
 
   const cnt = await pool.query('SELECT COUNT(*) as n FROM users').then(r => r.rows[0]);
