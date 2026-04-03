@@ -1374,7 +1374,11 @@ async function loadLoginUsers(){
     }catch(e){console.warn('Login retry',i,e.message);}
     if(i<5){sel.innerHTML=`<option value="">\u23F3 Verbinde\u2026 (${i}/5)</option>`;await new Promise(r=>setTimeout(r,i*2000));}
   }
-  sel.disabled=false;sel.innerHTML='<option value="">\u274C Fehler \u2013 Seite neu laden</option>';
+  sel.disabled=false;
+  sel.innerHTML='<option value="">&#10060; Server nicht erreichbar &#8211; Seite neu laden</option>';
+  // Show error visibly
+  const lerr=document.getElementById('lerr');
+  if(lerr){lerr.textContent='Server nicht erreichbar. Bitte Seite neu laden oder Render-Logs prüfen.';lerr.style.display='block';}
 }
 async function doLogin(){
   const userId=document.getElementById('lsel').value;
