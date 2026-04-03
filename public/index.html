@@ -287,6 +287,7 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
       <div class="nsh open" id="dpHdr" onclick="toggleNS('dp')"><span>&#128203; Dienstplan</span><span class="arr">&#9660;</span></div>
       <div class="nsub open" id="dpSub">
         <div class="ni" id="ni-schedule" onclick="setView('schedule')">&#128197; Eintrags&#252;bersicht</div>
+        <div class="ni" id="ni-calendar" onclick="setView('calendar')">&#128197; Kalenderansicht</div>
         <div class="ni" id="ni-allw" onclick="setView('allw')">&#128202; Zulagendienste</div>
         <div class="ni" id="ni-abrechnung" onclick="setView('abrechnung')">&#129534; Abrechnung</div>
         <div class="ni" id="ni-dienstplaene" onclick="setView('dienstplaene')">&#128196; Dienstpl&#228;ne</div>
@@ -1424,13 +1425,13 @@ function toggleSidebar(){const sb=document.getElementById('sidebar'),ov=document
 function toggleNS(id){document.getElementById(id+'Hdr').classList.toggle('open');document.getElementById(id+'Sub').classList.toggle('open');}
 function setView(v){
   S.view=v;
-  ['home','schedule','allw','abrechnung','dienstplaene','tickets','tickets_closed','checklists','messages','messages_sent'].forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
+  ['home','schedule','calendar','allw','abrechnung','dienstplaene','tickets','tickets_closed','checklists','messages','messages_sent'].forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
   document.getElementById('sidebar').classList.remove('open');document.getElementById('sbOv').classList.remove('open');
   renderSBF();renderMain();
 }
 function renderSBF(){
   const el=document.getElementById('sbf');if(!el)return;
-  if(S.view==='schedule'){
+  if(S.view==='schedule'||S.view==='calendar'){
     el.innerHTML=`<div><div class="sfl">Jahr &amp; Monat</div>
       <div class="yr-row"><button class="yb" onclick="S.year--;renderSBF();renderMain()">&lsaquo;</button><span class="yv">${S.year}</span><button class="yb" onclick="S.year++;renderSBF();renderMain()">&rsaquo;</button></div>
       <div class="mgrid"><button class="mb ${S.month===null?'on':''}" onclick="S.month=null;renderSBF();renderMain()">Alle</button>${MONTHS.map((m,i)=>`<button class="mb ${S.month===i?'on':''}" onclick="S.month=${i};renderSBF();renderMain()">${m.slice(0,3)}</button>`).join('')}</div></div>
@@ -1468,6 +1469,7 @@ function renderSBF(){
 function renderMain(){
   if(S.view==='home')renderHome();
   else if(S.view==='schedule')renderSchedule();
+  else if(S.view==='calendar')renderCalendar();
   else if(S.view==='allw')renderAllw();
   else if(S.view==='abrechnung')renderAbrechnung();
   else if(S.view==='dienstplaene')renderDienstplaene();
@@ -1640,6 +1642,99 @@ async function deleteEvt(id){
 function getPeriodMonths(){if(S.allwPeriod==='month')return[S.allwMonth];if(S.allwPeriod==='h1')return[1,2,3,4,5,6];if(S.allwPeriod==='h2')return[7,8,9,10,11,12];return[1,2,3,4,5,6,7,8,9,10,11,12];}
 function sumAllw(uid,year,months){return months.reduce((a,m)=>{const r=getAllw(uid,year,m);return{nd:a.nd+r.nd,fd:a.fd+r.fd,fw:a.fw+r.fw,c10:a.c10+r.c10};},{nd:0,fd:0,fw:0,c10:0});}
 function numCell(n,color){if(!n)return`<td style="text-align:center;color:var(--di)">\u2013</td>`;return`<td style="text-align:center"><span class="anum" style="background:${color}18;color:${color}">${n}</span></td>`;}
+
+// ══════════════════════════════════════════
+// SECTION: calendar
+// ══════════════════════════════════════════
+function renderCalendar(){
+  const yr=S.year, mo=S.month!==null?S.month:new Date().getMonth();
+  const WDAYS=['Mo','Di','Mi','Do','Fr','Sa','So'];
+  const firstDay=new Date(yr,mo,1);
+  const lastDay=new Date(yr,mo+1,0);
+  // Monday-based offset
+  let startOffset=(firstDay.getDay()+6)%7;
+  const totalCells=startOffset+lastDay.getDate();
+  const rows=Math.ceil(totalCells/7);
+
+  // Group events by date
+  const evByDate={};
+  const visEvs=getVisEvts ? getVisEvts() : (S.events||[]).filter(ev=>{
+    const d=new Date(ev.dateFrom);
+    return d.getFullYear()===yr && d.getMonth()===mo;
+  });
+  visEvs.forEach(ev=>{
+    // span all days from dateFrom to dateTo
+    const from=new Date(ev.dateFrom), to=new Date(ev.dateTo||ev.dateFrom);
+    for(let d=new Date(from);d<=to;d.setDate(d.getDate()+1)){
+      if(d.getFullYear()===yr && d.getMonth()===mo){
+        const key=d.getDate();
+        if(!evByDate[key])evByDate[key]=[];
+        evByDate[key].push(ev);
+      }
+    }
+  });
+
+  const today=new Date();
+  const isToday=(d)=>today.getFullYear()===yr&&today.getMonth()===mo&&today.getDate()===d;
+
+  let cells='';
+  let dayNum=1;
+  for(let r=0;r<rows;r++){
+    cells+='<tr>';
+    for(let c=0;c<7;c++){
+      const cellIdx=r*7+c;
+      if(cellIdx<startOffset||dayNum>lastDay.getDate()){
+        cells+='<td class="cal-empty"></td>';
+      } else {
+        const evs=evByDate[dayNum]||[];
+        const todayCls=isToday(dayNum)?' cal-today':'';
+        const isWe=c>=5?' cal-we':'';
+        cells+=`<td class="cal-day${todayCls}${isWe}">
+          <div class="cal-daynum">${dayNum}</div>
+          <div class="cal-evs">${evs.slice(0,4).map(ev=>{
+            if(ev._anonymized) return '<div class="cal-ev cal-ev-anon">🔒</div>';
+            const cat=S.categories.find(c2=>c2.id===ev.category);
+            const u=ev.isGeneral?null:S.users.find(u2=>u2.id===ev.userId);
+            const color=ev.isGeneral?'var(--ok)':cat?.color||'var(--acc)';
+            const label=ev.isGeneral?'🌐 '+ev.reason.slice(0,18):
+              (u?u.initials+' ':'')+ev.reason.slice(0,18);
+            return \`<div class="cal-ev" style="background:\${color}22;border-left:2px solid \${color};color:\${color}" title="\${ev.reason||''}">\${label}\${ev.reason.length>18?'…':''}</div>\`;
+          }).join('')}${evs.length>4?`<div class="cal-ev-more">+${evs.length-4} weitere</div>`:''}</div>
+        </td>`;
+        dayNum++;
+      }
+    }
+    cells+='</tr>';
+  }
+
+  const moName=['Jänner','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'][mo];
+  document.getElementById('main').innerHTML=`
+    <div class="ph">
+      <div class="pt">🗓️ Kalenderansicht <span>${moName} ${yr}</span></div>
+      <button class="btn-p" onclick="openEvtModal()">＋ Eintrag hinzufügen</button>
+    </div>
+    <style>
+      .cal-table{width:100%;border-collapse:collapse;table-layout:fixed}
+      .cal-table th{padding:8px 4px;text-align:center;font-size:11px;font-weight:700;color:var(--mu);background:var(--sf2);border:1px solid var(--border)}
+      .cal-table th:nth-child(6),.cal-table th:nth-child(7){color:var(--acc)}
+      .cal-day{border:1px solid var(--border);vertical-align:top;padding:4px;min-height:90px;background:var(--sf)}
+      .cal-day:hover{background:var(--sf2)}
+      .cal-empty{border:1px solid var(--border);background:var(--sf3);min-height:90px}
+      .cal-we{background:rgba(59,109,212,.03)}
+      .cal-today .cal-daynum{background:var(--acc);color:var(--act);border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center}
+      .cal-daynum{font-size:12px;font-weight:700;color:var(--mu);margin-bottom:3px}
+      .cal-ev{font-size:10px;font-weight:500;padding:2px 5px;border-radius:3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:default}
+      .cal-ev-anon{background:rgba(245,158,11,.1);border-left:2px solid var(--warn);color:var(--warn)}
+      .cal-ev-more{font-size:10px;color:var(--mu);padding:1px 4px}
+    </style>
+    <div class="tw">
+      <table class="cal-table">
+        <thead><tr>${WDAYS.map(d=>`<th>${d}</th>`).join('')}</tr></thead>
+        <tbody>${cells}</tbody>
+      </table>
+    </div>`;
+}
+
 function renderAllw(){
   const months=getPeriodMonths(),yr=S.allwYear;
   const pLbl=S.allwPeriod==='month'?MONTHS[S.allwMonth-1]:S.allwPeriod==='h1'?'1. Halbjahr':S.allwPeriod==='h2'?'2. Halbjahr':'Gesamtjahr';
