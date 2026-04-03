@@ -574,7 +574,7 @@ let _lu=[];
 async function loadLoginUsers(){
   try{_lu=await api('GET','/auth/users');}catch(e){_lu=[];}
   const sel=document.getElementById('luSel');
-  sel.innerHTML='<option value="">— Benutzer wählen —</option>'+_lu.map(u=>`<option value="${u.id}">${u.name}  (${(u.roles||['standard']).map(r=>getRD(r).icon).join('')})</option>`).join('');
+  sel.innerHTML='<option value="">— Benutzer wählen —</option>'+_lu.map(u=>`<option value="${u.id}">${u.name}</option>`).join('');
   document.getElementById('lpw').value='';
   document.getElementById('lerr').style.display='none';
 }
