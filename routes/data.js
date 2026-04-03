@@ -19,7 +19,7 @@ router.get('/', auth, async (req, res) => {
       q('SELECT * FROM tickets ORDER BY created_at DESC'),
       q('SELECT * FROM ticket_notes ORDER BY created_at'),
       p.seeAllAllw ? q('SELECT * FROM allowances') : q('SELECT * FROM allowances WHERE user_id=$1', [uid]),
-      q(`SELECT m.* FROM messages m WHERE m.to_department IS NULL OR m.to_department=ANY($1::text[]) OR m.from_user_id=$2 ORDER BY m.created_at DESC LIMIT 200`, [roles, uid]),
+      q(`SELECT * FROM messages WHERE (to_department IS NULL OR to_department=ANY($1::text[])) OR from_user_id=$2 ORDER BY created_at DESC LIMIT 200`, [roles, uid]).catch(() => []),
       q('SELECT * FROM message_acks WHERE user_id=$1', [uid]),
       q('SELECT * FROM checklist_templates ORDER BY name'),
       q('SELECT * FROM checklist_template_items ORDER BY template_id,sort_order'),
