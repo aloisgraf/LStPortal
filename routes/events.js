@@ -3,6 +3,13 @@ const router = require('express').Router();
 const { q, q1, newId, pool, createNotification } = require('../db');
 const { auth, ok, bad } = require('../middleware');
 
+async function logAct(pool, newId, uid, name, action, details={}) {
+  await pool.query(
+    'INSERT INTO activity_log (id,user_id,user_name,action,details,created_at) VALUES ($1,$2,$3,$4,$5,NOW())',
+    [newId(), uid, name, action, JSON.stringify(details)]
+  ).catch(()=>{});
+}
+
 router.post('/', auth, async (req,res) => {
   try {
     const {isGeneral,dateFrom,dateTo,timeFrom,timeTo,userId,category,reason} = req.body;
@@ -18,6 +25,7 @@ router.post('/', auth, async (req,res) => {
       const author = await getUser(req.uid);
       await createNotification(userId,'event_added',`${author?.name||'?'} hat einen Eintrag für dich eingetragen`,null,null,req.uid,id);
     }
+    await logAct(pool,newId,req.uid,req.user.name,'create_event',{dateFrom,isGeneral:!!isGeneral});
     ok(res,{id});
   } catch(e) { bad(res,e.message,500); }
 });
@@ -43,6 +51,7 @@ router.put('/:id/approval', auth, async (req,res) => {
     const {status} = req.body;
     if (!['approved','rejected'].includes(status)) return bad(res,'Ungültiger Status');
     await pool.query('UPDATE events SET approval_status=$1 WHERE id=$2 AND is_general=false',[status,req.params.id]);
+    await logAct(pool,newId,req.uid,req.user.name,'approve_event',{eventId:req.params.id,status});
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });

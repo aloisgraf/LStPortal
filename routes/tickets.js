@@ -3,6 +3,13 @@ const router = require('express').Router();
 const { q, q1, newId, pool, canSeeTk, canEditTk, nextTicketNumber, auditNote, createNotification, parseMentions } = require('../db');
 const { auth, ok, bad } = require('../middleware');
 
+async function logAct(pool, newId, uid, name, action, details={}) {
+  await pool.query(
+    'INSERT INTO activity_log (id,user_id,user_name,action,details,created_at) VALUES ($1,$2,$3,$4,$5,NOW())',
+    [newId(), uid, name, action, JSON.stringify(details)]
+  ).catch(()=>{});
+}
+
 router.post('/', auth, async (req,res) => {
   try {
     const {title,description,department,tags,priority,status,bucket,assigneeId,parentTicketId} = req.body;
@@ -18,6 +25,7 @@ router.post('/', auth, async (req,res) => {
       await createNotification(u.id,'new_ticket',`Neues Ticket in ${department}: ${title.trim()}`,id,null,req.uid);
     if (assigneeId && assigneeId!==req.uid)
       await createNotification(assigneeId,'assigned',`Dir wurde zugewiesen: ${title.trim()}`,id,null,req.uid);
+    await logAct(pool,newId,req.uid,req.user.name,'create_ticket',{number,title:title.trim()});
     ok(res,{id,number});
   } catch(e) { bad(res,e.message,500); }
 });
@@ -67,6 +75,7 @@ router.delete('/:id', auth, async (req,res) => {
     if (!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
     await pool.query('DELETE FROM ticket_notes WHERE ticket_id=$1',[req.params.id]);
     await pool.query('DELETE FROM tickets WHERE id=$1',[req.params.id]);
+    await logAct(pool,newId,req.uid,req.user.name,'delete_ticket',{id:req.params.id});
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
@@ -137,42 +146,4 @@ router.put('/:id/checklists/:cid/items/:iid', auth, async (req,res) => {
 });
 
 // CHECKLIST TEMPLATES
-router.post('/checklists', auth, async (req,res) => {
-  try {
-    const {name,department,items=[]} = req.body;
-    if (!name?.trim()) return bad(res,'Name erforderlich');
-    const id=newId();
-    await pool.query('INSERT INTO checklist_templates (id,name,department,created_by) VALUES ($1,$2,$3,$4)',[id,name.trim(),department,req.uid]);
-    for (let i=0;i<items.length;i++)
-      await pool.query('INSERT INTO checklist_template_items (id,template_id,text,item_type,sort_order) VALUES ($1,$2,$3,$4,$5)',
-        [newId(),id,items[i].text||items[i],items[i].itemType||'check',i]);
-    ok(res,{id});
-  } catch(e) { bad(res,e.message,500); }
-});
-router.put('/checklists/:id', auth, async (req,res) => {
-  try {
-    const tmpl = await q1('SELECT * FROM checklist_templates WHERE id=$1',[req.params.id]);
-    if (!tmpl) return bad(res,'Nicht gefunden',404);
-    if (!req.p.roles.includes('admin')&&tmpl.created_by!==req.uid) return bad(res,'Keine Berechtigung',403);
-    const {name,department,items=[]} = req.body;
-    await pool.query('UPDATE checklist_templates SET name=$1,department=$2 WHERE id=$3',[name.trim(),department,req.params.id]);
-    await pool.query('DELETE FROM checklist_template_items WHERE template_id=$1',[req.params.id]);
-    for (let i=0;i<items.length;i++)
-      await pool.query('INSERT INTO checklist_template_items (id,template_id,text,item_type,sort_order) VALUES ($1,$2,$3,$4,$5)',
-        [newId(),req.params.id,items[i].text||items[i],items[i].itemType||'check',i]);
-    ok(res);
-  } catch(e) { bad(res,e.message,500); }
-});
-router.delete('/checklists/:id', auth, async (req,res) => {
-  try {
-    const tmpl = await q1('SELECT * FROM checklist_templates WHERE id=$1',[req.params.id]);
-    if (!tmpl) return bad(res,'Nicht gefunden',404);
-    if (!req.p.roles.includes('admin')&&tmpl.created_by!==req.uid) return bad(res,'Keine Berechtigung',403);
-    await pool.query('DELETE FROM checklist_template_items WHERE template_id=$1',[req.params.id]);
-    await pool.query('DELETE FROM checklist_templates WHERE id=$1',[req.params.id]);
-    ok(res);
-  } catch(e) { bad(res,e.message,500); }
-});
-
-// ALLOWANCES
 module.exports = router;

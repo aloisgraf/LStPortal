@@ -4,6 +4,13 @@ const bcrypt = require('bcryptjs');
 const { q, q1, newId, pool, parseRoles, canSeeMsg } = require('../db');
 const { auth, adminOnly, ok, bad } = require('../middleware');
 
+async function logAct(pool, newId, uid, name, action, details={}) {
+  await pool.query(
+    'INSERT INTO activity_log (id,user_id,user_name,action,details,created_at) VALUES ($1,$2,$3,$4,$5,NOW())',
+    [newId(), uid, name, action, JSON.stringify(details)]
+  ).catch(()=>{});
+}
+
 router.put('/allowances', auth, async (req,res) => {
   try {
     if (!req.p.editAllw) return bad(res,'Keine Berechtigung',403);
@@ -203,7 +210,8 @@ router.get('/dienstplaene/:id/file', auth, async (req,res) => {
     const base64 = row.file_data.replace(/^data:[^;]+;base64,/,'');
     const buf = Buffer.from(base64,'base64');
     res.setHeader('Content-Type','application/pdf');
-    res.setHeader('Content-Disposition',`inline; filename="${row.filename}"`);
+    res.setHeader('Content-Disposition','inline');
+    res.setHeader('X-Content-Type-Options','nosniff');
     res.send(buf);
   } catch(e) { bad(res,e.message,500); }
 });
@@ -214,6 +222,45 @@ router.delete('/dienstplaene/:id', auth, async (req,res) => {
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
+// ── CHECKLISTEN-VORLAGEN ──
+router.post('/checklists', auth, async (req,res) => {
+  try {
+    const {name,department,items=[]} = req.body;
+    if (!name?.trim()) return bad(res,'Name erforderlich');
+    const id=newId();
+    await pool.query('INSERT INTO checklist_templates (id,name,department,created_by) VALUES ($1,$2,$3,$4)',[id,name.trim(),department,req.uid]);
+    for (let i=0;i<items.length;i++)
+      await pool.query('INSERT INTO checklist_template_items (id,template_id,text,item_type,sort_order) VALUES ($1,$2,$3,$4,$5)',
+        [newId(),id,items[i].text||items[i],items[i].itemType||'check',i]);
+    ok(res,{id});
+  } catch(e) { bad(res,e.message,500); }
+});
+router.put('/checklists/:id', auth, async (req,res) => {
+  try {
+    const tmpl = await q1('SELECT * FROM checklist_templates WHERE id=$1',[req.params.id]);
+    if (!tmpl) return bad(res,'Nicht gefunden',404);
+    if (!req.p.roles.includes('admin')&&tmpl.created_by!==req.uid) return bad(res,'Keine Berechtigung',403);
+    const {name,department,items=[]} = req.body;
+    await pool.query('UPDATE checklist_templates SET name=$1,department=$2 WHERE id=$3',[name.trim(),department,req.params.id]);
+    await pool.query('DELETE FROM checklist_template_items WHERE template_id=$1',[req.params.id]);
+    for (let i=0;i<items.length;i++)
+      await pool.query('INSERT INTO checklist_template_items (id,template_id,text,item_type,sort_order) VALUES ($1,$2,$3,$4,$5)',
+        [newId(),req.params.id,items[i].text||items[i],items[i].itemType||'check',i]);
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
+router.delete('/checklists/:id', auth, async (req,res) => {
+  try {
+    const tmpl = await q1('SELECT * FROM checklist_templates WHERE id=$1',[req.params.id]);
+    if (!tmpl) return bad(res,'Nicht gefunden',404);
+    if (!req.p.roles.includes('admin')&&tmpl.created_by!==req.uid) return bad(res,'Keine Berechtigung',403);
+    await pool.query('DELETE FROM checklist_template_items WHERE template_id=$1',[req.params.id]);
+    await pool.query('DELETE FROM checklist_templates WHERE id=$1',[req.params.id]);
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
+
+// ALLOWANCES
 // ── AKTIVITÄTSLOG ──
 router.get('/activity-log', auth, async (req,res) => {
   try {
