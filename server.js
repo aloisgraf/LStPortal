@@ -130,6 +130,12 @@ async function initDB() {
     `CREATE TABLE IF NOT EXISTS message_reads (id TEXT PRIMARY KEY, message_id TEXT NOT NULL, user_id TEXT NOT NULL, read_at TIMESTAMPTZ DEFAULT NOW(), UNIQUE(message_id, user_id))`,
     `CREATE TABLE IF NOT EXISTS activity_log (id TEXT PRIMARY KEY, user_id TEXT, user_name TEXT, action TEXT NOT NULL, details JSONB DEFAULT '{}', ip TEXT, created_at TIMESTAMPTZ DEFAULT NOW())`,
   ];
+  // activity_log Tabelle (falls noch nicht vorhanden)
+  await pool.query(`CREATE TABLE IF NOT EXISTS activity_log (
+    id TEXT PRIMARY KEY, user_id TEXT, user_name TEXT,
+    action TEXT NOT NULL, details JSONB DEFAULT '{}',
+    ip TEXT, created_at TIMESTAMPTZ DEFAULT NOW()
+  )`).catch(()=>{});
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }
 
   const cnt = await q1('SELECT COUNT(*) as n FROM users');
