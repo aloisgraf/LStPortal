@@ -14,7 +14,7 @@ const DB_URL  = process.env.DATABASE_URL;
 const IS_PROD = process.env.NODE_ENV === 'production';
 if (!DB_URL) { console.error('❌ DATABASE_URL fehlt!'); process.exit(1); }
 
-const pool = new Pool({ connectionString: DB_URL, ssl: IS_PROD ? { rejectUnauthorized: false } : false, max: 10 });
+const pool = new Pool({ connectionString: DB_URL, ssl: { rejectUnauthorized: false }, max: 10 });
 const q  = (sql, p) => pool.query(sql, p).then(r => r.rows);
 const q1 = (sql, p) => pool.query(sql, p).then(r => r.rows[0] || null);
 const newId = () => crypto.randomUUID();
@@ -829,6 +829,7 @@ app.get('*',(req,res)=>res.sendFile(path.join(__dirname,'public','index.html')))
 
 initDB().then(()=>{
   app.listen(PORT,'0.0.0.0',()=>{
-    console.log(`\n✓ LSt Portal auf Port ${PORT} | ${IS_PROD?'Produktion':'Entwicklung'}\n`);
+    console.log(`\n✓ LSt Portal auf Port ${PORT} | ${IS_PROD?'Produktion':'Entwicklung'}`);
+    console.log(`  DATABASE_URL: ${DB_URL?DB_URL.slice(0,40)+'...':'FEHLT'}\n`);
   });
 }).catch(err=>{ console.error('❌ DB-Fehler:',err.message); process.exit(1); });
