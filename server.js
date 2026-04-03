@@ -238,8 +238,12 @@ const bad = (res,msg,code=400) => res.status(code).json({success:false, error:ms
 app.get('/api/auth/users', async (req,res) => {
   try {
     const users = await q('SELECT id,name,initials,color,roles FROM users ORDER BY name');
+    console.log('[auth/users] Benutzer gefunden:', users.length);
     ok(res, users.map(u=>({id:u.id,name:u.name,initials:u.initials,color:u.color,roles:parseRoles(u.roles)})));
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) {
+    console.error('[auth/users] Fehler:', e.message);
+    bad(res,e.message,500);
+  }
 });
 app.post('/api/auth/login', async (req,res) => {
   try {
@@ -286,7 +290,7 @@ app.get('/api/data', auth, async (req,res) => {
       q('SELECT * FROM checklist_template_items ORDER BY sort_order'),
       q('SELECT * FROM ticket_checklists'),
       q('SELECT * FROM ticket_checklist_items ORDER BY sort_order'),
-      q('SELECT * FROM messages ORDER BY created_at DESC'),
+      q('SELECT * FROM messages ORDER BY created_at DESC').catch(()=>[]),
       q('SELECT message_id FROM message_reads WHERE user_id=$1',[uid]),
       q('SELECT * FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 50',[uid]),
       p.seeAllAbrechnung ? q('SELECT * FROM abrechnung_einspringer ORDER BY edate DESC')
