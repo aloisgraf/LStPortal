@@ -70,12 +70,14 @@ function parseMentions(text, users) {
   return users.filter(u => new RegExp('@' + u.name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'i').test(text));
 }
 
-const canSeeMsg = (msg, uid, roles) =>
-  msg.sender_id === uid ||
-  msg.target_type === 'all' ||
-  (msg.target_type === 'user'       && msg.target_value === uid) ||
-  (msg.target_type === 'department' && roles.includes(msg.target_value));
 
-module.exports = { pool, q, q1, newId, parseRoles, parseTags, getUser, DEPTS,
+async function logAct(uid, name, action, details={}) {
+  await pool.query(
+    'INSERT INTO activity_log (id,user_id,user_name,action,details,created_at) VALUES ($1,$2,$3,$4,$5,NOW())',
+    [newId(), uid, name, action, JSON.stringify(details)]
+  ).catch(()=>{});
+}
+
+module.exports = { pool, q, q1, newId, parseRoles, parseTags, getUser, DEPTS, logAct,
   getP, getTP, canSeeTk, canEditTk, nextTicketNumber, auditNote, createNotification,
-  parseMentions, canSeeMsg };
+  parseMentions };
