@@ -519,11 +519,19 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
         <button class="tb" id="atb-cats" onclick="swTab('cats')">&#127912; Kategorien</button>
         <button class="tb" id="atb-tags" onclick="swTab('tags')">&#127991;&#65039; Tags</button>
         <button class="tb" id="atb-rights" onclick="swTab('rights')">&#128272; Rechte</button>
+        <button class="tb" id="atb-log" onclick="swTab('log');loadLog(true)">&#128221; Aktivitätslog</button>
       </div>
       <div class="tp on" id="atp-users"><div class="al" id="usrList"></div><button class="btn-p" style="width:100%;justify-content:center" onclick="openUF(null)">&#65291; Benutzer</button></div>
       <div class="tp" id="atp-cats"><div class="al" id="catList"></div><button class="btn-p" style="width:100%;justify-content:center" onclick="openCF(null)">&#65291; Kategorie</button></div>
       <div class="tp" id="atp-tags"><div class="al" id="tagList"></div><button class="btn-p" style="width:100%;justify-content:center" onclick="openTF(null)">&#65291; Tag</button></div>
       <div class="tp" id="atp-rights"><div id="rightsMatrix" style="overflow-x:auto"></div></div>
+      <div class="tp" id="atp-log">
+        <div style="font-size:12px;color:var(--mu);margin-bottom:8px">Alle Benutzeraktionen chronologisch. Nur für Administratoren sichtbar.</div>
+        <div id="logContent" style="font-size:12px;max-height:400px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--r)">
+          <div style="padding:20px;text-align:center;color:var(--di)">Lade…</div>
+        </div>
+        <button class="btn-s" id="logMoreBtn" onclick="loadLog(false)" style="width:100%;margin-top:8px;display:none">Mehr laden …</button>
+      </div>
     </div>
   </div>
 </div>
@@ -2256,8 +2264,40 @@ async function sendMessage(){
   finally{loading(false);}
 }
 // ADMIN
+
+var _logOffset=0, _logTotal=0;
+async function loadLog(reset){
+  if(reset){_logOffset=0;_logTotal=0;document.getElementById('logContent').innerHTML='<div style="padding:20px;text-align:center;color:var(--di)">Lade&#8230;</div>';}
+  loading(true);
+  try{
+    const data=await api('GET','/activity-log?limit=50&offset='+_logOffset);
+    _logTotal=data.total||0;
+    const rows=data.logs||[];
+    _logOffset+=rows.length;
+    const AL={login:'&#128273; Login',logout:'&#128682; Logout',change_password:'&#128272; PW geändert',create_event:'&#128197; Eintrag erstellt',edit_event:'&#9999;&#65039; Eintrag bearbeitet',delete_event:'&#128465;&#65039; Eintrag gelöscht',approve_event:'&#9989; Freigabe',create_ticket:'&#127931; Ticket erstellt',update_ticket:'&#128221; Ticket geändert',delete_ticket:'&#128465;&#65039; Ticket gelöscht',send_message:'&#9993;&#65039; Nachricht gesendet',ack_message:'&#10003; Nachricht bestätigt'};
+    const fdt=s=>{if(!s)return'';const d=new Date(s);return d.toLocaleDateString('de-AT')+' '+d.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'});};
+    var html=reset?'':'';
+    if(!reset){const el=document.getElementById('logContent');html=el.innerHTML==='<div style="padding:20px;text-align:center;color:var(--di)">Lade&#8230;</div>'?'':el.innerHTML;}
+    if(rows.length===0&&reset){html='<div style="padding:20px;text-align:center;color:var(--di)">Keine Einträge vorhanden.</div>';}
+    else rows.forEach(function(l){
+      var det='';
+      if(l.details&&typeof l.details==='object'){var keys=Object.keys(l.details).filter(function(k){return k!=='ip';});if(keys.length)det=keys.map(function(k){return k+': '+JSON.stringify(l.details[k]).slice(0,40);}).join(', ');}
+      html+='<div style="display:grid;grid-template-columns:130px 110px 160px 1fr;gap:6px;padding:6px 10px;border-bottom:1px solid var(--border);align-items:center;font-size:11px">'
+        +'<span style="color:var(--mu)">'+fdt(l.created_at)+'</span>'
+        +'<span style="font-weight:600">'+escHtml(l.user_name||'?')+'</span>'
+        +'<span>'+(AL[l.action]||l.action)+'</span>'
+        +'<span style="color:var(--mu);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(det)+'</span>'
+        +'</div>';
+    });
+    document.getElementById('logContent').innerHTML=html||'<div style="padding:20px;text-align:center;color:var(--di)">Keine Einträge.</div>';
+    document.getElementById('logMoreBtn').style.display=_logOffset<_logTotal?'block':'none';
+  }catch(e){document.getElementById('logContent').innerHTML='<div style="padding:16px;color:var(--danger)">Fehler: '+escHtml(e.message)+'</div>';}
+  loading(false);
+}
+function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
 function openAdminModal(){renderUsrList();renderCatList();renderTagList();renderRightsMatrix();openModal('admOv');}
-function swTab(t){['users','cats','tags','rights'].forEach(x=>{document.getElementById('atb-'+x).classList.toggle('on',x===t);document.getElementById('atp-'+x).classList.toggle('on',x===t);});}
+function swTab(t){['users','cats','tags','rights','log'].forEach(x=>{document.getElementById('atb-'+x)?.classList.toggle('on',x===t);document.getElementById('atp-'+x)?.classList.toggle('on',x===t);});}
 function backToAdmin(tab='users'){['ufOv','cfOv','tfOv'].forEach(closeModal);openAdminModal();swTab(tab);}
 function renderUsrList(){document.getElementById('usrList').innerHTML=S.users.map(u=>`<div class="ai">${avHtml(u.initials,u.color,34,13,u.isOnline)}<div class="aii"><div class="ain">${u.name} ${roleBadges(u.id)}${u.isOnline?'<span style="font-size:10px;color:var(--ok)">\u25cf online</span>':''}</div><div class="ais">${u.mustChangePW?'\u26A0\uFE0F PW ausstehend':'\u2713 Aktiv'}</div></div><div class="aia"><button class="btn-e" onclick="openUF('${u.id}')">\u270e</button>${S.users.length>1&&u.id!==S.currentUser?`<button class="btn-d" onclick="delUser('${u.id}')">\u2715</button>`:''}</div></div>`).join('');}
 function renderCatList(){document.getElementById('catList').innerHTML=S.categories.map(c=>`<div class="ai"><div style="width:14px;height:14px;border-radius:3px;background:${c.color};flex-shrink:0"></div><div class="aii"><div class="ain">${c.emoji} ${c.label}</div></div><div class="aia"><button class="btn-e" onclick="openCF('${c.id}')">\u270e</button>${S.categories.length>1?`<button class="btn-d" onclick="delCat('${c.id}')">\u2715</button>`:''}</div></div>`).join('');}
