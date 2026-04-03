@@ -66,15 +66,3 @@ async function pollActive(){
 }
 
 // ══ NAVIGATION ══
-function toggleNS(id){
-  document.getElementById(id+'Hdr').classList.toggle('open');
-  document.getElementById(id+'Sub').classList.toggle('open');
-}
-function setView(v){
-  S.view=v;
-  ['dashboard','schedule','allw','tickets','tickets_closed','checklists','messages'].forEach(x=>{
-    const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);
-  });
-  renderSBF();renderMain();closeMob();
-}
-
