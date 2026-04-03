@@ -222,6 +222,21 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
 #helpContent svg text { font-family: 'Inter', system-ui, sans-serif; }
 
 .tk-child-row{background:rgba(59,109,212,.02)}.tk-child-row td:first-child{border-left:3px solid rgba(59,109,212,.25)}
+
+/* Kalenderansicht */
+.cal-table{width:100%;border-collapse:collapse;table-layout:fixed}
+.cal-table th{padding:8px 4px;text-align:center;font-size:11px;font-weight:700;color:var(--mu);background:var(--sf2);border:1px solid var(--border)}
+.cal-table th:nth-child(6),.cal-table th:nth-child(7){color:var(--acc)}
+.cal-day{border:1px solid var(--border);vertical-align:top;padding:5px;height:120px;background:var(--sf)}
+.cal-day:hover{background:var(--sf2)}
+.cal-empty{border:1px solid var(--border);background:rgba(0,0,0,.02);height:120px}
+.cal-we{background:rgba(59,109,212,.03)}
+.cal-today{background:rgba(59,109,212,.06)}
+.cal-daynum{font-size:12px;font-weight:700;color:var(--mu);margin-bottom:3px}
+.cal-daynum-today{background:var(--acc);color:var(--act);border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center}
+.cal-ev{font-size:10px;font-weight:500;padding:2px 5px;border-radius:3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-ev-anon{background:rgba(245,158,11,.1);border-left:2px solid #f59e0b;color:#f59e0b}
+.cal-ev-more{font-size:10px;color:var(--mu);padding:1px 4px;font-style:italic}
 </style>
 </head>
 <body>
@@ -280,6 +295,13 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
 </div>
 
 <div class="sb-overlay" id="sbOv" onclick="toggleSidebar()"></div>
+<div id="pdfPanel" style="display:none;position:fixed;bottom:0;left:0;right:0;height:60vh;background:var(--sf);border-top:2px solid var(--border);box-shadow:0 -4px 24px rgba(0,0,0,.15);z-index:900;flex-direction:column">
+  <div style="padding:8px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:var(--sf2)">
+    <span id="pdfPanelTitle" style="font-size:13px;font-weight:700">&#128196; Dienstplan</span>
+    <button class="btn-s" style="font-size:11px" onclick="closePdf()">&#10005; Schlie&szlig;en</button>
+  </div>
+  <iframe id="pdfIframe" src="" style="flex:1;border:none;width:100%"></iframe>
+</div>
 
 <div class="app" id="APP" style="display:none">
   <aside class="sb" id="sidebar">
@@ -372,6 +394,7 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
       <div class="fg full"><label>Beschreibung</label><textarea id="tkFDesc" rows="4"></textarea></div>
       <div class="fr">
         <div class="fg"><label>Fachbereich *</label><select id="tkFDept">
+              <option value="frei">&#127760; Frei (für alle sichtbar)</option>
           <option value="technik">&#128295; Technik</option><option value="leitung">&#11088; Leitung</option>
           <option value="dienstplanung">&#128203; Dienstplanung</option><option value="ausbildung">&#127891; Ausbildung</option>
           <option value="qm">&#9989; QM</option>
@@ -380,7 +403,7 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
           <option value="low">&#128994; Gering</option><option value="medium" selected>&#128993; Mittel</option><option value="high">&#128308; Hoch</option>
         </select></div>
       </div>
-      <div class="fr">
+      <div class="fr" id="tkFAdvRow">
         <div class="fg"><label>Status</label><select id="tkFSt">
           <option value="open">Offen</option><option value="in_progress">In Bearbeitung</option>
           <option value="on_hold">Zur&#252;ckgestellt</option><option value="closed">Abgeschlossen</option>
@@ -1262,14 +1285,15 @@ function showHelpSection(id){
     <div class="mh"><h2>&#128203; Changelog</h2><button class="mc" onclick="closeModal('changelogOv')">&#10005;</button></div>
     <div class="mb2" style="gap:10px">
       <div style="padding:12px;background:rgba(59,109,212,0.06));border:1px solid rgba(59,109,212,.20);border-radius:8px">
-        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v1.9.1</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v1.9.3</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
         <ul style="font-size:12px;line-height:1.8;padding-left:18px">
-          <li>Fix: Checklisten-Vorlagen anlegen (404-Fehler behoben)</li>
-          <li>Untertickets in Ticket-Liste eingerückt unter dem Elternticket</li>
-          <li>Dienstpläne: PDF öffnet direkt im Browser</li>
-          <li>Kalenderansicht: mind. 6 Zeilen, größere Zellen</li>
-          <li>Aktivitätslog: Login, Tickets &amp; Einträge werden protokolliert</li>
-          <li>Abgelehnte Einträge nur im Kalender ausgeblendet</li>
+          <li>Kalenderansicht: volle Zellhöhe (120px), korrekte 6 Zeilen</li>
+          <li>Dienstplan PDF: öffnet als Einblendung unterhalb (kein neues Fenster)</li>
+          <li>Nachrichten: Bestätigen öffnet zuerst die Nachricht zum Lesen</li>
+          <li>Auto-Refresh aktualisiert auch Ticket- und Nachrichtenansicht</li>
+          <li>Ticket anlegen: Standard-User sehen kein Status/Bucket-Feld</li>
+          <li>Neuer Fachbereich "Frei" – Ticket für alle Fachbereiche sichtbar</li>
+          <li>Rechte-Matrix überarbeitet und aktualisiert</li>
         </ul>
       </div>
       <div style="padding:12px;background:var(--sf2);border:1px solid var(--border);border-radius:8px">
@@ -1303,25 +1327,30 @@ function showHelpSection(id){
 </div>
 
 <script>
-const APP_VERSION='1.9.2';
+const APP_VERSION='1.9.3';
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
 const ROLES=[{id:'admin',label:'Administrator',icon:'\uD83D\uDD11'},{id:'leitung',label:'Leitung',icon:'\u2B50'},{id:'dienstplanung',label:'Dienstplanung',icon:'\uD83D\uDCCB'},{id:'technik',label:'Technik',icon:'\uD83D\uDD27'},{id:'ausbildung',label:'Ausbildung',icon:'\uD83C\uDF93'},{id:'qm',label:'QM',icon:'\u2705'},{id:'standard',label:'Standard',icon:'\uD83D\uDC64'}];
-const DEPTS=['technik','leitung','dienstplanung','ausbildung','qm'];
-const DEPT_LABELS={technik:'\uD83D\uDD27 Technik',leitung:'\u2B50 Leitung',dienstplanung:'\uD83D\uDCCB Dienstplanung',ausbildung:'\uD83C\uDF93 Ausbildung',qm:'\u2705 QM'};
+const DEPTS=['technik','leitung','dienstplanung','ausbildung','qm','frei'];
+const DEPT_LABELS={technik:'\uD83D\uDD27 Technik',leitung:'\u2B50 Leitung',dienstplanung:'\uD83D\uDCCB Dienstplanung',ausbildung:'\uD83C\uDF93 Ausbildung',qm:'\u2705 QM',frei:'\uD83C\uDF10 Frei'};
 const PRIORITIES=[{id:'low',label:'\uD83D\uDFE2 Gering',color:'#10b981'},{id:'medium',label:'\uD83D\uDFE1 Mittel',color:'#f59e0b'},{id:'high',label:'\uD83D\uDD34 Hoch',color:'#ef4444'}];
 const STATUSES=[{id:'open',label:'Offen'},{id:'in_progress',label:'In Bearbeitung'},{id:'on_hold',label:'Zur\u00fcckgestellt'},{id:'closed',label:'Abgeschlossen'}];
 const BUCKETS=[{id:'urgent',label:'\uD83D\uDEA8 Dringend'},{id:'week',label:'\uD83D\uDCC5 Diese Woche'},{id:'sched',label:'\uD83D\uDCCB Dienstplanung'},{id:'wait',label:'\u23F3 Wartet'},{id:'it',label:'\uD83D\uDCBB IT'},{id:'proj',label:'\uD83D\uDE80 Projekte'},{id:'org',label:'\uD83C\uDFE2 Organisation'},{id:'ideas',label:'\uD83D\uDCA1 Ideen'}];
 const RM=[
-  ['Benutzer verwalten',{admin:1,leitung:0,dienstplanung:0,technik:0,ausbildung:0,qm:0,standard:0}],
-  ['Alle Eintr\u00e4ge sehen',{admin:1,leitung:1,dienstplanung:1,technik:0,ausbildung:2,qm:2,standard:0}],
-  ['Eintr\u00e4ge genehmigen',{admin:1,leitung:0,dienstplanung:1,technik:0,ausbildung:0,qm:0,standard:0}],
-  ['Allg. Eintr\u00e4ge',{admin:1,leitung:1,dienstplanung:1,technik:1,ausbildung:1,qm:1,standard:0}],
-  ['Alle Zulagen',{admin:1,leitung:1,dienstplanung:1,technik:0,ausbildung:0,qm:0,standard:0}],
-  ['Alle Tickets sehen',{admin:1,leitung:1,dienstplanung:0,technik:0,ausbildung:0,qm:0,standard:0}],
-  ['Nachrichten senden',{admin:1,leitung:1,dienstplanung:1,technik:1,ausbildung:1,qm:1,standard:0}],
-  ['Abrechnung alle sehen',{admin:1,leitung:0,dienstplanung:1,technik:0,ausbildung:0,qm:0,standard:0}],
+  ['Benutzer verwalten',         {admin:1,leitung:0,dienstplanung:0,technik:0,ausbildung:0,qm:0,standard:0}],
+  ['Dienstplan: alle sehen',     {admin:1,leitung:1,dienstplanung:1,technik:0,ausbildung:0,qm:0,standard:0}],
+  ['Dienstplan: nur eigene',     {admin:0,leitung:0,dienstplanung:0,technik:1,ausbildung:1,qm:1,standard:1}],
+  ['Eintr\u00e4ge genehmigen',  {admin:1,leitung:0,dienstplanung:1,technik:0,ausbildung:0,qm:0,standard:0}],
+  ['Allg. Eintr\u00e4ge erstellen',{admin:1,leitung:1,dienstplanung:1,technik:1,ausbildung:1,qm:1,standard:0}],
+  ['Tickets: Fachbereich sehen', {admin:1,leitung:1,dienstplanung:2,technik:2,ausbildung:2,qm:2,standard:0}],
+  ['Tickets: alle sehen',        {admin:1,leitung:1,dienstplanung:0,technik:0,ausbildung:0,qm:0,standard:0}],
+  ['Tickets: nur eigene',        {admin:0,leitung:0,dienstplanung:0,technik:0,ausbildung:0,qm:0,standard:1}],
+  ['Status/Bucket setzen',       {admin:1,leitung:1,dienstplanung:1,technik:1,ausbildung:1,qm:1,standard:0}],
+  ['Nachrichten senden',         {admin:1,leitung:1,dienstplanung:1,technik:1,ausbildung:1,qm:1,standard:0}],
+  ['Alle Zulagen',               {admin:1,leitung:1,dienstplanung:1,technik:0,ausbildung:0,qm:0,standard:0}],
+  ['Abrechnung alle sehen',      {admin:1,leitung:0,dienstplanung:1,technik:0,ausbildung:0,qm:0,standard:0}],
+  ['Aktivit\u00e4tslog sehen',  {admin:1,leitung:0,dienstplanung:0,technik:0,ausbildung:0,qm:0,standard:0}],
 ];
 let S={
   year:new Date().getFullYear(),month:new Date().getMonth(),
@@ -1527,7 +1556,7 @@ function renderHome(){
       <div style="font-size:13px;font-weight:700;color:var(--danger);margin-bottom:10px">&#128276; ${unreadMsg.length} ungelesene Nachricht${unreadMsg.length>1?'en':''}</div>
       ${unreadMsg.map(m=>`<div style="padding:8px 12px;background:var(--sf);border-radius:6px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
         <div><div style="font-weight:600;font-size:13px">${m.title}</div><div style="font-size:11px;color:var(--mu)">von ${getU(m.senderId)?.name||'?'} &middot; ${fdt(m.createdAt)}</div></div>
-        <button class="btn-p" onclick="readMsg('${m.id}')">&#10003; Best\u00e4tigen</button>
+        <button class="btn-p" onclick="openMsg('${m.id}')">&#128279; Lesen &amp; Bestätigen</button>
       </div>`).join('')}
     </div>`:''}
     ${eventNotifs.length?`<div style="background:rgba(245,158,11,0.05));border:1px solid rgba(245,158,11,.25);border-radius:var(--r);padding:14px;margin-bottom:14px">
@@ -1737,17 +1766,7 @@ function renderCalendar(){
   var moNames=['Jänner','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
   var html='<div class="ph"><div class="pt">\uD83D\uDCC5 Kalenderansicht <span>'+moNames[mo]+' '+yr+'</span></div>';
   html+='<button class="btn-p" onclick="openEvtModal()">&#65291; Eintrag hinzufügen</button></div>';
-  html+='<style>.cal-table{width:100%;border-collapse:collapse;table-layout:fixed}'+
-    '.cal-table th{padding:8px 4px;text-align:center;font-size:11px;font-weight:700;color:var(--mu);background:var(--sf2);border:1px solid var(--border)}'+
-    '.cal-table th:nth-child(6),.cal-table th:nth-child(7){color:var(--acc)}'+
-    '.cal-day{border:1px solid var(--border);vertical-align:top;padding:4px;min-height:110px;background:var(--sf);cursor:default}'+
-    '.cal-day:hover{background:var(--sf2)}.cal-empty{border:1px solid var(--border);background:var(--sf3);min-height:110px}'+
-    '.cal-we{background:rgba(59,109,212,.03)}.cal-today{background:rgba(59,109,212,.05)}'+
-    '.cal-daynum{font-size:12px;font-weight:700;color:var(--mu);margin-bottom:3px}'+
-    '.cal-daynum-today{background:var(--acc);color:var(--act);border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center}'+
-    '.cal-ev{font-size:10px;font-weight:500;padding:2px 5px;border-radius:3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'+
-    '.cal-ev-anon{background:rgba(245,158,11,.1);border-left:2px solid #f59e0b;color:#f59e0b}'+
-    '.cal-ev-more{font-size:10px;color:var(--mu);padding:1px 4px;font-style:italic}</style>';
+
   html+='<div class="tw"><table class="cal-table"><thead><tr>';
   WDAYS.forEach(function(d){html+='<th>'+d+'</th>';});
   html+='</tr></thead><tbody>'+cells+'</tbody></table></div>';
@@ -1924,24 +1943,27 @@ async function undoRejectEinsp(id){
 // DIENSTPLAENE
 
 function showPdf(url, title) {
-  // Remove existing pdf viewer if present
-  var old = document.getElementById('pdfViewerSection');
-  if (old) {
-    if (old.dataset.url === url) { old.remove(); return; } // toggle
-    old.remove();
+  var panel = document.getElementById('pdfPanel');
+  var iframe = document.getElementById('pdfIframe');
+  var titleEl = document.getElementById('pdfPanelTitle');
+  if (!panel) return;
+  if (panel.style.display === 'flex' && iframe.src.includes(url.split('/').pop())) {
+    closePdf(); return; // toggle
   }
-  var section = document.createElement('div');
-  section.id = 'pdfViewerSection';
-  section.dataset.url = url;
-  section.style.cssText = 'margin-top:14px;background:var(--sf);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;box-shadow:var(--sh)';
-  section.innerHTML =
-    '<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">' +
-    '<span style="font-size:13px;font-weight:700">&#128196; ' + (title||'Dienstplan') + '</span>' +
-    '<button class="btn-s" style="font-size:11px" onclick="document.getElementById(&quot;pdfViewerSection&quot;).remove()">&times; Schlie&szlig;en</button>' +
-    '</div>' +
-    '<iframe src="' + url + '" style="width:100%;height:70vh;border:none;display:block"></iframe>';
-  document.getElementById('main').appendChild(section);
-  section.scrollIntoView({behavior:'smooth',block:'start'});
+  if (titleEl) titleEl.textContent = '\uD83D\uDCC4 ' + (title || 'Dienstplan');
+  iframe.src = url;
+  panel.style.display = 'flex';
+  // Add bottom padding to main so content isn't hidden
+  var main = document.getElementById('main');
+  if (main) main.style.paddingBottom = '62vh';
+}
+function closePdf() {
+  var panel = document.getElementById('pdfPanel');
+  var iframe = document.getElementById('pdfIframe');
+  if (panel) panel.style.display = 'none';
+  if (iframe) iframe.src = '';
+  var main = document.getElementById('main');
+  if (main) main.style.paddingBottom = '';
 }
 
 function renderDienstplaene(){
@@ -2173,9 +2195,13 @@ function openTkForm(id,parentId){
   document.getElementById('tkFId').value=tk?.id||'';
   document.getElementById('tkFNm').value=tk?.title||'';
   document.getElementById('tkFDesc').value=tk?.description||'';
-  document.getElementById('tkFDept').value=tk?.department||'technik';
+  document.getElementById('tkFDept').value=tk?.department||'frei';
   document.getElementById('tkFPrio').value=tk?.priority||'medium';
   document.getElementById('tkFSt').value=tk?.status||'open';
+  // Standard-User sehen keine Status/Bucket-Auswahl
+  var isStd=!(S.tp.seeAll||S.tp.myDepts.length>0);
+  var advRow=document.getElementById('tkFAdvRow');
+  if(advRow)advRow.style.display=isStd?'none':'flex';
   document.getElementById('tkFBkt').innerHTML='<option value="">\u2014</option>'+BUCKETS.map(b=>`<option value="${b.id}"${tk?.bucket===b.id?' selected':''}>${b.label}</option>`).join('');
   document.getElementById('tkFTags').innerHTML=S.tags.map(t=>`<option value="${t.id}"${tk?.tags?.includes(t.id)?' selected':''}>${t.label}</option>`).join('');
   document.getElementById('tkFAsgn').innerHTML='<option value="">\u2014 niemand \u2014</option>'+S.users.map(u=>`<option value="${u.id}"${tk?.assigneeId===u.id?' selected':''}>${u.name}</option>`).join('');
@@ -2472,6 +2498,8 @@ function startAutoRefresh(){
       if(_lastTkCount>=0&&newTkCount>_lastTkCount)toast('\uD83C\uDFAB Neues Ticket in deinem Bereich!');
       _lastMsgCount=newMsgCount;_lastTkCount=newTkCount;
       if(S.view==='home')renderHome();
+      else if(S.view==='messages'||S.view==='messages_sent')renderMessages();
+      else if(S.view==='tickets'||S.view==='tickets_closed')renderTickets();
     }catch(e){}
   },60000);
 }
