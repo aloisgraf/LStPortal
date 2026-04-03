@@ -1294,8 +1294,12 @@ function showHelpSection(id){
     <div class="mh"><h2>&#128203; Changelog</h2><button class="mc" onclick="closeModal('changelogOv')">&#10005;</button></div>
     <div class="mb2" style="gap:10px">
       <div style="padding:12px;background:rgba(59,109,212,0.06));border:1px solid rgba(59,109,212,.20);border-radius:8px">
-        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.0.1</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.0.3</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
         <ul style="font-size:12px;line-height:1.8;padding-left:18px">
+          <li>Fix: Angepinnte Nachrichten in der &Uuml;bersicht sichtbar (read_at Bug behoben)</li>
+          <li>Nachrichten: Alle empfangenen Nachrichten bleiben im Eingang</li>
+          <li>Nachrichten: Angepinnte oben, ungelesene darunter, gelesene zuletzt</li>
+          <li>Zulagendienste: Durchschnitt pro MA + pro Monat f&uuml;r Dienstplanung</li>
           <li>Fix: Nachrichten f&uuml;r alle Rollen wieder sichtbar</li>
           <li>Fix: Alte Nachrichten (ohne Sender) bleiben sichtbar</li>
           <li>Fix: Admin/Leitung sehen alle Department-Nachrichten</li>
@@ -1337,7 +1341,7 @@ function showHelpSection(id){
 </div>
 
 <script>
-const APP_VERSION='2.0.1';
+const APP_VERSION='2.0.3';
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
@@ -1978,7 +1982,31 @@ function renderAllw(){
         </tr>`;}
         const sv=sumAllw(u.id,yr,months);
         return`<tr><td><div style="display:flex;align-items:center;gap:6px">${avHtml(u.initials,u.color,22,9)}<span>${u.name}</span></div></td>${numCell(sv.nd,'#3b6dd4')}${numCell(sv.fd,'#10b981')}${numCell(sv.fw,'#f59e0b')}${numCell(sv.c10,'#7c3aed')}</tr>`;
-      }).join('')}</tbody></table></div>
+      }).join('')}
+      ${(()=>{
+        // Durchschnitt nur für Dienstplanung (seeAllAllw) bei mehr als 1 User
+        if(!S.p.seeAllAllw||showUsers.length<2)return '';
+        const n=showUsers.length;
+        const tot=showUsers.reduce((a,u)=>{const sv=sumAllw(u.id,yr,months);return{nd:a.nd+sv.nd,fd:a.fd+sv.fd,fw:a.fw+sv.fw,c10:a.c10+sv.c10};},{nd:0,fd:0,fw:0,c10:0});
+        const div=S.allwPeriod==='month'?1:S.allwPeriod==='h1'||S.allwPeriod==='h2'?6:12;
+        const avg={nd:tot.nd/n,fd:tot.fd/n,fw:tot.fw/n,c10:tot.c10/n};
+        const fmt=v=>(v%1===0?v:v.toFixed(1));
+        return`<tr style="background:rgba(59,109,212,.06);font-weight:700;border-top:2px solid var(--border)">
+          <td style="font-size:11px;color:var(--mu)">&#216; Durchschnitt pro MA</td>
+          <td style="text-align:center;color:#3b6dd4">${fmt(avg.nd)}</td>
+          <td style="text-align:center;color:#10b981">${fmt(avg.fd)}</td>
+          <td style="text-align:center;color:#f59e0b">${fmt(avg.fw)}</td>
+          <td style="text-align:center;color:#7c3aed">${fmt(avg.c10)}</td>
+        </tr>
+        <tr style="background:rgba(59,109,212,.03);border-bottom:2px solid var(--border)">
+          <td style="font-size:11px;color:var(--di)">&#216; pro Monat (Periode)</td>
+          <td style="text-align:center;font-size:11px;color:var(--mu)">${fmt(avg.nd/div)}</td>
+          <td style="text-align:center;font-size:11px;color:var(--mu)">${fmt(avg.fd/div)}</td>
+          <td style="text-align:center;font-size:11px;color:var(--mu)">${fmt(avg.fw/div)}</td>
+          <td style="text-align:center;font-size:11px;color:var(--mu)">${fmt(avg.c10/div)}</td>
+        </tr>`;
+      })()}
+      </tbody></table></div>
       ${isBulk?`<div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;justify-content:flex-end"><button class="btn-p" onclick="saveAllBulk()">&#128190; Alle speichern</button></div>`:''}
     </div>`;
 }
@@ -2489,14 +2517,13 @@ function renderMessages(){
   const isSent=S.view==='messages_sent';
   const msgs=isSent
     ?S.messages.filter(m=>m.senderId===S.currentUser).sort((a,b)=>b.createdAt.localeCompare(a.createdAt))
-    :S.messages.filter(m=>{
-        if(m.senderId===S.currentUser)return false; // eigene nicht im Eingang
-        // Zeige: nicht bestätigt ODER angepinnt
-        return !m.isRead||m.pinned;
-      }).sort((a,b)=>{
-        // Angepinnte zuerst
+    :S.messages.filter(m=>m.senderId!==S.currentUser) // alle empfangenen bleiben im Eingang
+      .sort((a,b)=>{
+        // Angepinnte zuerst, dann ungelesene, dann nach Datum
         if(a.pinned&&!b.pinned)return -1;
         if(!a.pinned&&b.pinned)return 1;
+        if(!a.isRead&&b.isRead)return -1;
+        if(a.isRead&&!b.isRead)return 1;
         return b.createdAt.localeCompare(a.createdAt);
       });
   const unread=isSent?[]:msgs.filter(m=>!m.isRead);
