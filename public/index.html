@@ -222,6 +222,8 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
 #helpContent svg text { font-family: 'Inter', system-ui, sans-serif; }
 
 .tk-child-row{background:rgba(59,109,212,.02)}.tk-child-row td:first-child{border-left:3px solid rgba(59,109,212,.25)}
+.tk-new-row{background:rgba(245,158,11,.04)}.tk-new-row td:first-child{border-left:3px solid var(--warn)!important}
+.tk-new-badge{display:inline-block;background:var(--warn);color:#fff;font-size:8px;font-weight:800;padding:1px 4px;border-radius:3px;margin-left:4px;vertical-align:middle;letter-spacing:.5px}
 
 /* Kalenderansicht */
 .cal-table{width:100%;border-collapse:collapse;table-layout:fixed}
@@ -1285,13 +1287,13 @@ function showHelpSection(id){
     <div class="mh"><h2>&#128203; Changelog</h2><button class="mc" onclick="closeModal('changelogOv')">&#10005;</button></div>
     <div class="mb2" style="gap:10px">
       <div style="padding:12px;background:rgba(59,109,212,0.06));border:1px solid rgba(59,109,212,.20);border-radius:8px">
-        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v1.9.4</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v1.9.5</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
         <ul style="font-size:12px;line-height:1.8;padding-left:18px">
-          <li>Fix: Angepinnte Nachrichten bleiben in der Übersicht sichtbar</li>
-          <li>Fix: "getUser not defined" Fehler beim Ticket anlegen behoben</li>
-          <li>Home: Neue Tickets im eigenen Fachbereich + Frei-Tickets werden angezeigt</li>
-          <li>Auto-Refresh prüft auch Frei-Tickets und Fachbereich-Tickets</li>
-          <li>Nachrichten: bestätigte aber angepinnte Nachrichten bleiben sichtbar</li>
+          <li>Neue &amp; ge&auml;nderte Tickets werden orangefarben hervorgehoben</li>
+          <li>Ticket-Detail &ouml;ffnen markiert es automatisch als gesehen</li>
+          <li>„NEU"-Badge auf ungesehenen Tickets in der Liste</li>
+          <li>Fix: Angepinnte Nachrichten bleiben in der &Uuml;bersicht</li>
+          <li>Fix: „getUser not defined" beim Ticket anlegen behoben</li>
         </ul>
       </div>
       <div style="padding:12px;background:var(--sf2);border:1px solid var(--border);border-radius:8px">
@@ -1325,7 +1327,7 @@ function showHelpSection(id){
 </div>
 
 <script>
-const APP_VERSION='1.9.4';
+const APP_VERSION='1.9.5';
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
@@ -2047,6 +2049,15 @@ function getVisTks(closed=false){
     return true;
   }).sort((a,b)=>{const po={high:0,medium:1,low:2};return(po[a.priority]||1)-(po[b.priority]||1)||b.createdAt.localeCompare(a.createdAt);});
 }
+
+function tkIsNew(tk) {
+  // Neu oder geändert wenn noch nicht angesehen, oder updatedAt nach letztem Ansehen
+  if (!tk.lastViewedAt) return true;
+  const viewed = new Date(tk.lastViewedAt);
+  const updated = new Date(tk.updatedAt || tk.createdAt);
+  return updated > viewed;
+}
+
 function renderTickets(){
   const closed=S.view==='tickets_closed';const tks=getVisTks(closed);
   document.getElementById('main').innerHTML=`
@@ -2071,8 +2082,9 @@ function renderTickets(){
           const asn=getU(tk.assigneeId);const par=tk.parentTicketId?getTk(tk.parentTicketId):null;
           const nc=tk.notes.filter(n=>n.noteType==='note').length;
           const isChild=!!tk.parentTicketId;
-          return`<tr class="clickable${isChild?' tk-child-row':''}" onclick="openTkDetail('${tk.id}')">
-            <td style="font-family:monospace;font-size:11px;color:var(--mu);white-space:nowrap${isChild?';padding-left:28px':''}">${isChild?'<span style="color:var(--di);margin-right:3px">↳</span>':''}${tk.number}</td>
+          const isNew=tkIsNew(tk);
+          return`<tr class="clickable${isChild?' tk-child-row':''}${isNew?' tk-new-row':''}" onclick="openTkDetail('${tk.id}')">
+            <td style="font-family:monospace;font-size:11px;color:var(--mu);white-space:nowrap${isChild?';padding-left:28px':''}">${isChild?'<span style="color:var(--di);margin-right:3px">↳</span>':''}${tk.number}${isNew?'<span class="tk-new-badge">NEU</span>':''}</td>
             <td style="max-width:220px"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis${isChild?';padding-left:10px;border-left:3px solid rgba(59,109,212,.3);margin-left:2px':''}">${tk.title}</div>${isChild&&par?`<div style="font-size:10px;color:var(--di);padding-left:10px">↑ ${par.number}: ${par.title.slice(0,25)}</div>`:''}${nc?`<div style="font-size:10px;color:var(--mu)">&#128172; ${nc}</div>`:''}</td>
             <td>${deptBdg(tk.department)}</td><td>${prioBdg(tk.priority)}</td><td>${stBdg(tk.status)}</td>
             <td>${tagChips(tk.tags)}</td>
@@ -2083,7 +2095,13 @@ function renderTickets(){
       })():`<tr><td colspan="8"><div class="empty">&#128235; Keine Tickets</div></td></tr>`}
       </tbody></table></div></div>`;
 }
-function openTkDetail(id){S.currentTicketId=id;renderTkDetail();openModal('tkDetOv');}
+function openTkDetail(id){
+  S.currentTicketId=id;
+  renderTkDetail();
+  openModal('tkDetOv');
+  // Im Hintergrund als gesehen markieren
+  api('PUT','/tickets/'+id+'/view').catch(()=>{});
+}
 function highlightMentions(text){return text.replace(/@(\S+)/g,(match,name)=>{const u=S.users.find(u=>u.name.toLowerCase()===name.toLowerCase());return u?`<span class="mention">@${u.name}</span>`:match;});}
 function renderTkDetail(){
   const tk=getTk(S.currentTicketId);if(!tk)return;
