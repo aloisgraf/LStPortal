@@ -114,7 +114,11 @@ router.post('/messages', auth, async (req,res) => {
 });
 router.post('/messages/:id/read', auth, async (req,res) => {
   try {
-    await pool.query('INSERT INTO message_reads (id,message_id,user_id) VALUES ($1,$2,$3) ON CONFLICT (message_id,user_id) DO NOTHING',
+    await pool.query(
+      `INSERT INTO message_reads (id,message_id,user_id,read_at)
+       VALUES ($1,$2,$3,NOW())
+       ON CONFLICT (message_id,user_id)
+       DO UPDATE SET read_at = COALESCE(message_reads.read_at, NOW())`,
       [newId(),req.params.id,req.uid]);
     ok(res);
   } catch(e) { bad(res,e.message,500); }
