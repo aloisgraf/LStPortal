@@ -11,7 +11,8 @@ const SECRET = process.env.SESSION_SECRET || 'bitte-aendern-' + crypto.randomByt
 if (!process.env.DATABASE_URL) { console.error('❌ DATABASE_URL fehlt!'); process.exit(1); }
 if (SECRET.startsWith('bitte-aendern-')) console.warn('⚠️  SESSION_SECRET nicht gesetzt!');
 
-const { pool } = require('./db');
+const { pool, q, q1, newId } = require('./db');
+const bcrypt = require('bcryptjs');
 
 async function initDB() {
   await pool.query(`
