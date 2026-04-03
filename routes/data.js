@@ -98,10 +98,20 @@ router.get('/', auth, async (req,res) => {
       })),
       allowances: allwRaw.map(a=>({id:a.id,userId:a.user_id,year:a.year,month:a.month,nd:a.nd,fd:a.fd,fw:a.fw,c10:a.c10})),
       checklists: clTmpls.map(t=>({id:t.id,name:t.name,department:t.department,createdBy:t.created_by,items:clItemMap[t.id]||[]})),
-      messages: msgsRaw.filter(m=>canSeeMsg(m,uid,roles)).map(m=>({
-        id:m.id,title:m.title,body:m.body,senderId:m.sender_id,
-        targetType:m.target_type,targetValue:m.target_value,
-        createdAt:m.created_at, isRead:readIds.has(m.id),
+      messages: msgsRaw.filter(m=>{
+        // from_user_id=sender, to_department=null means all
+        if(!m.from_user_id)return false;
+        if(m.from_user_id===uid)return true; // eigene gesendeten
+        if(!m.to_department)return true;     // an alle
+        return roles.includes(m.to_department); // an Fachbereich
+      }).map(m=>({
+        id:m.id, title:m.title, body:m.body,
+        senderId:m.from_user_id,
+        targetType:m.to_department?'department':'all',
+        targetValue:m.to_department||null,
+        createdAt:m.created_at,
+        isRead:readSet.has(m.id),
+        pinned:pinnedSet.get(m.id)||false,
       })),
       notifications: notifsRaw.map(n=>({
         id:n.id, type:n.type, title:n.title, ticketId:n.ticket_id,
