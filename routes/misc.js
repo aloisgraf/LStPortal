@@ -79,7 +79,7 @@ router.post('/messages', auth, async (req, res) => {
     const id = randomUUID();
     await pool.query('INSERT INTO messages (id,from_user_id,to_department,title,body) VALUES ($1,$2,$3,$4,$5)',
       [id, req.uid, toDepartment || null, title.trim(), body.trim()]);
-    await logActivity(req.uid, req.user.name, 'send_message', { message_id: id, title: title.trim(), toDepartment }, req.ip);
+    await logActivity(req.uid, req.user.name, 'send_message', { message_id: id, title: title.trim(), toDepartment }, req.clientIp);
     ok(res, { id });
   } catch (e) { bad(res, e.message, 500); }
 });
@@ -88,7 +88,7 @@ router.post('/messages/:id/ack', auth, async (req, res) => {
   try {
     await pool.query('INSERT INTO message_acks (id,message_id,user_id) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING',
       [randomUUID(), req.params.id, req.uid]);
-    await logActivity(req.uid, req.user.name, 'ack_message', { message_id: req.params.id }, req.ip);
+    await logActivity(req.uid, req.user.name, 'ack_message', { message_id: req.params.id }, req.clientIp);
     ok(res);
   } catch (e) { bad(res, e.message, 500); }
 });

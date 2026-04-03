@@ -26,7 +26,7 @@ router.post('/', auth, async (req, res) => {
        priority || 'medium', std ? 'open' : (status || 'open'), std ? '' : (bucket || ''),
        assigneeId || null, parentTicketId || null, req.uid, now]
     );
-    await logActivity(req.uid, req.user.name, 'create_ticket', { ticket_id: id, number, title: title.trim() }, req.ip);
+    await logActivity(req.uid, req.user.name, 'create_ticket', { ticket_id: id, number, title: title.trim() }, req.clientIp);
     ok(res, { id, number });
   } catch (e) { bad(res, e.message, 500); }
 });
@@ -61,7 +61,7 @@ router.put('/:id', auth, async (req, res) => {
 
     if (set.length > 1) { vals.push(req.params.id); await pool.query(`UPDATE tickets SET ${set.join(',')} WHERE id=$${vals.length}`, vals); }
     for (const c of changes) await addSystemNote(tk.id, c);
-    if (changes.length) await logActivity(req.uid, req.user.name, 'update_ticket', { ticket_id: tk.id, number: tk.number, changes }, req.ip);
+    if (changes.length) await logActivity(req.uid, req.user.name, 'update_ticket', { ticket_id: tk.id, number: tk.number, changes }, req.clientIp);
     ok(res);
   } catch (e) { bad(res, e.message, 500); }
 });
@@ -73,7 +73,7 @@ router.delete('/:id', auth, async (req, res) => {
     if (!canEditTk(req.tp, tk, req.uid)) return bad(res, 'Keine Berechtigung', 403);
     await pool.query('DELETE FROM ticket_notes WHERE ticket_id=$1', [req.params.id]);
     await pool.query('DELETE FROM tickets WHERE id=$1', [req.params.id]);
-    await logActivity(req.uid, req.user.name, 'delete_ticket', { ticket_id: req.params.id, number: tk.number }, req.ip);
+    await logActivity(req.uid, req.user.name, 'delete_ticket', { ticket_id: req.params.id, number: tk.number }, req.clientIp);
     ok(res);
   } catch (e) { bad(res, e.message, 500); }
 });
