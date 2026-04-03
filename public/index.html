@@ -511,6 +511,27 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
   </div>
 </div>
 
+<!-- MODAL: Nachricht lesen -->
+<div class="ov" id="msgDetOv">
+  <div class="modal">
+    <div class="mh">
+      <h2 id="msgDetTitle">Nachricht</h2>
+      <div style="display:flex;gap:6px">
+        <button id="msgDetPinBtn" class="btn-s" onclick="toggleMsgPin()" style="font-size:12px">&#128204; Anpinnen</button>
+        <button class="mc" onclick="closeModal('msgDetOv')">&#10005;</button>
+      </div>
+    </div>
+    <div class="mb2">
+      <div id="msgDetMeta" style="font-size:12px;color:var(--mu);margin-bottom:8px"></div>
+      <div id="msgDetBody" style="font-size:14px;line-height:1.6;white-space:pre-wrap"></div>
+    </div>
+    <div class="mf">
+      <button class="btn-s" onclick="closeModal('msgDetOv')">Schließen</button>
+      <button class="btn-p" id="msgDetConfirmBtn" onclick="confirmAndClose()" style="display:none">&#10003; Bestätigen &amp; Schließen</button>
+    </div>
+  </div>
+</div>
+
 <!-- ADMIN MODAL -->
 <div class="ov" id="admOv">
   <div class="modal wide">
@@ -1282,7 +1303,7 @@ function showHelpSection(id){
 </div>
 
 <script>
-const APP_VERSION='1.9.1';
+const APP_VERSION='1.9.2';
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
@@ -1720,7 +1741,7 @@ function renderCalendar(){
     '.cal-table th{padding:8px 4px;text-align:center;font-size:11px;font-weight:700;color:var(--mu);background:var(--sf2);border:1px solid var(--border)}'+
     '.cal-table th:nth-child(6),.cal-table th:nth-child(7){color:var(--acc)}'+
     '.cal-day{border:1px solid var(--border);vertical-align:top;padding:4px;min-height:110px;background:var(--sf);cursor:default}'+
-    '.cal-day:hover{background:var(--sf2)}.cal-empty{border:1px solid var(--border);background:var(--sf3);min-height:88px}'+
+    '.cal-day:hover{background:var(--sf2)}.cal-empty{border:1px solid var(--border);background:var(--sf3);min-height:110px}'+
     '.cal-we{background:rgba(59,109,212,.03)}.cal-today{background:rgba(59,109,212,.05)}'+
     '.cal-daynum{font-size:12px;font-weight:700;color:var(--mu);margin-bottom:3px}'+
     '.cal-daynum-today{background:var(--acc);color:var(--act);border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center}'+
@@ -1901,6 +1922,28 @@ async function undoRejectEinsp(id){
   catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
 }
 // DIENSTPLAENE
+
+function showPdf(url, title) {
+  // Remove existing pdf viewer if present
+  var old = document.getElementById('pdfViewerSection');
+  if (old) {
+    if (old.dataset.url === url) { old.remove(); return; } // toggle
+    old.remove();
+  }
+  var section = document.createElement('div');
+  section.id = 'pdfViewerSection';
+  section.dataset.url = url;
+  section.style.cssText = 'margin-top:14px;background:var(--sf);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;box-shadow:var(--sh)';
+  section.innerHTML =
+    '<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">' +
+    '<span style="font-size:13px;font-weight:700">&#128196; ' + (title||'Dienstplan') + '</span>' +
+    '<button class="btn-s" style="font-size:11px" onclick="document.getElementById('pdfViewerSection').remove()">&#10005; Schlie&szlig;en</button>' +
+    '</div>' +
+    '<iframe src="' + url + '" style="width:100%;height:70vh;border:none;display:block"></iframe>';
+  document.getElementById('main').appendChild(section);
+  section.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
 function renderDienstplaene(){
   const active=S.dienstplaene.filter(d=>!d.isArchived).sort((a,b)=>a.year!==b.year?b.year-a.year:b.month-a.month);
   const archived=S.dienstplaene.filter(d=>d.isArchived).sort((a,b)=>a.year!==b.year?b.year-a.year:b.month-a.month);
@@ -1916,7 +1959,7 @@ function renderDienstplaene(){
           <td style="font-size:11px;color:var(--mu)">${fdt(d.createdAt)}</td>
           <td style="font-size:12px">${getU(d.createdBy)?.name||'?'}</td>
           <td><div style="display:flex;gap:5px">
-            <a href="/api/dienstplaene/${d.id}/file" target="_blank" class="btn-ok" style="text-decoration:none;font-size:11px;padding:4px 8px">&#128065; \u00d6ffnen</a>
+            <button class="btn-ok" style="font-size:11px;padding:4px 8px" onclick="showPdf('/api/dienstplaene/${d.id}/file','${MONTHS[d.month-1]} ${d.year}')">&#128065; &#214;ffnen</button>
             ${canUp?`<button class="btn-d" onclick="deleteDp('${d.id}')" style="padding:4px 8px">\u2715</button>`:''}
           </div></td>
         </tr>`).join('')}
@@ -1930,7 +1973,7 @@ function renderDienstplaene(){
           <td>${d.label}</td><td><span class="bdg st-on_hold">v${d.version}</span></td>
           <td style="font-size:11px;color:var(--mu)">${fdt(d.archivedAt)}</td>
           <td><div style="display:flex;gap:5px">
-            <a href="/api/dienstplaene/${d.id}/file" target="_blank" class="btn-s" style="text-decoration:none;font-size:11px;padding:4px 8px">&#128065;</a>
+            <button class="btn-s" style="font-size:11px;padding:4px 8px" onclick="showPdf('/api/dienstplaene/${d.id}/file','${MONTHS[d.month-1]} ${d.year}')">&#128065;</button>
             ${canUp?`<button class="btn-d" onclick="deleteDp('${d.id}')" style="padding:4px 8px;font-size:10px">\u2715</button>`:''}
           </div></td>
         </tr>`).join('')}
@@ -2232,25 +2275,57 @@ function renderMessages(){
     ${!isSent&&unread.length?`<div style="padding:10px 14px;margin-bottom:12px;background:rgba(239,68,68,0.04));border:1px solid rgba(239,68,68,.20);border-radius:var(--r);font-size:12px;font-weight:600;color:var(--danger)">&#128276; ${unread.length} unbest\u00e4tigte Nachricht${unread.length>1?'en':''}</div>`:''}
     ${msgs.length?msgs.map(m=>{
       const from=getU(m.senderId);const toUser=m.targetType==='user'?getU(m.targetValue):null;
-      return`<div class="msg-card${!isSent&&!m.isRead?' unread':''}">
+      const isPinned=m.pinned||false;
+      return`<div class="msg-card${!isSent&&!m.isRead?' unread':''}" style="${isPinned?'border-left-color:var(--warn)':''};cursor:pointer" onclick="openMsg('${m.id}')">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap">
-          <div>
-            <div class="msg-title">${!isSent&&!m.isRead?'&#128276; ':''}${m.title}</div>
+          <div style="flex:1;min-width:0">
+            <div class="msg-title">${isPinned?'&#128204; ':''}${!isSent&&!m.isRead?'&#128276; ':''}${m.title}</div>
             <div class="msg-meta">${isSent?`An: <strong>${toUser?toUser.name:'Alle Mitarbeiter'}</strong> &middot; `:`Von: <strong>${from?.name||'?'}</strong> &middot; `}${fdt(m.createdAt)}</div>
+            <div class="msg-body" style="margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.body.slice(0,120)}${m.body.length>120?'&#8230;':''}</div>
           </div>
-          <div style="display:flex;gap:5px;flex-shrink:0;align-items:center">
-            ${!isSent&&!m.isRead?`<button class="btn-p" onclick="readMsg('${m.id}')">\u2713 Best\u00e4tigen</button>`:''}
-            ${!isSent&&m.isRead?`<span class="bdg ap-bdg-approved" style="font-size:10px">\u2713 Best\u00e4tigt</span>`:''}
-            ${isSent?`<span class="bdg ${m.isRead?'ap-bdg-approved':'ap-bdg-pending'}" style="font-size:10px">${m.isRead?'\u2713 Gelesen':'\u23f3 Ausstehend'}</span>`:''}
-            ${m.senderId===S.currentUser||S.p.manageUsers?`<button class="btn-d" onclick="deleteMsg('${m.id}')" style="padding:4px 8px;font-size:11px">\u2715</button>`:''}
+          <div style="display:flex;gap:5px;flex-shrink:0;align-items:flex-start" onclick="event.stopPropagation()">
+            ${!isSent&&!m.isRead?`<span class="bdg ap-bdg-pending" style="font-size:10px">&#128276; Neu</span>`:''}            ${!isSent&&m.isRead?`<span class="bdg ap-bdg-approved" style="font-size:10px">&#10003; Best&auml;tigt</span>`:''}
+            ${isSent?`<span class="bdg ${m.isRead?'ap-bdg-approved':'ap-bdg-pending'}" style="font-size:10px">${m.isRead?'&#10003; Gelesen':'&#8987; Ausstehend'}</span>`:''}
+            <button class="btn-s" style="font-size:10px;padding:3px 7px" onclick="toggleMsgPinDirect('${m.id}',${isPinned})" title="${isPinned?'Lospinnen':'Anpinnen'}">${isPinned?'&#128204;':'&#128203;'}</button>
+            ${m.senderId===S.currentUser||S.p.manageUsers?`<button class="btn-d" onclick="deleteMsg('${m.id}')" style="padding:4px 8px;font-size:11px">&#10005;</button>`:''}
           </div>
         </div>
-        <div class="msg-body" style="margin-top:8px">${m.body}</div>
       </div>`;
-    }).join(''):`<div class="empty" style="padding:30px">&#128235; ${isSent?'Keine gesendeten Nachrichten':'Keine Nachrichten'}</div>`}`;
+    }).join(''):`<div class="empty" style="padding:30px">&#128235; ${isSent?'Keine gesendeten Nachrichten':'Keine Nachrichten'}</div>`}  `;
+}
+var _currentMsgId=null;
+function openMsg(id){
+  const m=S.messages.find(x=>x.id===id);if(!m)return;
+  _currentMsgId=id;
+  const from=getU(m.senderId);const toUser=m.targetType==='user'?getU(m.targetValue):null;
+  document.getElementById('msgDetTitle').textContent=m.title;
+  document.getElementById('msgDetMeta').innerHTML=`Von: <strong>${from?.name||'?'}</strong> &middot; ${fdt(m.createdAt)} &middot; An: <strong>${m.targetType==='all'?'Alle Mitarbeiter':toUser?.name||m.targetValue}</strong>`;
+  document.getElementById('msgDetBody').textContent=m.body;
+  const pinBtn=document.getElementById('msgDetPinBtn');
+  pinBtn.textContent=m.pinned?'&#128204; Lospinnen':'&#128204; Anpinnen';
+  pinBtn.innerHTML=m.pinned?'&#128204; Lospinnen':'&#128203; Anpinnen';
+  const confirmBtn=document.getElementById('msgDetConfirmBtn');
+  confirmBtn.style.display=(!m.isRead&&m.senderId!==S.currentUser)?'block':'none';
+  openModal('msgDetOv');
+}
+async function confirmAndClose(){
+  if(!_currentMsgId)return;
+  try{await api('POST','/messages/'+_currentMsgId+'/read');await fetchData();closeModal('msgDetOv');renderMain();}catch(e){toast('&#9888;&#65039; '+e.message,'err');}
+}
+async function toggleMsgPin(){
+  if(!_currentMsgId)return;
+  const m=S.messages.find(x=>x.id===_currentMsgId);
+  const newPin=!m?.pinned;
+  try{await api('PUT','/messages/'+_currentMsgId+'/pin',{pinned:newPin});await fetchData();
+    const pinBtn=document.getElementById('msgDetPinBtn');
+    if(pinBtn)pinBtn.innerHTML=newPin?'&#128204; Lospinnen':'&#128203; Anpinnen';
+    renderMain();toast(newPin?'&#128204; Angepinnt!':'Lospinnen OK');}catch(e){toast('&#9888;&#65039; '+e.message,'err');}
+}
+async function toggleMsgPinDirect(id,isPinned){
+  try{await api('PUT','/messages/'+id+'/pin',{pinned:!isPinned});await fetchData();renderMain();}catch(e){toast('&#9888;&#65039; '+e.message,'err');}
 }
 async function readMsg(id){
-  try{await api('POST','/messages/'+id+'/read');await fetchData();renderMain();toast('\u2705 Best\u00e4tigt!');}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
+  try{await api('POST','/messages/'+id+'/read');await fetchData();renderMain();toast('&#10003; Best&auml;tigt!');}catch(e){toast('&#9888;&#65039; '+e.message,'err');}
 }
 async function deleteMsg(id){
   if(!confirm('Nachricht l\u00f6schen?'))return;
@@ -2356,7 +2431,7 @@ function openModal(id){document.getElementById(id)?.classList.add('open');}
 function closeModal(id){document.getElementById(id)?.classList.remove('open');}
 function eyeToggle(inputId,btn){const inp=document.getElementById(inputId);const show=inp.type==='password';inp.type=show?'text':'password';btn.textContent=show?'\uD83D\uDE48':'\uD83D\uDC41';}
 function toast(msg,type=''){const t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3200);}
-const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOr','clFormOv','attachClOv','changelogOv','dpOv','rejectEinspOv','helpOv','msgFormOv'];
+const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOr','clFormOv','attachClOv','changelogOv','dpOv','rejectEinspOv','helpOv','msgFormOv','msgDetOv'];
 document.addEventListener('keydown',e=>{if(e.key==='Escape')ALL_MODALS.forEach(closeModal);});
 ALL_MODALS.forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('click',e=>{if(e.target===el)closeModal(id);});});
 document.addEventListener('click',e=>{if(!e.target.closest('.note-input-wrap'))document.getElementById('mentionSug')?.classList.remove('open');});
