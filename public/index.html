@@ -221,6 +221,7 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
 #helpContent em { color:var(--mu);font-style:italic; }
 #helpContent svg text { font-family: 'Inter', system-ui, sans-serif; }
 
+.tk-child-row{background:rgba(59,109,212,.02)}.tk-child-row td:first-child{border-left:3px solid rgba(59,109,212,.25)}
 </style>
 </head>
 <body>
@@ -1554,8 +1555,6 @@ async function readAllNotifs(){try{await api('POST','/notifications/read-all');a
 // SCHEDULE
 function getVisEvts(){
   let evs=[...S.events];
-  // Abgelehnte Einträge nie anzeigen (außer in Eintragsübersicht mit Status-Filter)
-  evs=evs.filter(ev=>ev.isGeneral||ev.approvalStatus!=='rejected');
   if(S.filterUser)evs=evs.filter(ev=>!ev.isGeneral&&ev.userId===S.filterUser);
   if(S.month!==null)evs=evs.filter(ev=>{const d=new Date(ev.dateFrom);return d.getFullYear()===S.year&&d.getMonth()===S.month;});
   else evs=evs.filter(ev=>new Date(ev.dateFrom).getFullYear()===S.year);
@@ -1672,6 +1671,8 @@ function renderCalendar(){
   // Group events by day
   var evByDate={};
   var visEvs=S.events.filter(function(ev){
+    // Abgelehnte Einträge im Kalender nicht anzeigen
+    if(!ev.isGeneral && ev.approvalStatus==='rejected') return false;
     var d=new Date(ev.dateFrom);
     return d.getFullYear()===yr && d.getMonth()===mo || (ev.dateTo && new Date(ev.dateTo)>=firstDay && d<=lastDay);
   });
@@ -1991,17 +1992,28 @@ function renderTickets(){
     </div>
     <div class="tw"><div class="tt"><h2>Tickets</h2></div>
       <div style="overflow-x:auto"><table><thead><tr><th>#</th><th>Titel</th><th>Bereich</th><th>Prio</th><th>Status</th><th>Tags</th><th>Zust\u00e4ndig</th><th>Datum</th></tr></thead>
-      <tbody>${tks.length?tks.map(tk=>{
-        const asn=getU(tk.assigneeId);const par=tk.parentTicketId?getTk(tk.parentTicketId):null;
-        const nc=tk.notes.filter(n=>n.noteType==='note').length;
-        return`<tr class="clickable" onclick="openTkDetail('${tk.id}')">
-          <td style="font-family:monospace;font-size:11px;color:var(--mu);white-space:nowrap">${tk.number}${par?`<div style="font-size:9px;color:var(--di)">\u21b8${par.number}</div>`:''}</td>
-          <td style="max-width:220px"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${tk.title}</div>${nc?`<div style="font-size:10px;color:var(--mu)">&#128172; ${nc}</div>`:''}</td>
-          <td>${deptBdg(tk.department)}</td><td>${prioBdg(tk.priority)}</td><td>${stBdg(tk.status)}</td>
-          <td>${tagChips(tk.tags)}</td>
-          <td>${asn?`<div style="display:flex;align-items:center;gap:4px">${avHtml(asn.initials,asn.color,18,8)}<span style="font-size:11px">${asn.name}</span></div>`:'<span style="color:var(--di);font-size:11px">\u2014</span>'}</td>
-          <td style="font-size:11px;color:var(--mu);white-space:nowrap">${fd(tk.createdAt)}</td>
-        </tr>`;}).join(''):`<tr><td colspan="8"><div class="empty">&#128235; Keine Tickets</div></td></tr>`}
+      <tbody>${tks.length?(()=>{
+        // Sort: parent tickets first, then children directly below their parent
+        const parents=tks.filter(t=>!t.parentTicketId);
+        const children=tks.filter(t=>t.parentTicketId);
+        const sorted=[];
+        parents.forEach(p=>{sorted.push(p);children.filter(c=>c.parentTicketId===p.id).forEach(c=>sorted.push(c));});
+        // Also add orphan children (parent not in current view)
+        children.filter(c=>!parents.find(p=>p.id===c.parentTicketId)).forEach(c=>sorted.push(c));
+        return sorted.map(tk=>{
+          const asn=getU(tk.assigneeId);const par=tk.parentTicketId?getTk(tk.parentTicketId):null;
+          const nc=tk.notes.filter(n=>n.noteType==='note').length;
+          const isChild=!!tk.parentTicketId;
+          return`<tr class="clickable${isChild?' tk-child-row':''}" onclick="openTkDetail('${tk.id}')">
+            <td style="font-family:monospace;font-size:11px;color:var(--mu);white-space:nowrap${isChild?';padding-left:28px':''}">${isChild?'<span style="color:var(--di);margin-right:3px">↳</span>':''}${tk.number}</td>
+            <td style="max-width:220px"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${tk.title}</div>${isChild&&par?`<div style="font-size:10px;color:var(--di)">↑ ${par.number}</div>`:''}${nc?`<div style="font-size:10px;color:var(--mu)">&#128172; ${nc}</div>`:''}</td>
+            <td>${deptBdg(tk.department)}</td><td>${prioBdg(tk.priority)}</td><td>${stBdg(tk.status)}</td>
+            <td>${tagChips(tk.tags)}</td>
+            <td>${asn?`<div style="display:flex;align-items:center;gap:4px">${avHtml(asn.initials,asn.color,18,8)}<span style="font-size:11px">${asn.name}</span></div>`:'<span style="color:var(--di);font-size:11px">\u2014</span>'}</td>
+            <td style="font-size:11px;color:var(--mu);white-space:nowrap">${fd(tk.createdAt)}</td>
+          </tr>`;
+        }).join('');
+      })():`<tr><td colspan="8"><div class="empty">&#128235; Keine Tickets</div></td></tr>`}
       </tbody></table></div></div>`;
 }
 function openTkDetail(id){S.currentTicketId=id;renderTkDetail();openModal('tkDetOv');}
