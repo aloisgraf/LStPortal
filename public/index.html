@@ -239,6 +239,12 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
 .cal-ev{font-size:10px;font-weight:500;padding:2px 5px;border-radius:3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cal-ev-anon{background:rgba(245,158,11,.1);border-left:2px solid #f59e0b;color:#f59e0b}
 .cal-ev-more{font-size:10px;color:var(--mu);padding:1px 4px;font-style:italic}
+
+/* Diensttausch */
+.dt-row{padding:14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}
+.dt-row:hover{background:var(--sf2)}
+.dt-row-new{border-left:3px solid var(--warn);background:rgba(245,158,11,.04)}
+.dt-row-new:hover{background:rgba(245,158,11,.08)}
 </style>
 </head>
 <body>
@@ -315,6 +321,7 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
         <div class="ni" id="ni-schedule" onclick="setView('schedule')">&#128197; Eintrags&#252;bersicht</div>
         <div class="ni" id="ni-calendar" onclick="setView('calendar')">&#128197; Kalenderansicht</div>
         <div class="ni" id="ni-allw" onclick="setView('allw')">&#128202; Zulagendienste</div>
+        <div class="ni" id="ni-diensttausch" onclick="setView('diensttausch')">&#128257; Diensttausch<span class="bdgn" id="dtBdg" style="display:none">0</span></div>
         <div class="ni" id="ni-abrechnung" onclick="setView('abrechnung')">&#129534; Abrechnung</div>
         <div class="ni" id="ni-dienstplaene" onclick="setView('dienstplaene')">&#128196; Dienstpl&#228;ne</div>
       </div>
@@ -1287,12 +1294,13 @@ function showHelpSection(id){
     <div class="mh"><h2>&#128203; Changelog</h2><button class="mc" onclick="closeModal('changelogOv')">&#10005;</button></div>
     <div class="mb2" style="gap:10px">
       <div style="padding:12px;background:rgba(59,109,212,0.06));border:1px solid rgba(59,109,212,.20);border-radius:8px">
-        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v1.9.8</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v1.9.9</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
         <ul style="font-size:12px;line-height:1.8;padding-left:18px">
-          <li>Standard-User: Eigene Tickets &amp; Erw&auml;hnungen (@Name) in der &Uuml;bersicht</li>
-          <li>Fix: Nachrichten, Abrechnung, Zulagendienste, Dienstpl&auml;ne wieder korrekt</li>
-          <li>Fix: Ticket &ouml;ffnen entfernt Hervorhebung sofort (auch auf Home)</li>
-          <li>Fix: Nach Seiten-Reload bleiben gesehene Tickets korrekt markiert</li>
+          <li>Neues Modul: Diensttausch unter Dienstplan</li>
+          <li>Dienstplanung kann Tausche annehmen oder ablehnen</li>
+          <li>@Markierungen in Diensttausch-Eintr&auml;gen</li>
+          <li>&Uuml;bersicht zeigt ausstehende Tausche mit NEU-Badge</li>
+          <li>Farbhervorhebung + Gesehen-Markierung wie beim Ticketsystem</li>
         </ul>
       </div>
       <div style="padding:12px;background:var(--sf2);border:1px solid var(--border);border-radius:8px">
@@ -1326,7 +1334,7 @@ function showHelpSection(id){
 </div>
 
 <script>
-const APP_VERSION='1.9.8';
+const APP_VERSION='1.9.9';
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
@@ -1381,7 +1389,7 @@ async function fetchData(){
     S.events=data.events||[];S.tickets=data.tickets||[];S.allowances=data.allowances||[];
     S.checklists=data.checklists||[];S.messages=data.messages||[];
     S.notifications=data.notifications||[];S.abrechnung=data.abrechnung||{einspringer:[],homeoffice:[]};
-    S.dienstplaene=data.dienstplaene||[];
+    S.dienstplaene=data.dienstplaene||[];S.diensttausch=data.diensttausch||[];
     S.currentUser=data.currentUser;S.p=data.permissions||{};
     const u=getU(S.currentUser);const roles=u?.roles||['standard'];
     const has=(...r)=>r.some(x=>roles.includes(x));
@@ -1414,6 +1422,8 @@ function updateBadges(){
   const md=document.getElementById('msgDot');if(md)md.style.display=unreadMsg?'block':'none';
   const nd=document.getElementById('notifDot');if(nd)nd.style.display=unreadNotif?'block':'none';
   const nb=document.getElementById('navMsgBdg');if(nb){nb.style.display=unreadMsg?'flex':'none';nb.textContent=unreadMsg;}
+  const pendingDt=(S.diensttausch||[]).filter(dt=>dt.isRelevant&&!dt.isSeen).length;
+  const dtBdg=document.getElementById('dtBdg');if(dtBdg){dtBdg.style.display=pendingDt?'flex':'none';dtBdg.textContent=pendingDt;}
 }
 // AUTH
 let _loginUsers=[];
@@ -1487,7 +1497,7 @@ function toggleSidebar(){const sb=document.getElementById('sidebar'),ov=document
 function toggleNS(id){document.getElementById(id+'Hdr').classList.toggle('open');document.getElementById(id+'Sub').classList.toggle('open');}
 function setView(v){
   S.view=v;
-  ['home','schedule','calendar','allw','abrechnung','dienstplaene','tickets','tickets_closed','checklists','messages','messages_sent'].forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
+  ['home','schedule','calendar','allw','diensttausch','abrechnung','dienstplaene','tickets','tickets_closed','checklists','messages','messages_sent'].forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
   document.getElementById('sidebar').classList.remove('open');document.getElementById('sbOv').classList.remove('open');
   renderSBF();renderMain();
 }
@@ -1533,6 +1543,7 @@ function renderMain(){
   else if(S.view==='schedule')renderSchedule();
   else if(S.view==='calendar')renderCalendar();
   else if(S.view==='allw')renderAllw();
+  else if(S.view==='diensttausch')renderDiensttausch();
   else if(S.view==='abrechnung')renderAbrechnung();
   else if(S.view==='dienstplaene')renderDienstplaene();
   else if(S.view==='tickets'||S.view==='tickets_closed')renderTickets();
@@ -1598,7 +1609,23 @@ function renderHome(){
         ${online.map(x=>`<div class="online-user">${avHtml(x.initials,x.color,22,9,true)}<span>${x.name}</span></div>`).join('')}
         ${!online.length?'<span style="font-size:12px;color:var(--mu)">Keine anderen online</span>':''}
       </div></div>
-      <div class="dash-card"><h3>&#127931; Relevante Tickets (${relevantTks.length})${relevantTks.some(tkIsNew)?`<span class="tk-new-badge" style="margin-left:8px;font-size:10px">&#128276; NEU</span>`:''}</h3>
+      ${(()=>{const pendingDt=(S.diensttausch||[]).filter(dt=>dt.isRelevant&&!dt.isSeen);return pendingDt.length?`
+      <div class="dash-card" style="border-top:2px solid var(--warn)">
+        <h3 style="display:flex;align-items:center;gap:8px">&#128257; Diensttausch <span class="tk-new-badge">${pendingDt.length} NEU</span></h3>
+        ${pendingDt.slice(0,5).map(dt=>{
+          const creator=getU(dt.createdBy);
+          const stBadge=dt.status==='pending'?'<span class="bdg ap-bdg-pending" style="font-size:10px">Ausstehend</span>':dt.status==='approved'?'<span class="bdg ap-bdg-approved" style="font-size:10px">&#10003;</span>':'<span class="bdg ap-bdg-rejected" style="font-size:10px">&#10007;</span>';
+          return`<div style="padding:6px 0;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:8px;cursor:pointer" onclick="markDtSeen('${dt.id}');setView('diensttausch')">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:11px;font-weight:600">${creator?.name||'?'} <span style="color:var(--mu);font-weight:400">&middot; ${fdt(dt.createdAt)}</span></div>
+              <div style="font-size:11px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${dt.text.slice(0,80)}${dt.text.length>80?'…':''}</div>
+            </div>
+            ${stBadge}
+          </div>`;
+        }).join('')}
+        <button class="btn-s" style="width:100%;margin-top:8px;font-size:11px" onclick="setView('diensttausch')">Alle anzeigen &#8594;</button>
+      </div>`:'';})()}
+            <div class="dash-card"><h3>&#127931; Relevante Tickets (${relevantTks.length})${relevantTks.some(tkIsNew)?`<span class="tk-new-badge" style="margin-left:8px;font-size:10px">&#128276; NEU</span>`:''}</h3>
         ${relevantTks.length?relevantTks.map(tk=>{
           const n=tkIsNew(tk);
           return`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);gap:8px;${n?'background:rgba(245,158,11,.04);margin:0 -8px;padding:6px 8px;border-left:3px solid var(--warn);':''}">
@@ -1798,6 +1825,112 @@ function renderCalendar(){
   WDAYS.forEach(function(d){html+='<th>'+d+'</th>';});
   html+='</tr></thead><tbody>'+cells+'</tbody></table></div>';
   document.getElementById('main').innerHTML=html;
+}
+
+
+// ══════════════════════════════════════════
+// SECTION: Diensttausch
+// ══════════════════════════════════════════
+function renderDiensttausch() {
+  const canDecide = S.p.canApproveEvents;
+  const list = S.diensttausch;
+  const myList = list.filter(dt => dt.createdBy === S.currentUser ||
+    (S.p.canApproveEvents) ||
+    highlightMentions(dt.text).includes(getU(S.currentUser)?.name||'NEIN'));
+  // Ungesehen hervorheben
+  function dtRow(dt) {
+    const isNew = !dt.isSeen && dt.isRelevant;
+    const creator = getU(dt.createdBy);
+    const decider = dt.decidedBy ? getU(dt.decidedBy) : null;
+    const stBadge = dt.status==='pending'
+      ? '<span class="bdg ap-bdg-pending">&#8987; Ausstehend</span>'
+      : dt.status==='approved'
+      ? '<span class="bdg ap-bdg-approved">&#10003; Angenommen</span>'
+      : '<span class="bdg ap-bdg-rejected">&#10007; Abgelehnt</span>';
+    return `<div class="dt-row${isNew?' dt-row-new':''}" onclick="markDtSeen('${dt.id}')">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:11px;color:var(--mu);margin-bottom:4px">
+            <strong>${creator?.name||'?'}</strong> &middot; ${fdt(dt.createdAt)}
+            ${isNew?'<span class="tk-new-badge" style="margin-left:6px">NEU</span>':''}
+          </div>
+          <div style="font-size:13px;line-height:1.5;white-space:pre-wrap">${highlightMentions(dt.text||'')}</div>
+          ${dt.rejectReason?`<div style="margin-top:6px;font-size:11px;color:var(--danger);background:rgba(239,68,68,.08);padding:4px 8px;border-radius:4px">&#128680; Grund: ${dt.rejectReason}</div>`:''}
+          ${dt.decidedAt?`<div style="font-size:10px;color:var(--mu);margin-top:4px">Entschieden von ${decider?.name||'?'} am ${fdt(dt.decidedAt)}</div>`:''}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end;flex-shrink:0">
+          ${stBadge}
+          ${canDecide&&dt.status==='pending'?`
+            <div style="display:flex;gap:4px;margin-top:4px">
+              <button class="btn-ok" style="font-size:11px" onclick="event.stopPropagation();decideDt('${dt.id}','approved')">&#10003; Annehmen</button>
+              <button class="btn-d" style="font-size:11px" onclick="event.stopPropagation();openDtReject('${dt.id}')">&#10007; Ablehnen</button>
+            </div>`:''}
+          ${dt.createdBy===S.currentUser&&dt.status==='pending'?`
+            <button class="btn-d" style="font-size:10px;padding:2px 6px;margin-top:4px" onclick="event.stopPropagation();deleteDt('${dt.id}')">&#128465; L&ouml;schen</button>`:''}
+        </div>
+      </div>
+    </div>`;
+  }
+  document.getElementById('main').innerHTML = `
+    <div class="ph"><div class="pt">&#128257; Diensttausch</div></div>
+    <div class="tw" style="margin-bottom:14px">
+      <div class="tt"><h2>Neuer Diensttausch</h2></div>
+      <div style="padding:14px">
+        <div style="margin-bottom:8px;font-size:12px;color:var(--mu)">Beschreibe den gewünschten Tausch. Mit @Name kannst du Kollegen markieren.</div>
+        <textarea id="dtText" rows="4" style="width:100%;box-sizing:border-box;resize:vertical;font-size:13px;border:1px solid var(--border);border-radius:var(--r);padding:8px;background:var(--sf);color:var(--tx)" placeholder="z.B. Suche jemanden der am 15.4. für mich Dienst übernimmt. @Max Mustermann wärst du dabei?"></textarea>
+        <button class="btn-p" style="margin-top:8px" onclick="createDt()">&#128257; Eintragen</button>
+      </div>
+    </div>
+    ${list.length?`<div class="tw">
+      <div class="tt"><h2>Alle Einträge (${list.length})</h2></div>
+      ${list.map(dtRow).join('')}
+    </div>`:'<div class="empty">Noch keine Diensttausch-Einträge</div>'}`;
+}
+
+async function createDt() {
+  const text = document.getElementById('dtText')?.value?.trim();
+  if (!text) { toast('&#9888;&#65039; Bitte Text eingeben!'); return; }
+  try {
+    await api('POST','/diensttausch',{text});
+    await fetchData(); renderDiensttausch();
+    toast('&#10003; Diensttausch eingetragen!');
+  } catch(e) { toast('&#9888;&#65039; '+e.message,'err'); }
+}
+
+async function decideDt(id, decision, reason) {
+  try {
+    await api('PUT','/diensttausch/'+id+'/decide',{decision,rejectReason:reason||null});
+    // Mark as seen for decider
+    await api('PUT','/diensttausch/'+id+'/view').catch(()=>{});
+    const dt = S.diensttausch.find(d=>d.id===id);
+    if(dt){ dt.status=decision; dt.isSeen=true; }
+    await fetchData(); renderDiensttausch(); updateBadges();
+    toast(decision==='approved'?'&#10003; Angenommen!':'&#10007; Abgelehnt.');
+  } catch(e) { toast('&#9888;&#65039; '+e.message,'err'); }
+}
+
+function openDtReject(id) {
+  const reason = prompt('Ablehnungsgrund eingeben:');
+  if (reason === null) return; // cancelled
+  decideDt(id, 'rejected', reason.trim());
+}
+
+async function markDtSeen(id) {
+  const dt = S.diensttausch.find(d=>d.id===id);
+  if (!dt || dt.isSeen) return;
+  dt.isSeen = true;
+  await api('PUT','/diensttausch/'+id+'/view').catch(()=>{});
+  updateBadges();
+  if(S.view==='diensttausch') renderDiensttausch();
+  if(S.view==='home') renderHome();
+}
+
+async function deleteDt(id) {
+  if (!confirm('Diensttausch-Eintrag löschen?')) return;
+  try {
+    await api('DELETE','/diensttausch/'+id);
+    await fetchData(); renderDiensttausch(); toast('&#128465; Gelöscht.');
+  } catch(e) { toast('&#9888;&#65039; '+e.message,'err'); }
 }
 
 
@@ -2556,7 +2689,7 @@ function startAutoRefresh(){
       S.users=data.users||[];S.events=data.events||[];S.tickets=data.tickets||[];
       S.messages=data.messages||[];S.notifications=data.notifications||[];
       S.allowances=data.allowances||[];S.checklists=data.checklists||[];
-      S.abrechnung=data.abrechnung||{einspringer:[],homeoffice:[]};S.dienstplaene=data.dienstplaene||[];
+      S.abrechnung=data.abrechnung||{einspringer:[],homeoffice:[]};S.dienstplaene=data.dienstplaene||[];S.diensttausch=data.diensttausch||[];S.diensttausch=data.diensttausch||[];
       updateBadges();
       if(_lastMsgCount>=0&&newMsgCount>_lastMsgCount)toast('\uD83D\uDCEC Neue Nachricht eingegangen!');
       if(_lastTkCount>=0&&newTkCount>_lastTkCount)toast('\uD83C\uDFAB Neues Ticket in deinem Bereich!');
