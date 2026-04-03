@@ -275,7 +275,9 @@ app.get('/api/data', auth, async (req,res) => {
       q('SELECT id,name,initials,roles,color,must_change_pw,last_seen FROM users ORDER BY name'),
       q('SELECT * FROM categories ORDER BY sort_order,label'),
       q('SELECT * FROM tags ORDER BY label'),
-      q('SELECT * FROM events ORDER BY date_from'),
+      p.canApproveEvents
+        ? q('SELECT * FROM events ORDER BY date_from')
+        : q('SELECT * FROM events WHERE is_general=true OR user_id=$1 OR created_by=$1 ORDER BY date_from',[uid]),
       q('SELECT event_id FROM event_confirms WHERE user_id=$1',[uid]),
       q('SELECT * FROM tickets ORDER BY created_at DESC'),
       q('SELECT * FROM ticket_notes ORDER BY created_at'),
@@ -325,7 +327,8 @@ app.get('/api/data', auth, async (req,res) => {
       events: evRaw.map(ev=>{
         const concernsMe = !ev.is_general && ev.user_id === uid;
         const createdByMe = ev.created_by === uid;
-        const anonymize = !ev.is_general && ev.user_id !== uid && !createdByMe;
+        // Dienstplanung/Admin sehen alles klar; alle anderen nur eigene
+        const anonymize = !p.canApproveEvents && !ev.is_general && ev.user_id !== uid && !createdByMe;
         const confirmed = ev.is_general || createdByMe || confirmedEventIds.has(ev.id);
         return {
           id:ev.id, isGeneral:ev.is_general, dateFrom:ev.date_from, dateTo:ev.date_to,
