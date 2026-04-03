@@ -581,17 +581,31 @@ async function loadLoginUsers(){
 async function doLogin(){
   const sel=document.getElementById('luSel').value;
   if(!sel){toast('⚠️ Bitte Benutzer wählen!');return;}
+  const lerr=document.getElementById('lerr');
+  lerr.style.display='none';
   try{
     loading(true);
-    const res=await api('POST','/auth/login',{userId:sel,password:document.getElementById('lpw').value});
+    // Schritt 1: Login
+    let res;
+    try{
+      res=await api('POST','/auth/login',{userId:sel,password:document.getElementById('lpw').value});
+    }catch(e){
+      lerr.textContent='Falsches Passwort.';
+      lerr.style.display='block';
+      document.getElementById('lpw').value='';
+      return;
+    }
+    // Schritt 2: Daten laden
     S.currentUser=res.userId;
     if(res.mustChangePW){
       document.getElementById('LS').classList.remove('open');
       document.getElementById('np1').value='';document.getElementById('np2').value='';
       document.getElementById('CPWS').classList.add('open');
-    }else{await fetchData();loginOK();}
-  }catch(e){document.getElementById('lerr').style.display='block';document.getElementById('lpw').value='';}
-  finally{loading(false);}
+    }else{
+      try{await fetchData();}catch(e){toast('⚠️ Daten konnten nicht geladen werden: '+e.message,'err');}
+      loginOK();
+    }
+  }finally{loading(false);}
 }
 async function doForcePW(){
   const p1=document.getElementById('np1').value,p2=document.getElementById('np2').value;
