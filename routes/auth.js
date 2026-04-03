@@ -17,7 +17,9 @@ router.post('/login', async (req, res) => {
     const { userId, password } = req.body;
     if (!userId || !password) return bad(res, 'Benutzername und Passwort erforderlich');
     const user = await getUser(userId);
-    if (!user || !(await bcrypt.compare(password, user.pw_hash))) return bad(res, 'Falsches Passwort', 401);
+    const pwMatch = user ? await bcrypt.compare(password, user.pw_hash) : false;
+    console.log(`[LOGIN] userId=${userId} userFound=${!!user} pwMatch=${pwMatch}`);
+    if (!user || !pwMatch) return bad(res, 'Falsches Passwort', 401);
     req.session.userId = user.id;
     const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
     await logActivity(user.id, user.name, 'login', {}, ip);
