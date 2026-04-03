@@ -15,7 +15,7 @@ const newId = () => crypto.randomUUID();
 const parseRoles = r => !r ? ['standard'] : Array.isArray(r) ? r : (()=>{ try{return JSON.parse(r);}catch{return ['standard'];} })();
 const parseTags  = t => !t ? [] : Array.isArray(t) ? t : (()=>{ try{return JSON.parse(t);}catch{return [];} })();
 const getUser    = id => q1('SELECT * FROM users WHERE id=$1', [id]);
-const DEPTS = ['technik','leitung','dienstplanung','ausbildung','qm'];
+const DEPTS = ['technik','leitung','dienstplanung','ausbildung','qm','frei'];
 
 async function getP(uid) {
   const u = await getUser(uid);
@@ -46,7 +46,7 @@ async function getTP(uid) {
   };
 }
 
-const canSeeTk  = (tp,tk,uid) => tp.seeAll || tk.is_public || tk.created_by===uid || tp.myDepts.includes(tk.department);
+const canSeeTk  = (tp,tk,uid) => tp.seeAll || tk.is_public || tk.created_by===uid || tk.department==='frei' || tp.myDepts.includes(tk.department);
 const canEditTk = (tp,tk,uid) => tp.editAll || tk.created_by===uid || tp.myDepts.includes(tk.department);
 
 async function nextTicketNumber() {
