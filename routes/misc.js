@@ -1,15 +1,9 @@
 'use strict';
 const router = require('express').Router();
 const bcrypt = require('bcryptjs');
-const { q, q1, newId, pool, parseRoles, canSeeMsg } = require('../db');
+const { q, q1, newId, pool, parseRoles, logAct } = require('../db');
 const { auth, adminOnly, ok, bad } = require('../middleware');
 
-async function logAct(pool, newId, uid, name, action, details={}) {
-  await pool.query(
-    'INSERT INTO activity_log (id,user_id,user_name,action,details,created_at) VALUES ($1,$2,$3,$4,$5,NOW())',
-    [newId(), uid, name, action, JSON.stringify(details)]
-  ).catch(()=>{});
-}
 
 router.put('/allowances', auth, async (req,res) => {
   try {
@@ -109,6 +103,7 @@ router.post('/messages', auth, async (req,res) => {
     const id=newId();
     await pool.query('INSERT INTO messages (id,title,body,sender_id,target_type,target_value) VALUES ($1,$2,$3,$4,$5,$6)',
       [id,title.trim(),body.trim(),req.uid,targetType||'all',targetValue||null]);
+    await logAct(req.uid,req.user.name,'send_message',{title:req.body.title,target:req.body.target||'all'});
     ok(res,{id});
   } catch(e) { bad(res,e.message,500); }
 });
@@ -288,7 +283,7 @@ router.put('/diensttausch/:id/decide', auth, async (req,res) => {
       `UPDATE diensttausch SET status=$1,decided_by=$2,decided_at=NOW(),reject_reason=$3 WHERE id=$4`,
       [decision, req.uid, rejectReason||null, req.params.id]
     );
-    await logAct(pool,newId,req.uid,req.user.name,
+    await logAct(req.uid,req.user.name,
       decision==='approved'?'approve_diensttausch':'reject_diensttausch',
       {id:req.params.id});
     ok(res);

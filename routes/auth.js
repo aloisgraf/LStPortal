@@ -1,7 +1,7 @@
 'use strict';
 const router  = require('express').Router();
 const bcrypt  = require('bcryptjs');
-const { q, getUser, parseRoles, pool } = require('../db');
+const { q, getUser, parseRoles, pool, logAct } = require('../db');
 const { auth, ok, bad } = require('../middleware');
 
 async function logActivity(pool, uid, name, action, details={}, ip='') {
@@ -31,7 +31,7 @@ router.post('/login', async (req,res) => {
     req.session.userId = user.id;
     await new Promise((resolve, reject) => req.session.save(e => e ? reject(e) : resolve()));
     const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || '';
-    await logActivity(pool, user.id, user.name, 'login', {}, ip);
+    await logAct(user.id, user.name, 'login', {ip});
     ok(res, {userId:user.id, mustChangePW: user.must_change_pw===true});
   } catch(e) { bad(res,e.message,500); }
 });

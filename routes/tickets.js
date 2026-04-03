@@ -1,14 +1,8 @@
 'use strict';
 const router = require('express').Router();
-const { q, q1, newId, pool, getUser, canSeeTk, canEditTk, nextTicketNumber, auditNote, createNotification, parseMentions } = require('../db');
+const { q, q1, newId, pool, getUser, logAct, canSeeTk, canEditTk, nextTicketNumber, auditNote, createNotification, parseMentions } = require('../db');
 const { auth, ok, bad } = require('../middleware');
 
-async function logAct(pool, newId, uid, name, action, details={}) {
-  await pool.query(
-    'INSERT INTO activity_log (id,user_id,user_name,action,details,created_at) VALUES ($1,$2,$3,$4,$5,NOW())',
-    [newId(), uid, name, action, JSON.stringify(details)]
-  ).catch(()=>{});
-}
 
 router.post('/', auth, async (req,res) => {
   try {
@@ -25,7 +19,7 @@ router.post('/', auth, async (req,res) => {
       await createNotification(u.id,'new_ticket',`Neues Ticket in ${department}: ${title.trim()}`,id,null,req.uid);
     if (assigneeId && assigneeId!==req.uid)
       await createNotification(assigneeId,'assigned',`Dir wurde zugewiesen: ${title.trim()}`,id,null,req.uid);
-    await logAct(pool,newId,req.uid,req.user.name,'create_ticket',{number,title:title.trim()});
+    await logAct(req.uid,req.user.name,'create_ticket',{number,title:title.trim()});
     // Eigene Tickets direkt als gesehen markieren
     await pool.query(`INSERT INTO ticket_views (ticket_id,user_id,viewed_at) VALUES ($1,$2,NOW()) ON CONFLICT (ticket_id,user_id) DO UPDATE SET viewed_at=NOW()`,
       [id,req.uid]).catch(()=>{});
@@ -68,9 +62,9 @@ router.put('/:id', auth, async (req,res) => {
     add('updated_at',new Date().toISOString());
     vals.push(req.params.id);
     await pool.query(`UPDATE tickets SET ${setClauses.join(',')} WHERE id=$${vals.length}`,vals);
-    // Eigene Änderungen direkt als gesehen markieren
     await pool.query(`INSERT INTO ticket_views (ticket_id,user_id,viewed_at) VALUES ($1,$2,NOW()) ON CONFLICT (ticket_id,user_id) DO UPDATE SET viewed_at=NOW()`,
       [req.params.id,req.uid]).catch(()=>{});
+    await logAct(req.uid,req.user.name,'update_ticket',{id:req.params.id});
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
@@ -81,7 +75,7 @@ router.delete('/:id', auth, async (req,res) => {
     if (!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
     await pool.query('DELETE FROM ticket_notes WHERE ticket_id=$1',[req.params.id]);
     await pool.query('DELETE FROM tickets WHERE id=$1',[req.params.id]);
-    await logAct(pool,newId,req.uid,req.user.name,'delete_ticket',{id:req.params.id});
+    await logAct(req.uid,req.user.name,'delete_ticket',{id:req.params.id});
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
