@@ -1,5 +1,3 @@
-// ══ MAIN RENDER ══
-function renderMain(){
   if(S.view==='dashboard')renderDashboard();
   else if(S.view==='schedule')renderSchedule();
   else if(S.view==='allw')renderAllw();
