@@ -1,113 +1,115 @@
 'use strict';
 const router = require('express').Router();
-const { q, parseRoles, parseTags, canSeeTk, canEditTk } = require('../db');
+const { q, q1, parseRoles, parseTags, canSeeTk, canEditTk, canSeeMsg, pool } = require('../db');
 const { auth, ok, bad } = require('../middleware');
 
-router.get('/', auth, async (req, res) => {
+// DATA
+router.get('/api/data', auth, async (req,res) => {
   try {
-    const { uid, p, tp } = req;
-    const roles = parseRoles(req.user.roles);
-
-    const [usersRaw, cats, tagsRaw, evRaw, tkRaw, notesRaw, allwRaw,
-           msgsRaw, acksRaw, clTplRaw, clItemsRaw, clTkRaw, clTkItemsRaw] = await Promise.all([
-      q('SELECT id,name,initials,roles,color,must_change_pw FROM users ORDER BY name'),
+    const uid=req.uid, p=req.p, tp=req.tp, roles=p.roles;
+    const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
+           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw] = await Promise.all([
+      q('SELECT id,name,initials,roles,color,must_change_pw,last_seen FROM users ORDER BY name'),
       q('SELECT * FROM categories ORDER BY sort_order,label'),
       q('SELECT * FROM tags ORDER BY label'),
-      p.seeAllEntries
+      p.canApproveEvents
         ? q('SELECT * FROM events ORDER BY date_from')
-        : q('SELECT * FROM events WHERE is_general=true OR user_id=$1 OR created_by=$1 ORDER BY date_from', [uid]),
+        : q('SELECT * FROM events WHERE is_general=true OR user_id=$1 OR created_by=$1 ORDER BY date_from',[uid]),
+      q('SELECT event_id FROM event_confirms WHERE user_id=$1',[uid]),
       q('SELECT * FROM tickets ORDER BY created_at DESC'),
       q('SELECT * FROM ticket_notes ORDER BY created_at'),
-      p.seeAllAllw ? q('SELECT * FROM allowances') : q('SELECT * FROM allowances WHERE user_id=$1', [uid]),
-      q(`SELECT * FROM messages WHERE (to_department IS NULL OR to_department=ANY($1::text[])) OR from_user_id=$2 ORDER BY created_at DESC LIMIT 200`, [roles, uid]).catch(() => []),
-      q('SELECT * FROM message_acks WHERE user_id=$1', [uid]),
+      p.seeAllAllw ? q('SELECT * FROM allowances') : q('SELECT * FROM allowances WHERE user_id=$1',[uid]),
       q('SELECT * FROM checklist_templates ORDER BY name'),
-      q('SELECT * FROM checklist_template_items ORDER BY template_id,sort_order'),
-      q('SELECT * FROM ticket_checklists ORDER BY created_at'),
-      q('SELECT * FROM ticket_checklist_items ORDER BY checklist_id,sort_order'),
+      q('SELECT * FROM checklist_template_items ORDER BY sort_order'),
+      q('SELECT * FROM ticket_checklists'),
+      q('SELECT * FROM ticket_checklist_items ORDER BY sort_order'),
+      q('SELECT * FROM messages ORDER BY created_at DESC').catch(()=>[]),
+      q('SELECT message_id FROM message_reads WHERE user_id=$1',[uid]),
+      q('SELECT * FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 50',[uid]),
+      p.seeAllAbrechnung ? q('SELECT * FROM abrechnung_einspringer ORDER BY edate DESC')
+        : q('SELECT * FROM abrechnung_einspringer WHERE user_id=$1 ORDER BY edate DESC',[uid]),
+      p.seeAllAbrechnung ? q('SELECT * FROM abrechnung_homeoffice ORDER BY year DESC,month DESC')
+        : q('SELECT * FROM abrechnung_homeoffice WHERE user_id=$1 ORDER BY year DESC,month DESC',[uid]),
+      q('SELECT id,month,year,label,version,filename,is_archived,archived_at,created_by,created_at FROM dienstplaene ORDER BY year DESC,month DESC,version DESC'),
     ]);
 
-    // Note map
-    const noteMap = {};
-    notesRaw.forEach(n => (noteMap[n.ticket_id] = noteMap[n.ticket_id] || []).push({
-      id: n.id, text: n.text, authorId: n.author_id, isSystem: n.is_system, createdAt: n.created_at,
-    }));
+    const noteMap={}, clItemMap={}, tkClItemMap={}, tkClMap={};
+    notesRaw.forEach(n=>{ if(!noteMap[n.ticket_id]) noteMap[n.ticket_id]=[]; noteMap[n.ticket_id].push({id:n.id,text:n.text,authorId:n.author_id,noteType:n.note_type,createdAt:n.created_at}); });
+    clItems.forEach(i=>{ if(!clItemMap[i.template_id]) clItemMap[i.template_id]=[]; clItemMap[i.template_id].push({id:i.id,text:i.text,itemType:i.item_type||'check',sortOrder:i.sort_order}); });
+    tkClItemsRaw.forEach(i=>{ if(!tkClItemMap[i.checklist_id]) tkClItemMap[i.checklist_id]=[]; tkClItemMap[i.checklist_id].push({id:i.id,text:i.text,itemType:i.item_type||'check',sortOrder:i.sort_order,completedBy:i.completed_by,completedAt:i.completed_at,userNote:i.user_note||''}); });
+    tkClRaw.forEach(c=>{ if(!tkClMap[c.ticket_id]) tkClMap[c.ticket_id]=[]; tkClMap[c.ticket_id].push({id:c.id,templateId:c.template_id,name:c.name,createdBy:c.created_by,items:tkClItemMap[c.id]||[]}); });
 
-    const ackedSet = new Set(acksRaw.map(a => a.message_id));
-
-    // Events with anonymization logic
-    const events = evRaw.map(ev => {
-      if (ev.is_general) return {
-        id: ev.id, isGeneral: true, dateFrom: ev.date_from, dateTo: ev.date_to,
-        timeFrom: ev.time_from || '', timeTo: ev.time_to || '',
-        category: ev.category, reason: ev.reason, approved: 'approved',
-        createdBy: ev.created_by, createdAt: ev.created_at,
-        _anon: false, _blurred: false, _canEdit: false, _canApprove: false,
-      };
-      const isOwn = ev.user_id === uid || ev.created_by === uid;
-      const canSeeAll = p.canApproveEvents || isOwn;
-      if (ev.approved === 'rejected' && !canSeeAll) return null;
-      const anon = !canSeeAll && ev.approved !== 'approved';
-      return {
-        id: ev.id, isGeneral: false, dateFrom: ev.date_from, dateTo: ev.date_to,
-        timeFrom: ev.time_from || '', timeTo: ev.time_to || '',
-        userId: ev.user_id, category: anon ? null : ev.category,
-        reason: anon ? '(Termin ausstehend)' : ev.reason,
-        approved: ev.approved || 'pending', createdBy: ev.created_by, createdAt: ev.created_at,
-        _anon: anon, _blurred: !anon && p.othersBlurred && !isOwn,
-        _canEdit: isOwn, _canApprove: p.canApproveEvents,
-      };
-    }).filter(Boolean);
-
-    // Checklists per ticket
-    const clItemsByList = {};
-    clTkItemsRaw.forEach(i => (clItemsByList[i.checklist_id] = clItemsByList[i.checklist_id] || []).push({
-      id: i.id, text: i.text, checked: i.checked, checkedBy: i.checked_by, checkedAt: i.checked_at, sortOrder: i.sort_order,
-    }));
-    const clByTicket = {};
-    clTkRaw.forEach(cl => (clByTicket[cl.ticket_id] = clByTicket[cl.ticket_id] || []).push({
-      id: cl.id, templateId: cl.template_id, name: cl.name, createdBy: cl.created_by,
-      items: clItemsByList[cl.id] || [],
-    }));
-
-    const tickets = tkRaw.filter(tk => canSeeTk(tp, tk, uid)).map(tk => ({
-      id: tk.id, number: tk.number, title: tk.title, description: tk.description || '',
-      department: tk.department, tags: parseTags(tk.tags), priority: tk.priority,
-      status: tk.status, bucket: tk.bucket || '', isPublic: tk.is_public,
-      assigneeId: tk.assignee_id, parentTicketId: tk.parent_ticket_id,
-      createdBy: tk.created_by, createdAt: tk.created_at, updatedAt: tk.updated_at,
-      notes: noteMap[tk.id] || [], checklists: clByTicket[tk.id] || [],
-      _canEdit: canEditTk(tp, tk, uid),
-    }));
-
-    const clTemplates = clTplRaw
-      .filter(t => p.isAdmin || roles.includes(t.department) || tp.myDepts.includes(t.department))
-      .map(t => ({
-        id: t.id, name: t.name, department: t.department, createdBy: t.created_by,
-        items: clItemsRaw.filter(i => i.template_id === t.id)
-          .map(i => ({ id: i.id, text: i.text, sortOrder: i.sort_order })),
-      }));
-
-    const messages = msgsRaw.map(m => ({
-      id: m.id, fromUserId: m.from_user_id, toDepartment: m.to_department,
-      title: m.title, body: m.body, createdAt: m.created_at,
-      acked: ackedSet.has(m.id), isMine: m.from_user_id === uid,
-    }));
+    const fiveMinAgo = new Date(Date.now() - 5*60*1000);
+    const readIds = new Set(readsRaw.map(r=>r.message_id));
+    const confirmedEventIds = new Set(evConfirmsRaw.map(r=>r.event_id));
 
     ok(res, {
-      users: usersRaw.map(u => ({ id: u.id, name: u.name, initials: u.initials, roles: parseRoles(u.roles), color: u.color, mustChangePW: u.must_change_pw })),
-      categories: cats, tags: tagsRaw, events, tickets,
-      allowances: allwRaw.map(a => ({ id: a.id, userId: a.user_id, year: a.year, month: a.month, nd: a.nd, fd: a.fd, fw: a.fw, c10: a.c10 })),
-      messages, clTemplates, currentUser: uid,
-      permissions: { isDP: p.isDP, isAdmin: p.isAdmin, canApproveEvents: p.canApproveEvents, isStandard: tp.isStandard, myDepts: tp.myDepts, roles: p.roles, seeAllEntries: p.seeAllEntries, seeAllAllw: p.seeAllAllw, editAllw: p.editAllw, addGeneral: p.addGeneral, addForOthers: p.addForOthers, manageGeneral: p.manageGeneral, editAllPersonal: p.editAllPersonal, canSetPublic: tp.canSetPublic },
+      currentUser: uid,
+      permissions: {
+        canApproveEvents:p.canApproveEvents, canSendMessages:p.canSendMessages,
+        seeAllEntries:true, editAllPersonal:p.editAllPersonal,
+        addForOthers:p.addForOthers, addGeneral:p.addGeneral,
+        manageUsers:p.manageUsers, seeAllAllw:p.seeAllAllw, editAllw:p.editAllw,
+        seeAllAbrechnung:p.seeAllAbrechnung,
+        myDepts:tp.myDepts, seeAllTickets:tp.seeAll,
+        canSetPublic:tp.canSetPublic, canAssign:tp.canAssign,
+      },
+      users: usersRaw.map(u=>({
+        id:u.id, name:u.name, initials:u.initials, roles:parseRoles(u.roles),
+        color:u.color, mustChangePW:u.must_change_pw,
+        isOnline: !!(u.last_seen && new Date(u.last_seen) > fiveMinAgo),
+      })),
+      categories: cats,
+      tags: tagsRaw,
+      events: evRaw.map(ev=>{
+        const concernsMe = !ev.is_general && ev.user_id === uid;
+        const createdByMe = ev.created_by === uid;
+        // Dienstplanung/Admin sehen alles klar; alle anderen nur eigene
+        const anonymize = !p.canApproveEvents && !ev.is_general && ev.user_id !== uid && !createdByMe;
+        const confirmed = ev.is_general || createdByMe || confirmedEventIds.has(ev.id);
+        return {
+          id:ev.id, isGeneral:ev.is_general, dateFrom:ev.date_from, dateTo:ev.date_to,
+          timeFrom:ev.time_from||'', timeTo:ev.time_to||'',
+          userId: anonymize ? null : ev.user_id,
+          category:ev.category, reason: anonymize ? null : ev.reason,
+          approvalStatus:ev.approval_status,
+          createdBy: anonymize ? null : ev.created_by, createdAt:ev.created_at,
+          _anonymized: anonymize,
+          _concernsMe: concernsMe,
+          _confirmed: confirmed,
+          _isNew: concernsMe && !createdByMe && !confirmedEventIds.has(ev.id),
+          _canEdit: !ev.is_general && createdByMe && !ev.approval_status,
+        };
+      }),
+      tickets: tkRaw.filter(tk=>canSeeTk(tp,tk,uid)).map(tk=>({
+        id:tk.id, number:tk.number, title:tk.title, description:tk.description||'',
+        department:tk.department, tags:parseTags(tk.tags), priority:tk.priority,
+        status:tk.status, bucket:tk.bucket||'', isPublic:tk.is_public,
+        assigneeId:tk.assignee_id, parentTicketId:tk.parent_ticket_id,
+        createdBy:tk.created_by, createdAt:tk.created_at, updatedAt:tk.updated_at,
+        notes:noteMap[tk.id]||[], checklists:tkClMap[tk.id]||[],
+        _canEdit:canEditTk(tp,tk,uid),
+      })),
+      allowances: allwRaw.map(a=>({id:a.id,userId:a.user_id,year:a.year,month:a.month,nd:a.nd,fd:a.fd,fw:a.fw,c10:a.c10})),
+      checklists: clTmpls.map(t=>({id:t.id,name:t.name,department:t.department,createdBy:t.created_by,items:clItemMap[t.id]||[]})),
+      messages: msgsRaw.filter(m=>canSeeMsg(m,uid,roles)).map(m=>({
+        id:m.id,title:m.title,body:m.body,senderId:m.sender_id,
+        targetType:m.target_type,targetValue:m.target_value,
+        createdAt:m.created_at, isRead:readIds.has(m.id),
+      })),
+      notifications: notifsRaw.map(n=>({
+        id:n.id, type:n.type, title:n.title, ticketId:n.ticket_id,
+        noteId:n.note_id, eventId:n.event_id, createdBy:n.created_by, createdAt:n.created_at,
+        isRead:!!n.read_at,
+      })),
+      abrechnung: {
+        einspringer: einspRaw.map(e=>({id:e.id,userId:e.user_id,date:e.edate,note:e.note||'',rejectedBy:e.rejected_by,rejectedReason:e.rejected_reason,rejectedAt:e.rejected_at,createdAt:e.created_at})),
+        homeoffice:  hoRaw.map(h=>({id:h.id,userId:h.user_id,year:h.year,month:h.month,days:h.days})),
+      },
+      dienstplaene: dpRaw.map(d=>({id:d.id,month:d.month,year:d.year,label:d.label,version:d.version,filename:d.filename,isArchived:d.is_archived,archivedAt:d.archived_at,createdBy:d.created_by,createdAt:d.created_at})),
     });
-  } catch (e) { console.error(e); bad(res, e.message, 500); }
+  } catch(e) { console.error(e); bad(res,e.message,500); }
 });
 
-router.get('/active-users', auth, async (req, res) => {
-  try {
-    ok(res, await q(`SELECT id,name,initials,color FROM users WHERE last_seen > NOW() - INTERVAL '10 minutes'`));
-  } catch (e) { bad(res, e.message, 500); }
-});
-
+// EVENTS
 module.exports = router;
