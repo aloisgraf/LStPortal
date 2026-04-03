@@ -261,6 +261,59 @@ router.delete('/checklists/:id', auth, async (req,res) => {
 });
 
 // ALLOWANCES
+// ── DIENSTTAUSCH ──
+router.post('/diensttausch', auth, async (req,res) => {
+  try {
+    const { text } = req.body;
+    if (!text?.trim()) return bad(res,'Text erforderlich');
+    const id = newId();
+    await pool.query(
+      `INSERT INTO diensttausch (id,text,created_by,status) VALUES ($1,$2,$3,'pending')`,
+      [id, text.trim(), req.uid]
+    );
+    ok(res, { id });
+  } catch(e) { bad(res,e.message,500); }
+});
+
+router.put('/diensttausch/:id/decide', auth, async (req,res) => {
+  try {
+    if (!req.p.canApproveEvents) return bad(res,'Keine Berechtigung',403);
+    const { decision, rejectReason } = req.body;
+    if (!['approved','rejected'].includes(decision)) return bad(res,'Ungültige Entscheidung');
+    await pool.query(
+      `UPDATE diensttausch SET status=$1,decided_by=$2,decided_at=NOW(),reject_reason=$3 WHERE id=$4`,
+      [decision, req.uid, rejectReason||null, req.params.id]
+    );
+    await logAct(pool,newId,req.uid,req.user.name,
+      decision==='approved'?'approve_diensttausch':'reject_diensttausch',
+      {id:req.params.id});
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
+
+router.put('/diensttausch/:id/view', auth, async (req,res) => {
+  try {
+    await pool.query(
+      `INSERT INTO diensttausch_reads (diensttausch_id,user_id) VALUES ($1,$2)
+       ON CONFLICT DO NOTHING`,
+      [req.params.id, req.uid]
+    );
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
+
+router.delete('/diensttausch/:id', auth, async (req,res) => {
+  try {
+    const dt = await q1('SELECT * FROM diensttausch WHERE id=$1',[req.params.id]);
+    if (!dt) return bad(res,'Nicht gefunden',404);
+    if (dt.created_by !== req.uid && !req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+    await pool.query('DELETE FROM diensttausch_reads WHERE diensttausch_id=$1',[req.params.id]);
+    await pool.query('DELETE FROM diensttausch WHERE id=$1',[req.params.id]);
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
+
+
 // ── AKTIVITÄTSLOG ──
 router.get('/activity-log', auth, async (req,res) => {
   try {

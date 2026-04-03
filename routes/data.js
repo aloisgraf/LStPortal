@@ -8,7 +8,7 @@ router.get('/', auth, async (req,res) => {
   try {
     const uid=req.uid, p=req.p, tp=req.tp, roles=p.roles;
     const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
-           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw] = await Promise.all([
+           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw] = await Promise.all([
       q('SELECT id,name,initials,roles,color,must_change_pw,last_seen FROM users ORDER BY name'),
       q('SELECT * FROM categories ORDER BY sort_order,label'),
       q('SELECT * FROM tags ORDER BY label'),
@@ -32,6 +32,8 @@ router.get('/', auth, async (req,res) => {
         : q('SELECT * FROM abrechnung_homeoffice WHERE user_id=$1 ORDER BY year DESC,month DESC',[uid]),
       q('SELECT id,month,year,label,version,filename,is_archived,archived_at,created_by,created_at FROM dienstplaene ORDER BY year DESC,month DESC,version DESC'),
       q('SELECT ticket_id, viewed_at FROM ticket_views WHERE user_id=$1',[uid]),
+      q('SELECT * FROM diensttausch ORDER BY created_at DESC LIMIT 100'),
+      q('SELECT diensttausch_id FROM diensttausch_reads WHERE user_id=$1',[uid]),
     ]);
 
     const tkViewMap = new Map((tkViewsRaw||[]).map(v=>[v.ticket_id, v.viewed_at]));
@@ -45,6 +47,8 @@ router.get('/', auth, async (req,res) => {
     const readIds = new Set(readsRaw.map(r=>r.message_id));
     const confirmedEventIds = new Set(evConfirmsRaw.map(r=>r.event_id));
 
+    const dtSeenSet = new Set(dtReadsRaw.map(r=>r.diensttausch_id));
+    const myNameForDt = (usersRaw.find(u=>u.id===uid)?.name||'').toLowerCase();
     ok(res, {
       currentUser: uid,
       permissions: {
@@ -109,6 +113,14 @@ router.get('/', auth, async (req,res) => {
         homeoffice:  hoRaw.map(h=>({id:h.id,userId:h.user_id,year:h.year,month:h.month,days:h.days})),
       },
       dienstplaene: dpRaw.map(d=>({id:d.id,month:d.month,year:d.year,label:d.label,version:d.version,filename:d.filename,isArchived:d.is_archived,archivedAt:d.archived_at,createdBy:d.created_by,createdAt:d.created_at})),
+      diensttausch: dtRaw.map(dt => ({
+        id:dt.id, text:dt.text, createdBy:dt.created_by, createdAt:dt.created_at,
+        status:dt.status, decidedBy:dt.decided_by, decidedAt:dt.decided_at,
+        rejectReason:dt.reject_reason, isSeen:dtSeenSet.has(dt.id),
+        isRelevant: dt.created_by===uid ||
+          (myNameForDt && dt.text.toLowerCase().includes('@'+myNameForDt)) ||
+          (p.canApproveEvents && dt.status==='pending'),
+      })),
     });
   } catch(e) { console.error(e); bad(res,e.message,500); }
 });
