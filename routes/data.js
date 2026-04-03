@@ -22,7 +22,6 @@ router.get('/', auth, async (req,res) => {
       q('SELECT * FROM checklist_templates ORDER BY name'),
       q('SELECT * FROM checklist_template_items ORDER BY sort_order'),
       q('SELECT * FROM ticket_checklists'),
-      q('SELECT ticket_id, viewed_at FROM ticket_views WHERE user_id=$1',[uid]),
       q('SELECT * FROM ticket_checklist_items ORDER BY sort_order'),
       q('SELECT * FROM messages ORDER BY created_at DESC').catch(()=>[]),
       q('SELECT message_id, pinned, read_at FROM message_reads WHERE user_id=$1',[uid]),
@@ -32,6 +31,7 @@ router.get('/', auth, async (req,res) => {
       p.seeAllAbrechnung ? q('SELECT * FROM abrechnung_homeoffice ORDER BY year DESC,month DESC')
         : q('SELECT * FROM abrechnung_homeoffice WHERE user_id=$1 ORDER BY year DESC,month DESC',[uid]),
       q('SELECT id,month,year,label,version,filename,is_archived,archived_at,created_by,created_at FROM dienstplaene ORDER BY year DESC,month DESC,version DESC'),
+      q('SELECT ticket_id, viewed_at FROM ticket_views WHERE user_id=$1',[uid]),
     ]);
 
     const tkViewMap = new Map((tkViewsRaw||[]).map(v=>[v.ticket_id, v.viewed_at]));
