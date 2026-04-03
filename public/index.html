@@ -5,213 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LSt Portal v1.3.3</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<style>
-:root{--bg:#f0f2f6;--sf:#fff;--sf2:#f5f7fa;--sf3:#eef0f5;--border:#e2e6ef;--acc:#3b6dd4;--ach:#2d5ab8;--act:#fff;--ok:#10b981;--warn:#f59e0b;--info:#7c3aed;--danger:#ef4444;--teal:#0ea5e9;--tx:#1a2035;--mu:#64748b;--di:#94a3b8;--nav:224px;--hdr:56px;--r:8px;--sh:0 1px 4px rgba(0,0,0,.07);--sh2:0 6px 24px rgba(0,0,0,.13)}
-[data-theme=dark]{--bg:#0f0f12;--sf:#17171c;--sf2:#1f1f27;--sf3:#252530;--border:#2e2e3e;--acc:#e8c547;--ach:#f0d060;--act:#000;--ok:#5bc4a0;--warn:#c47b5b;--info:#8b7be8;--danger:#e85b5b;--teal:#5bc4e8;--tx:#e8e8f0;--mu:#8892a4;--di:#606070;--sh:0 1px 4px rgba(0,0,0,.4);--sh2:0 6px 24px rgba(0,0,0,.55)}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Inter',system-ui,sans-serif;font-size:14px;background:var(--bg);color:var(--tx);min-height:100vh}
-/* Header */
-.hdr{height:var(--hdr);background:var(--sf);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:8px;position:sticky;top:0;z-index:100;box-shadow:var(--sh)}
-.logo{display:flex;align-items:center;gap:8px;flex-shrink:0}
-.lm{width:30px;height:30px;background:var(--acc);border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--act);font-size:14px;font-weight:800}
-.ln{font-size:16px;font-weight:800;letter-spacing:-.3px;white-space:nowrap}.ln em{color:var(--acc);font-style:normal}
-.hsp{flex:1}
-.ib2{width:32px;height:32px;border-radius:var(--r);background:var(--sf2);border:1px solid var(--border);color:var(--tx);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:.15s;flex-shrink:0}
-.ib2:hover{border-color:var(--acc)}
-.hbg{display:none!important}
-.upill{display:flex;align-items:center;gap:6px;padding:4px 10px 4px 4px;background:var(--sf2);border:1px solid var(--border);border-radius:100px;cursor:pointer;font-size:12px;font-weight:600;transition:.15s;flex-shrink:0}
-.upill:hover{border-color:var(--acc)}
-.pav{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0}
-/* Layout */
-.app{display:grid;grid-template-columns:var(--nav) 1fr;min-height:calc(100vh - var(--hdr))}
-.sb-ov{display:none;position:fixed;inset:0;top:var(--hdr);background:rgba(0,0,0,.4);z-index:49}
-.sb{background:var(--sf);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:50;overflow-y:auto}
-/* Sidebar nav */
-.nav-a{padding:8px 6px;flex-shrink:0}
-.nsh{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;font-size:10px;font-weight:700;color:var(--di);cursor:pointer;border-radius:5px;transition:.15s;user-select:none;text-transform:uppercase;letter-spacing:.8px}
-.nsh:hover{background:var(--sf2);color:var(--mu)}.nsh .arr{font-size:9px;transition:transform .2s}
-.nsh.open .arr{transform:rotate(180deg)}.nsub{display:none;padding:1px 0}.nsub.open{display:block}
-.ni{display:flex;align-items:center;gap:7px;padding:7px 10px 7px 22px;border-radius:5px;margin:1px 0;font-size:13px;font-weight:500;color:var(--mu);cursor:pointer;transition:.15s;white-space:nowrap}
-.ni:hover{background:var(--sf2);color:var(--tx)}.ni.active{background:color-mix(in srgb,var(--acc) 10%,transparent);color:var(--acc);font-weight:600}
-.ni.top{padding-left:10px}
-.ni .bdgn{margin-left:auto;background:var(--danger);color:#fff;border-radius:100px;font-size:10px;font-weight:700;padding:1px 6px;min-width:18px;text-align:center}
-.ndiv{height:1px;background:var(--border);margin:5px 4px}
-.sbver{padding:10px;font-size:10px;color:var(--di);border-top:1px solid var(--border);margin-top:auto}
-.sbf{padding:10px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;border-top:1px solid var(--border)}
-.sfl{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--di);margin-bottom:4px}
-.yr-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
-.yb{width:24px;height:24px;background:var(--sf2);border:1px solid var(--border);border-radius:5px;cursor:pointer;color:var(--tx);font-size:12px;display:flex;align-items:center;justify-content:center;transition:.15s}.yb:hover{border-color:var(--acc)}
-.yv{font-size:14px;font-weight:700}
-.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:3px}
-.mb{padding:5px 3px;background:var(--sf2);border:1px solid var(--border);border-radius:5px;color:var(--mu);font-size:10px;font-weight:500;cursor:pointer;text-align:center;transition:.15s}
-.mb:hover{border-color:var(--acc);color:var(--tx)}.mb.on{background:var(--acc);color:var(--act);border-color:var(--acc);font-weight:700}
-.sbsel{width:100%;padding:6px 8px;background:var(--sf2);border:1px solid var(--border);border-radius:6px;color:var(--tx);font-family:inherit;font-size:12px;cursor:pointer}
-.sbsel:focus{outline:none;border-color:var(--acc)}
-/* Main */
-main{padding:20px 24px;overflow-y:auto;max-height:calc(100vh - var(--hdr))}
-.ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:8px;flex-wrap:wrap}
-.pt{font-size:19px;font-weight:800;letter-spacing:-.3px}.pt span{color:var(--acc)}.pt small{font-size:13px;color:var(--mu);font-weight:500}
-.btn-p{padding:7px 14px;background:var(--acc);color:var(--act);border:none;border-radius:var(--r);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;gap:5px}
-.btn-p:hover{background:var(--ach);transform:translateY(-1px)}
-.btn-s{padding:6px 12px;background:var(--sf2);color:var(--tx);border:1px solid var(--border);border-radius:var(--r);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;transition:.15s}.btn-s:hover{border-color:var(--mu)}
-.btn-d{padding:3px 7px;background:color-mix(in srgb,var(--danger) 8%,transparent);color:var(--danger);border:1px solid color-mix(in srgb,var(--danger) 20%,transparent);border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s}
-.btn-e{padding:3px 7px;background:color-mix(in srgb,var(--info) 8%,transparent);color:var(--info);border:1px solid color-mix(in srgb,var(--info) 20%,transparent);border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit}
-.btn-ok{padding:3px 7px;background:color-mix(in srgb,var(--ok) 8%,transparent);color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 20%,transparent);border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit}
-.btn-w{padding:3px 7px;background:color-mix(in srgb,var(--warn) 8%,transparent);color:var(--warn);border:1px solid color-mix(in srgb,var(--warn) 20%,transparent);border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit}
-/* Cards & Tables */
-.sr{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
-.sc{background:var(--sf);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;box-shadow:var(--sh)}
-.sv{font-size:24px;font-weight:800;line-height:1;margin-bottom:2px}.sl{font-size:11px;font-weight:500;color:var(--mu)}
-.tw{background:var(--sf);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;box-shadow:var(--sh);margin-bottom:14px}
-.tt{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap}.tt h2{font-size:13px;font-weight:700;flex:1}
-.srch{padding:6px 10px;background:var(--sf2);border:1px solid var(--border);border-radius:var(--r);color:var(--tx);font-family:inherit;font-size:12px;transition:.15s}.srch:focus{outline:none;border-color:var(--acc)}
-.srch::placeholder{color:var(--di)}
-.flt{padding:5px 8px;background:var(--sf2);border:1px solid var(--border);border-radius:var(--r);color:var(--tx);font-family:inherit;font-size:12px;cursor:pointer;max-width:150px}.flt:focus{outline:none;border-color:var(--acc)}
-.flt option{background:var(--sf)}
-table{width:100%;border-collapse:collapse}
-thead th{padding:7px 10px;text-align:left;font-size:11px;font-weight:600;color:var(--mu);background:var(--sf2);border-bottom:1px solid var(--border);white-space:nowrap}
-tbody tr{border-bottom:1px solid var(--border);transition:background .1s}.tbody tr:last-child{border-bottom:none}
-tbody tr:hover{background:var(--sf2)}.clickable{cursor:pointer}
-td{padding:7px 10px;font-size:13px;vertical-align:middle}
-.empty{text-align:center;padding:40px;color:var(--mu)}
-/* Badges */
-.bdg{display:inline-flex;align-items:center;padding:2px 7px;border-radius:100px;font-size:11px;font-weight:600;white-space:nowrap}
-.pr-low{background:color-mix(in srgb,var(--ok) 12%,transparent);color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 25%,transparent)}
-.pr-medium{background:color-mix(in srgb,var(--warn) 12%,transparent);color:var(--warn);border:1px solid color-mix(in srgb,var(--warn) 25%,transparent)}
-.pr-high{background:color-mix(in srgb,var(--danger) 12%,transparent);color:var(--danger);border:1px solid color-mix(in srgb,var(--danger) 25%,transparent)}
-.st-open{background:color-mix(in srgb,var(--acc) 12%,transparent);color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 25%,transparent)}
-.st-in_progress{background:color-mix(in srgb,var(--warn) 12%,transparent);color:var(--warn);border:1px solid color-mix(in srgb,var(--warn) 25%,transparent)}
-.st-on_hold{background:color-mix(in srgb,var(--info) 12%,transparent);color:var(--info);border:1px solid color-mix(in srgb,var(--info) 25%,transparent)}
-.st-closed{background:color-mix(in srgb,var(--ok) 12%,transparent);color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 25%,transparent)}
-.dp-technik{background:color-mix(in srgb,var(--teal) 12%,transparent);color:var(--teal)}
-.dp-leitung{background:color-mix(in srgb,var(--warn) 12%,transparent);color:var(--warn)}
-.dp-dienstplanung{background:color-mix(in srgb,var(--acc) 12%,transparent);color:var(--acc)}
-.dp-ausbildung{background:color-mix(in srgb,var(--info) 12%,transparent);color:var(--info)}
-.dp-qm{background:color-mix(in srgb,var(--ok) 12%,transparent);color:var(--ok)}
-.rb{display:inline-flex;align-items:center;padding:1px 5px;border-radius:100px;font-size:10px;font-weight:700}
-.rb-admin{background:color-mix(in srgb,var(--warn) 15%,transparent);color:color-mix(in srgb,var(--warn) 80%,#000)}
-.rb-leitung,.rb-qm{background:color-mix(in srgb,var(--ok) 12%,transparent);color:color-mix(in srgb,var(--ok) 80%,#000)}
-.rb-dienstplanung{background:color-mix(in srgb,var(--acc) 12%,transparent);color:var(--acc)}
-.rb-technik{background:color-mix(in srgb,var(--teal) 12%,transparent);color:var(--teal)}
-.rb-ausbildung{background:color-mix(in srgb,var(--info) 12%,transparent);color:var(--info)}
-.rb-standard{background:var(--sf3);color:var(--mu)}
-.ap-pending{background:color-mix(in srgb,var(--warn) 12%,transparent);color:var(--warn);border:1px solid color-mix(in srgb,var(--warn) 25%,transparent)}
-.ap-approved{background:color-mix(in srgb,var(--ok) 12%,transparent);color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 25%,transparent)}
-.ap-rejected{background:color-mix(in srgb,var(--danger) 12%,transparent);color:var(--danger);border:1px solid color-mix(in srgb,var(--danger) 25%,transparent)}
-.tag-chip{display:inline-flex;align-items:center;padding:2px 6px;border-radius:100px;font-size:11px;font-weight:600;margin:1px}
-.blur-c{filter:blur(4px);user-select:none;pointer-events:none}
-/* Modals */
-.ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
-.ov.open{display:flex}
-.modal{background:var(--sf);border:1px solid var(--border);border-radius:12px;width:520px;max-width:95vw;max-height:92vh;overflow-y:auto;box-shadow:var(--sh2);animation:fup .2s ease}
-.modal.wide{width:720px}.modal.xl{width:960px;max-height:94vh}.modal.sm{width:400px}
-@keyframes fup{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}
-.mh{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--sf);z-index:1}
-.mh h2{font-size:15px;font-weight:700}
-.mc{width:26px;height:26px;background:var(--sf2);border:1px solid var(--border);border-radius:6px;color:var(--mu);cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;transition:.15s;flex-shrink:0}.mc:hover{border-color:var(--danger);color:var(--danger)}
-.mb2{padding:18px;display:flex;flex-direction:column;gap:12px}
-.mf{padding:12px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
-.fr{display:grid;grid-template-columns:1fr 1fr;gap:10px}.fg{display:flex;flex-direction:column;gap:4px}.fg.full{grid-column:1/-1}
-label{font-size:11px;font-weight:600;color:var(--mu)}
-input,select,textarea{padding:7px 10px;background:var(--sf2);border:1px solid var(--border);border-radius:6px;color:var(--tx);font-family:inherit;font-size:13px;transition:.15s;width:100%}
-input:focus,select:focus,textarea:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 12%,transparent)}
-input[type=checkbox]{width:auto;accent-color:var(--acc)}
-select option{background:var(--sf)}.textarea{resize:vertical;min-height:60px}
-.pw-w{position:relative}.pw-w input{padding-right:32px}
-.eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--mu);font-size:12px;padding:2px}
-/* Login */
-.ls{display:none;position:fixed;inset:0;background:var(--bg);z-index:300;align-items:center;justify-content:center}
-.ls.open{display:flex}
-.lc{background:var(--sf);border:1px solid var(--border);border-radius:14px;padding:28px;width:400px;max-width:95vw;box-shadow:var(--sh2);animation:fup .3s ease}
-.ll{display:flex;align-items:center;gap:8px;margin-bottom:4px}
-.llm{width:34px;height:34px;background:var(--acc);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--act);font-size:16px;font-weight:800}
-.lln{font-size:19px;font-weight:800}.lln em{color:var(--acc);font-style:normal}
-.lsub{font-size:12px;color:var(--mu);margin-bottom:14px}
-.lerr{color:var(--danger);font-size:12px;font-weight:500;display:none;margin-top:4px}
-.cpws{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
-.cpws.open{display:flex}
-/* Admin tabs */
-.atabs{display:flex;border-bottom:1px solid var(--border);margin:-18px -18px 0;padding:0 18px;overflow-x:auto}
-.tb{padding:10px 12px;font-size:13px;font-weight:600;background:none;border:none;color:var(--mu);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:.15s;font-family:inherit;white-space:nowrap}.tb:hover{color:var(--tx)}.tb.on{color:var(--acc);border-bottom-color:var(--acc)}
-.tp{display:none;margin-top:18px}.tp.on{display:block}
-.al{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
-.ai{display:flex;align-items:center;gap:8px;padding:9px 11px;background:var(--sf2);border:1px solid var(--border);border-radius:7px}
-.aii{flex:1;min-width:0}.ain{font-size:13px;font-weight:600;display:flex;align-items:center;gap:4px;flex-wrap:wrap}.ais{font-size:11px;color:var(--mu);margin-top:1px}
-.aia{display:flex;gap:4px;flex-shrink:0;align-items:center}
-.cr{display:flex;gap:4px;flex-wrap:wrap}.cp{width:22px;height:22px;border-radius:4px;cursor:pointer;border:2px solid transparent;transition:.15s}.cp.on{border-color:var(--tx);transform:scale(1.15)}
-.role-chks{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-.rck{display:flex;align-items:center;gap:6px;padding:6px 9px;background:var(--sf2);border:1px solid var(--border);border-radius:6px;cursor:pointer;transition:.15s}.rck:hover{border-color:var(--acc)}.rck input{width:auto}.rck span{font-size:12px;font-weight:500}
-/* Ticket detail */
-.tk-body{display:grid;grid-template-columns:1fr 270px}
-.tk-main{padding:18px;border-right:1px solid var(--border);overflow-y:auto;max-height:calc(94vh - 60px);display:flex;flex-direction:column;gap:14px}
-.tk-sb{padding:14px;overflow-y:auto;max-height:calc(94vh - 60px);display:flex;flex-direction:column;gap:10px}
-.tkf{display:flex;flex-direction:column;gap:3px}.tkf label{font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--di)}.tkf .val{font-size:13px;font-weight:500}
-.tkdiv{height:1px;background:var(--border);margin:2px 0}
-.nfeed{display:flex;flex-direction:column;gap:7px}
-.ni2{background:var(--sf2);border:1px solid var(--border);border-radius:7px;padding:9px 12px}
-.ni2.sys{background:color-mix(in srgb,var(--acc) 5%,transparent);border-color:color-mix(in srgb,var(--acc) 15%,transparent)}
-.na{font-size:11px;font-weight:600;color:var(--mu)}.nd{font-size:10px;color:var(--di);margin-left:6px}
-.nt{font-size:13px;margin-top:3px;line-height:1.5}.nt.sys{font-style:italic;color:var(--mu);font-size:12px}
-.subl{display:flex;flex-direction:column;gap:4px}
-.subi{display:flex;align-items:center;gap:7px;padding:6px 9px;background:var(--sf2);border:1px solid var(--border);border-radius:6px;cursor:pointer;transition:.15s}.subi:hover{border-color:var(--acc)}
-/* Ticket indentation */
-.tk-sub-row{background:color-mix(in srgb,var(--acc) 3%,var(--sf))}
-.tk-sub-row td:first-child{padding-left:26px;border-left:2px solid color-mix(in srgb,var(--acc) 30%,transparent)}
-/* Checklists */
-.cl-tpl{background:var(--sf2);border:1px solid var(--border);border-radius:7px;padding:10px 12px;margin-bottom:8px}
-.cl-tpl-h{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-.cl-tpl-name{font-weight:700;font-size:13px;flex:1}
-.cl-it{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mu);padding:2px 0}
-.tk-cl{background:var(--sf2);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:6px}
-.tk-cl-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;font-size:12px;font-weight:700}
-.tk-cl-it{display:flex;align-items:center;gap:7px;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border)}.tk-cl-it:last-child{border-bottom:none}
-.tk-cl-it.done{text-decoration:line-through;color:var(--di)}.tk-cl-it input{width:auto;cursor:pointer}
-.cl-who{font-size:10px;color:var(--di);margin-left:auto;white-space:nowrap}
-/* Dashboard */
-.dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.dash-card{background:var(--sf);border:1px solid var(--border);border-radius:var(--r);padding:16px;box-shadow:var(--sh)}
-.dash-card h3{font-size:13px;font-weight:700;margin-bottom:10px}
-.au-list{display:flex;flex-wrap:wrap;gap:6px}
-.au-chip{display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:100px;background:var(--sf2);border:1px solid var(--border);font-size:12px;font-weight:500}
-.au-dot{width:7px;height:7px;border-radius:50%;background:var(--ok);flex-shrink:0}
-.msg-card{padding:10px 12px;border:1px solid var(--border);border-radius:7px;margin-bottom:6px}
-.msg-card.unread{border-color:color-mix(in srgb,var(--acc) 30%,transparent);background:color-mix(in srgb,var(--acc) 4%,var(--sf))}
-.msg-title{font-size:13px;font-weight:700;margin-bottom:2px}
-.msg-meta{font-size:11px;color:var(--mu);margin-bottom:6px}
-.msg-body{font-size:12px;line-height:1.5}
-/* Info bars */
-.ib3{padding:8px 12px;background:color-mix(in srgb,var(--acc) 8%,var(--sf));border:1px solid color-mix(in srgb,var(--acc) 20%,transparent);border-radius:var(--r);font-size:12px;color:var(--mu)}
-.wb{padding:8px 12px;background:color-mix(in srgb,var(--warn) 8%,var(--sf));border:1px solid color-mix(in srgb,var(--warn) 25%,transparent);border-radius:var(--r);font-size:12px;font-weight:500}
-/* Activity log */
-.log-row{display:grid;grid-template-columns:130px 110px 1fr auto;gap:6px;padding:6px 8px;border-bottom:1px solid var(--border);font-size:12px;align-items:center}
-.log-row:hover{background:var(--sf2)}.log-act{font-weight:600}
-/* Toast */
-.toast{position:fixed;bottom:16px;right:16px;background:var(--sf);border:1px solid var(--ok);border-radius:var(--r);padding:8px 14px;font-size:13px;font-weight:500;z-index:999;animation:fup .3s ease;box-shadow:var(--sh2)}
-.toast.err{border-color:var(--danger)}
-/* Loading */
-.lov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:400;align-items:center;justify-content:center}
-.lov.open{display:flex}
-.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--acc);border-radius:50%;animation:spin .7s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-/* Rights matrix */
-.rm-t{width:100%;border-collapse:collapse;font-size:11px}.rm-t th{padding:5px 8px;background:var(--sf2);border:1px solid var(--border);font-weight:600;white-space:nowrap}.rm-t td{padding:4px 8px;border:1px solid var(--border);text-align:center}.rm-t tr:hover td{background:var(--sf2)}
-/* MOBILE */
-@media(max-width:768px){
-  .hbg{display:flex!important}
-  .app{grid-template-columns:1fr}
-  .sb{position:fixed;left:-240px;top:var(--hdr);bottom:0;width:240px;transition:left .25s;box-shadow:var(--sh2)}
-  .sb.mob-open{left:0}.sb-ov.mob-open{display:block}
-  main{padding:14px;max-height:none}
-  .sr{grid-template-columns:1fr 1fr}
-  .dash-grid{grid-template-columns:1fr}
-  .tk-body{grid-template-columns:1fr}
-  .tk-sb{max-height:none;border-left:none;border-top:1px solid var(--border)}
-  .modal.wide,.modal.xl{width:98vw;max-height:96vh}
-  .fr{grid-template-columns:1fr}
-  table thead th:nth-child(n+5){display:none}
-  table td:nth-child(n+5){display:none}
-}
-</style>
+<link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
 <div class="lov" id="loadingOv"><div class="spinner"></div></div>
@@ -285,7 +79,7 @@ select option{background:var(--sf)}.textarea{resize:vertical;min-height:60px}
   <main id="main"></main>
 </div>
 
-<!-- MODALS: Event -->
+<!-- MODAL: Event -->
 <div class="ov" id="evtOv">
   <div class="modal">
     <div class="mh"><h2 id="evtTitle">Neuer Eintrag</h2><button class="mc" onclick="closeModal('evtOv')">✕</button></div>
@@ -302,12 +96,13 @@ select option{background:var(--sf)}.textarea{resize:vertical;min-height:60px}
         <div class="fg"><label>Uhrzeit bis</label><input type="time" id="fT2"></div>
       </div>
       <div class="fg full"><label>Kategorie *</label><select id="fCat"></select></div>
-      <div class="fg full"><label>Beschreibung *</label><textarea id="fRsn" rows="3" class="textarea"></textarea></div>
+      <div class="fg full"><label>Beschreibung *</label><textarea id="fRsn" rows="3"></textarea></div>
     </div>
     <div class="mf"><button class="btn-s" onclick="closeModal('evtOv')">Abbrechen</button><button class="btn-p" onclick="saveEvent()">💾 Speichern</button></div>
   </div>
 </div>
-<!-- PW Change -->
+
+<!-- MODAL: PW Change -->
 <div class="ov" id="pwModal">
   <div class="modal sm">
     <div class="mh"><h2>🔐 Passwort ändern</h2><button class="mc" onclick="closeModal('pwModal')">✕</button></div>
@@ -319,7 +114,8 @@ select option{background:var(--sf)}.textarea{resize:vertical;min-height:60px}
     <div class="mf"><button class="btn-s" onclick="closeModal('pwModal')">Abbrechen</button><button class="btn-p" onclick="doChangePW()">✓ Ändern</button></div>
   </div>
 </div>
-<!-- Allw -->
+
+<!-- MODAL: Allowances -->
 <div class="ov" id="allwOv">
   <div class="modal sm">
     <div class="mh"><h2 id="allwT">Zulagen</h2><button class="mc" onclick="closeModal('allwOv')">✕</button></div>
@@ -336,14 +132,15 @@ select option{background:var(--sf)}.textarea{resize:vertical;min-height:60px}
     <div class="mf"><button class="btn-s" onclick="closeModal('allwOv')">Abbrechen</button><button class="btn-p" onclick="saveAllw()">💾 Speichern</button></div>
   </div>
 </div>
-<!-- Ticket Form -->
+
+<!-- MODAL: Ticket Form -->
 <div class="ov" id="tkFormOv">
   <div class="modal wide">
     <div class="mh"><h2 id="tkFT">Neues Ticket</h2><button class="mc" onclick="closeModal('tkFormOv')">✕</button></div>
     <div class="mb2">
       <input type="hidden" id="tkFId">
       <div class="fg full"><label>Titel *</label><input type="text" id="tkFNm"></div>
-      <div class="fg full"><label>Beschreibung</label><textarea id="tkFDesc" rows="4" class="textarea"></textarea></div>
+      <div class="fg full"><label>Beschreibung</label><textarea id="tkFDesc" rows="4"></textarea></div>
       <div class="fr">
         <div class="fg"><label>Fachbereich *</label><select id="tkFDept"><option value="technik">🔧 Technik</option><option value="leitung">⭐ Leitung</option><option value="dienstplanung">📋 Dienstplanung</option><option value="ausbildung">🎓 Ausbildung</option><option value="qm">✅ QM</option></select></div>
         <div class="fg"><label>Priorität</label><select id="tkFPrio"><option value="low">🟢 Gering</option><option value="medium" selected>🟡 Mittel</option><option value="high">🔴 Hoch</option></select></div>
@@ -353,7 +150,7 @@ select option{background:var(--sf)}.textarea{resize:vertical;min-height:60px}
         <div class="fg"><label>Bucket</label><select id="tkFBkt"></select></div>
       </div>
       <div class="fr">
-        <div class="fg"><label>Tags (Mehrfachauswahl)</label><select id="tkFTags" multiple style="min-height:70px"></select></div>
+        <div class="fg"><label>Tags</label><select id="tkFTags" multiple style="min-height:70px"></select></div>
         <div class="fg"><label>Zuständig</label><select id="tkFAsgn"><option value="">— niemand —</option></select></div>
       </div>
       <div class="fg full"><label>Elternticket</label><select id="tkFPar"><option value="">— kein Elternticket —</option></select></div>
@@ -361,7 +158,8 @@ select option{background:var(--sf)}.textarea{resize:vertical;min-height:60px}
     <div class="mf"><button class="btn-s" onclick="closeModal('tkFormOv')">Abbrechen</button><button class="btn-p" onclick="saveTicket()">💾 Speichern</button></div>
   </div>
 </div>
-<!-- Ticket Detail -->
+
+<!-- MODAL: Ticket Detail -->
 <div class="ov" id="tkDetOv">
   <div class="modal xl">
     <div class="mh" id="tkDetHdr">
@@ -378,7 +176,8 @@ select option{background:var(--sf)}.textarea{resize:vertical;min-height:60px}
     <div class="tk-body"><div class="tk-main" id="tkDetMain"></div><div class="tk-sb" id="tkDetSB"></div></div>
   </div>
 </div>
-<!-- Checklist Template Form -->
+
+<!-- MODAL: Checklist Template Form -->
 <div class="ov" id="clFormOv">
   <div class="modal">
     <div class="mh"><h2 id="clFormT">Checkliste</h2><button class="mc" onclick="closeModal('clFormOv')">✕</button></div>
@@ -388,24 +187,26 @@ select option{background:var(--sf)}.textarea{resize:vertical;min-height:60px}
         <div class="fg"><label>Name *</label><input type="text" id="clFNm"></div>
         <div class="fg"><label>Fachbereich *</label><select id="clFDept"><option value="technik">🔧 Technik</option><option value="leitung">⭐ Leitung</option><option value="dienstplanung">📋 Dienstplanung</option><option value="ausbildung">🎓 Ausbildung</option><option value="qm">✅ QM</option></select></div>
       </div>
-      <div class="fg full"><label>Einträge – einer pro Zeile *</label><textarea id="clFItems" rows="9" class="textarea" placeholder="Schritt 1&#10;Schritt 2&#10;Schritt 3"></textarea></div>
+      <div class="fg full"><label>Einträge – einer pro Zeile *</label><textarea id="clFItems" rows="9" placeholder="Schritt 1&#10;Schritt 2&#10;Schritt 3"></textarea></div>
     </div>
     <div class="mf"><button class="btn-s" onclick="closeModal('clFormOv')">Abbrechen</button><button class="btn-p" onclick="saveClTemplate()">💾 Speichern</button></div>
   </div>
 </div>
-<!-- Message Form -->
+
+<!-- MODAL: Message Form -->
 <div class="ov" id="msgFormOv">
   <div class="modal">
     <div class="mh"><h2>✉️ Neue Nachricht</h2><button class="mc" onclick="closeModal('msgFormOv')">✕</button></div>
     <div class="mb2">
       <div class="fg"><label>An</label><select id="msgTo"><option value="">Alle Mitarbeiter</option><option value="technik">🔧 Technik</option><option value="leitung">⭐ Leitung</option><option value="dienstplanung">📋 Dienstplanung</option><option value="ausbildung">🎓 Ausbildung</option><option value="qm">✅ QM</option></select></div>
       <div class="fg"><label>Betreff *</label><input type="text" id="msgTitle"></div>
-      <div class="fg"><label>Nachricht *</label><textarea id="msgBody" rows="5" class="textarea"></textarea></div>
+      <div class="fg"><label>Nachricht *</label><textarea id="msgBody" rows="5"></textarea></div>
     </div>
     <div class="mf"><button class="btn-s" onclick="closeModal('msgFormOv')">Abbrechen</button><button class="btn-p" onclick="sendMessage()">📤 Senden</button></div>
   </div>
 </div>
-<!-- Admin -->
+
+<!-- MODAL: Admin -->
 <div class="ov" id="admOv">
   <div class="modal wide">
     <div class="mh"><h2>⚙️ Administration</h2><button class="mc" onclick="closeModal('admOv')">✕</button></div>
@@ -432,7 +233,8 @@ select option{background:var(--sf)}.textarea{resize:vertical;min-height:60px}
     </div>
   </div>
 </div>
-<!-- User/Cat/Tag sub-forms -->
+
+<!-- MODAL: User Form -->
 <div class="ov" id="ufOv">
   <div class="modal">
     <div class="mh"><h2 id="ufT">Benutzer</h2><button class="mc" onclick="backToAdmin('users')">✕</button></div>
@@ -446,6 +248,8 @@ select option{background:var(--sf)}.textarea{resize:vertical;min-height:60px}
     <div class="mf"><button class="btn-s" onclick="backToAdmin('users')">Abbrechen</button><button class="btn-p" onclick="saveUser()">💾 Speichern</button></div>
   </div>
 </div>
+
+<!-- MODAL: Category Form -->
 <div class="ov" id="cfOv">
   <div class="modal sm">
     <div class="mh"><h2 id="cfT">Kategorie</h2><button class="mc" onclick="backToAdmin('cats')">✕</button></div>
@@ -457,6 +261,8 @@ select option{background:var(--sf)}.textarea{resize:vertical;min-height:60px}
     <div class="mf"><button class="btn-s" onclick="backToAdmin('cats')">Abbrechen</button><button class="btn-p" onclick="saveCat()">💾 Speichern</button></div>
   </div>
 </div>
+
+<!-- MODAL: Tag Form -->
 <div class="ov" id="tfOv">
   <div class="modal sm">
     <div class="mh"><h2 id="tfT">Tag</h2><button class="mc" onclick="backToAdmin('tags')">✕</button></div>
@@ -469,886 +275,14 @@ select option{background:var(--sf)}.textarea{resize:vertical;min-height:60px}
   </div>
 </div>
 
-<script>
-// ══ CONSTANTS ══
-const MONTHS=['Jänner','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
-const PAL=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#14b8a6','#6366f1','#64748b'];
-const PAL_D=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#a05be8','#5b8be8','#8888a8'];
-const ROLES=[{id:'admin',label:'Administrator',icon:'🔑'},{id:'leitung',label:'Leitung',icon:'⭐'},{id:'dienstplanung',label:'Dienstplanung',icon:'📋'},{id:'technik',label:'Technik',icon:'🔧'},{id:'ausbildung',label:'Ausbildung',icon:'🎓'},{id:'qm',label:'QM',icon:'✅'},{id:'standard',label:'Standard',icon:'👤'}];
-const DEPTS=['technik','leitung','dienstplanung','ausbildung','qm'];
-const DLBL={technik:'🔧 Technik',leitung:'⭐ Leitung',dienstplanung:'📋 Dienstplanung',ausbildung:'🎓 Ausbildung',qm:'✅ QM'};
-const PRIO=[{id:'low',label:'🟢 Gering'},{id:'medium',label:'🟡 Mittel'},{id:'high',label:'🔴 Hoch'}];
-const STS=[{id:'open',label:'Offen'},{id:'in_progress',label:'In Bearbeitung'},{id:'on_hold',label:'Zurückgestellt'},{id:'closed',label:'Abgeschlossen'}];
-const BKTS=[{id:'urgent',label:'🚨 Dringend'},{id:'week',label:'📅 Diese Woche'},{id:'sched',label:'📋 Dienstplanung'},{id:'wait',label:'⏳ Warten'},{id:'it',label:'💻 IT / Systeme'},{id:'proj',label:'🚀 Projekte'},{id:'org',label:'🏢 Organisation'},{id:'ideas',label:'💡 Ideen / Irgendwann'}];
-const RM=[
-  ['Benutzer verwalten',{admin:1,leitung:0,dienstplanung:0,technik:0,ausbildung:0,qm:0,standard:0}],
-  ['Alle Einträge sehen',{admin:1,leitung:1,dienstplanung:1,technik:0,ausbildung:2,qm:2,standard:0}],
-  ['Einträge freigeben',{admin:1,leitung:1,dienstplanung:1,technik:0,ausbildung:0,qm:0,standard:0}],
-  ['Allgemeine Einträge',{admin:1,leitung:1,dienstplanung:1,technik:1,ausbildung:1,qm:1,standard:0}],
-  ['Für andere eintragen',{admin:1,leitung:1,dienstplanung:1,technik:0,ausbildung:1,qm:1,standard:0}],
-  ['Alle Zulagen bearb.',{admin:1,leitung:1,dienstplanung:1,technik:0,ausbildung:0,qm:0,standard:0}],
-  ['Alle Tickets sehen',{admin:1,leitung:1,dienstplanung:0,technik:0,ausbildung:0,qm:0,standard:0}],
-  ['Fachbereich-Tickets',{admin:1,leitung:1,dienstplanung:1,technik:1,ausbildung:1,qm:1,standard:0}],
-  ['Status/Bucket setzen',{admin:1,leitung:1,dienstplanung:1,technik:1,ausbildung:1,qm:1,standard:0}],
-  ['Nachrichten senden',{admin:1,leitung:1,dienstplanung:1,technik:0,ausbildung:0,qm:0,standard:0}],
-  ['Kategorien & Tags',{admin:1,leitung:0,dienstplanung:0,technik:0,ausbildung:0,qm:0,standard:0}],
-];
-const AL_LBL={login:'🔑 Login',logout:'🚪 Logout',change_password:'🔐 PW geändert',create_event:'📅 Eintrag erstellt',edit_event:'✏️ Eintrag bearbeitet',delete_event:'🗑️ Eintrag gelöscht',approve_event:'✅ Freigabe/Ablehnung',create_ticket:'🎫 Ticket erstellt',update_ticket:'📝 Ticket geändert',delete_ticket:'🗑️ Ticket gelöscht',send_message:'✉️ Nachricht gesendet',ack_message:'✓ Nachricht bestätigt'};
-
-// ══ STATE ══
-let S={
-  year:new Date().getFullYear(),month:new Date().getMonth(),
-  currentUser:null,loginSel:null,view:'dashboard',filterUser:null,
-  tkFD:'',tkFP:'',tkFB:'',tkFT2:'',tkFA:'',tkFS:'',tkSrch:'',
-  allwYear:new Date().getFullYear(),allwPeriod:'month',allwMonth:new Date().getMonth()+1,
-  events:[],users:[],categories:[],tags:[],allowances:[],tickets:[],messages:[],clTemplates:[],
-  permissions:{},activeUsers:[],currentTicketId:null,
-  ufCol:PAL[0],cfCol:PAL[2],tfCol:PAL[0],logOffset:0,logTotal:0,
-};
-
-// ══ API ══
-const api=(method,path2,body)=>{
-  const o={method,credentials:'include',headers:{}};
-  if(body){o.headers['Content-Type']='application/json';o.body=JSON.stringify(body);}
-  return fetch('/api'+path2,o).then(r=>r.json()).then(d=>{if(!d.success)throw new Error(d.error||'Fehler');return d.data;});
-};
-const loading=v=>document.getElementById('loadingOv').classList.toggle('open',v);
-async function fetchData(){
-  loading(true);
-  try{
-    const d=await api('GET','/data');
-    Object.assign(S,{users:d.users||[],categories:d.categories||[],tags:d.tags||[],events:d.events||[],tickets:d.tickets||[],allowances:d.allowances||[],messages:d.messages||[],clTemplates:d.clTemplates||[],currentUser:d.currentUser,permissions:d.permissions||{}});
-    const ur=S.messages.filter(m=>!m.acked&&!m.isMine).length;
-    const b=document.getElementById('msgBdg');if(b){b.textContent=ur;b.style.display=ur?'':'none';}
-  }finally{loading(false);}
-}
-
-// ══ HELPERS ══
-const getU=id=>S.users.find(u=>u.id===id);
-const getCat=id=>S.categories.find(c=>c.id===id);
-const getTag=id=>S.tags.find(t=>t.id===id);
-const getTk=id=>S.tickets.find(t=>t.id===id);
-const getAllw=(uid,y,m)=>S.allowances.find(a=>a.userId===uid&&a.year===y&&a.month===m)||{nd:0,fd:0,fw:0,c10:0};
-const getRD=r=>ROLES.find(x=>x.id===r)||ROLES[6];
-const fd=s=>{if(!s)return'—';const[y,m,d]=s.split('-');return`${d}.${m}.${y}`;};
-const fdt=s=>{if(!s)return'—';const d=new Date(s);return`${fd(d.toISOString().slice(0,10))} ${d.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'})}`;};
-const avH=(init,col,sz=24,fs=10)=>`<div style="width:${sz}px;height:${sz}px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:${fs}px;font-weight:700;background:${col}22;color:${col};flex-shrink:0">${init}</div>`;
-const rBdg=uid=>((getU(uid)?.roles)||['standard']).map(r=>{const d=getRD(r);return`<span class="rb rb-${r}">${d.icon} ${d.label}</span>`;}).join('');
-const prioBdg=p=>`<span class="bdg pr-${p}">${PRIO.find(x=>x.id===p)?.label||p}</span>`;
-const stBdg=s=>`<span class="bdg st-${s}">${STS.find(x=>x.id===s)?.label||s}</span>`;
-const dBdg=d=>`<span class="bdg dp-${d}">${DLBL[d]||d}</span>`;
-const tagC=tgs=>(tgs||[]).map(tid=>{const t=getTag(tid);return t?`<span class="tag-chip" style="background:${t.color}1a;color:${t.color};border:1px solid ${t.color}30">${t.label}</span>`:''}).join('');
-const apBdg=ap=>ap==='approved'?`<span class="bdg ap-approved">✅ Genehmigt</span>`:ap==='rejected'?`<span class="bdg ap-rejected">❌ Abgelehnt</span>`:ap==='pending'?`<span class="bdg ap-pending">⏳ Ausstehend</span>`:'';
-const curPal=()=>document.documentElement.getAttribute('data-theme')==='dark'?PAL_D:PAL;
-const h2r=hex=>{const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return`rgb(${r}, ${g}, ${b})`;};
-
-// ══ MOBILE ══
-function toggleMob(){
-  document.getElementById('SB').classList.toggle('mob-open');
-  document.getElementById('sbOv').classList.toggle('mob-open');
-}
-function closeMob(){
-  document.getElementById('SB').classList.remove('mob-open');
-  document.getElementById('sbOv').classList.remove('mob-open');
-}
-
-// ══ AUTH ══
-let _lu=[];
-async function loadLoginUsers(){
-  try{_lu=await api('GET','/auth/users');}catch(e){_lu=[];}
-  const sel=document.getElementById('luSel');
-  sel.innerHTML='<option value="">— Benutzer wählen —</option>'+_lu.map(u=>`<option value="${u.id}">${u.name}  (${(u.roles||['standard']).map(r=>getRD(r).icon).join('')})</option>`).join('');
-  document.getElementById('lpw').value='';
-  document.getElementById('lerr').style.display='none';
-}
-async function doLogin(){
-  const sel=document.getElementById('luSel').value;
-  if(!sel){toast('⚠️ Bitte Benutzer wählen!');return;}
-  try{
-    loading(true);
-    const res=await api('POST','/auth/login',{userId:sel,password:document.getElementById('lpw').value});
-    S.currentUser=res.userId;
-    if(res.mustChangePW){
-      document.getElementById('LS').classList.remove('open');
-      document.getElementById('np1').value='';document.getElementById('np2').value='';
-      document.getElementById('CPWS').classList.add('open');
-    }else{await fetchData();loginOK();}
-  }catch(e){document.getElementById('lerr').style.display='block';document.getElementById('lpw').value='';}
-  finally{loading(false);}
-}
-async function doForcePW(){
-  const p1=document.getElementById('np1').value,p2=document.getElementById('np2').value;
-  if(p1.length<6){toast('⚠️ Min. 6 Zeichen!');return;}
-  if(p1!==p2){toast('⚠️ Passwörter stimmen nicht überein!');return;}
-  try{
-    loading(true);
-    await fetch('/api/auth/change-password',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({currentPassword:'',newPassword:p1})});
-    document.getElementById('CPWS').classList.remove('open');
-    await fetchData();loginOK();
-  }catch(e){toast('⚠️ '+e.message);}
-  finally{loading(false);}
-}
-function loginOK(){
-  document.getElementById('LS').classList.remove('open');
-  document.getElementById('hdr').style.display='flex';
-  document.getElementById('APP').style.display='grid';
-  const u=getU(S.currentUser);
-  document.getElementById('pillNm').textContent=u?.name||'?';
-  const pa=document.getElementById('pillAv');
-  pa.textContent=u?.initials||'?';pa.style.background=(u?.color||'#888')+'22';pa.style.color=u?.color||'#888';
-  document.getElementById('ni-admin').style.display=S.permissions.isAdmin?'flex':'none';
-  setView('dashboard');
-  toast(`👋 Willkommen, ${u?.name||''}!`);
-  setInterval(pollActive,60000);pollActive();
-}
-async function logout(){
-  loading(true);try{await api('POST','/auth/logout');}catch(e){}finally{loading(false);}
-  S.currentUser=null;
-  document.getElementById('hdr').style.display='none';document.getElementById('APP').style.display='none';
-  await loadLoginUsers();document.getElementById('LS').classList.add('open');
-}
-async function doChangePW(){
-  const c=document.getElementById('cpw0').value,n=document.getElementById('cpw1').value,n2=document.getElementById('cpw2').value;
-  if(n.length<6){toast('⚠️ Min. 6 Zeichen!');return;}
-  if(n!==n2){toast('⚠️ Passwörter stimmen nicht!');return;}
-  try{await api('POST','/auth/change-password',{currentPassword:c,newPassword:n});closeModal('pwModal');toast('✅ Passwort geändert!');}
-  catch(e){toast('⚠️ '+e.message,'err');}
-}
-async function pollActive(){
-  try{S.activeUsers=await api('GET','/active-users');}catch(e){S.activeUsers=[];}
-  if(S.view==='dashboard')renderMain();
-}
-
-// ══ NAVIGATION ══
-function toggleNS(id){
-  document.getElementById(id+'Hdr').classList.toggle('open');
-  document.getElementById(id+'Sub').classList.toggle('open');
-}
-function setView(v){
-  S.view=v;
-  ['dashboard','schedule','allw','tickets','tickets_closed','checklists','messages'].forEach(x=>{
-    const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);
-  });
-  renderSBF();renderMain();closeMob();
-}
-
-// ══ SIDEBAR ══
-function renderSBF(){
-  const el=document.getElementById('sbf');
-  if(S.view==='schedule'){
-    el.innerHTML=`<div>
-      <div class="sfl">Jahr & Monat</div>
-      <div class="yr-row"><button class="yb" onclick="S.year--;renderSBF();renderMain()">‹</button><span class="yv">${S.year}</span><button class="yb" onclick="S.year++;renderSBF();renderMain()">›</button></div>
-      <div class="mgrid"><button class="mb ${S.month===null?'on':''}" onclick="S.month=null;renderSBF();renderMain()">Alle</button>${MONTHS.map((m,i)=>`<button class="mb ${S.month===i?'on':''}" onclick="S.month=${i};renderSBF();renderMain()">${m.slice(0,3)}</button>`).join('')}</div>
-    </div>
-    ${S.permissions.seeAllEntries?`<div><div class="sfl">Mitarbeiter</div><select class="sbsel" onchange="S.filterUser=this.value||null;renderMain()"><option value="">Alle Mitarbeiter</option>${S.users.filter(u=>!(u.roles||[]).includes('admin')).map(u=>`<option value="${u.id}"${S.filterUser===u.id?' selected':''}>${u.name}</option>`).join('')}</select></div>`:''}`;
-  }else if(S.view==='allw'){
-    el.innerHTML=`<div>
-      <div class="sfl">Jahr</div>
-      <div class="yr-row"><button class="yb" onclick="S.allwYear--;renderSBF();renderMain()">‹</button><span class="yv">${S.allwYear}</span><button class="yb" onclick="S.allwYear++;renderSBF();renderMain()">›</button></div>
-      <div class="sfl" style="margin-top:8px">Zeitraum</div>
-      <div style="display:flex;flex-direction:column;gap:3px">
-        ${['month','h1','h2','year'].map(p=>`<button class="mb ${S.allwPeriod===p?'on':''}" style="text-align:left;padding:5px 7px" onclick="S.allwPeriod='${p}';renderSBF();renderMain()">${{month:'Monatlich',h1:'1. Halbjahr',h2:'2. Halbjahr',year:'Gesamtjahr'}[p]}</button>`).join('')}
-      </div>
-      ${S.allwPeriod==='month'?`<div style="margin-top:8px"><div class="sfl">Monat</div><div class="mgrid">${MONTHS.map((m,i)=>`<button class="mb ${S.allwMonth===i+1?'on':''}" onclick="S.allwMonth=${i+1};renderSBF();renderMain()">${m.slice(0,3)}</button>`).join('')}</div></div>`:''}
-    </div>`;
-  }else if(S.view==='tickets'||S.view==='tickets_closed'){
-    const myD=S.permissions.isAdmin||S.permissions.isDP?DEPTS:(S.permissions.myDepts||[]);
-    el.innerHTML=`
-      <div><div class="sfl">Fachbereich</div><div style="display:flex;flex-direction:column;gap:3px">
-        <button class="mb ${!S.tkFD?'on':''}" onclick="S.tkFD='';renderMain()" style="text-align:left;padding:4px 7px">Alle</button>
-        ${myD.map(d=>`<button class="mb ${S.tkFD===d?'on':''}" onclick="S.tkFD='${d}';renderMain()" style="text-align:left;padding:4px 7px;font-size:11px">${DLBL[d]}</button>`).join('')}
-      </div></div>
-      <div><div class="sfl">Priorität</div><div style="display:flex;flex-direction:column;gap:3px">
-        <button class="mb ${!S.tkFP?'on':''}" onclick="S.tkFP='';renderMain()" style="text-align:left;padding:4px 7px">Alle</button>
-        ${PRIO.map(p=>`<button class="mb ${S.tkFP===p.id?'on':''}" onclick="S.tkFP='${p.id}';renderMain()" style="text-align:left;padding:4px 7px">${p.label}</button>`).join('')}
-      </div></div>
-      <div><div class="sfl">Status</div><div style="display:flex;flex-direction:column;gap:3px">
-        <button class="mb ${!S.tkFS?'on':''}" onclick="S.tkFS='';renderMain()" style="text-align:left;padding:4px 7px">Alle</button>
-        ${STS.filter(s=>S.view==='tickets_closed'?s.id==='closed':s.id!=='closed').map(s=>`<button class="mb ${S.tkFS===s.id?'on':''}" onclick="S.tkFS='${s.id}';renderMain()" style="text-align:left;padding:4px 7px;font-size:11px">${s.label}</button>`).join('')}
-      </div></div>
-      <div><div class="sfl">Bucket</div><div style="display:flex;flex-direction:column;gap:3px">
-        <button class="mb ${!S.tkFB?'on':''}" onclick="S.tkFB='';renderMain()" style="text-align:left;padding:4px 7px">Alle</button>
-        ${BKTS.map(b=>`<button class="mb ${S.tkFB===b.id?'on':''}" onclick="S.tkFB='${b.id}';renderMain()" style="text-align:left;padding:4px 7px;font-size:10px">${b.label}</button>`).join('')}
-      </div></div>`;
-  }else el.innerHTML='';
-}
-
-// ══ MAIN RENDER ══
-function renderMain(){
-  if(S.view==='dashboard')renderDashboard();
-  else if(S.view==='schedule')renderSchedule();
-  else if(S.view==='allw')renderAllw();
-  else if(S.view==='tickets'||S.view==='tickets_closed')renderTickets();
-  else if(S.view==='checklists')renderChecklists();
-  else if(S.view==='messages')renderMessages();
-}
-
-// ── DASHBOARD ──
-function renderDashboard(){
-  const u=getU(S.currentUser);
-  const h=new Date().getHours();
-  const gr=h<12?'☀️ Guten Morgen':h<18?'🌤️ Guten Tag':'🌙 Guten Abend';
-  const myEvts=S.events.filter(ev=>!ev.isGeneral&&(ev.userId===S.currentUser||ev.createdBy===S.currentUser));
-  const apC=myEvts.filter(e=>e.approved==='approved').length;
-  const pC=myEvts.filter(e=>e.approved==='pending').length;
-  const rC=myEvts.filter(e=>e.approved==='rejected').length;
-  const unread=S.messages.filter(m=>!m.acked&&!m.isMine);
-  document.getElementById('main').innerHTML=`
-    <div class="ph"><div class="pt">${gr}, <span>${u?.name||'?'}</span></div></div>
-    <div class="dash-grid">
-      <div class="dash-card">
-        <h3>🟢 Aktuell eingeloggt (${S.activeUsers.length})</h3>
-        <div class="au-list">${S.activeUsers.length?S.activeUsers.map(u2=>`<div class="au-chip">${avH(u2.initials,u2.color,20,8)}<div class="au-dot"></div><span>${u2.name}</span></div>`).join(''):'<span style="color:var(--di);font-size:12px">Keine anderen Benutzer aktiv</span>'}</div>
-      </div>
-      <div class="dash-card">
-        <h3>📋 Meine Einträge</h3>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <div class="sc" style="flex:1;min-width:70px"><div class="sv" style="color:var(--ok)">${apC}</div><div class="sl">✅ Genehmigt</div></div>
-          <div class="sc" style="flex:1;min-width:70px"><div class="sv" style="color:var(--warn)">${pC}</div><div class="sl">⏳ Ausstehend</div></div>
-          <div class="sc" style="flex:1;min-width:70px"><div class="sv" style="color:var(--danger)">${rC}</div><div class="sl">❌ Abgelehnt</div></div>
-        </div>
-        <button class="btn-s" style="width:100%;margin-top:10px;font-size:12px" onclick="setView('schedule')">Meine Einträge anzeigen →</button>
-      </div>
-      <div class="dash-card" style="grid-column:1/-1">
-        <h3>📬 Ungelesene Nachrichten (${unread.length})</h3>
-        ${unread.length?unread.slice(0,5).map(m=>{const snd=getU(m.fromUserId);return`<div class="msg-card unread"><div class="msg-title">${m.title}</div><div class="msg-meta">Von: ${snd?.name||'?'} · ${fdt(m.createdAt)}${m.toDepartment?' · '+DLBL[m.toDepartment]:' · Alle'}</div><div class="msg-body">${m.body.slice(0,200)}${m.body.length>200?'…':''}</div><button class="btn-ok" style="margin-top:8px" onclick="ackMsg('${m.id}')">✓ Bestätigen</button></div>`;}).join('')+'<br>'+
-        (unread.length>5?`<button class="btn-s" onclick="setView('messages')">Alle ${unread.length} Nachrichten ansehen →</button>`:'')
-        :'<span style="color:var(--di);font-size:13px">Keine ungelesenen Nachrichten. 🎉</span>'}
-      </div>
-    </div>`;
-}
-
-// ── SCHEDULE ──
-function getVisEvts(){
-  let evs=[...S.events];
-  if(!S.permissions.seeAllEntries) evs=evs.filter(ev=>ev.isGeneral||ev.userId===S.currentUser||ev.createdBy===S.currentUser);
-  if(S.filterUser) evs=evs.filter(ev=>!ev.isGeneral&&ev.userId===S.filterUser);
-  if(S.month!==null) evs=evs.filter(ev=>{const d=new Date(ev.dateFrom);return d.getFullYear()===S.year&&d.getMonth()===S.month;});
-  else evs=evs.filter(ev=>new Date(ev.dateFrom).getFullYear()===S.year);
-  return evs.sort((a,b)=>a.dateFrom.localeCompare(b.dateFrom));
-}
-function renderSchedule(){
-  const evs=getVisEvts();
-  const fuN=S.filterUser?getU(S.filterUser)?.name:null;
-  const counts={};S.categories.forEach(c=>counts[c.id]=0);evs.forEach(ev=>{if(counts[ev.category]!==undefined)counts[ev.category]++;});
-  document.getElementById('main').innerHTML=`
-    <div class="ph">
-      <div class="pt">Eintragsübersicht <span>${S.month!==null?MONTHS[S.month]+' ':''+ S.year}</span>${fuN?`<small>· Ansicht von Mitarbeiter: <b>${fuN}</b></small>`:''}</div>
-      <button class="btn-p" onclick="openEvtModal()">＋ Eintrag hinzufügen</button>
-    </div>
-    <div class="sr">${S.categories.slice(0,4).map(c=>`<div class="sc"><div class="sv" style="color:${c.color}">${counts[c.id]||0}</div><div class="sl">${c.emoji} ${c.label}</div></div>`).join('')}</div>
-    <div class="tw">
-      <div class="tt"><h2>Einträge</h2>
-        <input class="srch" type="text" placeholder="Suchen …" oninput="renderSchedRows(this.value)" style="width:150px">
-        <select class="flt" onchange="renderSchedRows(undefined,this.value)"><option value="">Alle Kategorien</option>${S.categories.map(c=>`<option value="${c.id}">${c.emoji} ${c.label}</option>`).join('')}</select>
-        <select class="flt" onchange="renderSchedRows(undefined,undefined,this.value)"><option value="">Alle Status</option><option value="pending">Ausstehend</option><option value="approved">Genehmigt</option><option value="rejected">Abgelehnt</option></select>
-      </div>
-      <table><thead><tr><th>Datum</th><th>Zeit</th><th>Mitarbeiter</th><th>Kategorie</th><th>Beschreibung</th><th>Status</th><th>Aktionen</th></tr></thead>
-      <tbody id="scTb">${buildEvRows(evs)}</tbody></table>
-      ${!evs.length?'<div class="empty">📭 Keine Einträge für diesen Zeitraum.</div>':''}
-    </div>`;
-}
-function buildEvRows(evs,srch='',catF='',apF=''){
-  const p=S.permissions;
-  return evs.filter(ev=>{
-    if(catF&&!ev.isGeneral&&ev.category!==catF)return false;
-    if(apF&&!ev.isGeneral&&ev.approved!==apF)return false;
-    if(srch){const s=srch.toLowerCase();const un=getU(ev.userId)?.name.toLowerCase()||'';if(!ev.reason.toLowerCase().includes(s)&&!un.includes(s))return false;}
-    return true;
-  }).map(ev=>{
-    const cat=ev.isGeneral?null:getCat(ev.category)||{label:'?',color:'#888',emoji:'📌'};
-    const emp=ev.isGeneral?null:getU(ev.userId)||{name:'?',color:'#888',initials:'?'};
-    const ds=ev.dateTo&&ev.dateTo!==ev.dateFrom?`${fd(ev.dateFrom)} – ${fd(ev.dateTo)}`:fd(ev.dateFrom);
-    const ts=ev.timeFrom?(ev.timeTo?`${ev.timeFrom}–${ev.timeTo}`:ev.timeFrom):'—';
-    const canDel=(ev.isGeneral&&p.manageGeneral)||(!ev.isGeneral&&(p.editAllPersonal||ev.createdBy===S.currentUser));
-    const canEdit=ev._canEdit&&!ev.isGeneral;
-    const canAppr=ev._canApprove&&!ev.isGeneral;
-    const isAnon=ev._anon;
-    const empCell=ev.isGeneral?`<span class="bdg" style="background:color-mix(in srgb,var(--ok)12%,transparent);color:var(--ok)">🌐 Allgemein</span>`:
-      emp?`<div style="display:flex;align-items:center;gap:6px">${avH(emp.initials,emp.color,20,8)}<span>${emp.name}</span></div>`:'—';
-    const catCell=isAnon?`<span style="color:var(--di);font-size:12px">🔒 Anonym</span>`:
-      ev.isGeneral?`<span class="bdg" style="background:color-mix(in srgb,var(--ok)8%,transparent);color:var(--ok)">Allgemein</span>`:
-      cat?`<span class="bdg" style="background:${cat.color}1a;color:${cat.color};border:1px solid ${cat.color}28">${cat.emoji} ${cat.label}</span>`:'—';
-    const bgStyle=ev.isGeneral?'style="background:color-mix(in srgb,var(--ok)3%,var(--sf))"':ev._anon?'style="background:color-mix(in srgb,var(--warn)3%,var(--sf))"':'';
-    return`<tr ${bgStyle}>
-      <td style="font-size:11px;color:var(--mu);white-space:nowrap">${ds}</td>
-      <td style="font-size:11px;color:var(--mu)">${ts}</td>
-      <td>${empCell}</td><td>${catCell}</td>
-      <td style="max-width:200px">${isAnon?'<span style="color:var(--di)">(ausstehend)</span>':ev._blurred?`<span class="blur-c">${ev.reason}</span>`:ev.reason}</td>
-      <td>${ev.isGeneral?'':apBdg(ev.approved)}</td>
-      <td><div style="display:flex;gap:4px;flex-wrap:wrap">
-        ${canEdit?`<button class="btn-e" onclick="openEvtEdit('${ev.id}')">✎</button>`:''}
-        ${canAppr&&ev.approved!=='approved'?`<button class="btn-ok" onclick="approveEvt('${ev.id}','approved')" title="Genehmigen">✅</button>`:''}
-        ${canAppr&&ev.approved!=='rejected'?`<button class="btn-d" onclick="approveEvt('${ev.id}','rejected')" title="Ablehnen" style="font-size:13px;padding:3px 6px">❌</button>`:''}
-        ${canAppr&&ev.approved!=='pending'?`<button class="btn-w" onclick="approveEvt('${ev.id}','pending')" title="Zurücksetzen">↩</button>`:''}
-        ${canDel?`<button class="btn-d" onclick="deleteEvt('${ev.id}')">✕</button>`:''}
-      </div></td>
-    </tr>`;
-  }).join('');
-}
-let _scSrch='',_scCat='',_scAp='';
-function renderSchedRows(srch,cat,ap){
-  if(srch!==undefined)_scSrch=srch;if(cat!==undefined)_scCat=cat;if(ap!==undefined)_scAp=ap;
-  const tb=document.getElementById('scTb');if(tb)tb.innerHTML=buildEvRows(getVisEvts(),_scSrch,_scCat,_scAp);
-}
-
-// ── ALLOWANCES ──
-function getPeriodMonths(){
-  if(S.allwPeriod==='month')return[S.allwMonth];
-  if(S.allwPeriod==='h1')return[1,2,3,4,5,6];
-  if(S.allwPeriod==='h2')return[7,8,9,10,11,12];
-  return[1,2,3,4,5,6,7,8,9,10,11,12];
-}
-function sumAllw(uid,year,months){
-  return months.reduce((a,m)=>{const r=getAllw(uid,year,m);return{nd:a.nd+r.nd,fd:a.fd+r.fd,fw:a.fw+r.fw,c10:a.c10+r.c10};},{nd:0,fd:0,fw:0,c10:0});
-}
-function numCell(n,col){
-  if(!n)return`<td style="text-align:center;color:var(--di)">–</td>`;
-  return`<td style="text-align:center"><span style="display:inline-block;min-width:28px;text-align:center;font-weight:600;padding:1px 6px;border-radius:4px;background:${col}18;color:${col}">${n}</span></td>`;
-}
-function renderAllw(){
-  const months=getPeriodMonths(),yr=S.allwYear;
-  const pLbl={month:MONTHS[S.allwMonth-1],h1:'1. Halbjahr',h2:'2. Halbjahr',year:'Gesamtjahr'}[S.allwPeriod];
-  const showUsers=S.permissions.seeAllAllw?S.users.filter(u=>!(u.roles||[]).includes('admin')):[getU(S.currentUser)].filter(Boolean);
-  const canEdit=S.permissions.editAllw&&S.allwPeriod==='month';
-  const totals=showUsers.reduce((t,u)=>{const sv=sumAllw(u.id,yr,months);return{nd:t.nd+sv.nd,fd:t.fd+sv.fd,fw:t.fw+sv.fw,c10:t.c10+sv.c10};},{nd:0,fd:0,fw:0,c10:0});
-  // Average (for DP role, when multiple months)
-  const showAvg=S.permissions.isDP&&months.length>1;
-  const avgRow=showAvg&&showUsers.length>1?`<tr style="border-top:1px dashed var(--border);font-style:italic"><td style="color:var(--mu);font-size:12px">⌀ Durchschnitt/MA</td>
-    ${['nd','fd','fw','c10'].map(k=>`<td style="text-align:center;color:var(--teal);font-size:12px">${showUsers.length?(totals[k]/showUsers.length).toFixed(1):0}</td>`).join('')}
-    ${canEdit?'<td></td>':''}</tr>`:'';
-  document.getElementById('main').innerHTML=`
-    <div class="ph"><div class="pt">Zulagendienste <span>${pLbl} ${yr}</span></div></div>
-    ${!S.permissions.seeAllAllw?`<div class="ib3" style="margin-bottom:12px">ℹ️ Deine Zulagen sind schreibgeschützt – Bearbeitung durch die Dienstplanung.</div>`:''}
-    <div class="tw">
-      <div class="tt"><h2>${S.permissions.seeAllAllw?'Alle Mitarbeiter':'Meine Zulagen'}</h2></div>
-      <table><thead><tr><th>Mitarbeiter</th><th style="text-align:center">🌙 Nacht</th><th style="text-align:center">🎉 Feiertag</th><th style="text-align:center">🏖️ Freie WE</th><th style="text-align:center">📋 C10</th>${canEdit?'<th></th>':''}</tr></thead>
-      <tbody>
-        ${showUsers.map(u=>{const sv=sumAllw(u.id,yr,months);return`<tr><td><div style="display:flex;align-items:center;gap:7px">${avH(u.initials,u.color,22,9)}<span>${u.name}</span></div></td>${numCell(sv.nd,'#3b6dd4')}${numCell(sv.fd,'#10b981')}${numCell(sv.fw,'#f59e0b')}${numCell(sv.c10,'#7c3aed')}${canEdit?`<td><button class="btn-e" onclick="openAllwM('${u.id}',${yr},${S.allwMonth})">✏️</button></td>`:''}</tr>`;}).join('')}
-        ${showUsers.length>1?`<tr style="border-top:2px solid var(--border);font-weight:700"><td>Gesamt</td>${numCell(totals.nd,'#3b6dd4')}${numCell(totals.fd,'#10b981')}${numCell(totals.fw,'#f59e0b')}${numCell(totals.c10,'#7c3aed')}${canEdit?'<td></td>':''}</tr>`:''}
-        ${avgRow}
-      </tbody></table>
-    </div>`;
-}
-function openAllwM(uid,year,month){
-  const u=getU(uid),a=getAllw(uid,year,month);
-  document.getElementById('allwT').textContent=`${u?.name} – ${MONTHS[month-1]} ${year}`;
-  document.getElementById('allwInfo').textContent=`Zulagen für ${MONTHS[month-1]} ${year}`;
-  ['aUid','aYr','aMo'].forEach((id,i)=>document.getElementById(id).value=[uid,year,month][i]);
-  document.getElementById('aND').value=a.nd||'';document.getElementById('aFD').value=a.fd||'';
-  document.getElementById('aFW').value=a.fw||'';document.getElementById('aC10').value=a.c10||'';
-  openModal('allwOv');
-}
-async function saveAllw(){
-  const uid=document.getElementById('aUid').value,year=+document.getElementById('aYr').value,month=+document.getElementById('aMo').value;
-  try{
-    await api('PUT','/allowances',{userId:uid,year,month,nd:+document.getElementById('aND').value||0,fd:+document.getElementById('aFD').value||0,fw:+document.getElementById('aFW').value||0,c10:+document.getElementById('aC10').value||0});
-    await fetchData();closeModal('allwOv');renderMain();toast('✅ Zulagen gespeichert!');
-  }catch(e){toast('⚠️ '+e.message,'err');}
-}
-
-// ── EVENT CRUD ──
-function openEvtModal(editId){
-  const ev=editId?S.events.find(e=>e.id===editId):null;
-  document.getElementById('evtTitle').textContent=ev?'Eintrag bearbeiten':'Neuer Eintrag';
-  document.getElementById('evtId').value=ev?.id||'';
-  const p=S.permissions;
-  document.getElementById('genRow').style.display=p.addGeneral?'block':'none';
-  document.getElementById('fGen').checked=false;
-  document.getElementById('empRow').style.display='block';
-  const empSel=document.getElementById('fEmp');empSel.innerHTML='';
-  if(p.addForOthers){S.users.filter(u=>!(u.roles||[]).includes('admin')).forEach(u=>{const o=document.createElement('option');o.value=u.id;o.textContent=u.name;empSel.appendChild(o);});}
-  else{const o=document.createElement('option');o.value=S.currentUser;o.textContent=getU(S.currentUser)?.name||'Ich';empSel.appendChild(o);}
-  if(ev)empSel.value=ev.userId||'';
-  else empSel.value=S.currentUser;
-  document.getElementById('fCat').innerHTML='<option value="">— wählen —</option>'+S.categories.map(c=>`<option value="${c.id}"${ev?.category===c.id?' selected':''}>${c.emoji} ${c.label}</option>`).join('');
-  document.getElementById('fD1').value=ev?.dateFrom||'';document.getElementById('fD2').value=ev?.dateTo||'';
-  document.getElementById('fT1').value=ev?.timeFrom||'';document.getElementById('fT2').value=ev?.timeTo||'';
-  document.getElementById('fRsn').value=ev?.reason||'';
-  openModal('evtOv');
-}
-function openEvtEdit(id){openEvtModal(id);}
-function onGenToggle(){document.getElementById('empRow').style.display=document.getElementById('fGen').checked?'none':'block';}
-async function saveEvent(){
-  const id=document.getElementById('evtId').value;
-  const isGeneral=document.getElementById('fGen').checked;
-  const d1=document.getElementById('fD1').value,d2=document.getElementById('fD2').value;
-  const userId=isGeneral?null:document.getElementById('fEmp').value;
-  const category=document.getElementById('fCat').value;
-  const reason=document.getElementById('fRsn').value.trim();
-  if(!d1){toast('⚠️ Datum von ist erforderlich!');return;}
-  if(!isGeneral&&!userId){toast('⚠️ Mitarbeiter auswählen!');return;}
-  if(!category){toast('⚠️ Kategorie auswählen!');return;}
-  if(!reason){toast('⚠️ Beschreibung ist erforderlich!');return;}
-  const body={isGeneral,dateFrom:d1,dateTo:d2||d1,timeFrom:document.getElementById('fT1').value,timeTo:document.getElementById('fT2').value,userId,category,reason};
-  try{
-    if(id)await api('PUT','/events/'+id,body);
-    else await api('POST','/events',body);
-    await fetchData();closeModal('evtOv');renderMain();toast(id?'✅ Eintrag aktualisiert!':'✅ Eintrag gespeichert!');
-  }catch(e){toast('⚠️ '+e.message,'err');}
-}
-async function approveEvt(id,approved){
-  try{await api('PUT','/events/'+id+'/approve',{approved});await fetchData();renderMain();toast(approved==='approved'?'✅ Genehmigt!':approved==='rejected'?'❌ Abgelehnt.':'↩ Zurückgesetzt.');}
-  catch(e){toast('⚠️ '+e.message,'err');}
-}
-async function deleteEvt(id){
-  if(!confirm('Eintrag wirklich löschen?'))return;
-  try{await api('DELETE','/events/'+id);await fetchData();renderMain();toast('🗑️ Eintrag gelöscht.');}
-  catch(e){toast('⚠️ '+e.message,'err');}
-}
-
-// ── TICKETS ──
-function getVisTks(closed=false){
-  return S.tickets.filter(tk=>{
-    if(closed!==(tk.status==='closed'))return false;
-    if(S.tkFD&&tk.department!==S.tkFD)return false;
-    if(S.tkFP&&tk.priority!==S.tkFP)return false;
-    if(S.tkFB&&tk.bucket!==S.tkFB)return false;
-    if(S.tkFS&&tk.status!==S.tkFS)return false;
-    if(S.tkSrch){const s=S.tkSrch.toLowerCase();if(!tk.title.toLowerCase().includes(s)&&!tk.number.toLowerCase().includes(s))return false;}
-    return true;
-  }).sort((a,b)=>{const po={high:0,medium:1,low:2};return((po[a.priority]||1)-(po[b.priority]||1))||b.createdAt.localeCompare(a.createdAt);});
-}
-function renderTickets(){
-  const closed=S.view==='tickets_closed';
-  const tks=getVisTks(closed);
-  document.getElementById('main').innerHTML=`
-    <div class="ph">
-      <div class="pt">${closed?'Abgeschlossene':'Offene'} Tickets <small>(${tks.length})</small></div>
-      <button class="btn-p" onclick="openTkForm(null)">＋ Ticket erstellen</button>
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-      <input class="srch" type="text" placeholder="Suchen …" value="${S.tkSrch}" oninput="S.tkSrch=this.value;renderMain()" style="width:200px">
-      <select class="flt" onchange="S.tkFT2=this.value;renderMain()"><option value="">Alle Tags</option>${S.tags.map(t=>`<option value="${t.id}"${S.tkFT2===t.id?' selected':''}>${t.label}</option>`).join('')}</select>
-      <select class="flt" onchange="S.tkFA=this.value;renderMain()"><option value="">Alle Bearbeiter</option>${S.users.map(u=>`<option value="${u.id}"${S.tkFA===u.id?' selected':''}>${u.name}</option>`).join('')}</select>
-    </div>
-    <div class="tw">
-      <table><thead><tr><th>#</th><th>Titel</th><th>Fachbereich</th><th>Priorität</th><th>Status</th><th>Tags</th><th>Zuständig</th><th>Datum</th></tr></thead>
-      <tbody>${tks.length?tks.map(tk=>{
-        const par=tk.parentTicketId?getTk(tk.parentTicketId):null;
-        const asn=getU(tk.assigneeId);
-        const bkt=BKTS.find(b=>b.id===tk.bucket);
-        const isChild=!!tk.parentTicketId;
-        return`<tr class="clickable${isChild?' tk-sub-row':''}" onclick="openTkDetail('${tk.id}')">
-          <td style="white-space:nowrap"><span style="font-family:monospace;font-size:11px;color:var(--mu)">${isChild?'↳ ':''} ${tk.number}</span>${tk.isPublic?`<span class="bdg" style="font-size:9px;padding:1px 4px;margin-left:3px;background:color-mix(in srgb,var(--ok)12%,transparent);color:var(--ok)">🌐</span>`:''}</td>
-          <td style="max-width:220px"><div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${tk.title}</div>${bkt?`<div style="font-size:10px;color:var(--mu)">${bkt.label}</div>`:''}${tk.notes?.length?`<div style="font-size:10px;color:var(--di)">💬 ${tk.notes.filter(n=>!n.isSystem).length} Notizen</div>`:''}</td>
-          <td>${dBdg(tk.department)}</td><td>${prioBdg(tk.priority)}</td><td>${stBdg(tk.status)}</td>
-          <td>${tagC(tk.tags)}</td>
-          <td>${asn?`<div style="display:flex;align-items:center;gap:5px">${avH(asn.initials,asn.color,20,8)}<span style="font-size:12px">${asn.name}</span></div>`:'<span style="color:var(--di);font-size:11px">—</span>'}</td>
-          <td style="font-size:11px;color:var(--mu);white-space:nowrap">${fd(tk.createdAt?.slice(0,10))}</td>
-        </tr>`;
-      }).join(''):`<tr><td colspan="8"><div class="empty">📭 Keine Tickets</div></td></tr>`}
-      </tbody></table>
-    </div>`;
-}
-function openTkDetail(id){S.currentTicketId=id;renderTkDetail();openModal('tkDetOv');}
-function renderTkDetail(){
-  const tk=getTk(S.currentTicketId);if(!tk)return;
-  const canEdit=tk._canEdit;
-  const par=tk.parentTicketId?getTk(tk.parentTicketId):null;
-  const subs=S.tickets.filter(t=>t.parentTicketId===tk.id);
-  document.getElementById('tkDetNum').textContent=tk.number;
-  document.getElementById('tkDetTitle').textContent=tk.title;
-  document.getElementById('tkDetPrio').innerHTML=prioBdg(tk.priority);
-  document.getElementById('tkDetSt').innerHTML=stBdg(tk.status);
-  document.getElementById('tkDetEditBtn').style.display=canEdit?'':'none';
-  const bkt=BKTS.find(b=>b.id===tk.bucket);
-  // Main area
-  document.getElementById('tkDetMain').innerHTML=`
-    <div><label style="font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--di);display:block;margin-bottom:5px">BESCHREIBUNG</label>
-      <div style="font-size:13px;line-height:1.6;color:${tk.description?'var(--tx)':'var(--di)'}">${tk.description||'Keine Beschreibung vorhanden.'}</div>
-    </div>
-    ${subs.length||canEdit?`<div>
-      <label style="font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--di);display:block;margin-bottom:6px">UNTERTICKETS (${subs.length})</label>
-      <div class="subl">${subs.map(st=>`<div class="subi" onclick="S.currentTicketId='${st.id}';renderTkDetail()">${avH('↳','#888',16,10)}<span style="font-family:monospace;font-size:11px;color:var(--mu)">${st.number}</span><span style="flex:1;font-size:12px;font-weight:500">${st.title}</span>${stBdg(st.status)}</div>`).join('')}
-      ${canEdit?`<button class="btn-s" style="font-size:11px" onclick="openTkForm(null,'${tk.id}')">＋ Unterticket erstellen</button>`:''}
-      </div></div>`:''}
-    ${renderTkChecklists(tk,canEdit)}
-    <div>
-      <label style="font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--di);display:block;margin-bottom:6px">NOTIZEN & ÄNDERUNGEN (${(tk.notes||[]).length})</label>
-      <div class="nfeed">${(tk.notes||[]).map(n=>{
-        const a=n.authorId?getU(n.authorId):null;
-        if(n.isSystem)return`<div class="ni2 sys"><span style="font-size:10px;color:var(--di)">🔄 ${fdt(n.createdAt)}</span><div class="nt sys">${n.text}</div></div>`;
-        return`<div class="ni2"><div>${a?avH(a.initials,a.color,18,8):''}<span class="na">${a?.name||'?'}</span><span class="nd">${fdt(n.createdAt)}</span></div><div class="nt">${n.text}</div></div>`;
-      }).join('')||'<div style="color:var(--di);font-size:12px">Noch keine Notizen.</div>'}
-      </div>
-      ${canEdit?`<div style="display:flex;gap:7px;align-items:flex-end;margin-top:10px"><textarea id="noteInp" rows="2" placeholder="Notiz hinzufügen …" class="textarea" style="flex:1;min-height:56px"></textarea><button class="btn-p" onclick="addNote('${tk.id}')" style="padding:8px 12px;white-space:nowrap">Senden</button></div>`:''}
-    </div>`;
-  // Sidebar
-  const std=S.permissions.isStandard;
-  document.getElementById('tkDetSB').innerHTML=`
-    ${canEdit?`
-    <div class="tkf"><label>Status</label>${std?stBdg(tk.status):`<select onchange="updateTkF('${tk.id}','status',this.value)">${STS.map(s=>`<option value="${s.id}"${tk.status===s.id?' selected':''}>${s.label}</option>`).join('')}</select>`}</div>
-    <div class="tkf"><label>Priorität</label><select onchange="updateTkF('${tk.id}','priority',this.value)">${PRIO.map(p=>`<option value="${p.id}"${tk.priority===p.id?' selected':''}>${p.label}</option>`).join('')}</select></div>
-    <div class="tkf"><label>Fachbereich</label><select onchange="updateTkF('${tk.id}','department',this.value)">${DEPTS.map(d=>`<option value="${d}"${tk.department===d?' selected':''}>${DLBL[d]}</option>`).join('')}</select></div>
-    ${!std?`<div class="tkf"><label>Bucket</label><select onchange="updateTkF('${tk.id}','bucket',this.value)"><option value="">— keiner —</option>${BKTS.map(b=>`<option value="${b.id}"${tk.bucket===b.id?' selected':''}>${b.label}</option>`).join('')}</select></div>`:''}
-    <div class="tkf"><label>Zuständig</label><div style="display:flex;gap:5px">
-      <select onchange="updateTkF('${tk.id}','assigneeId',this.value||null)" style="flex:1"><option value="">— niemand —</option>${S.users.map(u=>`<option value="${u.id}"${tk.assigneeId===u.id?' selected':''}>${u.name}</option>`).join('')}</select>
-      ${tk.assigneeId!==S.currentUser?`<button class="btn-ok" onclick="updateTkF('${tk.id}','assigneeId','${S.currentUser}')" title="Ticket übernehmen">Ich</button>`:''}
-    </div></div>
-    ${S.permissions.canSetPublic?`<div class="tkf"><label>Sichtbarkeit</label><button class="bdg ${tk.isPublic?'ap-approved':'ap-pending'}" onclick="updateTkF('${tk.id}','isPublic',${!tk.isPublic})" style="cursor:pointer;padding:5px 12px;border-radius:6px;font-size:12px;width:100%;justify-content:center">${tk.isPublic?'🌐 Öffentlich':'🔒 Privat'}</button></div>`:''}
-    ${!std?`<div class="tkf"><label>Checkliste anhängen</label><div style="display:flex;gap:5px"><select id="clAttSel" style="flex:1;font-size:12px"><option value="">— Vorlage wählen —</option>${S.clTemplates.map(t=>`<option value="${t.id}">${t.name} (${DLBL[t.department]||t.department})</option>`).join('')}</select><button class="btn-p" onclick="attachChecklist('${tk.id}')" style="padding:5px 8px;font-size:12px">＋</button></div></div>`:''}
-    <div class="tkf"><label>Elternticket</label><select onchange="updateTkF('${tk.id}','parentTicketId',this.value||null)"><option value="">— kein —</option>${S.tickets.filter(t=>t.id!==tk.id&&t.status!=='closed').map(t=>`<option value="${t.id}"${tk.parentTicketId===t.id?' selected':''}>${t.number}: ${t.title.slice(0,30)}</option>`).join('')}</select></div>
-    `:`
-    <div class="tkf"><label>Status</label><div class="val">${stBdg(tk.status)}</div></div>
-    <div class="tkf"><label>Priorität</label><div class="val">${prioBdg(tk.priority)}</div></div>
-    <div class="tkf"><label>Fachbereich</label><div class="val">${dBdg(tk.department)}</div></div>
-    <div class="tkf"><label>Bucket</label><div class="val" style="font-size:12px">${bkt?.label||'—'}</div></div>
-    <div class="tkf"><label>Zuständig</label><div class="val">${getU(tk.assigneeId)?`<div style="display:flex;align-items:center;gap:5px">${avH(getU(tk.assigneeId).initials,getU(tk.assigneeId).color,20,8)}<span style="font-size:12px">${getU(tk.assigneeId).name}</span></div>`:'—'}</div></div>
-    `}
-    <div class="tkdiv"></div>
-    <div class="tkf"><label>Tags</label><div style="margin-top:3px">${tagC(tk.tags)||'<span style="color:var(--di);font-size:11px">Keine</span>'}</div></div>
-    <div class="tkf"><label>Erstellt von</label><div class="val" style="font-size:12px">${getU(tk.createdBy)?.name||'?'}</div></div>
-    <div class="tkf"><label>Erstellt am</label><div class="val" style="font-size:11px;color:var(--mu)">${fdt(tk.createdAt)}</div></div>
-    <div class="tkf"><label>Zuletzt geändert</label><div class="val" style="font-size:11px;color:var(--mu)">${fdt(tk.updatedAt)}</div></div>
-    ${par?`<div class="tkf"><label>Elternticket</label><div class="subi" style="padding:5px 8px;margin-top:3px;cursor:pointer" onclick="S.currentTicketId='${par.id}';renderTkDetail()"><span style="font-family:monospace;font-size:11px">${par.number}</span><span style="font-size:12px;flex:1;margin-left:6px">${par.title.slice(0,28)}</span></div></div>`:''}
-    ${canEdit&&tk.status!=='closed'?`<div class="tkdiv"></div><button class="btn-ok" style="width:100%;justify-content:center;padding:7px" onclick="updateTkF('${tk.id}','status','closed')">✓ Ticket abschließen</button>`:''}
-    ${canEdit?`<button class="btn-d" style="width:100%;justify-content:center;margin-top:4px;padding:5px" onclick="deleteTk('${tk.id}')">🗑️ Ticket löschen</button>`:''}
-    `;
-}
-function renderTkChecklists(tk,canEdit){
-  if(!tk.checklists||!tk.checklists.length)return'';
-  return`<div>
-    <label style="font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--di);display:block;margin-bottom:6px">CHECKLISTEN</label>
-    ${tk.checklists.map(cl=>{
-      const done=cl.items.filter(i=>i.checked).length,total=cl.items.length;
-      return`<div class="tk-cl">
-        <div class="tk-cl-h"><span>${cl.name} <span style="color:var(--mu);font-weight:400">(${done}/${total})</span></span>
-        ${canEdit?`<button class="btn-d" style="font-size:10px;padding:2px 5px" onclick="detachChecklist('${cl.id}')">✕</button>`:''}
-        </div>
-        ${cl.items.map(it=>`<div class="tk-cl-it${it.checked?' done':''}">
-          ${canEdit?`<input type="checkbox" ${it.checked?'checked':''} onchange="toggleClItem('${it.id}',this)">`:'<input type="checkbox" disabled '+( it.checked?'checked':'')+'>'}
-          <span>${it.text}</span>
-          ${it.checked&&it.checkedBy?`<span class="cl-who">${getU(it.checkedBy)?.name||'?'}</span>`:''}
-        </div>`).join('')}
-      </div>`;
-    }).join('')}
-  </div>`;
-}
-async function attachChecklist(tkId){
-  const sel=document.getElementById('clAttSel');
-  if(!sel?.value){toast('⚠️ Bitte Vorlage wählen!');return;}
-  try{await api('POST','/tickets/'+tkId+'/checklists',{templateId:sel.value});await fetchData();renderTkDetail();toast('✅ Checkliste angehängt!');}
-  catch(e){toast('⚠️ '+e.message,'err');}
-}
-async function detachChecklist(clId){
-  if(!confirm('Checkliste vom Ticket entfernen?'))return;
-  try{await api('DELETE','/ticket-checklists/'+clId);await fetchData();renderTkDetail();toast('🗑️ Checkliste entfernt.');}
-  catch(e){toast('⚠️ '+e.message,'err');}
-}
-async function toggleClItem(itemId,cb){
-  try{await api('PUT','/checklist-items/'+itemId+'/toggle',{});await fetchData();renderTkDetail();}
-  catch(e){cb.checked=!cb.checked;toast('⚠️ '+e.message,'err');}
-}
-async function updateTkF(id,field,value){
-  try{await api('PUT','/tickets/'+id,{[field]:value});await fetchData();renderMain();renderTkDetail();}
-  catch(e){toast('⚠️ '+e.message,'err');}
-}
-async function addNote(tkId){
-  const inp=document.getElementById('noteInp');
-  if(!inp?.value.trim())return;
-  try{await api('POST','/tickets/'+tkId+'/notes',{text:inp.value.trim()});await fetchData();renderTkDetail();}
-  catch(e){toast('⚠️ '+e.message,'err');}
-}
-function editCurrentTicket(){openTkForm(S.currentTicketId);}
-function openTkForm(id,parentId){
-  const tk=id?getTk(id):null;
-  document.getElementById('tkFT').textContent=tk?`Ticket bearbeiten: ${tk.number}`:'Neues Ticket';
-  document.getElementById('tkFId').value=tk?.id||'';
-  document.getElementById('tkFNm').value=tk?.title||'';
-  document.getElementById('tkFDesc').value=tk?.description||'';
-  document.getElementById('tkFDept').value=tk?.department||'technik';
-  document.getElementById('tkFPrio').value=tk?.priority||'medium';
-  document.getElementById('tkFSt').value=tk?.status||'open';
-  document.getElementById('tkFBkt').innerHTML='<option value="">— kein Bucket —</option>'+BKTS.map(b=>`<option value="${b.id}"${tk?.bucket===b.id?' selected':''}>${b.label}</option>`).join('');
-  document.getElementById('tkFTags').innerHTML=S.tags.map(t=>`<option value="${t.id}"${tk?.tags?.includes(t.id)?' selected':''}>${t.label}</option>`).join('');
-  document.getElementById('tkFAsgn').innerHTML='<option value="">— niemand —</option>'+S.users.map(u=>`<option value="${u.id}"${tk?.assigneeId===u.id?' selected':''}>${u.name}</option>`).join('');
-  document.getElementById('tkFPar').innerHTML='<option value="">— kein Elternticket —</option>'+S.tickets.filter(t=>!id||t.id!==id).map(t=>`<option value="${t.id}"${(tk?.parentTicketId||parentId)===t.id?' selected':''}>${t.number}: ${t.title.slice(0,40)}</option>`).join('');
-  // Hide status/bucket for standard users
-  document.getElementById('tkFAdvRow').style.display=S.permissions.isStandard?'none':'grid';
-  closeModal('tkDetOv');openModal('tkFormOv');
-}
-async function saveTicket(){
-  const nm=document.getElementById('tkFNm').value.trim();
-  if(!nm){toast('⚠️ Titel ist erforderlich!');return;}
-  const id=document.getElementById('tkFId').value;
-  const tags=Array.from(document.getElementById('tkFTags').selectedOptions).map(o=>o.value);
-  const body={title:nm,description:document.getElementById('tkFDesc').value.trim(),department:document.getElementById('tkFDept').value,priority:document.getElementById('tkFPrio').value,status:document.getElementById('tkFSt').value,bucket:document.getElementById('tkFBkt').value,tags,assigneeId:document.getElementById('tkFAsgn').value||null,parentTicketId:document.getElementById('tkFPar').value||null};
-  try{
-    if(id)await api('PUT','/tickets/'+id,body);
-    else await api('POST','/tickets',body);
-    await fetchData();closeModal('tkFormOv');renderMain();toast(id?'✅ Ticket aktualisiert!':'✅ Ticket erstellt!');
-  }catch(e){toast('⚠️ '+e.message,'err');}
-}
-async function deleteTk(id){
-  if(!confirm('Ticket wirklich löschen?'))return;
-  try{await api('DELETE','/tickets/'+id);await fetchData();closeModal('tkDetOv');renderMain();toast('🗑️ Ticket gelöscht.');}
-  catch(e){toast('⚠️ '+e.message,'err');}
-}
-
-// ── CHECKLISTS ──
-function renderChecklists(){
-  const p=S.permissions;
-  const myRoles=p.roles||[];
-  const myTpls=S.clTemplates;
-  document.getElementById('main').innerHTML=`
-    <div class="ph"><div class="pt">☑️ Checklisten-Vorlagen</div>
-      <button class="btn-p" onclick="openClForm(null)">＋ Neue Vorlage</button>
-    </div>
-    <div class="ib3" style="margin-bottom:14px">Vorlagen sind nach Fachbereich gefiltert. Eine Vorlage kann in Tickets als Checkliste angehängt werden.</div>
-    ${myTpls.length?myTpls.map(tpl=>`
-      <div class="cl-tpl">
-        <div class="cl-tpl-h">
-          <span class="cl-tpl-name">📋 ${tpl.name}</span>
-          ${dBdg(tpl.department)}
-          <div style="display:flex;gap:4px">
-            <button class="btn-e" onclick="openClForm('${tpl.id}')">✎</button>
-            <button class="btn-d" onclick="deleteClTpl('${tpl.id}')">✕</button>
-          </div>
-        </div>
-        <div style="font-size:11px;color:var(--mu);margin-bottom:6px">Erstellt von: ${getU(tpl.createdBy)?.name||'?'} · ${tpl.items.length} Einträge</div>
-        <div style="display:flex;flex-direction:column;gap:2px">${tpl.items.map((it,i)=>`<div class="cl-it"><span style="color:var(--di);font-size:10px;min-width:16px">${i+1}.</span> ${it.text}</div>`).join('')}</div>
-      </div>`).join('')
-    :'<div class="empty">📭 Keine Checklisten-Vorlagen für deinen Fachbereich vorhanden.<br><small>Erstelle eine neue Vorlage mit dem Button oben.</small></div>'}`;
-}
-function openClForm(id){
-  const tpl=id?S.clTemplates.find(t=>t.id===id):null;
-  document.getElementById('clFormT').textContent=tpl?'Vorlage bearbeiten':'Neue Checkliste';
-  document.getElementById('clFId').value=tpl?.id||'';
-  document.getElementById('clFNm').value=tpl?.name||'';
-  document.getElementById('clFDept').value=tpl?.department||(S.permissions.myDepts?.[0]||'technik');
-  document.getElementById('clFItems').value=(tpl?.items||[]).map(i=>i.text).join('\n');
-  openModal('clFormOv');
-}
-async function saveClTemplate(){
-  const name=document.getElementById('clFNm').value.trim();
-  const department=document.getElementById('clFDept').value;
-  const items=document.getElementById('clFItems').value.split('\n').map(s=>s.trim()).filter(Boolean);
-  if(!name){toast('⚠️ Name erforderlich!');return;}
-  if(!items.length){toast('⚠️ Mindestens einen Eintrag eingeben!');return;}
-  const id=document.getElementById('clFId').value;
-  try{
-    if(id)await api('PUT','/checklists/templates/'+id,{name,department,items});
-    else await api('POST','/checklists/templates',{name,department,items});
-    await fetchData();closeModal('clFormOv');renderMain();toast(id?'✅ Vorlage aktualisiert!':'✅ Vorlage erstellt!');
-  }catch(e){toast('⚠️ '+e.message,'err');}
-}
-async function deleteClTpl(id){
-  if(!confirm('Vorlage wirklich löschen?'))return;
-  try{await api('DELETE','/checklists/templates/'+id);await fetchData();renderMain();toast('🗑️ Vorlage gelöscht.');}
-  catch(e){toast('⚠️ '+e.message,'err');}
-}
-
-// ── MESSAGES ──
-function renderMessages(){
-  const isDP=S.permissions.isDP;
-  const mine=S.messages.filter(m=>m.isMine);
-  const received=S.messages.filter(m=>!m.isMine);
-  document.getElementById('main').innerHTML=`
-    <div class="ph"><div class="pt">✉️ Nachrichten</div>
-      ${isDP?`<button class="btn-p" onclick="openModal('msgFormOv')">＋ Neue Nachricht</button>`:''}
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-      <div>
-        <h2 style="font-size:14px;font-weight:700;margin-bottom:10px">📥 Empfangen (${received.length})</h2>
-        ${received.length?received.map(m=>{const snd=getU(m.fromUserId);return`<div class="msg-card${m.acked?'':' unread'}">
-          <div class="msg-title">${m.title}</div>
-          <div class="msg-meta">Von: ${snd?.name||'?'} · ${fdt(m.createdAt)} · ${m.toDepartment?DLBL[m.toDepartment]:'Alle Mitarbeiter'}</div>
-          <div class="msg-body" style="margin-bottom:8px">${m.body}</div>
-          ${m.acked?`<span class="bdg ap-approved">✓ Bestätigt</span>`:`<button class="btn-ok" onclick="ackMsg('${m.id}')">✓ Bestätigen & Quittieren</button>`}
-        </div>`;}).join(''):'<div class="empty" style="padding:20px">📭 Keine Nachrichten erhalten.</div>'}
-      </div>
-      <div>
-        <h2 style="font-size:14px;font-weight:700;margin-bottom:10px">📤 Gesendet (${mine.length})</h2>
-        ${mine.length?mine.map(m=>`<div class="msg-card">
-          <div class="msg-title">${m.title}</div>
-          <div class="msg-meta">${fdt(m.createdAt)} · An: ${m.toDepartment?DLBL[m.toDepartment]:'Alle Mitarbeiter'}</div>
-          <div class="msg-body">${m.body}</div>
-        </div>`).join(''):`<div class="empty" style="padding:20px">${isDP?'Noch keine Nachrichten gesendet.':'Nur Dienstplanung kann Nachrichten senden.'}</div>`}
-      </div>
-    </div>`;
-}
-async function ackMsg(id){
-  try{await api('POST','/messages/'+id+'/ack',{});await fetchData();renderMain();toast('✓ Nachricht bestätigt.');}
-  catch(e){toast('⚠️ '+e.message,'err');}
-}
-async function sendMessage(){
-  const title=document.getElementById('msgTitle').value.trim();
-  const body=document.getElementById('msgBody').value.trim();
-  const toDept=document.getElementById('msgTo').value;
-  if(!title||!body){toast('⚠️ Betreff und Text sind erforderlich!');return;}
-  try{await api('POST','/messages',{title,body,toDepartment:toDept||null});await fetchData();closeModal('msgFormOv');renderMain();toast('✅ Nachricht gesendet!');}
-  catch(e){toast('⚠️ '+e.message,'err');}
-}
-
-// ── ADMIN ──
-function openAdminModal(){
-  renderUsrList();renderCatList();renderTagList();renderRightsMatrix();
-  openModal('admOv');swTab('users');
-}
-function swTab(t){
-  ['users','cats','tags','rights','log'].forEach(x=>{
-    document.getElementById('atb-'+x)?.classList.toggle('on',x===t);
-    document.getElementById('atp-'+x)?.classList.toggle('on',x===t);
-  });
-}
-function renderUsrList(){
-  document.getElementById('usrList').innerHTML=S.users.map(u=>`<div class="ai">${avH(u.initials,u.color,32,12)}<div class="aii"><div class="ain">${u.name} ${rBdg(u.id)}</div><div class="ais">${u.mustChangePW?'⚠️ PW-Änderung ausstehend':'✓ Aktiv'}</div></div><div class="aia"><button class="btn-e" onclick="openUF('${u.id}')">✎</button>${S.users.length>1&&u.id!==S.currentUser?`<button class="btn-d" onclick="delUser('${u.id}')">✕</button>`:''}</div></div>`).join('');
-}
-function renderCatList(){
-  document.getElementById('catList').innerHTML=S.categories.map(c=>`<div class="ai"><div style="width:12px;height:12px;border-radius:3px;background:${c.color};flex-shrink:0"></div><div class="aii"><div class="ain">${c.emoji} ${c.label}</div></div><div class="aia"><button class="btn-e" onclick="openCF('${c.id}')">✎</button><button class="btn-d" onclick="delCat('${c.id}')">✕</button></div></div>`).join('');
-}
-function renderTagList(){
-  document.getElementById('tagList').innerHTML=S.tags.map(t=>`<div class="ai"><div style="width:12px;height:12px;border-radius:3px;background:${t.color};flex-shrink:0"></div><div class="aii"><div class="ain"><span class="tag-chip" style="background:${t.color}1a;color:${t.color};border:1px solid ${t.color}30">${t.label}</span></div></div><div class="aia"><button class="btn-e" onclick="openTF('${t.id}')">✎</button><button class="btn-d" onclick="delTag('${t.id}')">✕</button></div></div>`).join('');
-}
-function renderRightsMatrix(){
-  const rids=ROLES.map(r=>r.id);
-  document.getElementById('rightsMatrix').innerHTML=`<table class="rm-t"><thead><tr><th style="text-align:left">Berechtigung</th>${ROLES.map(r=>`<th>${r.icon}<br>${r.label}</th>`).join('')}</tr></thead><tbody>${RM.map(([p2,v])=>`<tr><td style="text-align:left;font-size:11px">${p2}</td>${rids.map(r=>`<td>${v[r]===1?'<span style="color:var(--ok);font-weight:700">✓</span>':v[r]===2?'<span style="color:var(--warn);font-weight:700">〰</span>':'<span style="color:var(--di)">–</span>'}</td>`).join('')}</tr>`).join('')}</tbody></table><p style="font-size:11px;color:var(--di);margin-top:6px">✓ voll · 〰 eingeschränkt · – kein Zugriff</p>`;
-}
-// Activity log
-let _logRows=[];
-async function loadLog(reset=false){
-  if(reset){_logRows=[];S.logOffset=0;document.getElementById('logContent').innerHTML='<div class="empty">Lade …</div>';}
-  try{
-    const data=await api('GET',`/activity-log?limit=50&offset=${S.logOffset}`);
-    S.logTotal=data.total;
-    _logRows=[..._logRows,...data.logs];
-    S.logOffset=_logRows.length;
-    const rows=_logRows.map(l=>{
-      const det=l.details&&Object.keys(l.details).length?JSON.stringify(l.details).slice(0,80):'';
-      return`<div class="log-row"><span style="color:var(--mu);font-size:11px">${fdt(l.created_at)}</span><span style="font-weight:600;font-size:12px">${l.user_name||'?'}</span><span class="log-act">${AL_LBL[l.action]||l.action}</span><span style="font-size:10px;color:var(--di)">${det}</span></div>`;
-    }).join('');
-    document.getElementById('logContent').innerHTML=rows||'<div class="empty">Keine Einträge.</div>';
-    document.getElementById('logMoreBtn').style.display=_logRows.length<S.logTotal?'block':'none';
-  }catch(e){document.getElementById('logContent').innerHTML=`<div class="empty">Fehler: ${e.message}</div>`;}
-}
-
-// Color picker
-function buildCP(cid,sel,fn){document.getElementById(cid).innerHTML=curPal().map(col=>`<div class="cp ${col===sel?'on':''}" style="background:${col}" onclick="${fn}('${col}','${cid}')"></div>`).join('');}
-function pickU(col,cid){S.ufCol=col;document.querySelectorAll('#'+cid+' .cp').forEach(el=>el.classList.toggle('on',el.style.backgroundColor===h2r(col)));}
-function pickC(col,cid){S.cfCol=col;document.querySelectorAll('#'+cid+' .cp').forEach(el=>el.classList.toggle('on',el.style.backgroundColor===h2r(col)));}
-function pickT(col,cid){S.tfCol=col;document.querySelectorAll('#'+cid+' .cp').forEach(el=>el.classList.toggle('on',el.style.backgroundColor===h2r(col)));}
-
-// User form
-function openUF(id){
-  const u=id?getU(id):null;
-  document.getElementById('ufT').textContent=u?'Benutzer bearbeiten':'Benutzer anlegen';
-  document.getElementById('ufId').value=u?.id||'';
-  document.getElementById('ufNm').value=u?.name||'';
-  document.getElementById('ufIn').value=u?.initials||'';
-  document.getElementById('ufPWRR').style.display=u?'block':'none';
-  document.getElementById('ufPWRst').checked=false;
-  S.ufCol=u?.color||curPal()[0];
-  const uR=u?.roles||['standard'];
-  document.getElementById('ufRoles').innerHTML=ROLES.map(r=>`<label class="rck"><input type="checkbox" value="${r.id}"${uR.includes(r.id)?' checked':''}><span>${r.icon} ${r.label}</span></label>`).join('');
-  buildCP('ufCR',S.ufCol,'pickU');
-  closeModal('admOv');openModal('ufOv');
-}
-async function saveUser(){
-  const name=document.getElementById('ufNm').value.trim(),initials=document.getElementById('ufIn').value.trim().toUpperCase();
-  if(!name||!initials){toast('⚠️ Name und Kürzel erforderlich!');return;}
-  const roles=Array.from(document.querySelectorAll('#ufRoles input:checked')).map(cb=>cb.value);
-  if(!roles.length){toast('⚠️ Mindestens eine Rolle!');return;}
-  const resetPassword=document.getElementById('ufPWRst').checked;
-  const id=document.getElementById('ufId').value;
-  try{
-    if(id)await api('PUT','/users/'+id,{name,initials,roles,color:S.ufCol,resetPassword});
-    else await api('POST','/users',{name,initials,roles,color:S.ufCol});
-    await fetchData();backToAdmin('users');await loadLoginUsers();toast('✅ Benutzer gespeichert!');
-  }catch(e){toast('⚠️ '+e.message,'err');}
-}
-async function delUser(id){
-  if(!confirm('Benutzer wirklich löschen?'))return;
-  try{await api('DELETE','/users/'+id);await fetchData();backToAdmin('users');await loadLoginUsers();toast('🗑️ Benutzer gelöscht.');}
-  catch(e){toast('⚠️ '+e.message,'err');}
-}
-function backToAdmin(tab){['ufOv','cfOv','tfOv'].forEach(closeModal);openAdminModal();swTab(tab);}
-
-// Cat form
-function openCF(id){
-  const c=id?getCat(id):null;
-  document.getElementById('cfT').textContent=c?'Kategorie bearbeiten':'Neue Kategorie';
-  document.getElementById('cfId').value=c?.id||'';
-  document.getElementById('cfLb').value=c?.label||'';
-  document.getElementById('cfEm').value=c?.emoji||'📌';
-  S.cfCol=c?.color||curPal()[2];
-  buildCP('cfCR',S.cfCol,'pickC');
-  closeModal('admOv');openModal('cfOv');
-}
-async function saveCat(){
-  const label=document.getElementById('cfLb').value.trim(),emoji=document.getElementById('cfEm').value.trim()||'📌';
-  if(!label){toast('⚠️ Bezeichnung erforderlich!');return;}
-  const id=document.getElementById('cfId').value;
-  try{
-    if(id)await api('PUT','/categories/'+id,{label,emoji,color:S.cfCol});
-    else await api('POST','/categories',{label,emoji,color:S.cfCol});
-    await fetchData();backToAdmin('cats');toast('✅ Kategorie gespeichert!');
-  }catch(e){toast('⚠️ '+e.message,'err');}
-}
-async function delCat(id){
-  if(!confirm('Kategorie löschen?'))return;
-  try{await api('DELETE','/categories/'+id);await fetchData();backToAdmin('cats');}
-  catch(e){toast('⚠️ '+e.message,'err');}
-}
-
-// Tag form
-function openTF(id){
-  const t=id?getTag(id):null;
-  document.getElementById('tfT').textContent=t?'Tag bearbeiten':'Neuer Tag';
-  document.getElementById('tfId').value=t?.id||'';
-  document.getElementById('tfLb').value=t?.label||'';
-  S.tfCol=t?.color||curPal()[0];
-  buildCP('tfCR',S.tfCol,'pickT');
-  closeModal('admOv');openModal('tfOv');
-}
-async function saveTag(){
-  const label=document.getElementById('tfLb').value.trim();
-  if(!label){toast('⚠️ Bezeichnung erforderlich!');return;}
-  const id=document.getElementById('tfId').value;
-  try{
-    if(id)await api('PUT','/tags/'+id,{label,color:S.tfCol});
-    else await api('POST','/tags',{label,color:S.tfCol});
-    await fetchData();backToAdmin('tags');toast('✅ Tag gespeichert!');
-  }catch(e){toast('⚠️ '+e.message,'err');}
-}
-async function delTag(id){
-  if(!confirm('Tag löschen?'))return;
-  try{await api('DELETE','/tags/'+id);await fetchData();backToAdmin('tags');}
-  catch(e){toast('⚠️ '+e.message,'err');}
-}
-
-// ══ UTILITIES ══
-function toggleTheme(){
-  const dark=document.documentElement.getAttribute('data-theme')==='dark';
-  document.documentElement.setAttribute('data-theme',dark?'light':'dark');
-  document.getElementById('thBtn').textContent=dark?'🌙':'☀️';
-  localStorage.setItem('lst_theme',dark?'light':'dark');
-}
-function openModal(id){document.getElementById(id)?.classList.add('open');}
-function closeModal(id){document.getElementById(id)?.classList.remove('open');}
-function eyeToggle(inputId,btn){const inp=document.getElementById(inputId);const show=inp.type==='password';inp.type=show?'text':'password';btn.textContent=show?'🙈':'👁';}
-function toast(msg,type=''){
-  const t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;
-  document.body.appendChild(t);setTimeout(()=>t.remove(),3000);
-}
-document.addEventListener('keydown',e=>{if(e.key==='Escape')['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOv','clFormOv','msgFormOv'].forEach(closeModal);});
-['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOv','clFormOv','msgFormOv'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('click',e=>{if(e.target===el)closeModal(id);});});
-
-// ══ BOOT ══
-(async()=>{
-  const theme=localStorage.getItem('lst_theme')||'light';
-  document.documentElement.setAttribute('data-theme',theme);
-  document.getElementById('thBtn').textContent=theme==='dark'?'☀️':'🌙';
-  await loadLoginUsers();
-  document.getElementById('LS').classList.add('open');
-  try{
-    loading(true);
-    const me=await api('GET','/auth/me');
-    if(me?.userId){S.currentUser=me.userId;await fetchData();loginOK();}
-  }catch(e){}
-  finally{loading(false);}
-})();
-</script>
+<!-- JS: Reihenfolge wichtig (utils zuerst, dann features, boot zuletzt) -->
+<script src="/js/utils.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/nav.js"></script>
+<script src="/js/schedule.js"></script>
+<script src="/js/tickets.js"></script>
+<script src="/js/checklists.js"></script>
+<script src="/js/messages.js"></script>
+<script src="/js/admin.js"></script>
 </body>
 </html>
