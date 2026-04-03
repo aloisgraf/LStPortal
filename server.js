@@ -136,6 +136,10 @@ async function initDB() {
     action TEXT NOT NULL, details JSONB DEFAULT '{}',
     ip TEXT, created_at TIMESTAMPTZ DEFAULT NOW()
   )`).catch(()=>{});
+  const migs2 = [
+    `ALTER TABLE message_reads ADD COLUMN IF NOT EXISTS pinned BOOLEAN DEFAULT false`,
+  ];
+  for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }
 
   const cnt = await q1('SELECT COUNT(*) as n FROM users');
@@ -157,6 +161,7 @@ async function initDB() {
 
 const app = express();
 app.use(express.json({ limit: '20mb' }));
+app.use(express.urlencoded({ extended: true, limit: '20mb' })); // für Mailgun Webhook
 app.use(express.static(path.join(__dirname, 'public')));
 app.set('trust proxy', 1);
 app.use(session({
