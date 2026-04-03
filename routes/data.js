@@ -126,7 +126,14 @@ router.get('/', auth, async (req,res) => {
         homeoffice:  hoRaw.map(h=>({id:h.id,userId:h.user_id,year:h.year,month:h.month,days:h.days})),
       },
       dienstplaene: dpRaw.map(d=>({id:d.id,month:d.month,year:d.year,label:d.label,version:d.version,filename:d.filename,isArchived:d.is_archived,archivedAt:d.archived_at,createdBy:d.created_by,createdAt:d.created_at})),
-      diensttausch: dtRaw.map(dt => ({
+      diensttausch: dtRaw.filter(dt => {
+        // Dienstplanung/Admin sieht alles
+        if (p.canApproveEvents) return true;
+        // Alle anderen: nur eigene + Erwähnungen
+        if (dt.created_by === uid) return true;
+        if (myNameForDt && dt.text.toLowerCase().includes('@'+myNameForDt)) return true;
+        return false;
+      }).map(dt => ({
         id:dt.id, text:dt.text, createdBy:dt.created_by, createdAt:dt.created_at,
         status:dt.status, decidedBy:dt.decided_by, decidedAt:dt.decided_at,
         rejectReason:dt.reject_reason, isSeen:dtSeenSet.has(dt.id),
