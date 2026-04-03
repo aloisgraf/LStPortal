@@ -13,7 +13,7 @@ async function auth(req, res, next) {
   req.user = user;
   req.p    = await getP(user.id);
   req.tp   = await getTP(user.id);
-  req.ip   = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
+  req.clientIp = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
   require('./db').pool.query('UPDATE users SET last_seen=NOW() WHERE id=$1', [user.id]).catch(() => {});
   next();
 }
