@@ -48,7 +48,7 @@ router.post('/change-password', auth, async (req, res) => {
     if (!newPassword || newPassword.length < 6) return bad(res, 'Mindestens 6 Zeichen');
     await pool.query('UPDATE users SET pw_hash=$1,must_change_pw=false WHERE id=$2',
       [await bcrypt.hash(newPassword, 10), req.uid]);
-    await logActivity(req.uid, req.user.name, 'change_password', {}, req.ip);
+    await logActivity(req.uid, req.user.name, 'change_password', {}, req.clientIp);
     ok(res);
   } catch (e) { bad(res, e.message, 500); }
 });
