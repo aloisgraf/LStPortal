@@ -101,16 +101,17 @@ router.get('/', auth, async (req,res) => {
       allowances: allwRaw.map(a=>({id:a.id,userId:a.user_id,year:a.year,month:a.month,nd:a.nd,fd:a.fd,fw:a.fw,c10:a.c10})),
       checklists: clTmpls.map(t=>({id:t.id,name:t.name,department:t.department,createdBy:t.created_by,items:clItemMap[t.id]||[]})),
       messages: msgsRaw.filter(m=>{
-        if(!m.from_user_id) return true;          // alte Nachrichten (kein Sender) → alle sehen
-        if(m.from_user_id===uid) return true;     // eigene gesendete
-        if(!m.to_department) return true;         // an alle
+        if(!m.sender_id) return true;             // alte Nachrichten → alle sehen
+        if(m.sender_id===uid) return true;        // eigene gesendete
+        if(!m.target_type||m.target_type==='all') return true;  // an alle
+        if(m.target_type==='user') return m.target_value===uid; // direkt an mich
         const isPriv=roles.includes('admin')||roles.includes('leitung');
-        return isPriv||roles.includes(m.to_department); // an Fachbereich (oder Admin)
+        return isPriv||roles.includes(m.target_value); // an Fachbereich
       }).map(m=>({
         id:m.id, title:m.title, body:m.body,
-        senderId:m.from_user_id,
-        targetType:m.to_department?'department':'all',
-        targetValue:m.to_department||null,
+        senderId:m.sender_id,
+        targetType:m.target_type||'all',
+        targetValue:m.target_value||null,
         createdAt:m.created_at,
         isRead:readSet.has(m.id),
         pinned:pinnedSet.get(m.id)||false,
