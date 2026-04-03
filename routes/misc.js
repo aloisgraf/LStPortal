@@ -334,8 +334,7 @@ router.put('/messages/:id/pin', auth, async (req,res) => {
   try {
     const { pinned } = req.body;
     await pool.query(
-      `INSERT INTO message_reads (id,message_id,user_id,pinned) VALUES ($1,$2,$3,$4)
-       ON CONFLICT (message_id,user_id) DO UPDATE SET pinned=EXCLUDED.pinned`,
+      `INSERT INTO message_reads (id,message_id,user_id,pinned,read_at) VALUES ($1,$2,$3,$4,NULL) ON CONFLICT (message_id,user_id) DO UPDATE SET pinned=EXCLUDED.pinned`,
       [newId(), req.params.id, req.uid, !!pinned]
     );
     ok(res);
