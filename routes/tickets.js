@@ -26,6 +26,9 @@ router.post('/', auth, async (req,res) => {
     if (assigneeId && assigneeId!==req.uid)
       await createNotification(assigneeId,'assigned',`Dir wurde zugewiesen: ${title.trim()}`,id,null,req.uid);
     await logAct(pool,newId,req.uid,req.user.name,'create_ticket',{number,title:title.trim()});
+    // Eigene Tickets direkt als gesehen markieren
+    await pool.query(`INSERT INTO ticket_views (ticket_id,user_id,viewed_at) VALUES ($1,$2,NOW()) ON CONFLICT (ticket_id,user_id) DO UPDATE SET viewed_at=NOW()`,
+      [id,req.uid]).catch(()=>{});
     ok(res,{id,number});
   } catch(e) { bad(res,e.message,500); }
 });
@@ -65,6 +68,9 @@ router.put('/:id', auth, async (req,res) => {
     add('updated_at',new Date().toISOString());
     vals.push(req.params.id);
     await pool.query(`UPDATE tickets SET ${setClauses.join(',')} WHERE id=$${vals.length}`,vals);
+    // Eigene Änderungen direkt als gesehen markieren
+    await pool.query(`INSERT INTO ticket_views (ticket_id,user_id,viewed_at) VALUES ($1,$2,NOW()) ON CONFLICT (ticket_id,user_id) DO UPDATE SET viewed_at=NOW()`,
+      [req.params.id,req.uid]).catch(()=>{});
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
