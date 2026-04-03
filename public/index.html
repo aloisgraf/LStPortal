@@ -1241,16 +1241,14 @@ function showHelpSection(id){
     <div class="mh"><h2>&#128203; Changelog</h2><button class="mc" onclick="closeModal('changelogOv')">&#10005;</button></div>
     <div class="mb2" style="gap:10px">
       <div style="padding:12px;background:rgba(59,109,212,0.06));border:1px solid rgba(59,109,212,.20);border-radius:8px">
-        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v1.9.0</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v1.9.1</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
         <ul style="font-size:12px;line-height:1.8;padding-left:18px">
-          <li>Kalenderansicht im Dienstplan – Monatsübersicht aller Einträge</li>
-          <li>Datum &amp; Uhrzeit im Header immer sichtbar</li>
-          <li>Aktivitätslog für Administratoren (Admin → Tab „Aktivitätslog")</li>
-          <li>Abgelehnte Einträge in Kalender &amp; Übersicht nicht mehr sichtbar</li>
-          <li>Dienstplanung sieht alle Einträge vollständig (nie anonymisiert)</li>
-          <li>Andere Benutzer sehen nur eigene Einträge</li>
-          <li>Filter-Bereich in der Sidebar klar abgetrennt</li>
-          <li>Backend sauber in Route-Dateien aufgeteilt</li>
+          <li>Fix: Checklisten-Vorlagen anlegen (404-Fehler behoben)</li>
+          <li>Untertickets in Ticket-Liste eingerückt unter dem Elternticket</li>
+          <li>Dienstpläne: PDF öffnet direkt im Browser</li>
+          <li>Kalenderansicht: mind. 6 Zeilen, größere Zellen</li>
+          <li>Aktivitätslog: Login, Tickets &amp; Einträge werden protokolliert</li>
+          <li>Abgelehnte Einträge nur im Kalender ausgeblendet</li>
         </ul>
       </div>
       <div style="padding:12px;background:var(--sf2);border:1px solid var(--border);border-radius:8px">
@@ -1284,7 +1282,7 @@ function showHelpSection(id){
 </div>
 
 <script>
-const APP_VERSION='1.9.0';
+const APP_VERSION='1.9.1';
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
@@ -1665,7 +1663,7 @@ function renderCalendar(){
   var firstDay=new Date(yr,mo,1);
   var lastDay=new Date(yr,mo+1,0);
   var startOffset=(firstDay.getDay()+6)%7;
-  var rows=Math.ceil((startOffset+lastDay.getDate())/7);
+  var rows=Math.max(6,Math.ceil((startOffset+lastDay.getDate())/7));
   var today=new Date();
 
   // Group events by day
@@ -1721,7 +1719,7 @@ function renderCalendar(){
   html+='<style>.cal-table{width:100%;border-collapse:collapse;table-layout:fixed}'+
     '.cal-table th{padding:8px 4px;text-align:center;font-size:11px;font-weight:700;color:var(--mu);background:var(--sf2);border:1px solid var(--border)}'+
     '.cal-table th:nth-child(6),.cal-table th:nth-child(7){color:var(--acc)}'+
-    '.cal-day{border:1px solid var(--border);vertical-align:top;padding:4px;min-height:88px;background:var(--sf);cursor:default}'+
+    '.cal-day{border:1px solid var(--border);vertical-align:top;padding:4px;min-height:110px;background:var(--sf);cursor:default}'+
     '.cal-day:hover{background:var(--sf2)}.cal-empty{border:1px solid var(--border);background:var(--sf3);min-height:88px}'+
     '.cal-we{background:rgba(59,109,212,.03)}.cal-today{background:rgba(59,109,212,.05)}'+
     '.cal-daynum{font-size:12px;font-weight:700;color:var(--mu);margin-bottom:3px}'+
@@ -2006,7 +2004,7 @@ function renderTickets(){
           const isChild=!!tk.parentTicketId;
           return`<tr class="clickable${isChild?' tk-child-row':''}" onclick="openTkDetail('${tk.id}')">
             <td style="font-family:monospace;font-size:11px;color:var(--mu);white-space:nowrap${isChild?';padding-left:28px':''}">${isChild?'<span style="color:var(--di);margin-right:3px">↳</span>':''}${tk.number}</td>
-            <td style="max-width:220px"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${tk.title}</div>${isChild&&par?`<div style="font-size:10px;color:var(--di)">↑ ${par.number}</div>`:''}${nc?`<div style="font-size:10px;color:var(--mu)">&#128172; ${nc}</div>`:''}</td>
+            <td style="max-width:220px"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis${isChild?';padding-left:10px;border-left:3px solid rgba(59,109,212,.3);margin-left:2px':''}">${tk.title}</div>${isChild&&par?`<div style="font-size:10px;color:var(--di);padding-left:10px">↑ ${par.number}: ${par.title.slice(0,25)}</div>`:''}${nc?`<div style="font-size:10px;color:var(--mu)">&#128172; ${nc}</div>`:''}</td>
             <td>${deptBdg(tk.department)}</td><td>${prioBdg(tk.priority)}</td><td>${stBdg(tk.status)}</td>
             <td>${tagChips(tk.tags)}</td>
             <td>${asn?`<div style="display:flex;align-items:center;gap:4px">${avHtml(asn.initials,asn.color,18,8)}<span style="font-size:11px">${asn.name}</span></div>`:'<span style="color:var(--di);font-size:11px">\u2014</span>'}</td>
