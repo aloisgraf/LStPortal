@@ -1647,97 +1647,81 @@ function getPeriodMonths(){if(S.allwPeriod==='month')return[S.allwMonth];if(S.al
 function sumAllw(uid,year,months){return months.reduce((a,m)=>{const r=getAllw(uid,year,m);return{nd:a.nd+r.nd,fd:a.fd+r.fd,fw:a.fw+r.fw,c10:a.c10+r.c10};},{nd:0,fd:0,fw:0,c10:0});}
 function numCell(n,color){if(!n)return`<td style="text-align:center;color:var(--di)">\u2013</td>`;return`<td style="text-align:center"><span class="anum" style="background:${color}18;color:${color}">${n}</span></td>`;}
 
-// ══════════════════════════════════════════
-// SECTION: calendar
-// ══════════════════════════════════════════
-function renderCalendar(){
-  const yr=S.year, mo=S.month!==null?S.month:new Date().getMonth();
-  const WDAYS=['Mo','Di','Mi','Do','Fr','Sa','So'];
-  const firstDay=new Date(yr,mo,1);
-  const lastDay=new Date(yr,mo+1,0);
-  // Monday-based offset
-  let startOffset=(firstDay.getDay()+6)%7;
-  const totalCells=startOffset+lastDay.getDate();
-  const rows=Math.ceil(totalCells/7);
 
-  // Group events by date
-  const evByDate={};
-  const visEvs=getVisEvts ? getVisEvts() : (S.events||[]).filter(ev=>{
-    const d=new Date(ev.dateFrom);
-    return d.getFullYear()===yr && d.getMonth()===mo;
+function renderCalendar(){
+  var yr=S.year, mo=S.month!==null?S.month:new Date().getMonth();
+  var WDAYS=['Mo','Di','Mi','Do','Fr','Sa','So'];
+  var firstDay=new Date(yr,mo,1);
+  var lastDay=new Date(yr,mo+1,0);
+  var startOffset=(firstDay.getDay()+6)%7;
+  var rows=Math.ceil((startOffset+lastDay.getDate())/7);
+  var today=new Date();
+
+  // Group events by day
+  var evByDate={};
+  var visEvs=S.events.filter(function(ev){
+    var d=new Date(ev.dateFrom);
+    return d.getFullYear()===yr && d.getMonth()===mo || (ev.dateTo && new Date(ev.dateTo)>=firstDay && d<=lastDay);
   });
-  visEvs.forEach(ev=>{
-    // span all days from dateFrom to dateTo
-    const from=new Date(ev.dateFrom), to=new Date(ev.dateTo||ev.dateFrom);
-    for(let d=new Date(from);d<=to;d.setDate(d.getDate()+1)){
-      if(d.getFullYear()===yr && d.getMonth()===mo){
-        const key=d.getDate();
-        if(!evByDate[key])evByDate[key]=[];
-        evByDate[key].push(ev);
+  visEvs.forEach(function(ev){
+    var from=new Date(ev.dateFrom), to=new Date(ev.dateTo||ev.dateFrom);
+    for(var d=new Date(from);d<=to;d.setDate(d.getDate()+1)){
+      if(d.getFullYear()===yr&&d.getMonth()===mo){
+        var k=d.getDate(); if(!evByDate[k])evByDate[k]=[]; evByDate[k].push(ev);
       }
     }
   });
 
-  const today=new Date();
-  const isToday=(d)=>today.getFullYear()===yr&&today.getMonth()===mo&&today.getDate()===d;
-
-  let cells='';
-  let dayNum=1;
-  for(let r=0;r<rows;r++){
+  var cells='';
+  var dayNum=1;
+  for(var r=0;r<rows;r++){
     cells+='<tr>';
-    for(let c=0;c<7;c++){
-      const cellIdx=r*7+c;
-      if(cellIdx<startOffset||dayNum>lastDay.getDate()){
+    for(var c=0;c<7;c++){
+      var ci=r*7+c;
+      if(ci<startOffset||dayNum>lastDay.getDate()){
         cells+='<td class="cal-empty"></td>';
       } else {
-        const evs=evByDate[dayNum]||[];
-        const todayCls=isToday(dayNum)?' cal-today':'';
-        const isWe=c>=5?' cal-we':'';
-        cells+=`<td class="cal-day${todayCls}${isWe}">
-          <div class="cal-daynum">${dayNum}</div>
-          <div class="cal-evs">${evs.slice(0,4).map(ev=>{
-            if(ev._anonymized) return '<div class="cal-ev cal-ev-anon">🔒</div>';
-            const cat=S.categories.find(c2=>c2.id===ev.category);
-            const u=ev.isGeneral?null:S.users.find(u2=>u2.id===ev.userId);
-            const color=ev.isGeneral?'var(--ok)':cat?.color||'var(--acc)';
-            const label=ev.isGeneral?'🌐 '+ev.reason.slice(0,18):
-              (u?u.initials+' ':'')+ev.reason.slice(0,18);
-            return \`<div class="cal-ev" style="background:\${color}22;border-left:2px solid \${color};color:\${color}" title="\${ev.reason||''}">\${label}\${ev.reason.length>18?'…':''}</div>\`;
-          }).join('')}${evs.length>4?`<div class="cal-ev-more">+${evs.length-4} weitere</div>`:''}</div>
-        </td>`;
+        var evs=evByDate[dayNum]||[];
+        var isToday=today.getFullYear()===yr&&today.getMonth()===mo&&today.getDate()===dayNum;
+        var cls='cal-day'+(isToday?' cal-today':'')+(c>=5?' cal-we':'');
+        var dnHtml=isToday?'<div class="cal-daynum cal-daynum-today">'+dayNum+'</div>':'<div class="cal-daynum">'+dayNum+'</div>';
+        var evsHtml='';
+        evs.slice(0,4).forEach(function(ev){
+          if(ev._anonymized){evsHtml+='<div class="cal-ev cal-ev-anon">&#128274;</div>';return;}
+          var cat=S.categories.find(function(c2){return c2.id===ev.category;});
+          var u=ev.isGeneral?null:S.users.find(function(u2){return u2.id===ev.userId;});
+          var color=ev.isGeneral?'#10b981':cat?cat.color:'#3b6dd4';
+          var label=(ev.isGeneral?'\uD83C\uDF10 ':u?u.initials+' ':'')+ev.reason.slice(0,20);
+          evsHtml+='<div class="cal-ev" style="background:'+color+'22;border-left:2px solid '+color+';color:'+color+'" title="'+ev.reason.replace(/"/g,'&quot;')+'">'+label+'</div>';
+        });
+        if(evs.length>4)evsHtml+='<div class="cal-ev-more">+' +(evs.length-4)+' weitere</div>';
+        cells+='<td class="'+cls+'">'+dnHtml+'<div class="cal-evs">'+evsHtml+'</div></td>';
         dayNum++;
       }
     }
     cells+='</tr>';
   }
 
-  const moName=['Jänner','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'][mo];
-  document.getElementById('main').innerHTML=`
-    <div class="ph">
-      <div class="pt">🗓️ Kalenderansicht <span>${moName} ${yr}</span></div>
-      <button class="btn-p" onclick="openEvtModal()">＋ Eintrag hinzufügen</button>
-    </div>
-    <style>
-      .cal-table{width:100%;border-collapse:collapse;table-layout:fixed}
-      .cal-table th{padding:8px 4px;text-align:center;font-size:11px;font-weight:700;color:var(--mu);background:var(--sf2);border:1px solid var(--border)}
-      .cal-table th:nth-child(6),.cal-table th:nth-child(7){color:var(--acc)}
-      .cal-day{border:1px solid var(--border);vertical-align:top;padding:4px;min-height:90px;background:var(--sf)}
-      .cal-day:hover{background:var(--sf2)}
-      .cal-empty{border:1px solid var(--border);background:var(--sf3);min-height:90px}
-      .cal-we{background:rgba(59,109,212,.03)}
-      .cal-today .cal-daynum{background:var(--acc);color:var(--act);border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center}
-      .cal-daynum{font-size:12px;font-weight:700;color:var(--mu);margin-bottom:3px}
-      .cal-ev{font-size:10px;font-weight:500;padding:2px 5px;border-radius:3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:default}
-      .cal-ev-anon{background:rgba(245,158,11,.1);border-left:2px solid var(--warn);color:var(--warn)}
-      .cal-ev-more{font-size:10px;color:var(--mu);padding:1px 4px}
-    </style>
-    <div class="tw">
-      <table class="cal-table">
-        <thead><tr>${WDAYS.map(d=>`<th>${d}</th>`).join('')}</tr></thead>
-        <tbody>${cells}</tbody>
-      </table>
-    </div>`;
+  var moNames=['Jänner','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+  var html='<div class="ph"><div class="pt">\uD83D\uDCC5 Kalenderansicht <span>'+moNames[mo]+' '+yr+'</span></div>';
+  html+='<button class="btn-p" onclick="openEvtModal()">&#65291; Eintrag hinzufügen</button></div>';
+  html+='<style>.cal-table{width:100%;border-collapse:collapse;table-layout:fixed}'+
+    '.cal-table th{padding:8px 4px;text-align:center;font-size:11px;font-weight:700;color:var(--mu);background:var(--sf2);border:1px solid var(--border)}'+
+    '.cal-table th:nth-child(6),.cal-table th:nth-child(7){color:var(--acc)}'+
+    '.cal-day{border:1px solid var(--border);vertical-align:top;padding:4px;min-height:88px;background:var(--sf);cursor:default}'+
+    '.cal-day:hover{background:var(--sf2)}.cal-empty{border:1px solid var(--border);background:var(--sf3);min-height:88px}'+
+    '.cal-we{background:rgba(59,109,212,.03)}.cal-today{background:rgba(59,109,212,.05)}'+
+    '.cal-daynum{font-size:12px;font-weight:700;color:var(--mu);margin-bottom:3px}'+
+    '.cal-daynum-today{background:var(--acc);color:var(--act);border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center}'+
+    '.cal-ev{font-size:10px;font-weight:500;padding:2px 5px;border-radius:3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'+
+    '.cal-ev-anon{background:rgba(245,158,11,.1);border-left:2px solid #f59e0b;color:#f59e0b}'+
+    '.cal-ev-more{font-size:10px;color:var(--mu);padding:1px 4px;font-style:italic}</style>';
+  html+='<div class="tw"><table class="cal-table"><thead><tr>';
+  WDAYS.forEach(function(d){html+='<th>'+d+'</th>';});
+  html+='</tr></thead><tbody>'+cells+'</tbody></table></div>';
+  document.getElementById('main').innerHTML=html;
 }
+
 
 function renderAllw(){
   const months=getPeriodMonths(),yr=S.allwYear;
