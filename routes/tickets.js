@@ -146,4 +146,17 @@ router.put('/:id/checklists/:cid/items/:iid', auth, async (req,res) => {
 });
 
 // CHECKLIST TEMPLATES
+// ── TICKET ANSEHEN ──
+router.put('/:id/view', auth, async (req,res) => {
+  try {
+    await pool.query(
+      `INSERT INTO ticket_views (ticket_id,user_id,viewed_at) VALUES ($1,$2,NOW())
+       ON CONFLICT (ticket_id,user_id) DO UPDATE SET viewed_at=NOW()`,
+      [req.params.id, req.uid]
+    );
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
+
+
 module.exports = router;

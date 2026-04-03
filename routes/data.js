@@ -8,7 +8,7 @@ router.get('/', auth, async (req,res) => {
   try {
     const uid=req.uid, p=req.p, tp=req.tp, roles=p.roles;
     const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
-           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw] = await Promise.all([
+           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw] = await Promise.all([
       q('SELECT id,name,initials,roles,color,must_change_pw,last_seen FROM users ORDER BY name'),
       q('SELECT * FROM categories ORDER BY sort_order,label'),
       q('SELECT * FROM tags ORDER BY label'),
@@ -22,6 +22,7 @@ router.get('/', auth, async (req,res) => {
       q('SELECT * FROM checklist_templates ORDER BY name'),
       q('SELECT * FROM checklist_template_items ORDER BY sort_order'),
       q('SELECT * FROM ticket_checklists'),
+      q('SELECT ticket_id, viewed_at FROM ticket_views WHERE user_id=$1',[uid]),
       q('SELECT * FROM ticket_checklist_items ORDER BY sort_order'),
       q('SELECT * FROM messages ORDER BY created_at DESC').catch(()=>[]),
       q('SELECT message_id, pinned, read_at FROM message_reads WHERE user_id=$1',[uid]),
@@ -33,6 +34,7 @@ router.get('/', auth, async (req,res) => {
       q('SELECT id,month,year,label,version,filename,is_archived,archived_at,created_by,created_at FROM dienstplaene ORDER BY year DESC,month DESC,version DESC'),
     ]);
 
+    const tkViewMap = new Map((tkViewsRaw||[]).map(v=>[v.ticket_id, v.viewed_at]));
     const noteMap={}, clItemMap={}, tkClItemMap={}, tkClMap={};
     notesRaw.forEach(n=>{ if(!noteMap[n.ticket_id]) noteMap[n.ticket_id]=[]; noteMap[n.ticket_id].push({id:n.id,text:n.text,authorId:n.author_id,noteType:n.note_type,createdAt:n.created_at}); });
     clItems.forEach(i=>{ if(!clItemMap[i.template_id]) clItemMap[i.template_id]=[]; clItemMap[i.template_id].push({id:i.id,text:i.text,itemType:i.item_type||'check',sortOrder:i.sort_order}); });
@@ -86,7 +88,7 @@ router.get('/', auth, async (req,res) => {
         department:tk.department, tags:parseTags(tk.tags), priority:tk.priority,
         status:tk.status, bucket:tk.bucket||'', isPublic:tk.is_public,
         assigneeId:tk.assignee_id, parentTicketId:tk.parent_ticket_id,
-        createdBy:tk.created_by, createdAt:tk.created_at, updatedAt:tk.updated_at,
+        createdBy:tk.created_by, createdAt:tk.created_at, updatedAt:tk.updated_at,lastViewedAt:tkViewMap.get(tk.id)||null,
         notes:noteMap[tk.id]||[], checklists:tkClMap[tk.id]||[],
         _canEdit:canEditTk(tp,tk,uid),
       })),
