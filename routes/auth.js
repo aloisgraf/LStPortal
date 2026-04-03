@@ -4,6 +4,14 @@ const bcrypt  = require('bcryptjs');
 const { q, getUser, parseRoles, pool } = require('../db');
 const { auth, ok, bad } = require('../middleware');
 
+async function logActivity(pool, uid, name, action, details={}, ip='') {
+  const {newId} = require('../db');
+  await pool.query(
+    'INSERT INTO activity_log (id,user_id,user_name,action,details,ip,created_at) VALUES ($1,$2,$3,$4,$5,$6,NOW())',
+    [newId(), uid, name, action, JSON.stringify(details), ip]
+  ).catch(()=>{});
+}
+
 router.get('/users', async (req,res) => {
   try {
     const users = await q('SELECT id,name,initials,color,roles FROM users ORDER BY name');
@@ -22,6 +30,8 @@ router.post('/login', async (req,res) => {
     if (!user||!(await bcrypt.compare(password,user.pw_hash))) return bad(res,'Falsches Passwort',401);
     req.session.userId = user.id;
     await new Promise((resolve, reject) => req.session.save(e => e ? reject(e) : resolve()));
+    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || '';
+    await logActivity(pool, user.id, user.name, 'login', {}, ip);
     ok(res, {userId:user.id, mustChangePW: user.must_change_pw===true});
   } catch(e) { bad(res,e.message,500); }
 });

@@ -214,4 +214,19 @@ router.delete('/dienstplaene/:id', auth, async (req,res) => {
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
+// ── AKTIVITÄTSLOG ──
+router.get('/activity-log', auth, async (req,res) => {
+  try {
+    if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+    const limit  = Math.min(parseInt(req.query.limit||'50'), 200);
+    const offset = parseInt(req.query.offset||'0');
+    const [logs, total] = await Promise.all([
+      q('SELECT * FROM activity_log ORDER BY created_at DESC LIMIT $1 OFFSET $2', [limit, offset]),
+      q1('SELECT COUNT(*) as n FROM activity_log'),
+    ]);
+    ok(res, { logs, total: parseInt(total?.n||0) });
+  } catch(e) { bad(res,e.message,500); }
+});
+
+
 module.exports = router;
