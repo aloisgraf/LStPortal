@@ -138,6 +138,16 @@ async function initDB() {
   )`).catch(()=>{});
   const migs2 = [
     `ALTER TABLE message_reads ADD COLUMN IF NOT EXISTS pinned BOOLEAN DEFAULT false`,
+    `CREATE TABLE IF NOT EXISTS diensttausch (
+      id TEXT PRIMARY KEY, text TEXT NOT NULL, created_by TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW(), status TEXT DEFAULT 'pending',
+      decided_by TEXT, decided_at TIMESTAMPTZ, reject_reason TEXT
+    )`,
+    `CREATE TABLE IF NOT EXISTS diensttausch_reads (
+      diensttausch_id TEXT NOT NULL, user_id TEXT NOT NULL,
+      read_at TIMESTAMPTZ DEFAULT NOW(),
+      PRIMARY KEY (diensttausch_id, user_id)
+    )`,
     `CREATE TABLE IF NOT EXISTS ticket_views (
       ticket_id TEXT NOT NULL,
       user_id   TEXT NOT NULL,
