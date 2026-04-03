@@ -1294,13 +1294,13 @@ function showHelpSection(id){
     <div class="mh"><h2>&#128203; Changelog</h2><button class="mc" onclick="closeModal('changelogOv')">&#10005;</button></div>
     <div class="mb2" style="gap:10px">
       <div style="padding:12px;background:rgba(59,109,212,0.06));border:1px solid rgba(59,109,212,.20);border-radius:8px">
-        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v1.9.9</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.0.0</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
         <ul style="font-size:12px;line-height:1.8;padding-left:18px">
-          <li>Neues Modul: Diensttausch unter Dienstplan</li>
-          <li>Dienstplanung kann Tausche annehmen oder ablehnen</li>
-          <li>@Markierungen in Diensttausch-Eintr&auml;gen</li>
-          <li>&Uuml;bersicht zeigt ausstehende Tausche mit NEU-Badge</li>
-          <li>Farbhervorhebung + Gesehen-Markierung wie beim Ticketsystem</li>
+          <li>Fix: Nachrichten f&uuml;r Standard-User jetzt sichtbar (Spaltenname-Fehler behoben)</li>
+          <li>Fix: Anpinnen von Nachrichten funktioniert wieder</li>
+          <li>&Uuml;bersicht: Angepinnte Nachrichten bis zum Lospinnen sichtbar</li>
+          <li>Diensttausch: Standard-User sieht eigene Antr&auml;ge in der &Uuml;bersicht</li>
+          <li>Diensttausch: Placeholder-Text ge&auml;ndert</li>
         </ul>
       </div>
       <div style="padding:12px;background:var(--sf2);border:1px solid var(--border);border-radius:8px">
@@ -1334,7 +1334,7 @@ function showHelpSection(id){
 </div>
 
 <script>
-const APP_VERSION='1.9.9';
+const APP_VERSION='2.0.0';
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
@@ -1555,6 +1555,7 @@ function renderHome(){
   const u=getU(S.currentUser);
   const online=S.users.filter(x=>x.isOnline&&x.id!==S.currentUser);
   const unreadMsg=S.messages.filter(m=>!m.isRead&&m.senderId!==S.currentUser);
+  const pinnedMsg=S.messages.filter(m=>m.pinned&&m.senderId!==S.currentUser);
   const unreadNotif=S.notifications.filter(n=>!n.isRead&&n.type!=='event_added'&&n.type!=='event_changed'&&n.type!=='einspringer_rejected');
   const eventNotifs=S.notifications.filter(n=>!n.isRead&&(n.type==='event_added'||n.type==='event_changed'));
   const einspNotifs=S.notifications.filter(n=>!n.isRead&&n.type==='einspringer_rejected');
@@ -1572,6 +1573,13 @@ function renderHome(){
   }).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,10);
   document.getElementById('main').innerHTML=`
     <div class="ph"><div class="pt">&#128196; \u00dcbersicht <span>${u?.name||''}</span></div></div>
+    ${pinnedMsg.length?`<div style="background:rgba(59,109,212,.04);border:1px solid rgba(59,109,212,.2);border-radius:var(--r);padding:14px;margin-bottom:14px">
+      <div style="font-size:13px;font-weight:700;color:var(--acc);margin-bottom:10px">&#128204; ${pinnedMsg.length} angepinnte Nachricht${pinnedMsg.length>1?'en':''}</div>
+      ${pinnedMsg.map(m=>`<div style="padding:8px 12px;background:var(--sf);border-radius:6px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;cursor:pointer" onclick="openMsg('${m.id}')">
+        <div><div style="font-weight:600;font-size:13px">&#128204; ${m.title}</div><div style="font-size:11px;color:var(--mu)">von ${getU(m.senderId)?.name||'?'}</div></div>
+        <button class="btn-s" style="font-size:10px;padding:2px 8px" onclick="event.stopPropagation();toggleMsgPinDirect('${m.id}',true)">Lospinnen</button>
+      </div>`).join('')}
+    </div>`:''}
     ${unreadMsg.length?`<div style="background:rgba(239,68,68,0.05));border:1px solid rgba(239,68,68,.20);border-radius:var(--r);padding:14px;margin-bottom:14px">
       <div style="font-size:13px;font-weight:700;color:var(--danger);margin-bottom:10px">&#128276; ${unreadMsg.length} ungelesene Nachricht${unreadMsg.length>1?'en':''}</div>
       ${unreadMsg.map(m=>`<div style="padding:8px 12px;background:var(--sf);border-radius:6px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
@@ -1609,7 +1617,13 @@ function renderHome(){
         ${online.map(x=>`<div class="online-user">${avHtml(x.initials,x.color,22,9,true)}<span>${x.name}</span></div>`).join('')}
         ${!online.length?'<span style="font-size:12px;color:var(--mu)">Keine anderen online</span>':''}
       </div></div>
-      ${(()=>{const pendingDt=(S.diensttausch||[]).filter(dt=>dt.isRelevant&&!dt.isSeen);return pendingDt.length?`
+      ${(()=>{// Für Standard-User: eigene Tausche (auch entschiedene ungesehene)
+      const pendingDt=(S.diensttausch||[]).filter(dt=>{
+        if(dt.isSeen)return false;
+        if(dt.isRelevant)return true;
+        if(dt.createdBy===S.currentUser)return true; // eigene
+        return false;
+      });return pendingDt.length?`
       <div class="dash-card" style="border-top:2px solid var(--warn)">
         <h3 style="display:flex;align-items:center;gap:8px">&#128257; Diensttausch <span class="tk-new-badge">${pendingDt.length} NEU</span></h3>
         ${pendingDt.slice(0,5).map(dt=>{
@@ -1877,7 +1891,7 @@ function renderDiensttausch() {
       <div class="tt"><h2>Neuer Diensttausch</h2></div>
       <div style="padding:14px">
         <div style="margin-bottom:8px;font-size:12px;color:var(--mu)">Beschreibe den gewünschten Tausch. Mit @Name kannst du Kollegen markieren.</div>
-        <textarea id="dtText" rows="4" style="width:100%;box-sizing:border-box;resize:vertical;font-size:13px;border:1px solid var(--border);border-radius:var(--r);padding:8px;background:var(--sf);color:var(--tx)" placeholder="z.B. Suche jemanden der am 15.4. für mich Dienst übernimmt. @Max Mustermann wärst du dabei?"></textarea>
+        <textarea id="dtText" rows="4" style="width:100%;box-sizing:border-box;resize:vertical;font-size:13px;border:1px solid var(--border);border-radius:var(--r);padding:8px;background:var(--sf);color:var(--tx)" placeholder="Tauschdetails angeben... (@Name für Kollegen markieren)"></textarea>
         <button class="btn-p" style="margin-top:8px" onclick="createDt()">&#128257; Eintragen</button>
       </div>
     </div>
