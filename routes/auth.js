@@ -17,10 +17,11 @@ router.post('/login', async (req, res) => {
     const { userId, password } = req.body;
     if (!userId || !password) return bad(res, 'Benutzername und Passwort erforderlich');
     const user = await getUser(userId);
-    const pwMatch = user ? await bcrypt.compare(password, user.pw_hash) : false;
-    console.log(`[LOGIN] userId=${userId} userFound=${!!user} pwMatch=${pwMatch}`);
-    if (!user || !pwMatch) return bad(res, 'Falsches Passwort', 401);
+    if (!user || !(await bcrypt.compare(password, user.pw_hash)))
+      return bad(res, 'Falsches Passwort', 401);
     req.session.userId = user.id;
+    // Session explizit speichern bevor Antwort gesendet wird (verhindert Race Condition)
+    await new Promise((resolve, reject) => req.session.save(e => e ? reject(e) : resolve()));
     const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
     await logActivity(user.id, user.name, 'login', {}, ip);
     ok(res, { userId: user.id, mustChangePW: user.must_change_pw === true });
