@@ -48,8 +48,8 @@ body{font-family:"Inter",system-ui,sans-serif;font-size:14px;background:var(--bg
 .ni.top{padding-left:10px}
 .ni .nbdg{min-width:18px;height:18px;background:var(--danger);color:#fff;border-radius:9px;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px;margin-left:auto}
 .ndiv{height:1px;background:var(--border);margin:6px 4px}
-.sbf{padding:10px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:12px;flex:1;min-height:0;overflow-y:auto}
-.sfl{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--di);margin-bottom:5px}
+.sbf{padding:10px;border-top:2px solid var(--border);background:var(--sf3);display:flex;flex-direction:column;gap:10px;flex:1;min-height:0;overflow-y:auto}
+.sfl{font-size:9px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:rgba(100,116,139,.7);margin-bottom:4px;display:flex;align-items:center;gap:6px}.sfl::before{content:'';flex:1;height:1px;background:var(--border)}.sfl::after{content:'';flex:1;height:1px;background:var(--border)}
 .yr-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px}
 .yb{width:24px;height:24px;background:var(--sf2);border:1px solid var(--border);border-radius:5px;cursor:pointer;color:var(--tx);font-size:12px;display:flex;align-items:center;justify-content:center;transition:.15s}.yb:hover{border-color:var(--acc)}
 .yv{font-size:14px;font-weight:700}
@@ -260,6 +260,7 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
   <button class="ib2 hbg" onclick="toggleSidebar()">&#9776;</button>
   <div class="logo"><div class="lm">&#128203;</div><div class="ln">LSt <em>Portal</em></div></div>
   <div class="hsp"></div>
+  <div id="clockDisplay" style="font-size:11px;font-weight:600;color:var(--mu);text-align:right;line-height:1.4;white-space:nowrap;padding-right:4px;display:none"></div>
   <button class="ib2" id="thBtn" onclick="toggleTheme()">&#127769;</button>
   <button class="ib2" onclick="openModal('helpOv')" title="Hilfe / Anleitung" style="font-weight:700;font-size:13px">?</button>
   <button class="ib2" id="adminBtn" onclick="openAdminModal()" title="Administration" style="display:none">&#9881;&#65039;</button>
@@ -306,7 +307,7 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
         <div class="ni" id="ni-messages_sent" onclick="setView('messages_sent')">&#128228; Gesendet</div>
       </div>
     </div>
-    <div class="sbf" id="sbf"></div>
+    <div class="sbf" id="sbf"><div class="sfl">Filter</div></div>
     <div class="sbver" onclick="openModal('changelogOv')" title="Changelog">LSt Portal <span id="versionBadge"></span> &#9432;</div>
   </aside>
   <main id="main"></main>
@@ -1239,16 +1240,16 @@ function showHelpSection(id){
     <div class="mh"><h2>&#128203; Changelog</h2><button class="mc" onclick="closeModal('changelogOv')">&#10005;</button></div>
     <div class="mb2" style="gap:10px">
       <div style="padding:12px;background:rgba(59,109,212,0.06));border:1px solid rgba(59,109,212,.20);border-radius:8px">
-        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v1.8.0</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v1.9.0</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
         <ul style="font-size:12px;line-height:1.8;padding-left:18px">
-          <li>Integriertes Benutzerhandbuch (? oben rechts) mit Grafiken für alle Funktionen</li>
-          <li>Bug-Fix: Bestätigen-Button in Übersicht und Nachrichten funktioniert wieder</li>
-          <li>Bug-Fix: Gesendet-Tab zeigt jetzt eigene versendete Nachrichten korrekt</li>
-          <li>Bug-Fix: readMsg / deleteMsg Funktionen wieder vorhanden</li>
-          <li>Abrechnung: Einspringer-Übersicht für Dienstplanung (alle MA, nach Name+Datum sortiert)</li>
-          <li>Abrechnung: Einspringer ablehnen mit Begründung; Begründung beim MA sichtbar</li>
-          <li>Abrechnung: Nur der Ersteller kann eigene Einspringer löschen</li>
-          <li>Auto-Refresh alle 60s: Toast bei neuer Nachricht / neuem Ticket</li>
+          <li>Kalenderansicht im Dienstplan – Monatsübersicht aller Einträge</li>
+          <li>Datum &amp; Uhrzeit im Header immer sichtbar</li>
+          <li>Aktivitätslog für Administratoren (Admin → Tab „Aktivitätslog")</li>
+          <li>Abgelehnte Einträge in Kalender &amp; Übersicht nicht mehr sichtbar</li>
+          <li>Dienstplanung sieht alle Einträge vollständig (nie anonymisiert)</li>
+          <li>Andere Benutzer sehen nur eigene Einträge</li>
+          <li>Filter-Bereich in der Sidebar klar abgetrennt</li>
+          <li>Backend sauber in Route-Dateien aufgeteilt</li>
         </ul>
       </div>
       <div style="padding:12px;background:var(--sf2);border:1px solid var(--border);border-radius:8px">
@@ -1282,7 +1283,7 @@ function showHelpSection(id){
 </div>
 
 <script>
-const APP_VERSION='1.8.0';
+const APP_VERSION='1.9.0';
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
@@ -1409,6 +1410,7 @@ async function doForcePW(){
   catch(e){toast('\u26A0\uFE0F '+e.message);}finally{loading(false);}
 }
 function loginOK(){
+  startClock();
   document.getElementById('LS').classList.remove('open');
   document.getElementById('hdr').style.display='flex';document.getElementById('APP').style.display='grid';
   const vb=document.getElementById('versionBadge');if(vb)vb.textContent='v'+APP_VERSION;
@@ -1552,6 +1554,8 @@ async function readAllNotifs(){try{await api('POST','/notifications/read-all');a
 // SCHEDULE
 function getVisEvts(){
   let evs=[...S.events];
+  // Abgelehnte Einträge nie anzeigen (außer in Eintragsübersicht mit Status-Filter)
+  evs=evs.filter(ev=>ev.isGeneral||ev.approvalStatus!=='rejected');
   if(S.filterUser)evs=evs.filter(ev=>!ev.isGeneral&&ev.userId===S.filterUser);
   if(S.month!==null)evs=evs.filter(ev=>{const d=new Date(ev.dateFrom);return d.getFullYear()===S.year&&d.getMonth()===S.month;});
   else evs=evs.filter(ev=>new Date(ev.dateFrom).getFullYear()===S.year);
@@ -2348,6 +2352,21 @@ ALL_MODALS.forEach(id=>{const el=document.getElementById(id);if(el)el.addEventLi
 document.addEventListener('click',e=>{if(!e.target.closest('.note-input-wrap'))document.getElementById('mentionSug')?.classList.remove('open');});
 // AUTO-REFRESH
 let _lastMsgCount=-1,_lastTkCount=-1,_refreshTimer=null;
+
+function startClock(){
+  var el=document.getElementById('clockDisplay');
+  if(!el)return;
+  el.style.display='block';
+  function tick(){
+    var now=new Date();
+    var days=['So','Mo','Di','Mi','Do','Fr','Sa'];
+    var d=days[now.getDay()]+'. '+now.getDate()+'.'+(now.getMonth()+1)+'.'+now.getFullYear();
+    var t=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+    el.innerHTML=d+'<br>'+t;
+  }
+  tick();
+  setInterval(tick,1000);
+}
 function startAutoRefresh(){
   if(_refreshTimer)clearInterval(_refreshTimer);
   _lastMsgCount=S.messages.filter(m=>!m.isRead&&m.senderId!==S.currentUser).length;
