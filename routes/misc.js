@@ -276,4 +276,61 @@ router.get('/activity-log', auth, async (req,res) => {
 });
 
 
+// ── NACHRICHTEN PIN ──
+router.put('/messages/:id/pin', auth, async (req,res) => {
+  try {
+    const { pinned } = req.body;
+    await pool.query(
+      `INSERT INTO message_reads (id,message_id,user_id,pinned) VALUES ($1,$2,$3,$4)
+       ON CONFLICT (message_id,user_id) DO UPDATE SET pinned=EXCLUDED.pinned`,
+      [newId(), req.params.id, req.uid, !!pinned]
+    );
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
+
+// ── MAILGUN WEBHOOK ──
+router.post('/webhook/mailgun', async (req,res) => {
+  try {
+    // Simple token check – set MAILGUN_WEBHOOK_TOKEN in Render env vars
+    const token = process.env.MAILGUN_WEBHOOK_TOKEN;
+    if (token && req.body['webhook-token'] !== token && req.headers['x-mailgun-token'] !== token)
+      return res.status(401).send('Unauthorized');
+
+    const subject   = (req.body.subject || 'E-Mail Ticket').trim().slice(0,200);
+    const bodyText  = (req.body['body-plain'] || req.body['body-stripped'] || req.body.text || '').trim();
+    const sender    = req.body.sender || req.body.from || 'extern';
+    const dept      = process.env.MAILGUN_DEFAULT_DEPT || 'technik';
+
+    const id     = newId();
+    const number = await (async () => {
+      const row = await q1(`SELECT number FROM tickets ORDER BY CAST(REPLACE(number,'TK-','') AS INTEGER) DESC LIMIT 1`);
+      if (!row) return 'TK-1001';
+      return `TK-${(parseInt(row.number.replace('TK-',''))+1).toString().padStart(4,'0')}`;
+    })();
+
+    // Find a system user (first admin)
+    const sysUser = await q1(`SELECT id,name FROM users WHERE roles::text LIKE '%admin%' LIMIT 1`);
+    const createdBy = sysUser?.id || 'system';
+
+    await pool.query(
+      `INSERT INTO tickets (id,number,title,description,department,tags,priority,status,bucket,created_by)
+       VALUES ($1,$2,$3,$4,$5,'[]','medium','open','',$6)`,
+      [id, number, subject, `Von: ${sender}\n\n${bodyText}`, dept, createdBy]
+    );
+
+    await pool.query(
+      `INSERT INTO activity_log (id,user_id,user_name,action,details,created_at) VALUES ($1,$2,$3,$4,$5,NOW())`,
+      [newId(), createdBy, 'E-Mail', 'create_ticket', JSON.stringify({ number, subject, sender })]
+    ).catch(()=>{});
+
+    console.log('[Mailgun] Ticket erstellt:', number, subject);
+    res.status(200).send('OK');
+  } catch(e) {
+    console.error('[Mailgun] Fehler:', e.message);
+    res.status(500).send('Error');
+  }
+});
+
+
 module.exports = router;

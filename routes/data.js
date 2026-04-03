@@ -24,7 +24,7 @@ router.get('/', auth, async (req,res) => {
       q('SELECT * FROM ticket_checklists'),
       q('SELECT * FROM ticket_checklist_items ORDER BY sort_order'),
       q('SELECT * FROM messages ORDER BY created_at DESC').catch(()=>[]),
-      q('SELECT message_id FROM message_reads WHERE user_id=$1',[uid]),
+      q('SELECT message_id, pinned FROM message_reads WHERE user_id=$1',[uid]),
       q('SELECT * FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 50',[uid]),
       p.seeAllAbrechnung ? q('SELECT * FROM abrechnung_einspringer ORDER BY edate DESC')
         : q('SELECT * FROM abrechnung_einspringer WHERE user_id=$1 ORDER BY edate DESC',[uid]),
