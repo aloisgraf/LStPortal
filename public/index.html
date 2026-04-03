@@ -1294,8 +1294,10 @@ function showHelpSection(id){
     <div class="mh"><h2>&#128203; Changelog</h2><button class="mc" onclick="closeModal('changelogOv')">&#10005;</button></div>
     <div class="mb2" style="gap:10px">
       <div style="padding:12px;background:rgba(59,109,212,0.06));border:1px solid rgba(59,109,212,.20);border-radius:8px">
-        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.0.5</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.0.6</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
         <ul style="font-size:12px;line-height:1.8;padding-left:18px">
+          <li>Fix: Diensttausch als gesehen markieren funktioniert</li>
+          <li>Fix: Eigene Ticket&auml;nderungen werden nicht mehr als neu angezeigt</li>
           <li>Fix: Nachricht best&auml;tigen funktioniert auch nach Anpinnen</li>
           <li>Fix: Absender-Name in Nachrichten korrekt angezeigt (kein ? mehr)</li>
           <li>Fix: Angepinnte Nachrichten in der &Uuml;bersicht sichtbar (read_at Bug behoben)</li>
@@ -1343,7 +1345,7 @@ function showHelpSection(id){
 </div>
 
 <script>
-const APP_VERSION='2.0.5';
+const APP_VERSION='2.0.6';
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
@@ -1638,7 +1640,7 @@ function renderHome(){
         ${pendingDt.slice(0,5).map(dt=>{
           const creator=getU(dt.createdBy);
           const stBadge=dt.status==='pending'?'<span class="bdg ap-bdg-pending" style="font-size:10px">Ausstehend</span>':dt.status==='approved'?'<span class="bdg ap-bdg-approved" style="font-size:10px">&#10003;</span>':'<span class="bdg ap-bdg-rejected" style="font-size:10px">&#10007;</span>';
-          return`<div style="padding:6px 0;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:8px;cursor:pointer" onclick="markDtSeen('${dt.id}');setView('diensttausch')">
+          return`<div style="padding:6px 0;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:8px;cursor:pointer" onclick="markDtSeen('${dt.id}').then(()=>setView('diensttausch'))">
             <div style="flex:1;min-width:0">
               <div style="font-size:11px;font-weight:600">${creator?.name||'?'} <span style="color:var(--mu);font-weight:400">&middot; ${fdt(dt.createdAt)}</span></div>
               <div style="font-size:11px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${dt.text.slice(0,80)}${dt.text.length>80?'…':''}</div>
@@ -1940,7 +1942,8 @@ function openDtReject(id) {
 
 async function markDtSeen(id) {
   const dt = S.diensttausch.find(d=>d.id===id);
-  if (!dt || dt.isSeen) return;
+  if (!dt) return;
+  if (dt.isSeen) return; // already seen, no server call needed
   dt.isSeen = true;
   await api('PUT','/diensttausch/'+id+'/view').catch(()=>{});
   updateBadges();
