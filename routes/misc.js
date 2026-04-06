@@ -413,11 +413,16 @@ router.put('/homeoffice/config', auth, async (req,res) => {
     if(!req.p.canApproveEvents&&!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
     const {date,maxSlots} = req.body;
     if(!date||maxSlots==null) return bad(res,'date und maxSlots erforderlich');
-    await pool.query(
-      `INSERT INTO homeoffice_config (id,date,max_slots,created_by,updated_at) VALUES ($1,$2,$3,$4,NOW())
-       ON CONFLICT (date) DO UPDATE SET max_slots=EXCLUDED.max_slots,updated_at=NOW()`,
-      [newId(),date,parseInt(maxSlots),req.uid]
-    );
+    const slots = parseInt(maxSlots);
+    if (slots < 0) {
+      await pool.query('DELETE FROM homeoffice_config WHERE date=$1',[date]);
+    } else {
+      await pool.query(
+        `INSERT INTO homeoffice_config (id,date,max_slots,created_by,updated_at) VALUES ($1,$2,$3,$4,NOW())
+         ON CONFLICT (date) DO UPDATE SET max_slots=EXCLUDED.max_slots,updated_at=NOW()`,
+        [newId(),date,slots,req.uid]
+      );
+    }
     await logAct(req.uid,req.user.name,'ho_config',{date,maxSlots});
     ok(res);
   } catch(e){bad(res,e.message,500);}

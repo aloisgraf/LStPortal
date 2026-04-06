@@ -93,12 +93,17 @@ router.post('/:id/notes', auth, async (req,res) => {
     await pool.query('INSERT INTO ticket_notes (id,ticket_id,text,author_id,note_type,created_at,mentioned_users) VALUES ($1,$2,$3,$4,$5,$6,$7)',
       [id,req.params.id,text,req.uid,'note',now,JSON.stringify(mentionedIds)]);
     // Add mentioned users to ticket so they can see it
-    if(mentionedIds.length){
-      const existing=JSON.parse(tk.mentioned_users||'[]');
-      const merged=[...new Set([...existing,...mentionedIds])];
-      await pool.query('UPDATE tickets SET mentioned_users=$1,updated_at=$2 WHERE id=$3',[JSON.stringify(merged),now,req.params.id]);
-    } else {
-      await pool.query('UPDATE tickets SET updated_at=$1 WHERE id=$2',[now,req.params.id]);
+    try {
+      if(mentionedIds.length){
+        const existing=(()=>{try{return JSON.parse(tk.mentioned_users||'[]');}catch{return[];}})();
+        const merged=[...new Set([...existing,...mentionedIds])];
+        await pool.query('UPDATE tickets SET mentioned_users=$1,updated_at=$2 WHERE id=$3',[JSON.stringify(merged),now,req.params.id]);
+      } else {
+        await pool.query('UPDATE tickets SET updated_at=$1 WHERE id=$2',[now,req.params.id]);
+      }
+    } catch(mentionErr) {
+      // mentioned_users column might not exist yet - just update updated_at
+      await pool.query('UPDATE tickets SET updated_at=$1 WHERE id=$2',[now,req.params.id]).catch(()=>{});
     }
     const author = await getUser(req.uid);
     for (const u of mentioned) {
