@@ -581,11 +581,32 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
         <button class="tb" id="atb-tags" onclick="swTab('tags')">&#127991;&#65039; Tags</button>
         <button class="tb" id="atb-rights" onclick="swTab('rights')">&#128272; Rechte</button>
         <button class="tb" id="atb-log" onclick="swTab('log');loadLog(true)">&#128221; Aktivitätslog</button>
+        <button class="tb" id="atb-ho" onclick="swTab('ho')">&#127968; Homeoffice</button>
       </div>
       <div class="tp on" id="atp-users"><div class="al" id="usrList"></div><button class="btn-p" style="width:100%;justify-content:center" onclick="openUF(null)">&#65291; Benutzer</button></div>
       <div class="tp" id="atp-cats"><div class="al" id="catList"></div><button class="btn-p" style="width:100%;justify-content:center" onclick="openCF(null)">&#65291; Kategorie</button></div>
       <div class="tp" id="atp-tags"><div class="al" id="tagList"></div><button class="btn-p" style="width:100%;justify-content:center" onclick="openTF(null)">&#65291; Tag</button></div>
       <div class="tp" id="atp-rights"><div id="rightsMatrix" style="overflow-x:auto"></div></div>
+      <div class="tp" id="atp-ho">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div>
+            <div style="font-size:12px;font-weight:700;margin-bottom:8px">&#128230; Homeoffice-Boxen</div>
+            <div id="hoBoxList"></div>
+            <div style="display:flex;gap:6px;margin-top:8px">
+              <input type="text" id="hoNewBox" placeholder="Neue Box..." style="flex:1;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--r);background:var(--sf)">
+              <button class="btn-p" style="font-size:11px" onclick="hoAddBox()">&#43; Hinzufügen</button>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:12px;font-weight:700;margin-bottom:8px">&#128336; Dienste</div>
+            <div id="hoDienstList"></div>
+            <div style="display:flex;gap:6px;margin-top:8px">
+              <input type="text" id="hoNewDienst" placeholder="Neuer Dienst..." style="flex:1;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--r);background:var(--sf)">
+              <button class="btn-p" style="font-size:11px" onclick="hoAddDienst()">&#43; Hinzufügen</button>
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="tp" id="atp-log">
         <div style="font-size:12px;color:var(--mu);margin-bottom:8px">Alle Benutzeraktionen chronologisch. Nur für Administratoren sichtbar.</div>
         <div id="logContent" style="font-size:12px;max-height:400px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--r)">
@@ -1341,8 +1362,14 @@ function showHelpSection(id){
     <div class="mh"><h2>&#128203; Changelog</h2><button class="mc" onclick="closeModal('changelogOv')">&#10005;</button></div>
     <div class="mb2" style="gap:10px">
       <div style="padding:12px;background:rgba(59,109,212,0.06));border:1px solid rgba(59,109,212,.20);border-radius:8px">
-        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.0.9</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.1.0</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
         <ul style="font-size:12px;line-height:1.8;padding-left:18px">
+          <li>Fix: Ticket-Notiz @-Erw&auml;hnung – JSON-Fehler behoben</li>
+          <li>Fix: Homeoffice-Datum &ldquo;invalid date&rdquo; behoben</li>
+          <li>Homeoffice: &Ouml;sterreichische Feiertage (Salzburg) farblich markiert</li>
+          <li>Homeoffice: Boxen &amp; Dienste jetzt in den Einstellungen (Admin)</li>
+          <li>Homeoffice: Slot-Konfiguration zeigt aktuellen Monat, mit L&ouml;schen</li>
+          <li>Eintragsübersicht: Admin und Leitung k&ouml;nnen jeden Eintrag l&ouml;schen</li>
           <li>Neues Modul: Homeoffice mit Raster, Box/Dienst-Auswahl, Admin-Konfiguration</li>
           <li>@-Mention Autocomplete im Diensttausch-Textfeld</li>
           <li>Eintrags&uuml;bersicht: korrekte Sichtbarkeit und L&ouml;sch-Rechte nach Rolle</li>
@@ -1429,7 +1456,7 @@ function showHelpSection(id){
 </div>
 
 <script>
-const APP_VERSION='2.0.9';
+const APP_VERSION='2.1.0';
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
@@ -1501,7 +1528,7 @@ const getTk=id=>S.tickets.find(t=>t.id===id);
 const getAllw=(uid,year,month)=>S.allowances.find(a=>a.userId===uid&&a.year===year&&a.month===month)||{nd:0,fd:0,fw:0,c10:0};
 const getRoleDef=r=>ROLES.find(x=>x.id===r)||ROLES[6];
 const fd=s=>{if(!s)return'\u2014';const p=s.split('T')[0].split('-');return`${p[2]}.${p[1]}.${p[0]}`;};
-const fdt=s=>{if(!s)return'\u2014';const d=new Date(s);return`${fd(d.toISOString())} ${d.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'})}`;};
+const fdt=s=>{if(!s)return'\u2014';const d=new Date(s);if(isNaN(d))return String(s||'');if(s.length<=10)return fd(s);return`${fd(d.toISOString())} ${d.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'})}`;};
 const avHtml=(init,color,sz=24,fs=10,online=false)=>`<div class="av" style="width:${sz}px;height:${sz}px;font-size:${fs}px;background:${color}22;color:${color}">${init}${online?'<div class="online-dot"></div>':''}</div>`;
 const roleBadges=uid=>((getU(uid)?.roles)||['standard']).map(r=>{const d=getRoleDef(r);return`<span class="rb rb-${r}">${d.icon} ${d.label}</span>`;}).join('');
 const prioBdg=p=>{const d=PRIORITIES.find(x=>x.id===p)||PRIORITIES[1];return`<span class="bdg pr-${p}">${d.label}</span>`;};
@@ -2062,6 +2089,16 @@ function renderHomeoffice(){
         </div>
       </div>
     </div>`:''}`;
+}
+
+
+async function hoDeleteConfig(date) {
+  try {
+    await api('PUT','/homeoffice/config',{date,maxSlots:1}); // reset to default (1)
+    // Actually delete: use negative value as signal
+    await api('PUT','/homeoffice/config',{date,maxSlots:-1}).catch(()=>{});
+    await fetchData(); renderHomeoffice();
+  } catch(e) { toast('&#9888;&#65039; '+e.message,'err'); }
 }
 
 function hoEintragen(date){
@@ -2970,8 +3007,19 @@ async function loadLog(reset){
 }
 function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
+
+function renderHoAdmin() {
+  var bl = document.getElementById('hoBoxList');
+  var dl = document.getElementById('hoDienstList');
+  if (!bl||!dl) return;
+  var boxes = S.homeoffice?.boxes||[];
+  var dienste = S.homeoffice?.dienste||[];
+  bl.innerHTML = boxes.length ? boxes.map(b=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)"><span style="font-size:13px">${b.label}</span><button class="btn-d" style="font-size:10px;padding:2px 6px" onclick="hoDeleteBox('${b.id}')">&#10005;</button></div>`).join('') : '<div style="color:var(--di);font-size:12px">Keine Boxen</div>';
+  dl.innerHTML = dienste.length ? dienste.map(d=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)"><span style="font-size:13px">${d.label}</span><button class="btn-d" style="font-size:10px;padding:2px 6px" onclick="hoDeleteDienst('${d.id}')">&#10005;</button></div>`).join('') : '<div style="color:var(--di);font-size:12px">Keine Dienste</div>';
+}
+
 function openAdminModal(){renderUsrList();renderCatList();renderTagList();renderRightsMatrix();openModal('admOv');}
-function swTab(t){['users','cats','tags','rights','log'].forEach(x=>{document.getElementById('atb-'+x)?.classList.toggle('on',x===t);document.getElementById('atp-'+x)?.classList.toggle('on',x===t);});}
+function swTab(t){['users','cats','tags','rights','log','ho'].forEach(x=>{document.getElementById('atb-'+x)?.classList.toggle('on',x===t);document.getElementById('atp-'+x)?.classList.toggle('on',x===t);});if(t==='ho')renderHoAdmin();}
 function backToAdmin(tab='users'){['ufOv','cfOv','tfOv'].forEach(closeModal);openAdminModal();swTab(tab);}
 function renderUsrList(){document.getElementById('usrList').innerHTML=S.users.map(u=>`<div class="ai">${avHtml(u.initials,u.color,34,13,u.isOnline)}<div class="aii"><div class="ain">${u.name} ${roleBadges(u.id)}${u.isOnline?'<span style="font-size:10px;color:var(--ok)">\u25cf online</span>':''}</div><div class="ais">${u.mustChangePW?'\u26A0\uFE0F PW ausstehend':'\u2713 Aktiv'}</div></div><div class="aia"><button class="btn-e" onclick="openUF('${u.id}')">\u270e</button>${S.users.length>1&&u.id!==S.currentUser?`<button class="btn-d" onclick="delUser('${u.id}')">\u2715</button>`:''}</div></div>`).join('');}
 function renderCatList(){document.getElementById('catList').innerHTML=S.categories.map(c=>`<div class="ai"><div style="width:14px;height:14px;border-radius:3px;background:${c.color};flex-shrink:0"></div><div class="aii"><div class="ain">${c.emoji} ${c.label}</div></div><div class="aia"><button class="btn-e" onclick="openCF('${c.id}')">\u270e</button>${S.categories.length>1?`<button class="btn-d" onclick="delCat('${c.id}')">\u2715</button>`:''}</div></div>`).join('');}
@@ -3080,4 +3128,122 @@ function startAutoRefresh(){
 
 </script>
 </body>
-</html>
+</html
+function renderHomeoffice() {
+  var year=S.year, month=S.month!==null?S.month:new Date().getMonth();
+  var firstDay=new Date(year,month,1);
+  var lastDay=new Date(year,month+1,0);
+  var canManage=S.p.canApproveEvents||S.p.manageUsers;
+  var moNames=['Jänner','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+  var moName=moNames[month];
+  var dayNames=['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+  var holidays=getAustrianHolidays(year);
+  var pad=n=>String(n).padStart(2,'0');
+
+  // Upcoming 30 days personal
+  var today0=new Date(); today0.setHours(0,0,0,0);
+  var in30=new Date(today0); in30.setDate(in30.getDate()+30);
+  var myUpcoming=(S.homeoffice?.slots||[]).filter(s=>{
+    if(s.userId!==S.currentUser)return false;
+    var d=new Date(s.date+'T00:00:00'); return d>=today0&&d<=in30;
+  }).sort((a,b)=>a.date.localeCompare(b.date));
+
+  // Slot config map: date→maxSlots (default 1)
+  var cfgMap={};
+  (S.homeoffice?.config||[]).forEach(c=>{ cfgMap[c.date]=c.maxSlots; });
+
+  // Build days
+  var days=[];
+  for(var d=new Date(firstDay);d<=lastDay;d.setDate(d.getDate()+1)){
+    var iso=year+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+    var dow=d.getDay(); // 0=So
+    var isWe=dow===0||dow===6;
+    var isHol=holidays.has(iso);
+    var slots=(S.homeoffice?.slots||[]).filter(s=>s.date===iso);
+    var mySlot=slots.find(s=>s.userId===S.currentUser);
+    var maxS=cfgMap[iso]!==undefined?cfgMap[iso]:1;
+    var free=Math.max(0,maxS-slots.length);
+    days.push({iso,dow,isWe,isHol,slots,mySlot,maxS,free,day:d.getDate(),dayName:dayNames[dow]});
+  }
+
+  var dayRowBg=function(d){
+    if(d.isHol)return'rgba(124,58,237,.06)';
+    if(d.dow===0)return'rgba(239,68,68,.04)'; // Sonntag
+    if(d.dow===6)return'rgba(245,158,11,.04)'; // Samstag
+    return'';
+  };
+  var dayRowBorderLeft=function(d){
+    if(d.isHol)return'3px solid rgba(124,58,237,.5)';
+    if(d.dow===0)return'3px solid rgba(239,68,68,.3)';
+    if(d.dow===6)return'3px solid rgba(245,158,11,.3)';
+    return'';
+  };
+
+  document.getElementById('main').innerHTML=`
+    <div class="ph"><div class="pt">&#127968; Homeoffice <span>${moName} ${year}</span></div></div>
+
+    ${myUpcoming.length?`<div class="tw" style="margin-bottom:14px">
+      <div class="tt"><h2>&#128198; Meine HO-Tage (30 Tage)</h2></div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Datum</th><th>Box</th><th>Dienst</th><th></th></tr></thead><tbody>
+        ${myUpcoming.map(s=>{var dobj=new Date(s.date+'T00:00:00');return`<tr>
+          <td style="font-weight:600;white-space:nowrap">${pad(dobj.getDate())}. ${moNames[dobj.getMonth()]} ${dobj.getFullYear()} (${dayNames[dobj.getDay()]})</td>
+          <td>${s.box||'—'}</td><td>${s.dienst||'—'}</td>
+          <td><button class="btn-d" style="font-size:11px;padding:2px 8px" onclick="hoAustragen('${s.id}')">&#10005; Austragen</button></td>
+        </tr>`;}).join('')}
+      </tbody></table></div>
+    </div>`:''}
+
+    ${canManage?`<div class="tw" style="margin-bottom:14px">
+      <div class="tt"><h2>&#9881;&#65039; Slot-Konfiguration pro Tag</h2></div>
+      <div style="padding:12px">
+        <div style="font-size:11px;color:var(--mu);margin-bottom:10px">Standard: 1 Platz pro Tag. Hier können Tage abweichend konfiguriert werden (0–5 Plätze).</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <div class="fg" style="margin:0"><label>Datum</label><input type="date" id="hoConfDate" style="font-size:12px" min="${year+'-'+pad(month+1)+'-01'}" max="${year+'-'+pad(month+1)+'-'+pad(lastDay.getDate())}"></div>
+          <div class="fg" style="margin:0"><label>Plätze (0–5)</label><input type="number" id="hoConfSlots" min="0" max="5" value="1" style="width:70px;font-size:12px"></div>
+          <button class="btn-p" onclick="hoSaveConfig()">&#128190; Speichern</button>
+        </div>
+        ${(S.homeoffice?.config||[]).filter(c=>c.date.startsWith(year+'-'+pad(month+1))).length?`
+        <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:4px">
+          ${(S.homeoffice?.config||[]).filter(c=>c.date.startsWith(year+'-'+pad(month+1))).map(c=>{
+            var dobj=new Date(c.date+'T00:00:00');
+            return`<span style="background:var(--sf2);border:1px solid var(--border);border-radius:4px;padding:2px 10px;font-size:11px;display:inline-flex;align-items:center;gap:6px">
+              ${pad(dobj.getDate())}. ${moNames[dobj.getMonth()]}: <strong>${c.maxSlots} Pl.</strong>
+              <button onclick="hoDeleteConfig('${c.date}')" style="border:none;background:none;cursor:pointer;color:var(--danger);font-size:12px;padding:0;line-height:1">&#10005;</button>
+            </span>`;
+          }).join('')}
+        </div>`:''}
+      </div>
+    </div>`:''}
+
+    <div class="tw">
+      <div class="tt"><h2>&#128197; ${moName} ${year}</h2></div>
+      <div style="overflow-x:auto"><table><thead><tr>
+        <th style="text-align:left;min-width:200px">Tag</th>
+        <th style="text-align:center">Plätze</th>
+        <th style="text-align:left">Eingetragen</th>
+        <th></th>
+      </tr></thead><tbody>
+        ${days.map(function(day){
+          var bg=dayRowBg(day), bl=dayRowBorderLeft(day);
+          var label=pad(day.day)+'. '+moName+' '+year+' ('+day.dayName+')';
+          if(day.isHol) label='&#127877; '+label;
+          var slotHtml=day.slots.map(function(s){
+            var u=getU(s.userId);
+            return`<span style="background:${u?.color||'var(--acc)'}22;color:${u?.color||'var(--acc)'};border-radius:4px;padding:1px 7px;font-size:11px;font-weight:600;margin-right:4px">${u?.initials||'?'}${s.box?' / '+s.box:''}${s.dienst?' · '+s.dienst:''}</span>`;
+          }).join('');
+          var isMine=!!day.mySlot;
+          return`<tr style="background:${bg};${bl?'border-left:'+bl:''}">
+            <td style="white-space:nowrap;font-weight:${isMine?700:400}">${label}</td>
+            <td style="text-align:center"><span style="font-size:12px;font-weight:700;color:${day.free>0?'var(--ok)':'var(--danger)'}">${day.free}/${day.maxS}</span></td>
+            <td>${slotHtml||'<span style="color:var(--di);font-size:11px">—</span>'}</td>
+            <td>
+              ${!isMine&&day.free>0&&!day.isWe?`<button class="btn-ok" style="font-size:11px;padding:2px 8px;white-space:nowrap" onclick="hoEintragen('${day.iso}')">&#43; Eintragen</button>`:''}
+              ${isMine?`<button class="btn-d" style="font-size:11px;padding:2px 8px" onclick="hoAustragen('${day.mySlot.id}')">&#10005;</button>`:''}
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody></table></div>
+    </div>`;
+}
+
+>
