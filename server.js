@@ -151,8 +151,7 @@ async function initDB() {
       user_id TEXT NOT NULL,
       box TEXT NOT NULL DEFAULT '',
       dienst TEXT NOT NULL DEFAULT '',
-      created_at TIMESTAMPTZ DEFAULT NOW(),
-      UNIQUE(date, user_id)
+      created_at TIMESTAMPTZ DEFAULT NOW()
     )`,
     `CREATE TABLE IF NOT EXISTS homeoffice_boxes (
       id TEXT PRIMARY KEY,
