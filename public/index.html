@@ -245,6 +245,11 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
 .dt-row:hover{background:var(--sf2)}
 .dt-row-new{border-left:3px solid var(--warn);background:rgba(245,158,11,.04)}
 .dt-row-new:hover{background:rgba(245,158,11,.08)}
+
+/* @-Mention Autocomplete */
+.mention-box{position:absolute;background:var(--sf);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--sh);z-index:1000;min-width:160px;max-height:200px;overflow-y:auto}
+.mention-item{padding:7px 12px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px}
+.mention-item:hover,.mention-item.active{background:var(--sf2)}
 </style>
 </head>
 <body>
@@ -321,6 +326,7 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
         <div class="ni" id="ni-schedule" onclick="setView('schedule')">&#128197; Eintrags&#252;bersicht</div>
         <div class="ni" id="ni-calendar" onclick="setView('calendar')">&#128197; Kalenderansicht</div>
         <div class="ni" id="ni-allw" onclick="setView('allw')">&#128202; Zulagendienste</div>
+        <div class="ni" id="ni-homeoffice" onclick="setView('homeoffice')">&#127968; Homeoffice</div>
         <div class="ni" id="ni-diensttausch" onclick="setView('diensttausch')">&#128257; Diensttausch<span class="bdgn" id="dtBdg" style="display:none">0</span></div>
         <div class="ni" id="ni-abrechnung" onclick="setView('abrechnung')">&#129534; Abrechnung</div>
         <div class="ni" id="ni-dienstplaene" onclick="setView('dienstplaene')">&#128196; Dienstpl&#228;ne</div>
@@ -1335,8 +1341,14 @@ function showHelpSection(id){
     <div class="mh"><h2>&#128203; Changelog</h2><button class="mc" onclick="closeModal('changelogOv')">&#10005;</button></div>
     <div class="mb2" style="gap:10px">
       <div style="padding:12px;background:rgba(59,109,212,0.06));border:1px solid rgba(59,109,212,.20);border-radius:8px">
-        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.0.8</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.0.9</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
         <ul style="font-size:12px;line-height:1.8;padding-left:18px">
+          <li>Neues Modul: Homeoffice mit Raster, Box/Dienst-Auswahl, Admin-Konfiguration</li>
+          <li>@-Mention Autocomplete im Diensttausch-Textfeld</li>
+          <li>Eintrags&uuml;bersicht: korrekte Sichtbarkeit und L&ouml;sch-Rechte nach Rolle</li>
+          <li>Leitung darf Eintr&auml;ge genehmigen/ablehnen</li>
+          <li>Ticket @-Erw&auml;hnungen: User sehen Ticket ab Erw&auml;hnung auch ohne Fachbereich</li>
+          <li>Homeoffice-Widget auf der &Uuml;bersichtsseite (n&auml;chste 30 Tage)</li>
           <li>Kompletter Code-Review: logAct zentralisiert in db.js</li>
           <li>Benutzerhandbuch: 5 neue Module dokumentiert</li>
           <li>Changelog-History vollständig bis v1.5.0</li>
@@ -1417,7 +1429,7 @@ function showHelpSection(id){
 </div>
 
 <script>
-const APP_VERSION='2.0.8';
+const APP_VERSION='2.0.9';
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
@@ -1472,7 +1484,7 @@ async function fetchData(){
     S.events=data.events||[];S.tickets=data.tickets||[];S.allowances=data.allowances||[];
     S.checklists=data.checklists||[];S.messages=data.messages||[];
     S.notifications=data.notifications||[];S.abrechnung=data.abrechnung||{einspringer:[],homeoffice:[]};
-    S.dienstplaene=data.dienstplaene||[];S.diensttausch=data.diensttausch||[];
+    S.dienstplaene=data.dienstplaene||[];S.diensttausch=data.diensttausch||[];S.homeoffice=data.homeoffice||{slots:[],config:[],boxes:[],dienste:[]};
     S.currentUser=data.currentUser;S.p=data.permissions||{};
     const u=getU(S.currentUser);const roles=u?.roles||['standard'];
     const has=(...r)=>r.some(x=>roles.includes(x));
@@ -1625,6 +1637,7 @@ function renderMain(){
   if(S.view==='home')renderHome();
   else if(S.view==='schedule')renderSchedule();
   else if(S.view==='calendar')renderCalendar();
+  else if(S.view==='homeoffice')renderHomeoffice();
   else if(S.view==='allw')renderAllw();
   else if(S.view==='diensttausch')renderDiensttausch();
   else if(S.view==='abrechnung')renderAbrechnung();
@@ -1639,6 +1652,10 @@ function renderHome(){
   const online=S.users.filter(x=>x.isOnline&&x.id!==S.currentUser);
   const unreadMsg=S.messages.filter(m=>!m.isRead&&m.senderId!==S.currentUser);
   const pinnedMsg=S.messages.filter(m=>m.pinned&&m.senderId!==S.currentUser);
+  // Homeoffice nächste 30 Tage
+  var today0=new Date(); today0.setHours(0,0,0,0);
+  var in30d=new Date(today0); in30d.setDate(in30d.getDate()+30);
+  var myHo=(S.homeoffice?.slots||[]).filter(s=>{if(s.userId!==S.currentUser)return false;var d=new Date(s.date);return d>=today0&&d<=in30d;}).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,5);
   const unreadNotif=S.notifications.filter(n=>!n.isRead&&n.type!=='event_added'&&n.type!=='event_changed'&&n.type!=='einspringer_rejected');
   const eventNotifs=S.notifications.filter(n=>!n.isRead&&(n.type==='event_added'||n.type==='event_changed'));
   const einspNotifs=S.notifications.filter(n=>!n.isRead&&n.type==='einspringer_rejected');
@@ -1652,10 +1669,19 @@ function renderHome(){
     if(tk.department==='frei')return myDepts.length>0||S.tp.seeAll; // Frei für alle mit Fachbereich
     // Erwähnt in einer Notiz (@meinName)
     if(myName&&(tk.notes||[]).some(n=>n.text&&n.text.toLowerCase().includes('@'+myName)))return true;
+    if((tk.mentionedUsers||[]).includes(S.currentUser))return true; // direkt erwähnt
     return false;
   }).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,10);
   document.getElementById('main').innerHTML=`
     <div class="ph"><div class="pt">&#128196; \u00dcbersicht <span>${u?.name||''}</span></div></div>
+    ${myHo.length?`<div style="background:rgba(14,165,233,.04);border:1px solid rgba(14,165,233,.2);border-radius:var(--r);padding:14px;margin-bottom:14px">
+      <div style="font-size:13px;font-weight:700;color:var(--teal,#0ea5e9);margin-bottom:10px">&#127968; Meine Homeoffice-Tage</div>
+      ${myHo.map(s=>`<div style="padding:4px 0;font-size:12px;display:flex;gap:12px">
+        <span style="font-weight:600;color:var(--tx)">${s.date.slice(5)}</span>
+        <span style="color:var(--mu)">${s.box||''}${s.dienst?' · '+s.dienst:''}</span>
+      </div>`).join('')}
+      <button class="btn-s" style="margin-top:8px;font-size:11px" onclick="setView('homeoffice')">Alle anzeigen &#8594;</button>
+    </div>`:''}
     ${pinnedMsg.length?`<div style="background:rgba(59,109,212,.04);border:1px solid rgba(59,109,212,.2);border-radius:var(--r);padding:14px;margin-bottom:14px">
       <div style="font-size:13px;font-weight:700;color:var(--acc);margin-bottom:10px">&#128204; ${pinnedMsg.length} angepinnte Nachricht${pinnedMsg.length>1?'en':''}</div>
       ${pinnedMsg.map(m=>`<div style="padding:8px 12px;background:var(--sf);border-radius:6px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;cursor:pointer" onclick="openMsg('${m.id}')">
@@ -1928,6 +1954,175 @@ function renderCalendar(){
 // ══════════════════════════════════════════
 // SECTION: Diensttausch
 // ══════════════════════════════════════════
+// ══════════════════════════════════════════
+// SECTION: Homeoffice
+// ══════════════════════════════════════════
+function renderHomeoffice(){
+  const year=S.year, month=S.month!==null?S.month:new Date().getMonth();
+  const firstDay=new Date(year,month,1);
+  const lastDay=new Date(year,month+1,0);
+  const canManage=S.p.canApproveEvents||S.p.manageUsers;
+  const moName=['Jänner','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'][month];
+
+  // Build days array
+  var days=[];
+  for(var d=new Date(firstDay);d<=lastDay;d.setDate(d.getDate()+1)){
+    var iso=d.toISOString().slice(0,10);
+    var cfg=S.homeoffice.config.find(c=>c.date===iso);
+    var slots=S.homeoffice.slots.filter(s=>s.date===iso);
+    var mySlot=slots.find(s=>s.userId===S.currentUser);
+    var maxS=cfg?cfg.maxSlots:1;
+    days.push({iso,slots,mySlot,maxS,free:Math.max(0,maxS-slots.length)});
+  }
+
+  // Upcoming 30 days for personal overview
+  var today=new Date(); today.setHours(0,0,0,0);
+  var in30=new Date(today); in30.setDate(in30.getDate()+30);
+  var myUpcoming=S.homeoffice.slots.filter(s=>{
+    if(s.userId!==S.currentUser)return false;
+    var d=new Date(s.date); return d>=today&&d<=in30;
+  }).sort((a,b)=>a.date.localeCompare(b.date));
+
+  document.getElementById('main').innerHTML=`
+    <div class="ph"><div class="pt">&#127968; Homeoffice <span>${moName} ${year}</span></div></div>
+    ${myUpcoming.length?`<div class="tw" style="margin-bottom:14px">
+      <div class="tt"><h2>&#128198; Meine Homeoffice-Tage (nächste 30 Tage)</h2></div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Datum</th><th>Box</th><th>Dienst</th><th></th></tr></thead><tbody>
+        ${myUpcoming.map(s=>`<tr>
+          <td style="font-weight:600">${fdt(s.date+'T00:00:00')}</td>
+          <td>${s.box||'—'}</td><td>${s.dienst||'—'}</td>
+          <td><button class="btn-d" style="font-size:11px;padding:2px 8px" onclick="hoAustragen('${s.id}')">&#10005; Austragen</button></td>
+        </tr>`).join('')}
+      </tbody></table></div>
+    </div>`:''}
+    ${canManage?`<div class="tw" style="margin-bottom:14px">
+      <div class="tt"><h2>&#9881;&#65039; Einstellungen Slots</h2></div>
+      <div style="padding:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+        <div class="fg" style="margin:0"><label>Datum</label><input type="date" id="hoConfDate" style="font-size:12px"></div>
+        <div class="fg" style="margin:0"><label>Max. Plätze</label><input type="number" id="hoConfSlots" min="0" max="5" value="1" style="width:70px;font-size:12px"></div>
+        <button class="btn-p" style="margin-top:4px" onclick="hoSaveConfig()">&#128190; Speichern</button>
+      </div>
+      <div style="padding:0 12px 10px;font-size:11px;color:var(--mu)">Ohne Konfiguration: 1 Platz pro Tag (Standard). Nur konfigurierte Tage werden hier angezeigt.</div>
+      ${S.homeoffice.config.length?`<div style="padding:0 12px 12px;display:flex;flex-wrap:wrap;gap:4px">
+        ${S.homeoffice.config.map(c=>`<span style="background:var(--sf2);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px">${c.date.slice(5)}: ${c.maxSlots} Pl.</span>`).join('')}
+      </div>`:''}
+    </div>`:''}
+    <div class="tw">
+      <div class="tt"><h2>&#128197; ${moName} ${year}</h2></div>
+      <div style="overflow-x:auto"><table><thead><tr>
+        <th style="text-align:left;min-width:80px">Tag</th>
+        <th style="text-align:center">Plätze</th>
+        <th style="text-align:left">Eingetragen</th>
+        <th></th>
+      </tr></thead><tbody>
+        ${days.map(day=>{
+          var isWe=[0,6].includes(new Date(day.iso).getDay());
+          var isMine=!!day.mySlot;
+          var slots=day.slots.map(s=>{var u=getU(s.userId);return`<span style="background:${u?.color||'var(--acc)'}22;color:${u?.color||'var(--acc)'};border-radius:4px;padding:1px 6px;font-size:11px;font-weight:600;margin-right:4px">${u?.initials||'?'}${s.box?` / ${s.box}`:''}</span>`;}).join('');
+          return`<tr style="${isWe?'opacity:.7':''};${isMine?'background:rgba(16,185,129,.05)':''}">
+            <td style="font-weight:${isMine?700:400};white-space:nowrap">${day.iso.slice(5)} ${['So','Mo','Di','Mi','Do','Fr','Sa'][new Date(day.iso).getDay()]}</td>
+            <td style="text-align:center">
+              <span style="font-size:11px;color:${day.free>0?'var(--ok)':'var(--danger)'};font-weight:700">${day.free}/${day.maxS}</span>
+            </td>
+            <td>${slots||'<span style="color:var(--di);font-size:11px">—</span>'}</td>
+            <td>
+              ${!isMine&&day.free>0?`<button class="btn-ok" style="font-size:11px;padding:2px 8px;white-space:nowrap" onclick="hoEintragen('${day.iso}')">&#43; Eintragen</button>`:''}
+              ${isMine?`<button class="btn-d" style="font-size:11px;padding:2px 8px" onclick="hoAustragen('${day.mySlot.id}')">&#10005;</button>`:''}
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody></table></div>
+    </div>
+
+    <!-- Admin: Boxes & Dienste -->
+    ${canManage?`<div class="tw" style="margin-top:14px">
+      <div class="tt"><h2>&#127968; Homeoffice-Boxen &amp; Dienste (Admin)</h2></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:12px">
+        <div>
+          <div style="font-size:12px;font-weight:700;margin-bottom:8px">&#128230; Boxen</div>
+          ${S.homeoffice.boxes.map(b=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
+            <span style="font-size:12px">${b.label}</span>
+            <button class="btn-d" style="font-size:10px;padding:1px 6px" onclick="hoDeleteBox('${b.id}')">&#10005;</button>
+          </div>`).join('')}
+          <div style="display:flex;gap:6px;margin-top:8px">
+            <input type="text" id="hoNewBox" placeholder="Neue Box..." style="flex:1;font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:var(--r);background:var(--sf)">
+            <button class="btn-p" style="font-size:11px" onclick="hoAddBox()">&#43;</button>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:12px;font-weight:700;margin-bottom:8px">&#128336; Dienste</div>
+          ${S.homeoffice.dienste.map(d=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
+            <span style="font-size:12px">${d.label}</span>
+            <button class="btn-d" style="font-size:10px;padding:1px 6px" onclick="hoDeleteDienst('${d.id}')">&#10005;</button>
+          </div>`).join('')}
+          <div style="display:flex;gap:6px;margin-top:8px">
+            <input type="text" id="hoNewDienst" placeholder="Neuer Dienst..." style="flex:1;font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:var(--r);background:var(--sf)">
+            <button class="btn-p" style="font-size:11px" onclick="hoAddDienst()">&#43;</button>
+          </div>
+        </div>
+      </div>
+    </div>`:''}`;
+}
+
+function hoEintragen(date){
+  var boxes=S.homeoffice.boxes; var dienste=S.homeoffice.dienste;
+  var boxOpts=boxes.map(b=>`<option value="${b.label}">${b.label}</option>`).join('');
+  var dienstOpts=dienste.map(d=>`<option value="${d.label}">${d.label}</option>`).join('');
+  var html='<div style="padding:16px;background:var(--sf);border:1px solid var(--border);border-radius:var(--r);margin-top:8px;display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap" id="hoForm">';
+  html+=`<div class="fg" style="margin:0"><label>Box</label><select id="hoBox" style="font-size:12px"><option value="">— wählen —</option>${boxOpts}</select></div>`;
+  html+=`<div class="fg" style="margin:0"><label>Dienst</label><select id="hoDienst" style="font-size:12px"><option value="">— wählen —</option>${dienstOpts}</select></div>`;
+  html+=`<button class="btn-p" style="font-size:12px" onclick="hoSaveSlot('${date}')">&#10003; Eintragen</button>`;
+  html+=`<button class="btn-s" style="font-size:12px" onclick="document.getElementById('hoForm').remove()">Abbrechen</button></div>`;
+  // Insert after the button row
+  var rows=document.querySelectorAll('table tbody tr');
+  rows.forEach(row=>{
+    if(row.innerHTML.includes(date.slice(5))){
+      row.insertAdjacentHTML('afterend','<tr><td colspan="4">'+html+'</td></tr>');
+    }
+  });
+}
+async function hoSaveSlot(date){
+  var box=document.getElementById('hoBox')?.value||'';
+  var dienst=document.getElementById('hoDienst')?.value||'';
+  try{
+    await api('POST','/homeoffice/slots',{date,box,dienst});
+    await fetchData(); renderHomeoffice(); toast('&#10003; Homeoffice eingetragen!');
+  }catch(e){toast('&#9888;&#65039; '+e.message,'err');}
+}
+async function hoAustragen(id){
+  if(!confirm('Homeoffice-Eintrag löschen?'))return;
+  try{await api('DELETE','/homeoffice/slots/'+id);await fetchData();renderHomeoffice();toast('&#10003; Ausgetragen.');}
+  catch(e){toast('&#9888;&#65039; '+e.message,'err');}
+}
+async function hoSaveConfig(){
+  var date=document.getElementById('hoConfDate')?.value;
+  var maxSlots=document.getElementById('hoConfSlots')?.value;
+  if(!date)return toast('&#9888;&#65039; Datum wählen!');
+  try{await api('PUT','/homeoffice/config',{date,maxSlots});await fetchData();renderHomeoffice();toast('&#10003; Gespeichert.');}
+  catch(e){toast('&#9888;&#65039; '+e.message,'err');}
+}
+async function hoAddBox(){
+  var label=document.getElementById('hoNewBox')?.value?.trim();
+  if(!label)return;
+  try{await api('POST','/homeoffice/boxes',{label});await fetchData();renderHomeoffice();}
+  catch(e){toast('&#9888;&#65039; '+e.message,'err');}
+}
+async function hoDeleteBox(id){
+  try{await api('DELETE','/homeoffice/boxes/'+id);await fetchData();renderHomeoffice();}
+  catch(e){toast('&#9888;&#65039; '+e.message,'err');}
+}
+async function hoAddDienst(){
+  var label=document.getElementById('hoNewDienst')?.value?.trim();
+  if(!label)return;
+  try{await api('POST','/homeoffice/dienste',{label});await fetchData();renderHomeoffice();}
+  catch(e){toast('&#9888;&#65039; '+e.message,'err');}
+}
+async function hoDeleteDienst(id){
+  try{await api('DELETE','/homeoffice/dienste/'+id);await fetchData();renderHomeoffice();}
+  catch(e){toast('&#9888;&#65039; '+e.message,'err');}
+}
+
+
 function renderDiensttausch() {
   const canDecide = S.p.canApproveEvents;
   const list = S.diensttausch;
@@ -1972,7 +2167,10 @@ function renderDiensttausch() {
       <div class="tt"><h2>Neuer Diensttausch</h2></div>
       <div style="padding:14px">
         <div style="margin-bottom:8px;font-size:12px;color:var(--mu)">Beschreibe den gewünschten Tausch. Mit @Name kannst du Kollegen markieren.</div>
-        <textarea id="dtText" rows="4" style="width:100%;box-sizing:border-box;resize:vertical;font-size:13px;border:1px solid var(--border);border-radius:var(--r);padding:8px;background:var(--sf);color:var(--tx)" placeholder="Tauschdetails angeben... (@Name für Kollegen markieren)"></textarea>
+        <div style="position:relative">
+          <textarea id="dtText" rows="4" style="width:100%;box-sizing:border-box;resize:vertical;font-size:13px;border:1px solid var(--border);border-radius:var(--r);padding:8px;background:var(--sf);color:var(--tx)" placeholder="Tauschdetails angeben... (@Name für Kollegen markieren)" oninput="dtMentionInput(this)"></textarea>
+          <div id="dtMentionBox" class="mention-box" style="display:none;top:auto;bottom:100%;margin-bottom:2px;left:8px"></div>
+        </div>
         <button class="btn-p" style="margin-top:8px" onclick="createDt()">&#128257; Eintragen</button>
       </div>
     </div>
@@ -1981,6 +2179,52 @@ function renderDiensttausch() {
       ${list.map(dtRow).join('')}
     </div>`:'<div class="empty">Noch keine Diensttausch-Einträge</div>'}`;
 }
+
+
+// ── @-MENTION Autocomplete ──
+var _dtMentionStart=-1;
+function dtMentionInput(ta){
+  var val=ta.value, pos=ta.selectionStart;
+  var before=val.slice(0,pos);
+  var atIdx=before.lastIndexOf('@');
+  var box=document.getElementById('dtMentionBox');
+  if(atIdx<0||(before.slice(atIdx+1).includes(' ')&&before.slice(atIdx+1).length>0)){
+    box.style.display='none'; _dtMentionStart=-1; return;
+  }
+  _dtMentionStart=atIdx;
+  var query=before.slice(atIdx+1).toLowerCase();
+  var matches=S.users.filter(u=>u.name.toLowerCase().startsWith(query)).slice(0,8);
+  if(!matches.length){box.style.display='none';return;}
+  box.innerHTML=matches.map((u,i)=>
+    `<div class="mention-item${i===0?' active':''}" data-name="${u.name}" onclick="dtMentionSelect('${u.name}')">`+
+    `<span style="background:${u.color};color:#fff;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0">${u.initials}</span>`+
+    `<span>${u.name}</span></div>`
+  ).join('');
+  box.style.display='block';
+}
+function dtMentionSelect(name){
+  var ta=document.getElementById('dtText');
+  var val=ta.value, pos=ta.selectionStart;
+  var before=val.slice(0,_dtMentionStart);
+  var after=val.slice(pos);
+  ta.value=before+'@'+name+' '+after;
+  ta.focus();
+  var newPos=before.length+name.length+2;
+  ta.setSelectionRange(newPos,newPos);
+  document.getElementById('dtMentionBox').style.display='none';
+  _dtMentionStart=-1;
+}
+document.addEventListener('keydown',function(e){
+  var box=document.getElementById('dtMentionBox');
+  if(!box||box.style.display==='none')return;
+  var items=box.querySelectorAll('.mention-item');
+  var active=box.querySelector('.mention-item.active');
+  var idx=Array.from(items).indexOf(active);
+  if(e.key==='ArrowDown'){e.preventDefault();items[idx]?.classList.remove('active');items[Math.min(idx+1,items.length-1)]?.classList.add('active');}
+  else if(e.key==='ArrowUp'){e.preventDefault();items[idx]?.classList.remove('active');items[Math.max(idx-1,0)]?.classList.add('active');}
+  else if(e.key==='Enter'||e.key==='Tab'){var act=box.querySelector('.mention-item.active');if(act){e.preventDefault();dtMentionSelect(act.dataset.name);}}
+  else if(e.key==='Escape'){box.style.display='none';}
+});
 
 async function createDt() {
   const text = document.getElementById('dtText')?.value?.trim();
@@ -2813,7 +3057,7 @@ function startAutoRefresh(){
       S.users=data.users||[];S.events=data.events||[];S.tickets=data.tickets||[];
       S.messages=data.messages||[];S.notifications=data.notifications||[];
       S.allowances=data.allowances||[];S.checklists=data.checklists||[];
-      S.abrechnung=data.abrechnung||{einspringer:[],homeoffice:[]};S.dienstplaene=data.dienstplaene||[];S.diensttausch=data.diensttausch||[];S.diensttausch=data.diensttausch||[];
+      S.abrechnung=data.abrechnung||{einspringer:[],homeoffice:[]};S.dienstplaene=data.dienstplaene||[];S.diensttausch=data.diensttausch||[];S.homeoffice=data.homeoffice||{slots:[],config:[],boxes:[],dienste:[]};S.homeoffice=data.homeoffice||{slots:[],config:[],boxes:[],dienste:[]};S.diensttausch=data.diensttausch||[];
       updateBadges();
       if(_lastMsgCount>=0&&newMsgCount>_lastMsgCount)toast('\uD83D\uDCEC Neue Nachricht eingegangen!');
       if(_lastTkCount>=0&&newTkCount>_lastTkCount)toast('\uD83C\uDFAB Neues Ticket in deinem Bereich!');
