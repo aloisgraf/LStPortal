@@ -31,18 +31,18 @@ router.get('/', auth, async (req,res) => {
       p.seeAllAbrechnung ? q('SELECT * FROM abrechnung_homeoffice ORDER BY year DESC,month DESC')
         : q('SELECT * FROM abrechnung_homeoffice WHERE user_id=$1 ORDER BY year DESC,month DESC',[uid]),
       q('SELECT id,month,year,label,version,filename,is_archived,archived_at,created_by,created_at FROM dienstplaene ORDER BY year DESC,month DESC,version DESC'),
-      q('SELECT ticket_id, viewed_at FROM ticket_views WHERE user_id=$1',[uid]),
-      q('SELECT * FROM diensttausch ORDER BY created_at DESC LIMIT 100'),
-      q('SELECT diensttausch_id FROM diensttausch_reads WHERE user_id=$1',[uid]),
-      q('SELECT * FROM homeoffice_slots ORDER BY date'),
-      q('SELECT * FROM homeoffice_config ORDER BY date'),
-      q('SELECT * FROM homeoffice_boxes ORDER BY sort_order,label'),
-      q('SELECT * FROM homeoffice_dienste ORDER BY sort_order,label'),
+      q('SELECT ticket_id, viewed_at FROM ticket_views WHERE user_id=$1',[uid]).catch(()=>[]),
+      q('SELECT * FROM diensttausch ORDER BY created_at DESC LIMIT 100').catch(()=>[]),
+      q('SELECT diensttausch_id FROM diensttausch_reads WHERE user_id=$1',[uid]).catch(()=>[]),
+      q('SELECT * FROM homeoffice_slots ORDER BY date').catch(()=>[]),
+      q('SELECT * FROM homeoffice_config ORDER BY date').catch(()=>[]),
+      q('SELECT * FROM homeoffice_boxes ORDER BY sort_order,label').catch(()=>[]),
+      q('SELECT * FROM homeoffice_dienste ORDER BY sort_order,label').catch(()=>[]),
     ]);
 
     const tkViewMap = new Map((tkViewsRaw||[]).map(v=>[v.ticket_id, v.viewed_at]));
     const noteMap={}, clItemMap={}, tkClItemMap={}, tkClMap={};
-    notesRaw.forEach(n=>{ if(!noteMap[n.ticket_id]) noteMap[n.ticket_id]=[]; noteMap[n.ticket_id].push({id:n.id,text:n.text,authorId:n.author_id,noteType:n.note_type,createdAt:n.created_at,mentionedUsers:JSON.parse(n.mentioned_users||'[]')}); });
+    notesRaw.forEach(n=>{ if(!noteMap[n.ticket_id]) noteMap[n.ticket_id]=[]; noteMap[n.ticket_id].push({id:n.id,text:n.text,authorId:n.author_id,noteType:n.note_type,createdAt:n.created_at,mentionedUsers:(()=>{try{return JSON.parse(n.mentioned_users||'[]');}catch{return [];}})()}); });
     clItems.forEach(i=>{ if(!clItemMap[i.template_id]) clItemMap[i.template_id]=[]; clItemMap[i.template_id].push({id:i.id,text:i.text,itemType:i.item_type||'check',sortOrder:i.sort_order}); });
     tkClItemsRaw.forEach(i=>{ if(!tkClItemMap[i.checklist_id]) tkClItemMap[i.checklist_id]=[]; tkClItemMap[i.checklist_id].push({id:i.id,text:i.text,itemType:i.item_type||'check',sortOrder:i.sort_order,completedBy:i.completed_by,completedAt:i.completed_at,userNote:i.user_note||''}); });
     tkClRaw.forEach(c=>{ if(!tkClMap[c.ticket_id]) tkClMap[c.ticket_id]=[]; tkClMap[c.ticket_id].push({id:c.id,templateId:c.template_id,name:c.name,createdBy:c.created_by,items:tkClItemMap[c.id]||[]}); });
@@ -106,7 +106,7 @@ router.get('/', auth, async (req,res) => {
         status:tk.status, bucket:tk.bucket||'', isPublic:tk.is_public,
         assigneeId:tk.assignee_id, parentTicketId:tk.parent_ticket_id,
         createdBy:tk.created_by, createdAt:tk.created_at, updatedAt:tk.updated_at, lastViewedAt:tkViewMap.get(tk.id)||null,
-        mentionedUsers:[...new Set((noteMap[tk.id]||[]).flatMap(n=>n.mentionedUsers||[]))],
+        mentionedUsers:[...new Set((noteMap[tk.id]||[]).flatMap(n=>n.mentionedUsers||[]))].filter(Boolean),
         notes:noteMap[tk.id]||[], checklists:tkClMap[tk.id]||[],
         _canEdit:canEditTk(tp,tk,uid),
       })),
@@ -160,7 +160,7 @@ router.get('/', auth, async (req,res) => {
           (p.canApproveEvents && dt.status==='pending'),
       })),
     });
-  } catch(e) { console.error(e); bad(res,e.message,500); }
+  } catch(e) { console.error('[/api/data FEHLER]', e.message, e.stack?.split('\n')[1]); bad(res,e.message,500); }
 });
 
 // EVENTS
