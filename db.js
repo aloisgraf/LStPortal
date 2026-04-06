@@ -28,7 +28,7 @@ async function getP(uid) {
     addGeneral: has('admin','leitung','dienstplanung','technik','ausbildung','qm'),
     manageGeneral: has('admin','leitung','dienstplanung','technik','ausbildung','qm'),
     seeAllAllw: full, editAllw: full,
-    canApproveEvents: has('admin','dienstplanung'),
+    canApproveEvents: has('admin','dienstplanung','leitung'),
     canSendMessages: !has('standard'),
     seeAllAbrechnung: has('admin','dienstplanung'),
     roles,
@@ -46,7 +46,7 @@ async function getTP(uid) {
   };
 }
 
-const canSeeTk  = (tp,tk,uid) => tp.seeAll || tk.is_public || tk.created_by===uid || tk.department==='frei' || tp.myDepts.includes(tk.department);
+const canSeeTk  = (tp,tk,uid) => tp.seeAll || tk.is_public || tk.created_by===uid || tk.department==='frei' || tp.myDepts.includes(tk.department) || (tk.mentioned_users && JSON.parse(tk.mentioned_users||'[]').includes(uid));
 const canEditTk = (tp,tk,uid) => tp.editAll || tk.created_by===uid || tp.myDepts.includes(tk.department);
 
 async function nextTicketNumber() {

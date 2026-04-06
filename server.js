@@ -138,6 +138,34 @@ async function initDB() {
   )`).catch(()=>{});
   const migs2 = [
     `ALTER TABLE message_reads ADD COLUMN IF NOT EXISTS pinned BOOLEAN DEFAULT false`,
+    `CREATE TABLE IF NOT EXISTS homeoffice_config (
+      id TEXT PRIMARY KEY,
+      date DATE NOT NULL UNIQUE,
+      max_slots INTEGER NOT NULL DEFAULT 1,
+      created_by TEXT NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS homeoffice_slots (
+      id TEXT PRIMARY KEY,
+      date DATE NOT NULL,
+      user_id TEXT NOT NULL,
+      box TEXT NOT NULL DEFAULT '',
+      dienst TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(date, user_id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS homeoffice_boxes (
+      id TEXT PRIMARY KEY,
+      label TEXT NOT NULL,
+      sort_order INTEGER DEFAULT 0
+    )`,
+    `CREATE TABLE IF NOT EXISTS homeoffice_dienste (
+      id TEXT PRIMARY KEY,
+      label TEXT NOT NULL,
+      sort_order INTEGER DEFAULT 0
+    )`,
+    `ALTER TABLE ticket_notes ADD COLUMN IF NOT EXISTS mentioned_users JSONB DEFAULT '[]'`,
+    `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS mentioned_users JSONB DEFAULT '[]'`,
     `CREATE TABLE IF NOT EXISTS diensttausch (
       id TEXT PRIMARY KEY, text TEXT NOT NULL, created_by TEXT NOT NULL,
       created_at TIMESTAMPTZ DEFAULT NOW(), status TEXT DEFAULT 'pending',
