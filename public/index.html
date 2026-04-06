@@ -1357,8 +1357,13 @@ function showHelpSection(id){
     <div class="mh"><h2>&#128203; Changelog</h2><button class="mc" onclick="closeModal('changelogOv')">&#10005;</button></div>
     <div class="mb2" style="gap:10px">
       <div style="padding:12px;background:rgba(59,109,212,0.06));border:1px solid rgba(59,109,212,.20);border-radius:8px">
-        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.1.0</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.1.1</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
         <ul style="font-size:12px;line-height:1.8;padding-left:18px">
+          <li>Homeoffice: Mehrfach-Eintragung pro Tag m&ouml;glich</li>
+          <li>Homeoffice: Monatswechsel mit &larr;/&rarr; Pfeilen</li>
+          <li>Homeoffice: Box pro Tag nur 1x buchbar (Prüfung Client + Server)</li>
+          <li>Homeoffice: Dienstplanung/Admin kann jeden Slot l&ouml;schen</li>
+          <li>Homeoffice: Erste Spalte kompakter</li>
           <li>Homeoffice-Modul: Monatsraster mit &ouml;sterr. Feiertagen (Salzburg)</li>
           <li>Homeoffice: Boxen &amp; Dienste im Admin-Bereich verwalten</li>
           <li>Homeoffice: Slot-Konfiguration pro Tag, korrekte Datumsanzeige</li>
@@ -1445,7 +1450,7 @@ function showHelpSection(id){
 </div>
 
 <script>
-const APP_VERSION='2.1.0';
+const APP_VERSION='2.1.1';
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
@@ -2021,7 +2026,12 @@ function renderHomeoffice() {
   var confInMonth=(S.homeoffice&&S.homeoffice.config||[]).filter(function(c){return normDate(c.date).startsWith(year+'-'+pad(month+1));});
 
   document.getElementById('main').innerHTML=''+
-    '<div class="ph"><div class="pt">&#127968; Homeoffice <span>'+moName+' '+year+'</span></div></div>'+
+    '<div class="ph"><div class="pt">&#127968; Homeoffice</div>'+
+    '<div style="display:flex;align-items:center;gap:8px">'+
+    '<button class="btn-s" onclick="S.month=S.month!==null?(S.month===0?(S.year--,11):S.month-1):new Date().getMonth();renderMain()" style="padding:4px 10px">&#8249;</button>'+
+    '<span style="font-weight:700;font-size:14px">'+moName+' '+year+'</span>'+
+    '<button class="btn-s" onclick="S.month=S.month!==null?(S.month===11?(S.year++,0):S.month+1):new Date().getMonth()+1;if(S.month>11){S.month=0;S.year++;}renderMain()" style="padding:4px 10px">&#8250;</button>'+
+    '</div></div>'+
     (canManage?'<div class="tw" style="margin-bottom:14px"><div class="tt"><h2>&#9881;&#65039; Slot-Konfiguration</h2></div>'+
       '<div style="padding:12px"><div style="font-size:11px;color:var(--mu);margin-bottom:10px">Standard: 1 Platz pro Tag. Abweichende Tage hier konfigurieren.</div>'+
       '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'+
@@ -2037,7 +2047,7 @@ function renderHomeoffice() {
       '</div></div>':'')+ 
     '<div class="tw"><div class="tt"><h2>&#128197; '+moName+' '+year+'</h2></div>'+
     '<div style="overflow-x:auto"><table><thead><tr>'+
-    '<th style="text-align:left;min-width:220px">Tag</th>'+
+    '<th style="text-align:left;width:180px">Tag</th>'+
     '<th style="text-align:center;width:80px">Plätze</th>'+
     '<th style="text-align:left">Eingetragen</th><th style="width:120px"></th></tr></thead><tbody>'+
     days.map(function(day){
@@ -2052,12 +2062,15 @@ function renderHomeoffice() {
       var isMine=!!day.mySlot;
       var canAustr=isMine||(day.mySlot&&(S.p.canApproveEvents||S.p.manageUsers));
       return '<tr style="background:'+bg+';'+bl+'">'+
-        '<td style="white-space:nowrap;font-weight:'+(isMine?700:400)+'">'+label+'</td>'+
+        '<td style="white-space:nowrap;font-weight:'+(isMine?700:400)+';font-size:12px">'+label+'</td>'+
         '<td style="text-align:center"><span style="font-size:12px;font-weight:700;color:'+(day.free>0?'var(--ok)':'var(--danger)')+'">'+day.free+'/'+day.maxS+'</span></td>'+
         '<td>'+(slotHtml||'<span style="color:var(--di);font-size:11px">—</span>')+'</td>'+
-        '<td>'+
-          (!isMine&&day.free>0&&!day.dow===0?'<button class="btn-ok" style="font-size:11px;padding:2px 8px;white-space:nowrap" onclick="hoEintragen(\''+day.iso+'\')">&#43; Eintragen</button>':'')+
-          (canAustr&&day.mySlot?'<button class="btn-d" style="font-size:11px;padding:2px 8px" onclick="hoAustragen(\''+day.mySlot.id+'\')">&#10005;</button>':'')+
+        '<td style="white-space:nowrap">'+
+          (day.free>0&&day.dow!==0&&day.dow!==6&&!day.isHol?'<button class="btn-ok" style="font-size:11px;padding:2px 8px;margin-right:3px" onclick="hoEintragen(\''+day.iso+'\')">&#43; Eintragen</button>':'')+
+          ((S.p.canApproveEvents||S.p.manageUsers)&&day.slots.length>0?
+            day.slots.map(function(sl){var u=getU(sl.userId);return '<button class="btn-d" style="font-size:10px;padding:1px 5px;margin:1px" onclick="hoAustragen(\''+sl.id+'\')" title="'+( u?u.name:'?')+'">&#10005; '+(u?u.initials:'?')+'</button>';}).join('')
+            :(day.mySlot?'<button class="btn-d" style="font-size:11px;padding:2px 6px" onclick="hoAustragen(\''+day.mySlot.id+'\')">&#10005;</button>':'')
+          )+
         '</td></tr>';
     }).join('')+
     '</tbody></table></div></div>';
@@ -2994,6 +3007,14 @@ function hoEintragen(date) {
 async function hoSaveSlot(date) {
   var box=document.getElementById('hoBox')?document.getElementById('hoBox').value:'';
   var dienst=document.getElementById('hoDienst')?document.getElementById('hoDienst').value:'';
+  // Check: box already taken on this day?
+  if(box){
+    var taken=(S.homeoffice&&S.homeoffice.slots||[]).filter(function(s){
+      var sd=typeof s.date==='string'?s.date.slice(0,10):'';
+      return sd===date&&s.box===box&&s.userId!==S.currentUser;
+    });
+    if(taken.length>0){toast('&#9888;&#65039; Diese Box ist am '+date+' bereits vergeben!','err');return;}
+  }
   try {
     await api('POST','/homeoffice/slots',{date:date,box:box,dienst:dienst});
     await fetchData(); renderHomeoffice(); toast('&#10003; Homeoffice eingetragen!');
