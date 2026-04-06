@@ -46,7 +46,11 @@ async function getTP(uid) {
   };
 }
 
-const canSeeTk  = (tp,tk,uid) => tp.seeAll || tk.is_public || tk.created_by===uid || tk.department==='frei' || tp.myDepts.includes(tk.department) || (tk.mentioned_users && JSON.parse(tk.mentioned_users||'[]').includes(uid));
+const canSeeTk  = (tp,tk,uid) => {
+  if(tp.seeAll||tk.is_public||tk.created_by===uid||tk.department==='frei') return true;
+  if(tp.myDepts.includes(tk.department)) return true;
+  try { return JSON.parse(tk.mentioned_users||'[]').includes(uid); } catch { return false; }
+};
 const canEditTk = (tp,tk,uid) => tp.editAll || tk.created_by===uid || tp.myDepts.includes(tk.department);
 
 async function nextTicketNumber() {
