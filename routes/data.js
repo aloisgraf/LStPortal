@@ -139,8 +139,8 @@ router.get('/', auth, async (req,res) => {
       },
       dienstplaene: dpRaw.map(d=>({id:d.id,month:d.month,year:d.year,label:d.label,version:d.version,filename:d.filename,isArchived:d.is_archived,archivedAt:d.archived_at,createdBy:d.created_by,createdAt:d.created_at})),
       homeoffice: {
-        slots: hoSlotsRaw.map(s=>({id:s.id,date:s.date,userId:s.user_id,box:s.box,dienst:s.dienst,createdAt:s.created_at})),
-        config: hoConfigRaw.map(c=>({date:c.date,maxSlots:c.max_slots})),
+        slots: hoSlotsRaw.map(s=>({id:s.id,date:typeof s.date==='string'?s.date.slice(0,10):(s.date instanceof Date?s.date.toISOString().slice(0,10):String(s.date).slice(0,10)),userId:s.user_id,box:s.box,dienst:s.dienst,createdAt:s.created_at})),
+        config: hoConfigRaw.map(c=>({date:typeof c.date==='string'?c.date.slice(0,10):(c.date instanceof Date?c.date.toISOString().slice(0,10):String(c.date).slice(0,10)),maxSlots:c.max_slots})),
         boxes: hoBoxesRaw,
         dienste: hoDiensteRaw,
       },
