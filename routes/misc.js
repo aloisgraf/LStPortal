@@ -438,9 +438,13 @@ router.post('/homeoffice/slots', auth, async (req,res) => {
     const taken = await q('SELECT COUNT(*) as n FROM homeoffice_slots WHERE date=$1',[date]);
     if(parseInt(taken[0]?.n||0) >= maxS) return bad(res,'Keine freien Plätze für diesen Tag');
     const id=newId();
+    // Check box unique per day
+    if(box) {
+      const boxTaken = await q1('SELECT id FROM homeoffice_slots WHERE date=$1 AND box=$2 AND user_id!=$3',[date,box,req.uid]);
+      if(boxTaken) return bad(res,'Diese Box ist an diesem Tag bereits vergeben');
+    }
     await pool.query(
-      `INSERT INTO homeoffice_slots (id,date,user_id,box,dienst) VALUES ($1,$2,$3,$4,$5)
-       ON CONFLICT (date,user_id) DO UPDATE SET box=EXCLUDED.box,dienst=EXCLUDED.dienst`,
+      `INSERT INTO homeoffice_slots (id,date,user_id,box,dienst) VALUES ($1,$2,$3,$4,$5)`,
       [id,date,req.uid,box||'',dienst||'']
     );
     await logAct(req.uid,req.user.name,'ho_eintragen',{date,box,dienst});
