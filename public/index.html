@@ -1357,8 +1357,12 @@ function showHelpSection(id){
     <div class="mh"><h2>&#128203; Changelog</h2><button class="mc" onclick="closeModal('changelogOv')">&#10005;</button></div>
     <div class="mb2" style="gap:10px">
       <div style="padding:12px;background:rgba(59,109,212,0.06));border:1px solid rgba(59,109,212,.20);border-radius:8px">
-        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.1.1</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.1.2</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
         <ul style="font-size:12px;line-height:1.8;padding-left:18px">
+          <li>Fix: Eintragen-Button im Homeoffice funktioniert (data-date Attribut)</li>
+          <li>Homeoffice: Kein Eintragen an Wochenenden und Feiertagen m&ouml;glich</li>
+          <li>Homeoffice: Standard 2 Plätze pro Tag</li>
+          <li>Homeoffice: Einer der 2 Plätze ist für den Dienst C10 reserviert</li>
           <li>Homeoffice: Mehrfach-Eintragung pro Tag m&ouml;glich</li>
           <li>Homeoffice: Monatswechsel mit &larr;/&rarr; Pfeilen</li>
           <li>Homeoffice: Box pro Tag nur 1x buchbar (Prüfung Client + Server)</li>
@@ -1450,7 +1454,7 @@ function showHelpSection(id){
 </div>
 
 <script>
-const APP_VERSION='2.1.1';
+const APP_VERSION='2.1.2';
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
@@ -2010,7 +2014,7 @@ function renderHomeoffice() {
     var dow=dt.getDay();
     var slots=(S.homeoffice&&S.homeoffice.slots||[]).filter(function(s){return normDate(s.date)===iso;});
     var mySlot=slots.find(function(s){return s.userId===S.currentUser;});
-    var maxS=cfgMap[iso]!==undefined?cfgMap[iso]:1;
+    var maxS=cfgMap[iso]!==undefined?cfgMap[iso]:2; // Standard: 2 Slots/Tag
     days.push({iso:iso,dow:dow,isWe:dow===0||dow===6,isHol:holidays.has(iso),
       slots:slots,mySlot:mySlot,maxS:maxS,free:Math.max(0,maxS-slots.length),
       day:dt.getDate(),dayName:dayNames[dow]});
@@ -2048,7 +2052,7 @@ function renderHomeoffice() {
     '<div class="tw"><div class="tt"><h2>&#128197; '+moName+' '+year+'</h2></div>'+
     '<div style="overflow-x:auto"><table><thead><tr>'+
     '<th style="text-align:left;width:180px">Tag</th>'+
-    '<th style="text-align:center;width:80px">Plätze</th>'+
+    '<th style="text-align:center;width:90px">Plätze<br><span style="font-size:9px;color:var(--mu);font-weight:400">1× C10 reserviert</span></th>'+
     '<th style="text-align:left">Eingetragen</th><th style="width:120px"></th></tr></thead><tbody>'+
     days.map(function(day){
       var bg=rowBg(day),bl=rowBl(day);
@@ -2061,7 +2065,7 @@ function renderHomeoffice() {
       }).join('');
       var isMine=!!day.mySlot;
       var canAustr=isMine||(day.mySlot&&(S.p.canApproveEvents||S.p.manageUsers));
-      return '<tr style="background:'+bg+';'+bl+'">'+
+      return '<tr data-date="'+day.iso+'" style="background:'+bg+';'+bl+'">'+
         '<td style="white-space:nowrap;font-weight:'+(isMine?700:400)+';font-size:12px">'+label+'</td>'+
         '<td style="text-align:center"><span style="font-size:12px;font-weight:700;color:'+(day.free>0?'var(--ok)':'var(--danger)')+'">'+day.free+'/'+day.maxS+'</span></td>'+
         '<td>'+(slotHtml||'<span style="color:var(--di);font-size:11px">—</span>')+'</td>'+
@@ -2982,26 +2986,42 @@ function startAutoRefresh(){
 }
 // ── HOMEOFFICE Hilfsfunktionen ──
 function hoEintragen(date) {
-  var boxes=S.homeoffice&&S.homeoffice.boxes||[];
-  var dienste=S.homeoffice&&S.homeoffice.dienste||[];
-  var boxOpts=boxes.map(function(b){return '<option value="'+b.label+'">'+b.label+'</option>';}).join('');
-  var dienstOpts=dienste.map(function(d){return '<option value="'+d.label+'">'+d.label+'</option>';}).join('');
-  // Find the row for this date and insert a form after it
-  var rows=document.querySelectorAll('table tbody tr');
+  var boxes=(S.homeoffice&&S.homeoffice.boxes)||[];
+  var dienste=(S.homeoffice&&S.homeoffice.dienste)||[];
+  // Remove existing form if open
   var existing=document.getElementById('hoForm');
-  if(existing)existing.closest('tr')&&existing.closest('tr').remove();
-  rows.forEach(function(row){
-    if(row.innerHTML.includes(date.slice(5).replace('-','.'))){
-      var formRow=document.createElement('tr');
-      formRow.innerHTML='<td colspan="4"><div id="hoForm" style="padding:10px;background:var(--sf2);border:1px solid var(--border);border-radius:var(--r);display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">'+
-        '<div class="fg" style="margin:0"><label>Box</label><select id="hoBox" style="font-size:12px"><option value="">— wählen —</option>'+boxOpts+'</select></div>'+
-        '<div class="fg" style="margin:0"><label>Dienst</label><select id="hoDienst" style="font-size:12px"><option value="">— wählen —</option>'+dienstOpts+'</select></div>'+
-        '<button class="btn-p" style="font-size:12px" onclick="hoSaveSlot(\''+date+'\')">&#10003; Eintragen</button>'+
-        '<button class="btn-s" style="font-size:12px" onclick="this.closest(\'tr\').remove()">Abbrechen</button>'+
-      '</div></td>';
-      row.insertAdjacentElement('afterend',formRow);
-    }
-  });
+  if(existing){
+    var existRow=existing.closest('tr');
+    if(existRow)existRow.remove();
+  }
+  // Find row by data-date attribute
+  var targetRow=document.querySelector('tr[data-date="'+date+'"]');
+  if(!targetRow){toast('&#9888;&#65039; Zeile nicht gefunden','err');return;}
+  
+  // Check which boxes are already taken today (for this user can add more, but box must be free)
+  var takenBoxes=(S.homeoffice&&S.homeoffice.slots||[]).filter(function(s){
+    var sd=typeof s.date==='string'?s.date.slice(0,10):'';
+    return sd===date;
+  }).map(function(s){return s.box;});
+  
+  var boxOpts=boxes.filter(function(b){return !takenBoxes.includes(b.label);}).map(function(b){
+    return '<option value="'+b.label+'">'+b.label+'</option>';
+  }).join('');
+  var dienstOpts=dienste.map(function(d){return '<option value="'+d.label+'">'+d.label+'</option>';}).join('');
+  
+  var formRow=document.createElement('tr');
+  formRow.setAttribute('id','hoFormRow');
+  formRow.innerHTML='<td colspan="4" style="padding:0"><div id="hoForm" style="padding:10px;background:var(--sf2);border:1px solid var(--border);border-radius:var(--r);display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin:2px">'+
+    '<div class="fg" style="margin:0"><label>Box</label><select id="hoBox" style="font-size:12px"><option value="">— wählen —</option>'+boxOpts+'</select></div>'+
+    '<div class="fg" style="margin:0"><label>Dienst</label><select id="hoDienst" style="font-size:12px"><option value="">— wählen —</option>'+dienstOpts+'</select></div>'+
+    '<button class="btn-p" style="font-size:12px" id="hoSaveBtn">&#10003; Eintragen</button>'+
+    '<button class="btn-s" style="font-size:12px" id="hoCancelBtn">Abbrechen</button>'+
+  '</div></td>';
+  targetRow.insertAdjacentElement('afterend',formRow);
+  // Attach events after DOM insertion
+  var savedDate=date;
+  document.getElementById('hoSaveBtn').onclick=function(){hoSaveSlot(savedDate);};
+  document.getElementById('hoCancelBtn').onclick=function(){var r=document.getElementById('hoFormRow');if(r)r.remove();};
 }
 
 async function hoSaveSlot(date) {
@@ -3009,11 +3029,23 @@ async function hoSaveSlot(date) {
   var dienst=document.getElementById('hoDienst')?document.getElementById('hoDienst').value:'';
   // Check: box already taken on this day?
   if(box){
-    var taken=(S.homeoffice&&S.homeoffice.slots||[]).filter(function(s){
+    var takenBox=(S.homeoffice&&S.homeoffice.slots||[]).filter(function(s){
       var sd=typeof s.date==='string'?s.date.slice(0,10):'';
       return sd===date&&s.box===box&&s.userId!==S.currentUser;
     });
-    if(taken.length>0){toast('&#9888;&#65039; Diese Box ist am '+date+' bereits vergeben!','err');return;}
+    if(takenBox.length>0){toast('&#9888;&#65039; Diese Box ist am '+date+' bereits vergeben!','err');return;}
+  }
+  // C10-Regel: Von 2 Slots muss einer für C10-Dienst reserviert sein
+  var slotsToday=(S.homeoffice&&S.homeoffice.slots||[]).filter(function(s){
+    var sd=typeof s.date==='string'?s.date.slice(0,10):'';
+    return sd===date;
+  });
+  var hasC10=slotsToday.some(function(s){return s.dienst==='C10';});
+  var maxS=(function(){var cfg=(S.homeoffice&&S.homeoffice.config||[]).find(function(c){return(typeof c.date==='string'?c.date.slice(0,10):String(c.date).slice(0,10))===date;});return cfg?cfg.maxSlots:2;})();
+  // If filling the last slot and no C10 yet → must be C10
+  if(slotsToday.length>=maxS-1&&!hasC10&&dienst!=='C10'){
+    toast('&#9888;&#65039; Einer der '+maxS+' Plätze muss für den Dienst C10 reserviert sein!','err');
+    return;
   }
   try {
     await api('POST','/homeoffice/slots',{date:date,box:box,dienst:dienst});
