@@ -8,7 +8,7 @@ router.get('/', auth, async (req,res) => {
   try {
     const uid=req.uid, p=req.p, tp=req.tp, roles=p.roles;
     const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
-           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw] = await Promise.all([
+           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw] = await Promise.all([
       q('SELECT id,name,initials,roles,color,must_change_pw,last_seen FROM users ORDER BY name'),
       q('SELECT * FROM categories ORDER BY sort_order,label'),
       q('SELECT * FROM tags ORDER BY label'),
@@ -72,8 +72,14 @@ router.get('/', auth, async (req,res) => {
       events: evRaw.map(ev=>{
         const concernsMe = !ev.is_general && ev.user_id === uid;
         const createdByMe = ev.created_by === uid;
-        // Dienstplanung/Admin sehen alles klar; alle anderen nur eigene
-        const anonymize = !p.canApproveEvents && !ev.is_general && ev.user_id !== uid && !createdByMe;
+        // Sichtbarkeit: Dienstplanung/Admin/Leitung sehen alles
+        // Andere: eigene + die für sie erstellt wurden + allgemeine
+        const canSeeAll = roles.includes('admin') || roles.includes('leitung') || p.canApproveEvents;
+        const isForMe = ev.user_id === uid;
+        // Anonymisieren wenn: kein Vollzugriff, nicht allgemein, nicht eigener Eintrag, nicht für mich erstellt
+        const anonymize = !canSeeAll && !ev.is_general && !isForMe && !createdByMe;
+        // Löschen darf: Admin, Ersteller (wenn ausstehend)
+        const canDelete = roles.includes('admin') || (createdByMe && (!ev.approval_status || ev.approval_status === 'pending'));
         const confirmed = ev.is_general || createdByMe || confirmedEventIds.has(ev.id);
         return {
           id:ev.id, isGeneral:ev.is_general, dateFrom:ev.date_from, dateTo:ev.date_to,
@@ -87,6 +93,7 @@ router.get('/', auth, async (req,res) => {
           _confirmed: confirmed,
           _isNew: concernsMe && !createdByMe && !confirmedEventIds.has(ev.id),
           _canEdit: !ev.is_general && createdByMe && !ev.approval_status,
+          _canDelete: canDelete,
         };
       }),
       tickets: tkRaw.filter(tk=>canSeeTk(tp,tk,uid)).map(tk=>({
@@ -94,7 +101,8 @@ router.get('/', auth, async (req,res) => {
         department:tk.department, tags:parseTags(tk.tags), priority:tk.priority,
         status:tk.status, bucket:tk.bucket||'', isPublic:tk.is_public,
         assigneeId:tk.assignee_id, parentTicketId:tk.parent_ticket_id,
-        createdBy:tk.created_by, createdAt:tk.created_at, updatedAt:tk.updated_at,lastViewedAt:tkViewMap.get(tk.id)||null,
+        createdBy:tk.created_by, createdAt:tk.created_at, updatedAt:tk.updated_at, lastViewedAt:tkViewMap.get(tk.id)||null,
+        mentionedUsers:(notesForTk||[]).flatMap(n=>n.mentionedUsers||[]),
         notes:noteMap[tk.id]||[], checklists:tkClMap[tk.id]||[],
         _canEdit:canEditTk(tp,tk,uid),
       })),
@@ -126,6 +134,12 @@ router.get('/', auth, async (req,res) => {
         homeoffice:  hoRaw.map(h=>({id:h.id,userId:h.user_id,year:h.year,month:h.month,days:h.days})),
       },
       dienstplaene: dpRaw.map(d=>({id:d.id,month:d.month,year:d.year,label:d.label,version:d.version,filename:d.filename,isArchived:d.is_archived,archivedAt:d.archived_at,createdBy:d.created_by,createdAt:d.created_at})),
+      homeoffice: {
+        slots: hoSlotsRaw.map(s=>({id:s.id,date:s.date,userId:s.user_id,box:s.box,dienst:s.dienst,createdAt:s.created_at})),
+        config: hoConfigRaw.map(c=>({date:c.date,maxSlots:c.max_slots})),
+        boxes: hoBoxesRaw,
+        dienste: hoDiensteRaw,
+      },
       diensttausch: dtRaw.filter(dt => {
         // Dienstplanung/Admin sieht alles
         if (p.canApproveEvents) return true;

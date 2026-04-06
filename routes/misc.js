@@ -385,3 +385,99 @@ router.post('/webhook/mailgun', async (req,res) => {
 
 
 module.exports = router;
+
+// ── HOMEOFFICE ──
+router.get('/homeoffice/config', auth, async (req,res) => {
+  try {
+    const [config,boxes,dienste] = await Promise.all([
+      q('SELECT * FROM homeoffice_config ORDER BY date'),
+      q('SELECT * FROM homeoffice_boxes ORDER BY sort_order,label'),
+      q('SELECT * FROM homeoffice_dienste ORDER BY sort_order,label'),
+    ]);
+    ok(res,{config,boxes,dienste});
+  } catch(e){bad(res,e.message,500);}
+});
+
+router.get('/homeoffice/slots', auth, async (req,res) => {
+  try {
+    const {from,to} = req.query;
+    const slots = from&&to
+      ? await q('SELECT * FROM homeoffice_slots WHERE date>=$1 AND date<=$2 ORDER BY date',[from,to])
+      : await q('SELECT * FROM homeoffice_slots ORDER BY date');
+    ok(res,slots);
+  } catch(e){bad(res,e.message,500);}
+});
+
+router.put('/homeoffice/config', auth, async (req,res) => {
+  try {
+    if(!req.p.canApproveEvents&&!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+    const {date,maxSlots} = req.body;
+    if(!date||maxSlots==null) return bad(res,'date und maxSlots erforderlich');
+    await pool.query(
+      `INSERT INTO homeoffice_config (id,date,max_slots,created_by,updated_at) VALUES ($1,$2,$3,$4,NOW())
+       ON CONFLICT (date) DO UPDATE SET max_slots=EXCLUDED.max_slots,updated_at=NOW()`,
+      [newId(),date,parseInt(maxSlots),req.uid]
+    );
+    await logAct(req.uid,req.user.name,'ho_config',{date,maxSlots});
+    ok(res);
+  } catch(e){bad(res,e.message,500);}
+});
+
+router.post('/homeoffice/slots', auth, async (req,res) => {
+  try {
+    const {date,box,dienst} = req.body;
+    if(!date) return bad(res,'date erforderlich');
+    // Check slots available
+    const config = await q1('SELECT max_slots FROM homeoffice_config WHERE date=$1',[date]);
+    const maxS = config?.max_slots ?? 1;
+    const taken = await q('SELECT COUNT(*) as n FROM homeoffice_slots WHERE date=$1',[date]);
+    if(parseInt(taken[0]?.n||0) >= maxS) return bad(res,'Keine freien Plätze für diesen Tag');
+    const id=newId();
+    await pool.query(
+      `INSERT INTO homeoffice_slots (id,date,user_id,box,dienst) VALUES ($1,$2,$3,$4,$5)
+       ON CONFLICT (date,user_id) DO UPDATE SET box=EXCLUDED.box,dienst=EXCLUDED.dienst`,
+      [id,date,req.uid,box||'',dienst||'']
+    );
+    await logAct(req.uid,req.user.name,'ho_eintragen',{date,box,dienst});
+    ok(res,{id});
+  } catch(e){bad(res,e.message,500);}
+});
+
+router.delete('/homeoffice/slots/:id', auth, async (req,res) => {
+  try {
+    const slot = await q1('SELECT * FROM homeoffice_slots WHERE id=$1',[req.params.id]);
+    if(!slot) return bad(res,'Nicht gefunden',404);
+    if(slot.user_id!==req.uid&&!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+    await pool.query('DELETE FROM homeoffice_slots WHERE id=$1',[req.params.id]);
+    await logAct(req.uid,req.user.name,'ho_austragen',{date:slot.date});
+    ok(res);
+  } catch(e){bad(res,e.message,500);}
+});
+
+// Admin: Boxes & Dienste verwalten
+router.post('/homeoffice/boxes', auth, adminOnly, async (req,res) => {
+  try {
+    const {label} = req.body;
+    if(!label?.trim()) return bad(res,'Label erforderlich');
+    const id=newId();
+    await pool.query('INSERT INTO homeoffice_boxes (id,label) VALUES ($1,$2)',[id,label.trim()]);
+    ok(res,{id});
+  } catch(e){bad(res,e.message,500);}
+});
+router.delete('/homeoffice/boxes/:id', auth, adminOnly, async (req,res) => {
+  try { await pool.query('DELETE FROM homeoffice_boxes WHERE id=$1',[req.params.id]); ok(res); }
+  catch(e){bad(res,e.message,500);}
+});
+router.post('/homeoffice/dienste', auth, adminOnly, async (req,res) => {
+  try {
+    const {label} = req.body;
+    if(!label?.trim()) return bad(res,'Label erforderlich');
+    const id=newId();
+    await pool.query('INSERT INTO homeoffice_dienste (id,label) VALUES ($1,$2)',[id,label.trim()]);
+    ok(res,{id});
+  } catch(e){bad(res,e.message,500);}
+});
+router.delete('/homeoffice/dienste/:id', auth, adminOnly, async (req,res) => {
+  try { await pool.query('DELETE FROM homeoffice_dienste WHERE id=$1',[req.params.id]); ok(res); }
+  catch(e){bad(res,e.message,500);}
+});

@@ -87,11 +87,19 @@ router.post('/:id/notes', auth, async (req,res) => {
     const text=req.body?.text?.trim();
     if (!text) return bad(res,'Text erforderlich');
     const id=newId(), now=new Date().toISOString();
-    await pool.query('INSERT INTO ticket_notes (id,ticket_id,text,author_id,note_type,created_at) VALUES ($1,$2,$3,$4,$5,$6)',
-      [id,req.params.id,text,req.uid,'note',now]);
-    await pool.query('UPDATE tickets SET updated_at=$1 WHERE id=$2',[now,req.params.id]);
     const allUsers = await q('SELECT id,name FROM users');
     const mentioned = parseMentions(text, allUsers);
+    const mentionedIds = mentioned.map(u=>u.id);
+    await pool.query('INSERT INTO ticket_notes (id,ticket_id,text,author_id,note_type,created_at,mentioned_users) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+      [id,req.params.id,text,req.uid,'note',now,JSON.stringify(mentionedIds)]);
+    // Add mentioned users to ticket so they can see it
+    if(mentionedIds.length){
+      const existing=JSON.parse(tk.mentioned_users||'[]');
+      const merged=[...new Set([...existing,...mentionedIds])];
+      await pool.query('UPDATE tickets SET mentioned_users=$1,updated_at=$2 WHERE id=$3',[JSON.stringify(merged),now,req.params.id]);
+    } else {
+      await pool.query('UPDATE tickets SET updated_at=$1 WHERE id=$2',[now,req.params.id]);
+    }
     const author = await getUser(req.uid);
     for (const u of mentioned) {
       if (u.id === req.uid) continue;
