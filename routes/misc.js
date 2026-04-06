@@ -434,7 +434,7 @@ router.post('/homeoffice/slots', auth, async (req,res) => {
     if(!date) return bad(res,'date erforderlich');
     // Check slots available
     const config = await q1('SELECT max_slots FROM homeoffice_config WHERE date=$1',[date]);
-    const maxS = config?.max_slots ?? 1;
+    const maxS = config?.max_slots ?? 2; // Standard: 2 Slots/Tag
     const taken = await q('SELECT COUNT(*) as n FROM homeoffice_slots WHERE date=$1',[date]);
     if(parseInt(taken[0]?.n||0) >= maxS) return bad(res,'Keine freien Plätze für diesen Tag');
     const id=newId();
@@ -443,6 +443,11 @@ router.post('/homeoffice/slots', auth, async (req,res) => {
       const boxTaken = await q1('SELECT id FROM homeoffice_slots WHERE date=$1 AND box=$2 AND user_id!=$3',[date,box,req.uid]);
       if(boxTaken) return bad(res,'Diese Box ist an diesem Tag bereits vergeben');
     }
+    // C10-Regel: letzter freier Slot muss C10 sein
+    const slotsToday2 = await q('SELECT dienst FROM homeoffice_slots WHERE date=$1',[date]);
+    const hasC10 = slotsToday2.some(s=>s.dienst==='C10');
+    if(slotsToday2.length >= maxS-1 && !hasC10 && dienst!=='C10')
+      return bad(res,'Einer der '+maxS+' Plätze muss für den Dienst C10 reserviert sein');
     await pool.query(
       `INSERT INTO homeoffice_slots (id,date,user_id,box,dienst) VALUES ($1,$2,$3,$4,$5)`,
       [id,date,req.uid,box||'',dienst||'']
