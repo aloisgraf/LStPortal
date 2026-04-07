@@ -1690,7 +1690,37 @@ function renderHome(){
     if(myName&&(tk.notes||[]).some(n=>n.text&&n.text.toLowerCase().includes('@'+myName)))return true;
     return false;
   }).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,10);
-  document.getElementById('main').innerHTML=`
+  // ── Homeoffice nächste 30 Tage ──
+  var _today0=new Date(); _today0.setHours(0,0,0,0);
+  var _in30=new Date(_today0); _in30.setDate(_in30.getDate()+30);
+  var _normD=function(d){if(!d)return'';var s=typeof d==='string'?d:d instanceof Date?d.toISOString():''+d;return s.slice(0,10);};
+  var _moNs=['Jänner','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+  var _dyNs=['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+  var myHo=(S.homeoffice&&S.homeoffice.slots||[]).filter(function(s){if(s.userId!==S.currentUser)return false;var d=new Date(_normD(s.date)+'T00:00:00');return d>=_today0&&d<=_in30;}).sort(function(a,b){return _normD(a.date).localeCompare(_normD(b.date));});
+  var hoHtml='';
+  if(myHo.length){
+    hoHtml='<div style="background:rgba(14,165,233,.05);border:1px solid rgba(14,165,233,.2);border-radius:var(--r);padding:14px;margin-bottom:14px">';
+    hoHtml+='<div style="font-size:13px;font-weight:700;color:#0ea5e9;margin-bottom:8px">&#127968; Meine Homeoffice-Tage (n\u00e4chste 30 Tage)</div>';
+    myHo.forEach(function(s){var dobj=new Date(_normD(s.date)+'T00:00:00');hoHtml+='<div style="padding:3px 0;font-size:12px;display:flex;gap:10px;border-bottom:1px solid var(--border)"><span style="font-weight:600;min-width:220px">'+String(dobj.getDate()).padStart(2,'0')+'. '+_moNs[dobj.getMonth()]+' '+dobj.getFullYear()+' ('+_dyNs[dobj.getDay()]+')</span><span style="color:var(--mu)">'+(s.box||'')+(s.dienst?' \u00b7 '+s.dienst:'')+'</span></div>';});
+    hoHtml+='<button class="btn-s" style="margin-top:8px;font-size:11px" onclick="setView(\'homeoffice\')">Homeoffice-Raster &#8594;</button></div>';
+  }
+  // ── Meine Urlaube nächste 90 Tage ──
+  var _today=new Date().toISOString().slice(0,10);
+  var _in90=new Date();_in90.setDate(_in90.getDate()+90);var _in90s=_in90.toISOString().slice(0,10);
+  var _vacCats=S.categories.filter(function(c){return c.label&&c.label.toLowerCase().includes('urlaub');});
+  var _vacCatIds=_vacCats.map(function(c){return c.id;});
+  var vacHtml='';
+  if(_vacCatIds.length){
+    var myVac=S.events.filter(function(ev){return ev.userId===S.currentUser&&_vacCatIds.includes(ev.category)&&ev.dateTo>=_today&&ev.dateFrom<=_in90s;}).sort(function(a,b){return a.dateFrom.localeCompare(b.dateFrom);});
+    if(myVac.length){
+      vacHtml='<div style="background:rgba(16,185,129,.05);border:1px solid rgba(16,185,129,.2);border-radius:var(--r);padding:14px;margin-bottom:14px">';
+      vacHtml+='<div style="font-size:13px;font-weight:700;color:var(--ok);margin-bottom:10px">&#127958;&#65039; Meine Urlaube (n\u00e4chste 90 Tage)</div>';
+      vacHtml+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px">';
+      myVac.forEach(function(ev){var cat=_vacCats.find(function(c){return c.id===ev.category;});var st=ev.approvalStatus==='approved'?'<span class="bdg ap-bdg-approved" style="font-size:10px">&#10003; Genehmigt</span>':ev.approvalStatus==='rejected'?'<span class="bdg ap-bdg-rejected" style="font-size:10px">&#10007; Abgelehnt</span>':'<span class="bdg ap-bdg-pending" style="font-size:10px">&#8987; Ausstehend</span>';vacHtml+='<div style="background:var(--sf);border:1px solid var(--border);border-radius:var(--r);padding:10px;border-left:3px solid '+(cat&&cat.color||'var(--ok)')+'"><div style="font-size:12px;font-weight:700">'+ev.dateFrom.slice(5)+' – '+ev.dateTo.slice(5)+'</div><div style="font-size:11px;color:var(--mu)">'+(ev.reason||'Urlaub')+'</div>'+st+'</div>';});
+      vacHtml+='</div><button class="btn-s" style="margin-top:8px;font-size:11px" onclick="setView(\'vacation\')">Urlaubsübersicht &#8594;</button></div>';
+    }
+  }
+    document.getElementById('main').innerHTML=`
     <div class="ph"><div class="pt">&#128196; \u00dcbersicht <span>${u?.name||''}</span></div></div>
     ${pinnedMsg.length?`<div style="background:rgba(59,109,212,.04);border:1px solid rgba(59,109,212,.2);border-radius:var(--r);padding:14px;margin-bottom:14px">
       <div style="font-size:13px;font-weight:700;color:var(--acc);margin-bottom:10px">&#128204; ${pinnedMsg.length} angepinnte Nachricht${pinnedMsg.length>1?'en':''}</div>
@@ -1730,6 +1760,8 @@ function renderHome(){
         <div><div style="font-size:12px;font-weight:600">${n.title}</div><div style="font-size:10px;color:var(--mu)">${fdt(n.createdAt)}</div></div>
       </div>`;}).join('')}
     </div>`:''}
+
+    ${hoHtml}${vacHtml}
     <div class="dash-grid">
       <div class="dash-card"><h3>&#128101; Online (${online.length+1})</h3><div class="online-list">
         <div class="online-user">${avHtml(u?.initials||'?',u?.color||'#888',22,9,true)}<span>${u?.name} (du)</span></div>
