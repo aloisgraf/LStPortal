@@ -165,6 +165,21 @@ async function initDB() {
     )`,
     `ALTER TABLE ticket_notes ADD COLUMN IF NOT EXISTS mentioned_users JSONB DEFAULT '[]'`,
     `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS mentioned_users JSONB DEFAULT '[]'`,
+    `CREATE TABLE IF NOT EXISTS news (
+      id TEXT PRIMARY KEY, title TEXT NOT NULL, body TEXT NOT NULL,
+      from_date DATE, to_date DATE, is_important BOOLEAN DEFAULT false,
+      created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS news_pins (
+      news_id TEXT NOT NULL, user_id TEXT NOT NULL,
+      PRIMARY KEY (news_id, user_id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS vacation_config (
+      id TEXT PRIMARY KEY, date DATE NOT NULL UNIQUE,
+      max_slots INTEGER NOT NULL DEFAULT 8,
+      note TEXT DEFAULT '',
+      created_by TEXT NOT NULL, updated_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
     `CREATE TABLE IF NOT EXISTS diensttausch (
       id TEXT PRIMARY KEY, text TEXT NOT NULL, created_by TEXT NOT NULL,
       created_at TIMESTAMPTZ DEFAULT NOW(), status TEXT DEFAULT 'pending',
