@@ -293,10 +293,9 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
     <div class="notif-dot" id="msgDot" style="display:none"></div>
   </div>
   <div class="ibw">
-    <button class="ib2" onclick="setView('home')" title="Benachrichtigungen">&#128276;</button>
     <div class="notif-dot" id="notifDot" style="display:none"></div>
   </div>
-  <div class="upill" onclick="openModal('pwModal')">
+  <div class="upill" onclick="openModal('pwModal');setTimeout(initMyColorPicker,50)">
     <div class="pav" id="pillAv"></div><span id="pillNm">&#8212;</span>
   </div>
   <button class="ib2" onclick="logout()" title="Abmelden">&#9211;</button>
@@ -322,6 +321,14 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
         <div class="ni" id="ni-calendar" onclick="setView('calendar')">&#128197; Kalenderansicht</div>
         <div class="ni" id="ni-allw" onclick="setView('allw')">&#128202; Zulagendienste</div>
         <div class="ni" id="ni-homeoffice" onclick="setView('homeoffice')">&#127968; Homeoffice</div>
+        <div class="ndiv"></div>
+        <div class="nsh open" id="newsHdr" onclick="toggleNS('news')"><span>&#128240; News</span><span class="arr">&#9660;</span></div>
+        <div class="nsub open" id="newsSub">
+          <div class="ni" id="ni-news" onclick="setView('news')">&#128240; Aktuelle News<span class="bdgn" id="newsBdg" style="display:none">0</span></div>
+          <div class="ni" id="ni-news_archiv" onclick="setView('news_archiv')" style="display:none">&#128450; Archiv</div>
+        </div>
+        <div class="ndiv"></div>
+        <div class="ni" id="ni-vacation" onclick="setView('vacation')">&#127958;&#65039; Urlaubsübersicht</div>
         <div class="ni" id="ni-diensttausch" onclick="setView('diensttausch')">&#128257; Diensttausch<span class="bdgn" id="dtBdg" style="display:none">0</span></div>
         <div class="ni" id="ni-abrechnung" onclick="setView('abrechnung')">&#129534; Abrechnung</div>
         <div class="ni" id="ni-dienstplaene" onclick="setView('dienstplaene')">&#128196; Dienstpl&#228;ne</div>
@@ -351,6 +358,13 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
   <div class="modal sm">
     <div class="mh"><h2>&#128272; Passwort &#228;ndern</h2><button class="mc" onclick="closeModal('pwModal')">&#10005;</button></div>
     <div class="mb2">
+      <div class="fg"><label>Meine Farbe</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="color" id="myColorPicker" style="width:40px;height:32px;padding:1px;border:1px solid var(--border);border-radius:var(--r);cursor:pointer">
+          <button class="btn-s" style="font-size:12px" onclick="saveMyColor()">&#128190; Farbe speichern</button>
+          <div id="myColorPreview" style="width:32px;height:32px;border-radius:50%;border:2px solid var(--border)"></div>
+        </div>
+      </div>
       <div class="fg"><label>Aktuelles Passwort</label><div class="pw-w"><input type="password" id="cpw0"><button class="eye" onclick="eyeToggle('cpw0',this)">&#128065;</button></div></div>
       <div class="fg"><label>Neues Passwort</label><div class="pw-w"><input type="password" id="cpw1"><button class="eye" onclick="eyeToggle('cpw1',this)">&#128065;</button></div></div>
       <div class="fg"><label>Best&#228;tigen</label><div class="pw-w"><input type="password" id="cpw2"><button class="eye" onclick="eyeToggle('cpw2',this)">&#128065;</button></div></div>
@@ -1357,8 +1371,15 @@ function showHelpSection(id){
     <div class="mh"><h2>&#128203; Changelog</h2><button class="mc" onclick="closeModal('changelogOv')">&#10005;</button></div>
     <div class="mb2" style="gap:10px">
       <div style="padding:12px;background:rgba(59,109,212,0.06));border:1px solid rgba(59,109,212,.20);border-radius:8px">
-        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.1.2</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.2.0</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
         <ul style="font-size:12px;line-height:1.8;padding-left:18px">
+          <li>Neues Modul: News (Admin/Leitung erstellen, alle lesen, anpinnen)</li>
+          <li>Neues Modul: Urlaubsübersicht mit Tageslimits und Bemerkungen</li>
+          <li>Pers&ouml;nliche Farbe selbst &auml;ndern (Profilseite)</li>
+          <li>Fix: Eigener Name im Event-Dropdown; getUser in events.js</li>
+          <li>Fix: Admin/DP k&ouml;nnen Eintr&auml;ge l&ouml;schen</li>
+          <li>Glocken-Button entfernt; Homeoffice Tooltip mit Name</li>
+          <li>Meine Eintr&auml;ge + Urlaube in der Übersicht</li>
           <li>Fix: Eintragen-Button im Homeoffice funktioniert (data-date Attribut)</li>
           <li>Homeoffice: Kein Eintragen an Wochenenden und Feiertagen m&ouml;glich</li>
           <li>Homeoffice: Standard 2 Plätze pro Tag</li>
@@ -1454,7 +1475,7 @@ function showHelpSection(id){
 </div>
 
 <script>
-const APP_VERSION='2.1.2';
+const APP_VERSION='2.2.0';
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
@@ -1486,7 +1507,7 @@ let S={
   allwYear:new Date().getFullYear(),allwPeriod:'month',allwMonth:new Date().getMonth()+1,
   abrYear:new Date().getFullYear(),abrMonth:new Date().getMonth()+1,abrUser:null,
   events:[],users:[],categories:[],tags:[],allowances:[],tickets:[],
-  checklists:[],messages:[],notifications:[],abrechnung:{einspringer:[],homeoffice:[]},dienstplaene:[],diensttausch:[],homeoffice:{slots:[],config:[],boxes:[],dienste:[]},
+  checklists:[],messages:[],notifications:[],abrechnung:{einspringer:[],homeoffice:[]},dienstplaene:[],diensttausch:[],homeoffice:{slots:[],config:[],boxes:[],dienste:[]},news:[],vacationConfig:[],
   p:{canApproveEvents:false,canSendMessages:false,seeAllEntries:true,editAllPersonal:false,addForOthers:false,addGeneral:false,manageUsers:false,seeAllAllw:false,editAllw:false,seeAllAbrechnung:false},
   tp:{seeAll:false,editAll:false,myDepts:[],canSetPublic:false,canAssign:false},
   ufColor:PALETTE[0],cfColor:PALETTE[2],tfColor:PALETTE[0],currentTicketId:null,
@@ -1508,7 +1529,7 @@ async function fetchData(){
     S.users=data.users||[];S.categories=data.categories||[];S.tags=data.tags||[];
     S.events=data.events||[];S.tickets=data.tickets||[];S.allowances=data.allowances||[];
     S.checklists=data.checklists||[];S.messages=data.messages||[];
-    S.notifications=data.notifications||[];S.abrechnung=data.abrechnung||{einspringer:[],homeoffice:[]};S.diensttausch=data.diensttausch||[];S.homeoffice=data.homeoffice||{slots:[],config:[],boxes:[],dienste:[]};
+    S.notifications=data.notifications||[];S.abrechnung=data.abrechnung||{einspringer:[],homeoffice:[]};S.diensttausch=data.diensttausch||[];S.homeoffice=data.homeoffice||{slots:[],config:[],boxes:[],dienste:[]};S.vacationConfig=data.vacationConfig||[];
     S.dienstplaene=data.dienstplaene||[];S.diensttausch=data.diensttausch||[];
     S.currentUser=data.currentUser;S.p=data.permissions||{};
     const u=getU(S.currentUser);const roles=u?.roles||['standard'];
@@ -1543,6 +1564,8 @@ function updateBadges(){
   const nd=document.getElementById('notifDot');if(nd)nd.style.display=unreadNotif?'block':'none';
   const nb=document.getElementById('navMsgBdg');if(nb){nb.style.display=unreadMsg?'flex':'none';nb.textContent=unreadMsg;}
   const pendingDt=(S.diensttausch||[]).filter(dt=>dt.isRelevant&&!dt.isSeen).length;
+  const unreadNews=(S.news||[]).filter(n=>n.isActive&&!n.isExpired&&!n.isPinned&&n.isImportant).length;
+  const newsBdg=document.getElementById('newsBdg');if(newsBdg){newsBdg.style.display=unreadNews?'flex':'none';newsBdg.textContent=unreadNews;}
   const dtBdg=document.getElementById('dtBdg');if(dtBdg){dtBdg.style.display=pendingDt?'flex':'none';dtBdg.textContent=pendingDt;}
 }
 // AUTH
@@ -1596,7 +1619,11 @@ function loginOK(){
   document.getElementById('pillNm').textContent=u?.name||'?';
   const pa=document.getElementById('pillAv');pa.textContent=u?.initials||'?';pa.style.background=(u?.color||'#888')+'22';pa.style.color=u?.color||'#888';
   const ab=document.getElementById('adminBtn');if(ab)ab.style.display=S.p.manageUsers?'flex':'none';
-  setView('home');startAutoRefresh();
+  setView('home');startAutoRefresh();loadNews();
+  // Show archiv nav only for admin/leitung
+  const canNews=S.p.manageUsers||(getU(S.currentUser)?.roles||[]).includes('leitung');
+  const archivNav=document.getElementById('ni-news_archiv');
+  if(archivNav)archivNav.style.display=canNews?'block':'none';
   toast('\uD83D\uDC4B Willkommen, '+(u?.name||'')+'!');
 }
 async function logout(){
@@ -1664,8 +1691,12 @@ function renderMain(){
   else if(S.view==='calendar')renderCalendar();
   else if(S.view==='homeoffice')renderHomeoffice();
   else if(S.view==='diensttausch')renderDiensttausch();
+  else if(S.view==='news'||S.view==='news_archiv')renderNews();
+  else if(S.view==='vacation')renderVacation();
   else if(S.view==='allw')renderAllw();
   else if(S.view==='diensttausch')renderDiensttausch();
+  else if(S.view==='news'||S.view==='news_archiv')renderNews();
+  else if(S.view==='vacation')renderVacation();
   else if(S.view==='abrechnung')renderAbrechnung();
   else if(S.view==='dienstplaene')renderDienstplaene();
   else if(S.view==='tickets'||S.view==='tickets_closed')renderTickets();
@@ -1677,6 +1708,11 @@ function renderHome(){
   const u=getU(S.currentUser);
   const online=S.users.filter(x=>x.isOnline&&x.id!==S.currentUser);
   const unreadMsg=S.messages.filter(m=>!m.isRead&&m.senderId!==S.currentUser);
+  // Meine Einträge (Dienstplan) - für mich erstellt oder von mir erstellt
+  const myEvents=S.events.filter(ev=>{
+    if(ev.isGeneral)return false;
+    return ev.userId===S.currentUser||ev.createdBy===S.currentUser;
+  }).sort((a,b)=>a.dateFrom.localeCompare(b.dateFrom)).slice(0,10);
   const pinnedMsg=S.messages.filter(m=>m.pinned&&m.senderId!==S.currentUser);
   var today0=new Date(); today0.setHours(0,0,0,0);
   var in30d=new Date(today0); in30d.setDate(in30d.getDate()+30);
@@ -1701,10 +1737,22 @@ function renderHome(){
   }).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,10);
   document.getElementById('main').innerHTML=`
     <div class="ph"><div class="pt">&#128196; \u00dcbersicht <span>${u?.name||''}</span></div></div>
-    ${myHo.length?`<div style="background:rgba(14,165,233,.05);border:1px solid rgba(14,165,233,.2);border-radius:var(--r);padding:14px;margin-bottom:14px">
+    ${myHo.length?`<div style="background:rgba(14,165,233,.05);border:1px solid rgba(14,165,233,.2);border-radius:var(--r);padding:12px;margin-bottom:14px;max-width:480px">
       <div style="font-size:13px;font-weight:700;color:#0ea5e9;margin-bottom:10px">&#127968; Meine Homeoffice-Tage (30 Tage)</div>
       ${myHo.map(s=>{var dobj=new Date(normD(s.date)+'T00:00:00');return`<div style="padding:4px 0;font-size:12px;display:flex;gap:12px;border-bottom:1px solid var(--border)"><span style="font-weight:600;min-width:240px">${String(dobj.getDate()).padStart(2,'0')}. ${moNs[dobj.getMonth()]} ${dobj.getFullYear()} (${dyNs[dobj.getDay()]})</span><span style="color:var(--mu)">${s.box||''}${s.dienst?' · '+s.dienst:''}</span></div>`;}).join('')}
       <button class="btn-s" style="margin-top:8px;font-size:11px" onclick="setView('homeoffice')">Homeoffice-Raster &#8594;</button>
+    </div>`:''}
+    ${(S.news||[]).filter(n=>n.isImportant&&n.isActive&&!n.isExpired).length?`<div style="background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.2);border-radius:var(--r);padding:14px;margin-bottom:14px">
+      <div style="font-size:13px;font-weight:700;color:var(--danger);margin-bottom:10px">&#9888;&#65039; Wichtige News</div>
+      ${(S.news||[]).filter(n=>n.isImportant&&n.isActive&&!n.isExpired).map(n=>`<div style="padding:6px 0;border-bottom:1px solid rgba(239,68,68,.15)">
+        <div style="font-size:13px;font-weight:700">${escHtml(n.title)}</div>
+        <div style="font-size:12px;color:var(--tx);white-space:pre-wrap">${n.body.slice(0,200)}${n.body.length>200?'…':''}</div>
+      </div>`).join('')}
+      <button class="btn-s" style="margin-top:8px;font-size:11px" onclick="setView('news')">Alle News &#8594;</button>
+    </div>`:''}
+    ${(S.news||[]).filter(n=>n.isPinned&&n.isActive).length?`<div style="background:rgba(59,109,212,.04);border:1px solid rgba(59,109,212,.2);border-radius:var(--r);padding:14px;margin-bottom:14px">
+      <div style="font-size:13px;font-weight:700;color:var(--acc);margin-bottom:10px">&#128204; Angepinnte News</div>
+      ${(S.news||[]).filter(n=>n.isPinned&&n.isActive).map(n=>`<div style="padding:5px 0;border-bottom:1px solid var(--border);cursor:pointer;font-size:12px" onclick="setView('news')">&#128240; <strong>${escHtml(n.title)}</strong></div>`).join('')}
     </div>`:''}
     ${pinnedMsg.length?`<div style="background:rgba(59,109,212,.04);border:1px solid rgba(59,109,212,.2);border-radius:var(--r);padding:14px;margin-bottom:14px">
       <div style="font-size:13px;font-weight:700;color:var(--acc);margin-bottom:10px">&#128204; ${pinnedMsg.length} angepinnte Nachricht${pinnedMsg.length>1?'en':''}</div>
@@ -1772,6 +1820,20 @@ function renderHome(){
         }).join('')}
         <button class="btn-s" style="width:100%;margin-top:8px;font-size:11px" onclick="setView('diensttausch')">Alle anzeigen &#8594;</button>
       </div>`:'';})()}
+      ${myEvents.length?`<div class="dash-card">
+        <h3>&#128197; Meine Eintr&auml;ge</h3>
+        ${myEvents.map(ev=>{
+          const cat=S.categories.find(c=>c.id===ev.category);
+          const statusBadge=ev.approvalStatus==='approved'?'<span class="bdg ap-bdg-approved" style="font-size:10px">&#10003; Genehmigt</span>':
+            ev.approvalStatus==='rejected'?'<span class="bdg ap-bdg-rejected" style="font-size:10px">&#10007; Abgelehnt</span>':
+            ev.isGeneral?'':'<span class="bdg ap-bdg-pending" style="font-size:10px">&#8987; Ausstehend</span>';
+          return`<div style="padding:5px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;font-size:12px">
+            <span style="color:var(--mu);min-width:70px;flex-shrink:0">${ev.dateFrom.slice(5)}</span>
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${cat?cat.emoji+' ':''}<strong>${ev.reason||'—'}</strong></span>
+            ${statusBadge}
+          </div>`;
+        }).join('')}
+      </div>`:''}
             <div class="dash-card"><h3>&#127931; Relevante Tickets (${relevantTks.length})${relevantTks.some(tkIsNew)?`<span class="tk-new-badge" style="margin-left:8px;font-size:10px">&#128276; NEU</span>`:''}</h3>
         ${relevantTks.length?relevantTks.map(tk=>{
           const n=tkIsNew(tk);
@@ -1832,7 +1894,7 @@ function buildEvRows(evs){
     const emp=ev.isGeneral?null:anon?null:(getU(ev.userId)||{name:'?',color:'#888',initials:'?'});
     const ds=ev.dateTo&&ev.dateTo!==ev.dateFrom?`${fd(ev.dateFrom)} \u2013 ${fd(ev.dateTo)}`:fd(ev.dateFrom);
     const ts=ev.timeFrom?(ev.timeTo?`${ev.timeFrom}\u2013${ev.timeTo}`:ev.timeFrom):'\u2014';
-    const canDel=(ev.isGeneral&&S.p.addGeneral)||ev._canEdit;
+    const canDel=(ev.isGeneral&&S.p.addGeneral)||ev._canEdit||ev._canDelete||S.p.canApproveEvents||S.p.manageUsers;
     const empCell=ev.isGeneral?`<span class="bdg" style="background:rgba(16,185,129,.12);color:var(--ok)">&#127760; Allgemein</span>`
       :anon?`<span class="bdg" style="background:var(--sf2);color:var(--di)">&#128274; Anonym</span>`
       :`<div style="display:flex;align-items:center;gap:5px">${avHtml(emp.initials,emp.color,20,9)}<span>${emp.name}</span></div>`;
@@ -1865,7 +1927,7 @@ function openEvtModal(){
   document.getElementById('genRow').style.display=S.p.addGeneral?'block':'none';
   document.getElementById('fGen').checked=false;document.getElementById('empRow').style.display='block';
   const empSel=document.getElementById('fEmp');empSel.innerHTML='';
-  const addable=S.p.addForOthers?S.users.filter(u2=>!(u2.roles||[]).includes('admin')):[u].filter(Boolean);
+  const addable=S.p.addForOthers?S.users:[u].filter(Boolean);
   addable.forEach(u2=>{const opt=document.createElement('option');opt.value=u2.id;opt.textContent=u2.name;empSel.appendChild(opt);});
   empSel.value=u?.id||'';
   document.getElementById('fCat').innerHTML='<option value="">\u2014 w\u00e4hlen \u2014</option>'+S.categories.map(c=>`<option value="${c.id}">${c.emoji} ${c.label}</option>`).join('');
@@ -2060,7 +2122,7 @@ function renderHomeoffice() {
       var slotHtml=day.slots.map(function(s){
         var u=getU(s.userId);
         var clr=u&&u.color?u.color:'var(--acc)';
-        return '<span style="background:'+clr+'22;color:'+clr+';border-radius:4px;padding:1px 7px;font-size:11px;font-weight:600;margin-right:4px">'+
+        return '<span style="background:'+clr+'22;color:'+clr+';border-radius:4px;padding:1px 7px;font-size:11px;font-weight:600;margin-right:4px;cursor:default" title="'+(u?u.name:'?')+(s.box?' / Box: '+s.box:'')+(s.dienst?' · '+s.dienst:'')+'">'+
           (u?u.initials:'?')+(s.box?' / '+s.box:'')+(s.dienst?' · '+s.dienst:'')+'</span>';
       }).join('');
       var isMine=!!day.mySlot;
@@ -2070,7 +2132,7 @@ function renderHomeoffice() {
         '<td style="text-align:center"><span style="font-size:12px;font-weight:700;color:'+(day.free>0?'var(--ok)':'var(--danger)')+'">'+day.free+'/'+day.maxS+'</span></td>'+
         '<td>'+(slotHtml||'<span style="color:var(--di);font-size:11px">—</span>')+'</td>'+
         '<td style="white-space:nowrap">'+
-          (day.free>0&&day.dow!==0&&day.dow!==6&&!day.isHol?'<button class="btn-ok" style="font-size:11px;padding:2px 8px;margin-right:3px" onclick="hoEintragen(\''+day.iso+'\')">&#43; Eintragen</button>':'')+
+          (day.free>0?'<button class="btn-ok" style="font-size:11px;padding:2px 8px;margin-right:3px" onclick="hoEintragen(\''+day.iso+'\')">&#43; Eintragen</button>':'')+
           ((S.p.canApproveEvents||S.p.manageUsers)&&day.slots.length>0?
             day.slots.map(function(sl){var u=getU(sl.userId);return '<button class="btn-d" style="font-size:10px;padding:1px 5px;margin:1px" onclick="hoAustragen(\''+sl.id+'\')" title="'+( u?u.name:'?')+'">&#10005; '+(u?u.initials:'?')+'</button>';}).join('')
             :(day.mySlot?'<button class="btn-d" style="font-size:11px;padding:2px 6px" onclick="hoAustragen(\''+day.mySlot.id+'\')">&#10005;</button>':'')
@@ -2973,7 +3035,7 @@ function startAutoRefresh(){
       S.users=data.users||[];S.events=data.events||[];S.tickets=data.tickets||[];
       S.messages=data.messages||[];S.notifications=data.notifications||[];
       S.allowances=data.allowances||[];S.checklists=data.checklists||[];
-      S.abrechnung=data.abrechnung||{einspringer:[],homeoffice:[]};S.dienstplaene=data.dienstplaene||[];S.diensttausch=data.diensttausch||[];S.homeoffice=data.homeoffice||{slots:[],config:[],boxes:[],dienste:[]};
+      S.abrechnung=data.abrechnung||{einspringer:[],homeoffice:[]};S.dienstplaene=data.dienstplaene||[];S.diensttausch=data.diensttausch||[];S.homeoffice=data.homeoffice||{slots:[],config:[],boxes:[],dienste:[]};S.vacationConfig=data.vacationConfig||[];
       updateBadges();
       if(_lastMsgCount>=0&&newMsgCount>_lastMsgCount)toast('\uD83D\uDCEC Neue Nachricht eingegangen!');
       if(_lastTkCount>=0&&newTkCount>_lastTkCount)toast('\uD83C\uDFAB Neues Ticket in deinem Bereich!');
@@ -3044,7 +3106,7 @@ async function hoSaveSlot(date) {
   var maxS=(function(){var cfg=(S.homeoffice&&S.homeoffice.config||[]).find(function(c){return(typeof c.date==='string'?c.date.slice(0,10):String(c.date).slice(0,10))===date;});return cfg?cfg.maxSlots:2;})();
   // If filling the last slot and no C10 yet → must be C10
   if(slotsToday.length>=maxS-1&&!hasC10&&dienst!=='C10'){
-    toast('&#9888;&#65039; Einer der '+maxS+' Plätze muss für den Dienst C10 reserviert sein!','err');
+    toast('⚠️ Einer der '+maxS+' Plätze ist für den Dienst C10 reserviert!','err');
     return;
   }
   try {
@@ -3110,6 +3172,224 @@ function renderHoAdmin() {
   var dienste=S.homeoffice&&S.homeoffice.dienste||[];
   bl.innerHTML=boxes.length?boxes.map(function(b){return '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)"><span style="font-size:13px">'+b.label+'</span><button class="btn-d" style="font-size:10px;padding:2px 6px" onclick="hoDeleteBox(\''+b.id+'\')">&#10005;</button></div>';}).join(''):'<div style="color:var(--di);font-size:12px;padding:8px 0">Keine Boxen definiert</div>';
   dl.innerHTML=dienste.length?dienste.map(function(d){return '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)"><span style="font-size:13px">'+d.label+'</span><button class="btn-d" style="font-size:10px;padding:2px 6px" onclick="hoDeleteDienst(\''+d.id+'\')">&#10005;</button></div>';}).join(''):'<div style="color:var(--di);font-size:12px;padding:8px 0">Keine Dienste definiert</div>';
+}
+
+
+async function saveMyColor() {
+  var color = document.getElementById('myColorPicker')?.value;
+  if (!color) return;
+  try {
+    await api('PUT','/users/'+S.currentUser,{color:color});
+    await fetchData();
+    // Update preview
+    var preview = document.getElementById('myColorPreview');
+    if(preview) preview.style.background = color;
+    toast('&#10003; Farbe gespeichert!');
+  } catch(e) { toast('&#9888;&#65039; '+e.message,'err'); }
+}
+function initMyColorPicker() {
+  var u = getU(S.currentUser);
+  var picker = document.getElementById('myColorPicker');
+  var preview = document.getElementById('myColorPreview');
+  if(picker && u) { picker.value = u.color||'#3b6dd4'; }
+  if(preview && u) { preview.style.background = u.color||'#3b6dd4'; }
+}
+
+
+// ══════════════════════════════════════════
+// SECTION: News
+// ══════════════════════════════════════════
+async function loadNews() {
+  try {
+    var data = await api('GET','/news');
+    S.news = data||[];
+    updateBadges();
+  } catch(e) {}
+}
+
+function renderNews() {
+  var isArchiv = S.view==='news_archiv';
+  var canEdit = S.p.manageUsers||(getU(S.currentUser)?.roles||[]).includes('leitung');
+  var today = new Date().toISOString().slice(0,10);
+  var news = S.news||[];
+
+  var active = news.filter(function(n){return !n.isExpired;});
+  var archiv = news.filter(function(n){return n.isExpired;});
+  var display = isArchiv ? archiv : active;
+
+  function fmtDate(d){if(!d)return'';var p=String(d).slice(0,10);return p.slice(8)+'.'+p.slice(5,7)+'.'+p.slice(0,4);}
+  function newsCard(n){
+    var isPast = n.fromDate && today<n.fromDate;
+    var opacity = (canEdit && isPast) ? 'opacity:.6;' : '';
+    var bg = n.isImportant ? 'rgba(239,68,68,.05);border-left:3px solid var(--danger)' : 'var(--sf);border-left:3px solid var(--acc)';
+    return '<div style="padding:14px;background:'+bg+';border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px;'+opacity+'">'+
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap">'+
+      '<div style="flex:1">'+
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">'+
+          (n.isImportant?'<span class="bdg ap-bdg-rejected" style="font-size:10px">&#9888;&#65039; Wichtig</span>':'')+
+          '<span style="font-size:15px;font-weight:700">'+escHtml(n.title)+'</span>'+
+          (isPast&&canEdit?'<span class="bdg ap-bdg-pending" style="font-size:10px">Ab '+fmtDate(n.fromDate)+'</span>':'')+
+        '</div>'+
+        '<div style="font-size:13px;line-height:1.6;white-space:pre-wrap">'+n.body+'</div>'+
+        '<div style="font-size:11px;color:var(--mu);margin-top:8px">'+
+          'Von: <strong>'+(getU(n.createdBy)?.name||'?')+'</strong>'+
+          (n.fromDate?' &middot; Ab: '+fmtDate(n.fromDate):'')+
+          (n.toDate?' &middot; Bis: '+fmtDate(n.toDate):'')+
+        '</div>'+
+      '</div>'+
+      '<div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end;flex-shrink:0">'+
+        '<button class="btn-s" style="font-size:11px" onclick="toggleNewsPin(\''+n.id+'\','+n.isPinned+')">'+(n.isPinned?'&#128204; Lospinnen':'&#128203; Anpinnen')+'</button>'+
+        (canEdit?'<button class="btn-e" style="font-size:11px" onclick="openNewsForm(\''+n.id+'\')">&#10000; Bearbeiten</button>':'')+
+        (canEdit?'<button class="btn-d" style="font-size:11px" onclick="deleteNews(\''+n.id+'\')">&#10005;</button>':'')+
+      '</div></div></div>';
+  }
+
+  document.getElementById('main').innerHTML =
+    '<div class="ph"><div class="pt">&#128240; '+(isArchiv?'News-Archiv':'Aktuelle News')+'</div>'+
+      (canEdit&&!isArchiv?'<button class="btn-p" onclick="openNewsForm(null)">&#65291; News erstellen</button>':'')+
+    '</div>'+
+    (display.length?display.map(newsCard).join(''):
+      '<div class="empty">&#128240; '+( isArchiv?'Keine archivierten News':'Noch keine News vorhanden')+'</div>');
+}
+
+function openNewsForm(id) {
+  var n = id ? (S.news||[]).find(function(x){return x.id===id;}) : null;
+  var html = '<div class="ov open" id="newsFormOv" style="z-index:1001"><div class="modal">' +
+    '<div class="mh"><h2>'+(n?'News bearbeiten':'Neue News')+'</h2><button class="mc" onclick="document.getElementById(\'newsFormOv\').remove()">&#10005;</button></div>'+
+    '<div class="mb2">'+
+      '<div class="fg full"><label>Titel *</label><input type="text" id="nFTitle" value="'+escHtml(n?.title||'')+'" style="font-size:14px;font-weight:600"></div>'+
+      '<div class="fg full"><label>Text (HTML-Links erlaubt)</label><textarea id="nFBody" rows="6" style="font-family:inherit">'+escHtml(n?.body||'')+'</textarea></div>'+
+      '<div class="fr">'+
+        '<div class="fg"><label>Von Datum</label><input type="date" id="nFFrom" value="'+(n?.fromDate||'')+'"></div>'+
+        '<div class="fg"><label>Bis Datum</label><input type="date" id="nFTo" value="'+(n?.toDate||'')+'"></div>'+
+      '</div>'+
+      '<div class="fg"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="nFImportant" '+(n?.isImportant?'checked':'')+' style="width:auto"> &#9888;&#65039; Als wichtig markieren</label></div>'+
+    '</div>'+
+    '<div class="mf"><button class="btn-s" onclick="document.getElementById(\'newsFormOv\').remove()">Abbrechen</button>'+
+      '<button class="btn-p" onclick="saveNews(\''+( id||'')+'\')">&#128190; Speichern</button></div>'+
+  '</div></div>';
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+
+async function saveNews(id) {
+  var title=document.getElementById('nFTitle')?.value?.trim();
+  var body=document.getElementById('nFBody')?.value?.trim();
+  if(!title){toast('&#9888;&#65039; Titel erforderlich!');return;}
+  var payload={title:title,body:body||'',fromDate:document.getElementById('nFFrom')?.value||null,toDate:document.getElementById('nFTo')?.value||null,isImportant:document.getElementById('nFImportant')?.checked||false};
+  try {
+    if(id) await api('PUT','/news/'+id,payload);
+    else await api('POST','/news',payload);
+    document.getElementById('newsFormOv')?.remove();
+    await loadNews(); renderNews();
+    toast('&#10003; News gespeichert!');
+  } catch(e){toast('&#9888;&#65039; '+e.message,'err');}
+}
+
+async function deleteNews(id) {
+  if(!confirm('News löschen?'))return;
+  try{await api('DELETE','/news/'+id);await loadNews();renderNews();toast('&#128465; Gelöscht.');}
+  catch(e){toast('&#9888;&#65039; '+e.message,'err');}
+}
+
+async function toggleNewsPin(id,isPinned) {
+  try{await api('PUT','/news/'+id+'/pin',{pinned:!isPinned});await loadNews();if(S.view==='news'||S.view==='news_archiv')renderNews();renderHome&&S.view==='home'&&renderHome();toast(isPinned?'Lospinnen OK':'&#128204; Angepinnt!');}
+  catch(e){toast('&#9888;&#65039; '+e.message,'err');}
+}
+
+// ══════════════════════════════════════════
+// SECTION: Urlaubsübersicht
+// ══════════════════════════════════════════
+function renderVacation() {
+  var year=S.year, month=S.month!==null?S.month:new Date().getMonth();
+  var firstDay=new Date(year,month,1), lastDay=new Date(year,month+1,0);
+  var canManage=S.p.canApproveEvents||S.p.manageUsers;
+  var moNames=['Jänner','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+  var dayNames=['So','Mo','Di','Mi','Do','Fr','Sa'];
+  var moName=moNames[month];
+  var pad=function(n){return String(n).padStart(2,'0');};
+
+  // Vacation categories - entries with category labeled "Urlaub"
+  var vacCats=S.categories.filter(function(c){return c.label&&c.label.toLowerCase().includes('urlaub');});
+  var vacCatIds=vacCats.map(function(c){return c.id;});
+
+  // Vacation config map
+  var cfgMap={};
+  (S.vacationConfig||[]).forEach(function(c){cfgMap[c.date]={maxSlots:c.maxSlots,note:c.note};});
+
+  // Build days
+  var days=[];
+  for(var dt=new Date(firstDay);dt<=lastDay;dt.setDate(dt.getDate()+1)){
+    var iso=year+'-'+pad(dt.getMonth()+1)+'-'+pad(dt.getDate());
+    // Count vacation entries for this day
+    var vacEntries=S.events.filter(function(ev){
+      if(ev.isGeneral||ev._anonymized)return false;
+      if(vacCatIds.length>0&&!vacCatIds.includes(ev.category))return false;
+      if(!vacCatIds.length)return false; // no vac category defined
+      return ev.dateFrom<=iso&&ev.dateTo>=iso&&ev.approvalStatus!=='rejected';
+    });
+    var cfg=cfgMap[iso]||{maxSlots:8,note:''};
+    var dow=dt.getDay();
+    days.push({iso:iso,dow:dow,day:dt.getDate(),dayName:dayNames[dow],isWe:dow===0||dow===6,vacEntries:vacEntries,maxS:cfg.maxSlots,note:cfg.note,full:vacEntries.length>=cfg.maxSlots});
+  }
+
+  // My vacation entries next 90 days
+  var today=new Date().toISOString().slice(0,10);
+  var in90=new Date(); in90.setDate(in90.getDate()+90); var in90s=in90.toISOString().slice(0,10);
+  var myVac=S.events.filter(function(ev){return ev.userId===S.currentUser&&vacCatIds.includes(ev.category)&&ev.dateTo>=today&&ev.dateFrom<=in90s;}).sort(function(a,b){return a.dateFrom.localeCompare(b.dateFrom);});
+
+  document.getElementById('main').innerHTML =
+    '<div class="ph"><div class="pt">&#127958;&#65039; Urlaubsübersicht</div></div>'+
+
+    (vacCatIds.length===0?'<div class="wb">&#9888;&#65039; Bitte zuerst eine Kategorie "Urlaub" in der Administration anlegen, damit Urlaubseinträge erkannt werden.</div>':'')+
+
+    (myVac.length?'<div class="tw" style="margin-bottom:14px"><div class="tt"><h2>&#128197; Meine Urlaube (nächste 90 Tage)</h2></div>'+
+      '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;padding:12px">'+
+      myVac.map(function(ev){
+        var cat=S.categories.find(function(c){return c.id===ev.category;});
+        var st=ev.approvalStatus==='approved'?'<span class="bdg ap-bdg-approved" style="font-size:10px">&#10003; Genehmigt</span>':ev.approvalStatus==='rejected'?'<span class="bdg ap-bdg-rejected" style="font-size:10px">&#10007;</span>':'<span class="bdg ap-bdg-pending" style="font-size:10px">&#8987; Ausstehend</span>';
+        return '<div style="background:var(--sf);border:1px solid var(--border);border-radius:var(--r);padding:10px;border-left:3px solid '+(cat?.color||'var(--ok)')+'">'+
+          '<div style="font-size:12px;font-weight:700">'+ev.dateFrom.slice(5)+' – '+ev.dateTo.slice(5)+'</div>'+
+          '<div style="font-size:11px;color:var(--mu)">'+(ev.reason||'Urlaub')+'</div>'+
+          st+'</div>';
+      }).join('')+
+    '</div></div>':'')+
+
+    '<div class="tw"><div class="tt">'+
+      '<h2>&#128197; '+moName+' '+year+'</h2>'+
+      '<div style="display:flex;gap:6px">'+
+        '<button class="btn-s" style="padding:4px 10px" onclick="(S.month=(S.month!==null?S.month:new Date().getMonth()))===0?(S.year--,S.month=11):S.month--;renderMain()">&#8249;</button>'+
+        '<button class="btn-s" style="padding:4px 10px" onclick="(S.month=(S.month!==null?S.month:new Date().getMonth()))===11?(S.year++,S.month=0):S.month++;renderMain()">&#8250;</button>'+
+      '</div>'+
+    '</div>'+
+    '<div style="overflow-x:auto"><table><thead><tr>'+
+      '<th style="text-align:left;width:140px">Tag</th>'+
+      '<th style="text-align:center">Urlaube</th>'+
+      '<th style="text-align:left">Mitarbeiter</th>'+
+      (canManage?'<th style="width:200px">Konfiguration</th>':'')+
+    '</tr></thead><tbody>'+
+    days.map(function(day){
+      var bg=day.isWe?'rgba(0,0,0,.02)':'';
+      var full=day.full&&!day.isWe;
+      var countColor=day.vacEntries.length===0?'var(--di)':full?'var(--danger)':'var(--warn)';
+      var users=day.vacEntries.map(function(ev){var u=getU(ev.userId);return u?'<span style="background:'+(u.color||'var(--acc)')+'22;color:'+(u.color||'var(--acc)')+';border-radius:4px;padding:1px 6px;font-size:11px;font-weight:600;margin-right:3px" title="'+u.name+'">'+u.initials+'</span>':'';}).join('');
+      return '<tr style="background:'+bg+(full?';border-left:3px solid var(--danger)':'')+'">'+
+        '<td style="white-space:nowrap;font-size:12px">'+(day.isWe?'<span style="color:var(--mu)">':'')+pad(day.day)+'. '+moName+' ('+day.dayName+')'+(day.isWe?'</span>':'')+'</td>'+
+        '<td style="text-align:center"><span style="font-weight:700;color:'+countColor+'">'+day.vacEntries.length+'/'+day.maxS+'</span></td>'+
+        '<td>'+(users||'<span style="color:var(--di);font-size:11px">—</span>')+(day.note?'<div style="font-size:10px;color:var(--mu);font-style:italic">'+escHtml(day.note)+'</div>':'')+'</td>'+
+        (canManage?'<td><div style="display:flex;gap:4px;align-items:center">'+
+          '<input type="number" min="0" max="20" value="'+day.maxS+'" style="width:50px;font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:3px" id="vacMax_'+day.iso+'">'+
+          '<input type="text" placeholder="Bemerkung" value="'+escHtml(day.note)+'" style="flex:1;font-size:11px;padding:2px 6px;border:1px solid var(--border);border-radius:3px" id="vacNote_'+day.iso+'">'+
+          '<button class="btn-ok" style="font-size:10px;padding:2px 6px;white-space:nowrap" onclick="vacSaveConfig(\''+day.iso+'\')">&#128190;</button>'+
+        '</div></td>':'')+'</tr>';
+    }).join('')+
+    '</tbody></table></div></div>';
+}
+
+async function vacSaveConfig(date) {
+  var maxSlots=parseInt(document.getElementById('vacMax_'+date)?.value??8);
+  var note=document.getElementById('vacNote_'+date)?.value||'';
+  try{await api('PUT','/vacation/config',{date:date,maxSlots:maxSlots,note:note});await fetchData();renderVacation();toast('&#10003; Gespeichert.');}
+  catch(e){toast('&#9888;&#65039; '+e.message,'err');}
 }
 
 
