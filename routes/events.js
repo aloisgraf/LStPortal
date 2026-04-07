@@ -1,6 +1,6 @@
 'use strict';
 const router = require('express').Router();
-const { q, q1, newId, pool, logAct, createNotification } = require('../db');
+const { q, q1, newId, pool, logAct, getUser, createNotification } = require('../db');
 const { auth, ok, bad } = require('../middleware');
 
 
@@ -60,7 +60,7 @@ router.delete('/:id', auth, async (req,res) => {
   try {
     const ev = await q1('SELECT * FROM events WHERE id=$1',[req.params.id]);
     if (!ev) return bad(res,'Nicht gefunden',404);
-    const canDel = (ev.is_general&&req.p.manageGeneral)||(!ev.is_general&&(req.p.editAllPersonal||ev.created_by===req.uid));
+    const canDel = req.p.manageUsers || req.p.canApproveEvents || (ev.is_general&&req.p.manageGeneral) || (!ev.is_general&&(req.p.editAllPersonal||ev.created_by===req.uid));
     if (!canDel) return bad(res,'Keine Berechtigung',403);
     await pool.query('DELETE FROM event_confirms WHERE event_id=$1',[req.params.id]);
     await pool.query('DELETE FROM events WHERE id=$1',[req.params.id]);

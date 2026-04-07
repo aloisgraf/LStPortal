@@ -495,3 +495,100 @@ router.delete('/homeoffice/dienste/:id', auth, adminOnly, async (req,res) => {
   try { await pool.query('DELETE FROM homeoffice_dienste WHERE id=$1',[req.params.id]); ok(res); }
   catch(e){bad(res,e.message,500);}
 });
+
+// ── NEWS ──
+router.get('/news', auth, async (req,res) => {
+  try {
+    const canManage = req.p.manageUsers || req.p.roles?.includes('leitung');
+    const today = new Date().toISOString().slice(0,10);
+    const all = await q('SELECT * FROM news ORDER BY created_at DESC');
+    const pins = await q('SELECT news_id FROM news_pins WHERE user_id=$1',[req.uid]);
+    const pinSet = new Set(pins.map(p=>p.news_id));
+    const mapped = all.map(n=>({
+      id:n.id, title:n.title, body:n.body,
+      fromDate:n.from_date?.toISOString?.()?.slice(0,10)||n.from_date?.slice?.(0,10)||n.from_date,
+      toDate:n.to_date?.toISOString?.()?.slice(0,10)||n.to_date?.slice?.(0,10)||n.to_date,
+      isImportant:n.is_important, createdBy:n.created_by, createdAt:n.created_at,
+      isPinned:pinSet.has(n.id),
+      isActive: (!n.from_date||(today>=String(n.from_date).slice(0,10)))&&(!n.to_date||(today<=String(n.to_date).slice(0,10))),
+      isExpired: n.to_date && today>String(n.to_date).slice(0,10),
+    }));
+    // Non-managers only see active news
+    ok(res, canManage ? mapped : mapped.filter(n=>n.isActive&&!n.isExpired));
+  } catch(e) { bad(res,e.message,500); }
+});
+
+router.post('/news', auth, async (req,res) => {
+  try {
+    const isEditor = req.p.manageUsers || req.p.roles?.includes('leitung');
+    if(!isEditor) return bad(res,'Keine Berechtigung',403);
+    const {title,body,fromDate,toDate,isImportant} = req.body;
+    if(!title?.trim()) return bad(res,'Titel erforderlich');
+    const id = newId();
+    await pool.query(
+      'INSERT INTO news (id,title,body,from_date,to_date,is_important,created_by) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+      [id,title.trim(),body||'',fromDate||null,toDate||null,!!isImportant,req.uid]
+    );
+    await logAct(req.uid,req.user.name,'create_news',{title});
+    ok(res,{id});
+  } catch(e) { bad(res,e.message,500); }
+});
+
+router.put('/news/:id', auth, async (req,res) => {
+  try {
+    const isEditor = req.p.manageUsers || req.p.roles?.includes('leitung');
+    if(!isEditor) return bad(res,'Keine Berechtigung',403);
+    const {title,body,fromDate,toDate,isImportant} = req.body;
+    await pool.query(
+      'UPDATE news SET title=$1,body=$2,from_date=$3,to_date=$4,is_important=$5 WHERE id=$6',
+      [title,body,fromDate||null,toDate||null,!!isImportant,req.params.id]
+    );
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
+
+router.delete('/news/:id', auth, async (req,res) => {
+  try {
+    const isEditor = req.p.manageUsers || req.p.roles?.includes('leitung');
+    if(!isEditor) return bad(res,'Keine Berechtigung',403);
+    await pool.query('DELETE FROM news_pins WHERE news_id=$1',[req.params.id]);
+    await pool.query('DELETE FROM news WHERE id=$1',[req.params.id]);
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
+
+router.put('/news/:id/pin', auth, async (req,res) => {
+  try {
+    if(req.body.pinned) {
+      await pool.query('INSERT INTO news_pins (news_id,user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',[req.params.id,req.uid]);
+    } else {
+      await pool.query('DELETE FROM news_pins WHERE news_id=$1 AND user_id=$2',[req.params.id,req.uid]);
+    }
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
+
+// ── URLAUB OVERVIEW ──
+router.get('/vacation/config', auth, async (req,res) => {
+  try {
+    ok(res, await q('SELECT * FROM vacation_config ORDER BY date'));
+  } catch(e) { bad(res,e.message,500); }
+});
+
+router.put('/vacation/config', auth, async (req,res) => {
+  try {
+    if(!req.p.canApproveEvents&&!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+    const {date,maxSlots,note} = req.body;
+    const slots = parseInt(maxSlots??8);
+    if(slots<0) {
+      await pool.query('DELETE FROM vacation_config WHERE date=$1',[date]);
+    } else {
+      await pool.query(
+        `INSERT INTO vacation_config (id,date,max_slots,note,created_by,updated_at) VALUES ($1,$2,$3,$4,$5,NOW())
+         ON CONFLICT (date) DO UPDATE SET max_slots=EXCLUDED.max_slots,note=EXCLUDED.note,updated_at=NOW()`,
+        [newId(),date,slots,note||'',req.uid]
+      );
+    }
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});

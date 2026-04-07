@@ -8,7 +8,7 @@ router.get('/', auth, async (req,res) => {
   try {
     const uid=req.uid, p=req.p, tp=req.tp, roles=p.roles;
     const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
-           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw] = await Promise.all([
+           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw] = await Promise.all([
       q('SELECT id,name,initials,roles,color,must_change_pw,last_seen FROM users ORDER BY name'),
       q('SELECT * FROM categories ORDER BY sort_order,label'),
       q('SELECT * FROM tags ORDER BY label'),
@@ -38,6 +38,7 @@ router.get('/', auth, async (req,res) => {
       q('SELECT * FROM homeoffice_config ORDER BY date').catch(()=>[]),
       q('SELECT * FROM homeoffice_boxes ORDER BY sort_order,label').catch(()=>[]),
       q('SELECT * FROM homeoffice_dienste ORDER BY sort_order,label').catch(()=>[]),
+      q('SELECT * FROM vacation_config ORDER BY date').catch(()=>[]),
     ]);
 
     const tkViewMap = new Map((tkViewsRaw||[]).map(v=>[v.ticket_id, v.viewed_at]));
@@ -144,6 +145,10 @@ router.get('/', auth, async (req,res) => {
         boxes: hoBoxesRaw,
         dienste: hoDiensteRaw,
       },
+      vacationConfig: (vacCfgRaw||[]).map(c=>({
+        date:typeof c.date==='string'?c.date.slice(0,10):(c.date instanceof Date?c.date.toISOString().slice(0,10):String(c.date).slice(0,10)),
+        maxSlots:c.max_slots, note:c.note||'',
+      })),
       diensttausch: dtRaw.filter(dt => {
         // Dienstplanung/Admin sieht alles
         if (p.canApproveEvents) return true;
