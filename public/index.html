@@ -320,14 +320,7 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
         <div class="ni" id="ni-schedule" onclick="setView('schedule')">&#128197; Eintrags&#252;bersicht</div>
         <div class="ni" id="ni-calendar" onclick="setView('calendar')">&#128197; Kalenderansicht</div>
         <div class="ni" id="ni-allw" onclick="setView('allw')">&#128202; Zulagendienste</div>
-        <div class="ni" id="ni-homeoffice" onclick="setView('homeoffice')">&#127968; Homeoffice</div>
-        <div class="ndiv"></div>
-        <div class="nsh open" id="newsHdr" onclick="toggleNS('news')"><span>&#128240; News</span><span class="arr">&#9660;</span></div>
-        <div class="nsub open" id="newsSub">
-          <div class="ni" id="ni-news" onclick="setView('news')">&#128240; Aktuelle News<span class="bdgn" id="newsBdg" style="display:none">0</span></div>
-          <div class="ni" id="ni-news_archiv" onclick="setView('news_archiv')" style="display:none">&#128450; Archiv</div>
-        </div>
-        <div class="ndiv"></div>
+        <div class="ni" id="ni-homeoffice" onclick="setView(\'homeoffice\')">&#127968; Homeoffice</div>
         <div class="ni" id="ni-vacation" onclick="setView('vacation')">&#127958;&#65039; Urlaubsübersicht</div>
         <div class="ni" id="ni-diensttausch" onclick="setView('diensttausch')">&#128257; Diensttausch<span class="bdgn" id="dtBdg" style="display:none">0</span></div>
         <div class="ni" id="ni-abrechnung" onclick="setView('abrechnung')">&#129534; Abrechnung</div>
@@ -336,7 +329,7 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
       <div class="ndiv"></div>
       <div class="nsh open" id="tkHdr" onclick="toggleNS('tk')"><span>&#127931; Ticketsystem</span><span class="arr">&#9660;</span></div>
       <div class="nsub open" id="tkSub">
-        <div class="ni" id="ni-tickets" onclick="setView('tickets')">&#128203; Offene Tickets</div>
+        <div class="ni" id="ni-tickets" onclick="setView(\'tickets\')">&#128203; Offene Tickets</div>
         <div class="ni" id="ni-tickets_closed" onclick="setView('tickets_closed')">&#9989; Abgeschlossene</div>
         <div class="ni" id="ni-checklists" onclick="setView('checklists')">&#9745;&#65039; Checklisten</div>
       </div>
@@ -345,6 +338,12 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
       <div class="nsub open" id="msgSub">
         <div class="ni" id="ni-messages" onclick="setView('messages')">&#128235; Eingang</div>
         <div class="ni" id="ni-messages_sent" onclick="setView('messages_sent')">&#128228; Gesendet</div>
+      </div>
+      <div class="ndiv"></div>
+      <div class="nsh open" id="newsHdr" onclick="toggleNS('news')"><span>&#128240; News</span><span class="arr">&#9660;</span></div>
+      <div class="nsub open" id="newsSub">
+        <div class="ni" id="ni-news" onclick="setView(\'news\')">&#128240; Aktuelle News<span class="bdgn" id="newsBdg" style="display:none">0</span></div>
+        <div class="ni" id="ni-news_archiv" onclick="setView('news_archiv')" style="display:none">&#128450; Archiv</div>
       </div>
     </div>
     <div class="sbf" id="sbf"><div class="sfl">Filter</div></div>
@@ -1371,8 +1370,15 @@ function showHelpSection(id){
     <div class="mh"><h2>&#128203; Changelog</h2><button class="mc" onclick="closeModal('changelogOv')">&#10005;</button></div>
     <div class="mb2" style="gap:10px">
       <div style="padding:12px;background:rgba(59,109,212,0.06));border:1px solid rgba(59,109,212,.20);border-radius:8px">
-        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.2.0</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.2.1</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
         <ul style="font-size:12px;line-height:1.8;padding-left:18px">
+          <li>Fix: News-Nav jetzt nach Nachrichten (nicht im Dienstplan)</li>
+          <li>Fix: Meine Eintr&auml;ge zeigt nur Eintr&auml;ge die f&uuml;r mich erstellt sind</li>
+          <li>Fix: Diensttausch @-Mention Autocomplete funktioniert</li>
+          <li>Diensttausch: Vormonat-Eintr&auml;ge ins Archiv (aufklappbar)</li>
+          <li>Urlaubsübersicht: Datumsformat 01. Juli 2026 (Mittwoch)</li>
+          <li>&Uuml;bersicht: Online volle Breite, Eintr&auml;ge+Tickets nebeneinander</li>
+          <li>&Uuml;bersicht: Angepinnte Nachrichten &amp; News oben</li>
           <li>Neues Modul: News (Admin/Leitung erstellen, alle lesen, anpinnen)</li>
           <li>Neues Modul: Urlaubsübersicht mit Tageslimits und Bemerkungen</li>
           <li>Pers&ouml;nliche Farbe selbst &auml;ndern (Profilseite)</li>
@@ -1475,7 +1481,7 @@ function showHelpSection(id){
 </div>
 
 <script>
-const APP_VERSION='2.2.0';
+const APP_VERSION='2.2.1';
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
@@ -1704,152 +1710,147 @@ function renderMain(){
   else if(S.view==='messages'||S.view==='messages_sent')renderMessages();
 }
 // HOME
+function _hmCard(id,icon,txt,extra){return '<div style="padding:8px 12px;background:var(--sf);border-radius:6px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">'+txt+(extra||'')+'</div>';}
 function renderHome(){
-  const u=getU(S.currentUser);
-  const online=S.users.filter(x=>x.isOnline&&x.id!==S.currentUser);
-  const unreadMsg=S.messages.filter(m=>!m.isRead&&m.senderId!==S.currentUser);
-  // Meine Einträge (Dienstplan) - für mich erstellt oder von mir erstellt
-  const myEvents=S.events.filter(ev=>{
-    if(ev.isGeneral)return false;
-    return ev.userId===S.currentUser||ev.createdBy===S.currentUser;
-  }).sort((a,b)=>a.dateFrom.localeCompare(b.dateFrom)).slice(0,10);
-  const pinnedMsg=S.messages.filter(m=>m.pinned&&m.senderId!==S.currentUser);
+  var u=getU(S.currentUser);
+  var online=S.users.filter(function(x){return x.isOnline&&x.id!==S.currentUser;});
+  var unreadMsg=S.messages.filter(function(m){return !m.isRead&&m.senderId!==S.currentUser;});
+  var pinnedMsg=S.messages.filter(function(m){return m.pinned&&m.senderId!==S.currentUser;});
+  var myEvents=S.events.filter(function(ev){if(ev.isGeneral)return false;return ev.userId===S.currentUser;}).sort(function(a,b){return a.dateFrom.localeCompare(b.dateFrom);}).slice(0,10);
   var today0=new Date(); today0.setHours(0,0,0,0);
   var in30d=new Date(today0); in30d.setDate(in30d.getDate()+30);
   var normD=function(d){if(!d)return'';var s=typeof d==='string'?d:d instanceof Date?d.toISOString():''+d;return s.slice(0,10);};
   var moNs=['Jänner','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
   var dyNs=['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
   var myHo=(S.homeoffice&&S.homeoffice.slots||[]).filter(function(s){if(s.userId!==S.currentUser)return false;var d=new Date(normD(s.date)+'T00:00:00');return d>=today0&&d<=in30d;}).sort(function(a,b){return normD(a.date).localeCompare(normD(b.date));}).slice(0,7);
-  const unreadNotif=S.notifications.filter(n=>!n.isRead&&n.type!=='event_added'&&n.type!=='event_changed'&&n.type!=='einspringer_rejected');
-  const eventNotifs=S.notifications.filter(n=>!n.isRead&&(n.type==='event_added'||n.type==='event_changed'));
-  const einspNotifs=S.notifications.filter(n=>!n.isRead&&n.type==='einspringer_rejected');
-  const myDepts=S.tp.myDepts;
-  const myName=(getU(S.currentUser)?.name||'').toLowerCase();
-  const relevantTks=S.tickets.filter(tk=>{
+  var unreadNotif=S.notifications.filter(function(n){return !n.isRead&&n.type!=='event_added'&&n.type!=='event_changed'&&n.type!=='einspringer_rejected';});
+  var eventNotifs=S.notifications.filter(function(n){return !n.isRead&&(n.type==='event_added'||n.type==='event_changed');});
+  var einspNotifs=S.notifications.filter(function(n){return !n.isRead&&n.type==='einspringer_rejected';});
+  var myDepts=S.tp.myDepts;
+  var myName=(getU(S.currentUser)?.name||'').toLowerCase();
+  var relevantTks=S.tickets.filter(function(tk){
     if(tk.status==='closed')return false;
-    if(tk.assigneeId===S.currentUser)return true; // mir zugewiesen
-    if(tk.createdBy===S.currentUser)return true;  // von mir erstellt
-    if(myDepts.includes(tk.department))return true; // mein Fachbereich
-    if(tk.department==='frei')return myDepts.length>0||S.tp.seeAll; // Frei für alle mit Fachbereich
-    // Erwähnt in einer Notiz (@meinName)
-    if(myName&&(tk.notes||[]).some(n=>n.text&&n.text.toLowerCase().includes('@'+myName)))return true;
+    if(tk.assigneeId===S.currentUser)return true;
+    if(tk.createdBy===S.currentUser)return true;
+    if(myDepts.includes(tk.department))return true;
+    if(tk.department==='frei')return myDepts.length>0||S.tp.seeAll;
+    if(myName&&(tk.notes||[]).some(function(n){return n.text&&n.text.toLowerCase().includes('@'+myName);}))return true;
+    if((tk.mentionedUsers||[]).includes(S.currentUser))return true;
     return false;
-  }).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,10);
-  document.getElementById('main').innerHTML=`
-    <div class="ph"><div class="pt">&#128196; \u00dcbersicht <span>${u?.name||''}</span></div></div>
-    ${myHo.length?`<div style="background:rgba(14,165,233,.05);border:1px solid rgba(14,165,233,.2);border-radius:var(--r);padding:12px;margin-bottom:14px;max-width:480px">
-      <div style="font-size:13px;font-weight:700;color:#0ea5e9;margin-bottom:10px">&#127968; Meine Homeoffice-Tage (30 Tage)</div>
-      ${myHo.map(s=>{var dobj=new Date(normD(s.date)+'T00:00:00');return`<div style="padding:4px 0;font-size:12px;display:flex;gap:12px;border-bottom:1px solid var(--border)"><span style="font-weight:600;min-width:240px">${String(dobj.getDate()).padStart(2,'0')}. ${moNs[dobj.getMonth()]} ${dobj.getFullYear()} (${dyNs[dobj.getDay()]})</span><span style="color:var(--mu)">${s.box||''}${s.dienst?' · '+s.dienst:''}</span></div>`;}).join('')}
-      <button class="btn-s" style="margin-top:8px;font-size:11px" onclick="setView('homeoffice')">Homeoffice-Raster &#8594;</button>
-    </div>`:''}
-    ${(S.news||[]).filter(n=>n.isImportant&&n.isActive&&!n.isExpired).length?`<div style="background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.2);border-radius:var(--r);padding:14px;margin-bottom:14px">
-      <div style="font-size:13px;font-weight:700;color:var(--danger);margin-bottom:10px">&#9888;&#65039; Wichtige News</div>
-      ${(S.news||[]).filter(n=>n.isImportant&&n.isActive&&!n.isExpired).map(n=>`<div style="padding:6px 0;border-bottom:1px solid rgba(239,68,68,.15)">
-        <div style="font-size:13px;font-weight:700">${escHtml(n.title)}</div>
-        <div style="font-size:12px;color:var(--tx);white-space:pre-wrap">${n.body.slice(0,200)}${n.body.length>200?'…':''}</div>
-      </div>`).join('')}
-      <button class="btn-s" style="margin-top:8px;font-size:11px" onclick="setView('news')">Alle News &#8594;</button>
-    </div>`:''}
-    ${(S.news||[]).filter(n=>n.isPinned&&n.isActive).length?`<div style="background:rgba(59,109,212,.04);border:1px solid rgba(59,109,212,.2);border-radius:var(--r);padding:14px;margin-bottom:14px">
-      <div style="font-size:13px;font-weight:700;color:var(--acc);margin-bottom:10px">&#128204; Angepinnte News</div>
-      ${(S.news||[]).filter(n=>n.isPinned&&n.isActive).map(n=>`<div style="padding:5px 0;border-bottom:1px solid var(--border);cursor:pointer;font-size:12px" onclick="setView('news')">&#128240; <strong>${escHtml(n.title)}</strong></div>`).join('')}
-    </div>`:''}
-    ${pinnedMsg.length?`<div style="background:rgba(59,109,212,.04);border:1px solid rgba(59,109,212,.2);border-radius:var(--r);padding:14px;margin-bottom:14px">
-      <div style="font-size:13px;font-weight:700;color:var(--acc);margin-bottom:10px">&#128204; ${pinnedMsg.length} angepinnte Nachricht${pinnedMsg.length>1?'en':''}</div>
-      ${pinnedMsg.map(m=>`<div style="padding:8px 12px;background:var(--sf);border-radius:6px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;cursor:pointer" onclick="openMsg('${m.id}')">
-        <div><div style="font-weight:600;font-size:13px">&#128204; ${m.title}</div><div style="font-size:11px;color:var(--mu)">von ${getU(m.senderId)?.name||'?'}</div></div>
-        <button class="btn-s" style="font-size:10px;padding:2px 8px" onclick="event.stopPropagation();toggleMsgPinDirect('${m.id}',true)">Lospinnen</button>
-      </div>`).join('')}
-    </div>`:''}
-    ${unreadMsg.length?`<div style="background:rgba(239,68,68,0.05));border:1px solid rgba(239,68,68,.20);border-radius:var(--r);padding:14px;margin-bottom:14px">
-      <div style="font-size:13px;font-weight:700;color:var(--danger);margin-bottom:10px">&#128276; ${unreadMsg.length} ungelesene Nachricht${unreadMsg.length>1?'en':''}</div>
-      ${unreadMsg.map(m=>`<div style="padding:8px 12px;background:var(--sf);border-radius:6px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-        <div><div style="font-weight:600;font-size:13px">${m.title}</div><div style="font-size:11px;color:var(--mu)">von ${getU(m.senderId)?.name||'?'} &middot; ${fdt(m.createdAt)}</div></div>
-        <button class="btn-p" onclick="openMsg('${m.id}')">&#128279; Lesen &amp; Bestätigen</button>
-      </div>`).join('')}
-    </div>`:''}
-    ${eventNotifs.length?`<div style="background:rgba(245,158,11,0.05));border:1px solid rgba(245,158,11,.25);border-radius:var(--r);padding:14px;margin-bottom:14px">
-      <div style="font-size:13px;font-weight:700;color:var(--warn);margin-bottom:10px">&#128197; ${eventNotifs.length} neue/ge\u00e4nderte Eintr\u00e4ge f\u00fcr dich</div>
-      ${eventNotifs.map(n=>{const ev=S.events.find(e=>e.id===n.eventId);return`<div style="padding:8px 12px;background:var(--sf);border-radius:6px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-        <div><div style="font-weight:600;font-size:13px">${n.title}</div>${ev?`<div style="font-size:11px;color:var(--mu)">${fd(ev.dateFrom)} &middot; ${ev.reason||'Eintrag'}</div>`:''}</div>
-        <button class="btn-ok" onclick="confirmEventNotif('${n.id}')">&#10003; Zur Kenntnis</button>
-      </div>`;}).join('')}
-    </div>`:''}
-    ${einspNotifs.length?`<div style="background:rgba(239,68,68,0.05));border:1px solid rgba(239,68,68,0.22);border-radius:var(--r);padding:14px;margin-bottom:14px">
-      <div style="font-size:13px;font-weight:700;color:var(--danger);margin-bottom:10px">&#10007; ${einspNotifs.length} abgelehnter Einspringerdienst${einspNotifs.length>1?'e':''}</div>
-      ${einspNotifs.map(n=>`<div style="padding:8px 12px;background:var(--sf);border-radius:6px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-        <div><div style="font-weight:600;font-size:13px">${n.title}</div><div style="font-size:11px;color:var(--mu)">${fdt(n.createdAt)}</div></div>
-        <button class="btn-ok" onclick="confirmEventNotif('${n.id}')">&#10003; Zur Kenntnis</button>
-      </div>`).join('')}
-    </div>`:''}
-    ${unreadNotif.length?`<div style="background:rgba(59,109,212,.04);border:1px solid rgba(59,109,212,0.18);border-radius:var(--r);padding:14px;margin-bottom:14px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div style="font-size:13px;font-weight:700;color:var(--acc)">&#128276; ${unreadNotif.length} Benachrichtigung${unreadNotif.length>1?'en':''}</div>
-        <button class="btn-s" style="font-size:11px" onclick="readAllNotifs()">Alle gelesen</button>
-      </div>
-      ${unreadNotif.slice(0,5).map(n=>{const icon=n.type==='mention'?'&#128172;':n.type==='assigned'?'&#128100;':'&#127931;';return`<div class="notif-card unread ${n.type}" onclick="openNotif('${n.id}','${n.ticketId||''}')">
-        <div style="font-size:18px;flex-shrink:0">${icon}</div>
-        <div><div style="font-size:12px;font-weight:600">${n.title}</div><div style="font-size:10px;color:var(--mu)">${fdt(n.createdAt)}</div></div>
-      </div>`;}).join('')}
-    </div>`:''}
-    <div class="dash-grid">
-      <div class="dash-card"><h3>&#128101; Online (${online.length+1})</h3><div class="online-list">
-        <div class="online-user">${avHtml(u?.initials||'?',u?.color||'#888',22,9,true)}<span>${u?.name} (du)</span></div>
-        ${online.map(x=>`<div class="online-user">${avHtml(x.initials,x.color,22,9,true)}<span>${x.name}</span></div>`).join('')}
-        ${!online.length?'<span style="font-size:12px;color:var(--mu)">Keine anderen online</span>':''}
-      </div></div>
-      ${(()=>{// Für Standard-User: eigene Tausche (auch entschiedene ungesehene)
-      const pendingDt=(S.diensttausch||[]).filter(dt=>{
-        if(dt.isSeen)return false;
-        if(dt.isRelevant)return true;
-        if(dt.createdBy===S.currentUser)return true; // eigene
-        return false;
-      });return pendingDt.length?`
-      <div class="dash-card" style="border-top:2px solid var(--warn)">
-        <h3 style="display:flex;align-items:center;gap:8px">&#128257; Diensttausch <span class="tk-new-badge">${pendingDt.length} NEU</span></h3>
-        ${pendingDt.slice(0,5).map(dt=>{
-          const creator=getU(dt.createdBy);
-          const stBadge=dt.status==='pending'?'<span class="bdg ap-bdg-pending" style="font-size:10px">Ausstehend</span>':dt.status==='approved'?'<span class="bdg ap-bdg-approved" style="font-size:10px">&#10003;</span>':'<span class="bdg ap-bdg-rejected" style="font-size:10px">&#10007;</span>';
-          return`<div style="padding:6px 0;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:8px;cursor:pointer" onclick="markDtSeen('${dt.id}').then(()=>setView('diensttausch'))">
-            <div style="flex:1;min-width:0">
-              <div style="font-size:11px;font-weight:600">${creator?.name||'?'} <span style="color:var(--mu);font-weight:400">&middot; ${fdt(dt.createdAt)}</span></div>
-              <div style="font-size:11px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${dt.text.slice(0,80)}${dt.text.length>80?'…':''}</div>
-            </div>
-            ${stBadge}
-          </div>`;
-        }).join('')}
-        <button class="btn-s" style="width:100%;margin-top:8px;font-size:11px" onclick="setView('diensttausch')">Alle anzeigen &#8594;</button>
-      </div>`:'';})()}
-      ${myEvents.length?`<div class="dash-card">
-        <h3>&#128197; Meine Eintr&auml;ge</h3>
-        ${myEvents.map(ev=>{
-          const cat=S.categories.find(c=>c.id===ev.category);
-          const statusBadge=ev.approvalStatus==='approved'?'<span class="bdg ap-bdg-approved" style="font-size:10px">&#10003; Genehmigt</span>':
-            ev.approvalStatus==='rejected'?'<span class="bdg ap-bdg-rejected" style="font-size:10px">&#10007; Abgelehnt</span>':
-            ev.isGeneral?'':'<span class="bdg ap-bdg-pending" style="font-size:10px">&#8987; Ausstehend</span>';
-          return`<div style="padding:5px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;font-size:12px">
-            <span style="color:var(--mu);min-width:70px;flex-shrink:0">${ev.dateFrom.slice(5)}</span>
-            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${cat?cat.emoji+' ':''}<strong>${ev.reason||'—'}</strong></span>
-            ${statusBadge}
-          </div>`;
-        }).join('')}
-      </div>`:''}
-            <div class="dash-card"><h3>&#127931; Relevante Tickets (${relevantTks.length})${relevantTks.some(tkIsNew)?`<span class="tk-new-badge" style="margin-left:8px;font-size:10px">&#128276; NEU</span>`:''}</h3>
-        ${relevantTks.length?relevantTks.map(tk=>{
-          const n=tkIsNew(tk);
-          return`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);gap:8px;${n?'background:rgba(245,158,11,.04);margin:0 -8px;padding:6px 8px;border-left:3px solid var(--warn);':''}">
-            <div style="min-width:0;flex:1;cursor:pointer" onclick="openTkDetail('${tk.id}')">
-              <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${n?'<span class=\"tk-new-badge\">NEU</span> ':''}${tk.number}: ${tk.title}</div>
-              <div style="font-size:10px;color:var(--mu)">${tk.assigneeId===S.currentUser?'&#128100; Dir zugewiesen':'&#128202; '+(DEPT_LABELS[tk.department]||tk.department)}</div>
-            </div>
-            <div style="display:flex;gap:4px;align-items:center;flex-shrink:0">
-              ${prioBdg(tk.priority)}
-              ${n?`<button class="btn-ok" style="font-size:10px;padding:2px 7px;white-space:nowrap" onclick="event.stopPropagation();markTkSeen('${tk.id}')">&#10003; Gesehen</button>`:''}
-            </div>
-          </div>`;
-        }).join(''):'<div style="color:var(--mu);font-size:12px">Keine relevanten Tickets</div>'}
-      </div>
-    </div>`;
+  }).sort(function(a,b){return b.createdAt.localeCompare(a.createdAt);}).slice(0,10);
+  var importantNews=(S.news||[]).filter(function(n){return n.isImportant&&n.isActive&&!n.isExpired;});
+  var pinnedNews=(S.news||[]).filter(function(n){return n.isPinned&&n.isActive;});
+
+  var h='<div class="ph"><div class="pt">&#128196; \u00dcbersicht <span>'+(u?u.name:'')+'</span></div></div>';
+
+  // 1. Angepinnte Nachrichten
+  if(pinnedMsg.length){
+    h+='<div style="background:rgba(59,109,212,.04);border:1px solid rgba(59,109,212,.2);border-radius:var(--r);padding:14px;margin-bottom:14px">';
+    h+='<div style="font-size:13px;font-weight:700;color:var(--acc);margin-bottom:10px">&#128204; '+pinnedMsg.length+' angepinnte Nachricht'+(pinnedMsg.length>1?'en':'')+'</div>';
+    pinnedMsg.forEach(function(pm){
+      h+='<div style="padding:8px 12px;background:var(--sf);border-radius:6px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">';
+      h+='<div onclick="openMsg('+JSON.stringify(pm.id)+')" style="cursor:pointer;flex:1"><div style="font-weight:600;font-size:13px">&#128204; '+pm.title+'</div>';
+      h+='<div style="font-size:11px;color:var(--mu)">von '+(getU(pm.senderId)?.name||'?')+'</div></div>';
+      h+='<button class="btn-s" style="font-size:10px;padding:2px 8px" onclick="toggleMsgPinDirect('+JSON.stringify(pm.id)+',true)">Lospinnen</button>';
+      h+='</div>';
+    });
+    h+='</div>';
+  }
+
+  // 2. Wichtige News
+  if(importantNews.length){
+    h+='<div style="background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.2);border-radius:var(--r);padding:14px;margin-bottom:14px">';
+    h+='<div style="font-size:13px;font-weight:700;color:var(--danger);margin-bottom:10px">&#9888;&#65039; Wichtige News</div>';
+    importantNews.forEach(function(n){
+      h+='<div style="padding:6px 0;border-bottom:1px solid rgba(239,68,68,.15)">';
+      h+='<div style="font-size:13px;font-weight:700">'+escHtml(n.title)+'</div>';
+      h+='<div style="font-size:12px;color:var(--tx);white-space:pre-wrap">'+n.body.slice(0,200)+(n.body.length>200?'\u2026':'')+'</div></div>';
+    });
+    h+='<button class="btn-s" style="margin-top:8px;font-size:11px" onclick="setView(\'news\')">Alle News &#8594;</button></div>';
+  }
+
+  // 3. Angepinnte News
+  if(pinnedNews.length){
+    h+='<div style="background:rgba(59,109,212,.04);border:1px solid rgba(59,109,212,.2);border-radius:var(--r);padding:14px;margin-bottom:14px">';
+    h+='<div style="font-size:13px;font-weight:700;color:var(--acc);margin-bottom:10px">&#128204; Angepinnte News</div>';
+    pinnedNews.forEach(function(n){
+      h+='<div style="padding:5px 0;border-bottom:1px solid var(--border);cursor:pointer;font-size:12px" onclick="setView(\'news\')">&#128240; <strong>'+escHtml(n.title)+'</strong></div>';
+    });
+    h+='</div>';
+  }
+
+  // 4. Homeoffice 30 Tage
+  if(myHo.length){
+    h+='<div style="background:rgba(14,165,233,.05);border:1px solid rgba(14,165,233,.2);border-radius:var(--r);padding:12px;margin-bottom:14px;max-width:480px">';
+    h+='<div style="font-size:13px;font-weight:700;color:#0ea5e9;margin-bottom:8px">&#127968; Meine Homeoffice-Tage</div>';
+    myHo.forEach(function(s){
+      var dobj=new Date(normD(s.date)+'T00:00:00');
+      h+='<div style="padding:3px 0;font-size:12px;display:flex;gap:10px">';
+      h+='<span style="font-weight:600;min-width:200px">'+String(dobj.getDate()).padStart(2,'0')+'. '+moNs[dobj.getMonth()]+' '+dobj.getFullYear()+' ('+dyNs[dobj.getDay()]+')</span>';
+      h+='<span style="color:var(--mu)">'+(s.box||'')+(s.dienst?' \u00b7 '+s.dienst:'')+'</span></div>';
+    });
+    h+='<button class="btn-s" style="margin-top:6px;font-size:11px" onclick="setView(\'homeoffice\')">Homeoffice-Raster &#8594;</button></div>';
+  }
+
+  // 5. Ungelesene Nachrichten
+  if(unreadMsg.length){
+    h+='<div style="background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,.20);border-radius:var(--r);padding:14px;margin-bottom:14px">';
+    h+='<div style="font-size:13px;font-weight:700;color:var(--danger);margin-bottom:10px">&#128276; '+unreadMsg.length+' ungelesene Nachricht'+(unreadMsg.length>1?'en':'')+'</div>';
+    unreadMsg.forEach(function(m){
+      h+='<div style="padding:8px 12px;background:var(--sf);border-radius:6px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">';
+      h+='<div><div style="font-weight:600;font-size:13px">'+m.title+'</div>';
+      h+='<div style="font-size:11px;color:var(--mu)">von '+(getU(m.senderId)?.name||'?')+' \u00b7 '+fdt(m.createdAt)+'</div></div>';
+      h+='<button class="btn-p" onclick="openMsg('+JSON.stringify(m.id)+')">&#128279; Lesen &amp; Best\u00e4tigen</button>';
+      h+='</div>';
+    });
+    h+='</div>';
+  }
+
+  // 6. Benachrichtigungen
+  if(unreadNotif.length||eventNotifs.length||einspNotifs.length){
+    h+='<div style="background:rgba(245,158,11,.04);border:1px solid rgba(245,158,11,.2);border-radius:var(--r);padding:14px;margin-bottom:14px">';
+    h+='<div style="font-size:13px;font-weight:700;color:var(--warn);margin-bottom:8px">&#128276; Benachrichtigungen</div>';
+    unreadNotif.forEach(function(n){h+='<div style="padding:4px 0;font-size:12px;border-bottom:1px solid var(--border)">'+n.title+'</div>';});
+    eventNotifs.forEach(function(n){h+='<div style="padding:4px 0;font-size:12px;border-bottom:1px solid var(--border)">&#128197; '+n.title+'</div>';});
+    h+='</div>';
+  }
+
+  // 7. Grid: Online (voll) | Einträge + Tickets
+  h+='<div style="display:flex;flex-direction:column;gap:14px">';
+  h+='<div class="dash-card" style="max-width:100%"><h3>&#128101; Online ('+(online.length+1)+')</h3>';
+  h+='<div class="online-list" style="flex-wrap:wrap">';
+  h+='<div class="online-user">'+avHtml(u?u.initials:'?',u?u.color:'#888',22,9,true)+'<span>'+(u?u.name:'')+'<span style="color:var(--mu);font-size:10px"> (du)</span></span></div>';
+  online.forEach(function(x){h+='<div class="online-user">'+avHtml(x.initials,x.color,22,9,true)+'<span>'+x.name+'</span></div>';});
+  h+='</div></div>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">';
+  // Meine Einträge
+  h+='<div class="dash-card"><h3>&#128197; Meine Eintr\u00e4ge</h3>';
+  if(myEvents.length){
+    myEvents.forEach(function(ev){
+      var cat=S.categories.find(function(c){return c.id===ev.category;});
+      var st=ev.approvalStatus==='approved'?'<span class="bdg ap-bdg-approved" style="font-size:10px">&#10003;</span>':ev.approvalStatus==='rejected'?'<span class="bdg ap-bdg-rejected" style="font-size:10px">&#10007;</span>':ev.isGeneral?'':'<span class="bdg ap-bdg-pending" style="font-size:10px">&#8987;</span>';
+      h+='<div style="padding:4px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;font-size:12px">';
+      h+='<span style="color:var(--mu);flex-shrink:0">'+ev.dateFrom.slice(5)+'</span>';
+      h+='<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(cat?cat.emoji+' ':'')+'<strong>'+(ev.reason||'\u2014')+'</strong></span>'+st+'</div>';
+    });
+  }else{h+='<div style="color:var(--di);font-size:12px;padding:8px 0">Keine Eintr\u00e4ge</div>';}
+  h+='</div>';
+  // Relevante Tickets
+  h+='<div class="dash-card"><h3>&#127931; Relevante Tickets</h3>';
+  if(relevantTks.length){
+    relevantTks.slice(0,8).forEach(function(tk){
+      var isNew=!tk.lastViewedAt||tk.updatedAt>tk.lastViewedAt;
+      h+='<div style="padding:4px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer'+(isNew?';border-left:2px solid var(--warn);padding-left:6px':'')+'" onclick="setView(\'tickets\')">';
+      h+='<span class="tk-num" style="flex-shrink:0">'+tk.number+'</span>';
+      h+='<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+tk.title+'</span>';
+      if(isNew)h+='<span class="tk-new-badge">NEU</span>';
+      h+='</div>';
+    });
+    if(relevantTks.length>8)h+='<div style="font-size:11px;color:var(--mu);padding:4px 0">+'+( relevantTks.length-8)+' weitere</div>';
+  }else{h+='<div style="color:var(--di);font-size:12px;padding:8px 0">Keine Tickets</div>';}
+  h+='</div>';
+  h+='</div></div>';
+  document.getElementById('main').innerHTML=h;
 }
 async function confirmEventNotif(notifId){try{await api('POST','/notifications/'+notifId+'/read');await fetchData();renderHome();}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}}
 
@@ -2194,15 +2195,76 @@ function renderDiensttausch() {
       <div class="tt"><h2>Neuer Diensttausch</h2></div>
       <div style="padding:14px">
         <div style="margin-bottom:8px;font-size:12px;color:var(--mu)">Beschreibe den gewünschten Tausch. Mit @Name kannst du Kollegen markieren.</div>
-        <textarea id="dtText" rows="4" style="width:100%;box-sizing:border-box;resize:vertical;font-size:13px;border:1px solid var(--border);border-radius:var(--r);padding:8px;background:var(--sf);color:var(--tx)" placeholder="Tauschdetails angeben... (@Name für Kollegen markieren)"></textarea>
+        <div style="position:relative">
+          <textarea id="dtText" rows="4" style="width:100%;box-sizing:border-box;resize:vertical;font-size:13px;border:1px solid var(--border);border-radius:var(--r);padding:8px;background:var(--sf);color:var(--tx)" placeholder="Tauschdetails angeben... (@Name für Kollegen markieren)" oninput="dtMentionInput(this)" onkeydown="dtMentionKey(event)"></textarea>
+          <div id="dtMentionBox" style="display:none;position:absolute;bottom:100%;left:0;background:var(--sf);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--sh);z-index:100;min-width:180px;max-height:180px;overflow-y:auto;margin-bottom:2px"></div>
+        </div>
         <button class="btn-p" style="margin-top:8px" onclick="createDt()">&#128257; Eintragen</button>
       </div>
     </div>
     ${list.length?`<div class="tw">
-      <div class="tt"><h2>Alle Einträge (${list.length})</h2></div>
+      <div class="tt"><h2>Aktuelle Einträge (${list.length})</h2></div>
       ${list.map(dtRow).join('')}
-    </div>`:'<div class="empty">Noch keine Diensttausch-Einträge</div>'}`;
+    </div>`:`<div class="empty" style="padding:14px">Noch keine Einträge diesen Monat</div>`}
+    ${(function(){
+      var keys=Object.keys(archiveGroups).sort().reverse();
+      if(!keys.length)return '';
+      var mos=['','Jänner','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+      return keys.map(function(key){
+        var p=key.split('-'),label=mos[parseInt(p[1])]+' '+p[0];
+        var rows=archiveGroups[key].map(dtRow).join('');
+        return '<div class="tw" style="margin-top:10px"><div class="tt"><h2>&#128450; Archiv: '+label+' ('+archiveGroups[key].length+')</h2></div>'
+          +'<details><summary style="padding:8px 14px;cursor:pointer;color:var(--mu);font-size:12px">Einträge anzeigen</summary>'+rows+'</details></div>';
+      }).join('');
+    })()}`;
 }
+
+// ── DT @-Mention Autocomplete ──
+var _dtMentionAt = -1;
+function dtMentionInput(ta) {
+  var val=ta.value, pos=ta.selectionStart;
+  var before=val.slice(0,pos);
+  var atIdx=before.lastIndexOf('@');
+  var box=document.getElementById('dtMentionBox');
+  if(atIdx<0){box.style.display='none';_dtMentionAt=-1;return;}
+  var query=before.slice(atIdx+1);
+  if(query.includes(' ')&&query.length>0){box.style.display='none';_dtMentionAt=-1;return;}
+  _dtMentionAt=atIdx;
+  var q2=query.toLowerCase();
+  var matches=(S.users||[]).filter(function(u){return u.name.toLowerCase().startsWith(q2)&&u.id!==S.currentUser;}).slice(0,8);
+  if(!matches.length){box.style.display='none';return;}
+  box.innerHTML=matches.map(function(u,i){
+    return '<div class="mention-item'+(i===0?' active':'')+'" data-name="'+u.name+'" onclick="dtPickMention('+JSON.stringify(u.name)+')">'+
+      '<span style="background:'+(u.color||'var(--acc)')+';color:#fff;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0">'+u.initials+'</span>'+
+      '<span>'+u.name+'</span></div>';
+  }).join('');
+  box.style.display='block';
+}
+function dtPickMention(name) {
+  var ta=document.getElementById('dtText');
+  if(!ta)return;
+  var val=ta.value, pos=ta.selectionStart;
+  var before=val.slice(0,_dtMentionAt);
+  var after=val.slice(pos);
+  ta.value=before+'@'+name+' '+after;
+  var np=before.length+name.length+2;
+  ta.focus();ta.setSelectionRange(np,np);
+  var box=document.getElementById('dtMentionBox');
+  if(box)box.style.display='none';
+  _dtMentionAt=-1;
+}
+function dtMentionKey(e) {
+  var box=document.getElementById('dtMentionBox');
+  if(!box||box.style.display==='none')return;
+  var items=box.querySelectorAll('.mention-item');
+  var active=box.querySelector('.mention-item.active');
+  var idx=Array.from(items).indexOf(active);
+  if(e.key==='ArrowDown'){e.preventDefault();items[idx]&&items[idx].classList.remove('active');items[Math.min(idx+1,items.length-1)]&&items[Math.min(idx+1,items.length-1)].classList.add('active');}
+  else if(e.key==='ArrowUp'){e.preventDefault();items[idx]&&items[idx].classList.remove('active');items[Math.max(idx-1,0)]&&items[Math.max(idx-1,0)].classList.add('active');}
+  else if(e.key==='Enter'||e.key==='Tab'){var act=box.querySelector('.mention-item.active');if(act){e.preventDefault();dtPickMention(act.dataset.name);}}
+  else if(e.key==='Escape'){box.style.display='none';}
+}
+
 
 async function createDt() {
   const text = document.getElementById('dtText')?.value?.trim();
@@ -3373,7 +3435,7 @@ function renderVacation() {
       var countColor=day.vacEntries.length===0?'var(--di)':full?'var(--danger)':'var(--warn)';
       var users=day.vacEntries.map(function(ev){var u=getU(ev.userId);return u?'<span style="background:'+(u.color||'var(--acc)')+'22;color:'+(u.color||'var(--acc)')+';border-radius:4px;padding:1px 6px;font-size:11px;font-weight:600;margin-right:3px" title="'+u.name+'">'+u.initials+'</span>':'';}).join('');
       return '<tr style="background:'+bg+(full?';border-left:3px solid var(--danger)':'')+'">'+
-        '<td style="white-space:nowrap;font-size:12px">'+(day.isWe?'<span style="color:var(--mu)">':'')+pad(day.day)+'. '+moName+' ('+day.dayName+')'+(day.isWe?'</span>':'')+'</td>'+
+        '<td style="white-space:nowrap;font-size:12px">'+(day.isWe?'<span style="color:var(--mu)">':'')+pad(day.day)+'. '+moName+' '+year+' ('+dayNamesLong[day.dow]+')'+(day.isWe?'</span>':'')+'</td>'+
         '<td style="text-align:center"><span style="font-weight:700;color:'+countColor+'">'+day.vacEntries.length+'/'+day.maxS+'</span></td>'+
         '<td>'+(users||'<span style="color:var(--di);font-size:11px">—</span>')+(day.note?'<div style="font-size:10px;color:var(--mu);font-style:italic">'+escHtml(day.note)+'</div>':'')+'</td>'+
         (canManage?'<td><div style="display:flex;gap:4px;align-items:center">'+
