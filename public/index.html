@@ -2018,6 +2018,16 @@ function renderDiensttausch() {
       </div>
     </div>`;
   }
+  // Archiv HTML (dtRow ist hier bereits definiert)
+  var dtArchiveHtml='';
+  if(Object.keys(archiveGroups).length){
+    var _moAr=['Jänner','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+    dtArchiveHtml=Object.keys(archiveGroups).sort().reverse().map(function(k){
+      var p2=k.split('-'),lbl=_moAr[parseInt(p2[1])-1]+' '+p2[0];
+      return '<div class="tw" style="margin-top:10px"><div class="tt"><h2>&#128450; Archiv: '+lbl+' ('+archiveGroups[k].length+')</h2></div>'
+        +'<details><summary style="padding:8px 14px;cursor:pointer;color:var(--mu);font-size:12px">Eintr&auml;ge anzeigen</summary>'+archiveGroups[k].map(dtRow).join('')+'</details></div>';
+    }).join('');
+  }
   document.getElementById('main').innerHTML = `
     <div class="ph"><div class="pt">&#128257; Diensttausch</div></div>
     <div class="tw" style="margin-bottom:14px">
