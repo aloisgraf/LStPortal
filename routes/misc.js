@@ -166,7 +166,11 @@ router.post('/users', auth, adminOnly, async (req,res) => {
     ok(res,{id});
   } catch(e) { bad(res,e.message,500); }
 });
-router.put('/users/:id', auth, adminOnly, async (req,res) => {
+router.put('/users/:id', auth, async (req,res) => {
+  // Allow user to update own color only; full edit requires admin
+  const isSelf = req.params.id === req.uid;
+  const colorOnly = isSelf && Object.keys(req.body).every(k=>k==='color');
+  if(!colorOnly && !req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
   try {
     const {name,initials,roles,color,resetPassword}=req.body;
     if (!name?.trim()||!initials?.trim()) return bad(res,'Name und Kürzel erforderlich');
