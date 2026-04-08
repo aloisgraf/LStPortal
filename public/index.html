@@ -245,6 +245,11 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
 .dt-row:hover{background:var(--sf2)}
 .dt-row-new{border-left:3px solid var(--warn);background:rgba(245,158,11,.04)}
 .dt-row-new:hover{background:rgba(245,158,11,.08)}
+
+.dash-card details > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
+.dash-card details > summary::-webkit-details-marker { display: none; }
+.dash-card details > summary::after { content: '\25BC'; font-size: 10px; color: var(--mu); margin-left: 8px; transition: transform .2s; }
+.dash-card details[open] > summary::after { transform: rotate(-180deg); }
 </style>
 </head>
 <body>
@@ -295,7 +300,7 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
   <div class="ibw">
     <div class="notif-dot" id="notifDot" style="display:none"></div>
   </div>
-  <div class="upill" onclick="openModal('pwModal');setTimeout(initMyColorPicker,50)">
+  <div class="upill" onclick="openModal('pwModal')">
     <div class="pav" id="pillAv"></div><span id="pillNm">&#8212;</span>
   </div>
   <button class="ib2" onclick="logout()" title="Abmelden">&#9211;</button>
@@ -357,11 +362,6 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
   <div class="modal sm">
     <div class="mh"><h2>&#128272; Passwort &#228;ndern</h2><button class="mc" onclick="closeModal('pwModal')">&#10005;</button></div>
     <div class="mb2">
-      <div class="fg" style="margin-bottom:12px"><label>&#127912; Meine Farbe</label>
-        <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
-          <input type="color" id="myColorPicker" style="width:40px;height:32px;padding:1px;border:1px solid var(--border);border-radius:var(--r);cursor:pointer">
-          <button class="btn-s" style="font-size:12px" onclick="saveMyColor()">&#128190; Farbe speichern</button>
-        </div></div>
       <div class="fg"><label>Aktuelles Passwort</label><div class="pw-w"><input type="password" id="cpw0"><button class="eye" onclick="eyeToggle('cpw0',this)">&#128065;</button></div></div>
       <div class="fg"><label>Neues Passwort</label><div class="pw-w"><input type="password" id="cpw1"><button class="eye" onclick="eyeToggle('cpw1',this)">&#128065;</button></div></div>
       <div class="fg"><label>Best&#228;tigen</label><div class="pw-w"><input type="password" id="cpw2"><button class="eye" onclick="eyeToggle('cpw2',this)">&#128065;</button></div></div>
@@ -1367,7 +1367,18 @@ function showHelpSection(id){
     <div class="mh"><h2>&#128203; Changelog</h2><button class="mc" onclick="closeModal('changelogOv')">&#10005;</button></div>
     <div class="mb2" style="gap:10px">
       <div style="padding:12px;background:rgba(59,109,212,0.06));border:1px solid rgba(59,109,212,.20);border-radius:8px">
-        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.0.8</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.2.3</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
+        <ul style="font-size:12px;line-height:1.8;padding-left:18px">
+          <li>Datumsformat in &Uuml;bersicht: 06.07.2026 statt 07-06</li>
+          <li>Wichtige aktive News werden allen Mitarbeitern in der &Uuml;bersicht angezeigt</li>
+          <li>Online-Kachel ein-/ausklappbar (Einstellung gespeichert)</li>
+          <li>Homeoffice- und Urlaubstage in der &Uuml;bersicht</li>
+          <li>Pers&ouml;nliche Farbe &auml;ndern (Passwort-Modal)</li>
+          <li>Diensttausch Archiv (Vormonat-Eintr&auml;ge aufklappbar)</li>
+        </ul>
+      </div>
+      <div style="padding:12px;background:rgba(59,109,212,0.06));border:1px solid rgba(59,109,212,.20);border-radius:8px">
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--sf3);color:var(--mu);padding:2px 8px;border-radius:4px">v2.0.8</span></div>
         <ul style="font-size:12px;line-height:1.8;padding-left:18px">
           <li>Kompletter Code-Review: logAct zentralisiert in db.js</li>
           <li>Benutzerhandbuch: 5 neue Module dokumentiert</li>
@@ -1449,7 +1460,7 @@ function showHelpSection(id){
 </div>
 
 <script>
-const APP_VERSION='2.2.2';
+const APP_VERSION='2.2.3';
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
@@ -1521,6 +1532,13 @@ const getTk=id=>S.tickets.find(t=>t.id===id);
 const getAllw=(uid,year,month)=>S.allowances.find(a=>a.userId===uid&&a.year===year&&a.month===month)||{nd:0,fd:0,fw:0,c10:0};
 const getRoleDef=r=>ROLES.find(x=>x.id===r)||ROLES[6];
 const fd=s=>{if(!s)return'\u2014';const p=s.split('T')[0].split('-');return`${p[2]}.${p[1]}.${p[0]}`;};
+
+function fmtDateShort(s) {
+  if(!s) return '';
+  var p = String(s).slice(0,10).split('-');
+  if(p.length < 3) return s;
+  return p[2]+'.'+p[1]+'.'+p[0];
+}
 const fdt=s=>{if(!s)return'\u2014';const d=new Date(s);if(isNaN(d))return String(s||'');if(typeof s==='string'&&s.length<=10)return fd(s);return`${fd(d.toISOString())} ${d.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'})}`;};
 const avHtml=(init,color,sz=24,fs=10,online=false)=>`<div class="av" style="width:${sz}px;height:${sz}px;font-size:${fs}px;background:${color}22;color:${color}">${init}${online?'<div class="online-dot"></div>':''}</div>`;
 const roleBadges=uid=>((getU(uid)?.roles)||['standard']).map(r=>{const d=getRoleDef(r);return`<span class="rb rb-${r}">${d.icon} ${d.label}</span>`;}).join('');
@@ -1721,9 +1739,23 @@ function renderHome(){
       vacHtml='<div style="background:rgba(16,185,129,.05);border:1px solid rgba(16,185,129,.2);border-radius:var(--r);padding:14px;margin-bottom:14px">';
       vacHtml+='<div style="font-size:13px;font-weight:700;color:var(--ok);margin-bottom:10px">&#127958;&#65039; Meine Urlaube (n\u00e4chste 90 Tage)</div>';
       vacHtml+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px">';
-      myVac.forEach(function(ev){var cat=_vacCats.find(function(c){return c.id===ev.category;});var st=ev.approvalStatus==='approved'?'<span class="bdg ap-bdg-approved" style="font-size:10px">&#10003; Genehmigt</span>':ev.approvalStatus==='rejected'?'<span class="bdg ap-bdg-rejected" style="font-size:10px">&#10007; Abgelehnt</span>':'<span class="bdg ap-bdg-pending" style="font-size:10px">&#8987; Ausstehend</span>';vacHtml+='<div style="background:var(--sf);border:1px solid var(--border);border-radius:var(--r);padding:10px;border-left:3px solid '+(cat&&cat.color||'var(--ok)')+'"><div style="font-size:12px;font-weight:700">'+ev.dateFrom.slice(5)+' – '+ev.dateTo.slice(5)+'</div><div style="font-size:11px;color:var(--mu)">'+(ev.reason||'Urlaub')+'</div>'+st+'</div>';});
+      myVac.forEach(function(ev){var cat=_vacCats.find(function(c){return c.id===ev.category;});var st=ev.approvalStatus==='approved'?'<span class="bdg ap-bdg-approved" style="font-size:10px">&#10003; Genehmigt</span>':ev.approvalStatus==='rejected'?'<span class="bdg ap-bdg-rejected" style="font-size:10px">&#10007; Abgelehnt</span>':'<span class="bdg ap-bdg-pending" style="font-size:10px">&#8987; Ausstehend</span>';vacHtml+='<div style="background:var(--sf);border:1px solid var(--border);border-radius:var(--r);padding:10px;border-left:3px solid '+(cat&&cat.color||'var(--ok)')+'"><div style="font-size:12px;font-weight:700">'+fmtDateShort(ev.dateFrom)+' – '+fmtDateShort(ev.dateTo)+'</div><div style="font-size:11px;color:var(--mu)">'+(ev.reason||'Urlaub')+'</div>'+st+'</div>';});
       vacHtml+='</div><button class="btn-s" style="margin-top:8px;font-size:11px" onclick="setView(\'vacation\')">Urlaubsübersicht &#8594;</button></div>';
     }
+  }
+    // Wichtige aktive News
+  var importantNewsHtml='';
+  var _impNews=(S.news||[]).filter(function(n){return n.isImportant&&n.isActive&&!n.isExpired;});
+  if(_impNews.length){
+    importantNewsHtml='<div style="background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.2);border-radius:var(--r);padding:14px;margin-bottom:14px">';
+    importantNewsHtml+='<div style="font-size:13px;font-weight:700;color:var(--danger);margin-bottom:8px">&#9888;&#65039; Wichtige News</div>';
+    _impNews.forEach(function(n){
+      importantNewsHtml+='<div style="padding:6px 0;border-bottom:1px solid rgba(239,68,68,.12)">';
+      importantNewsHtml+='<div style="font-size:13px;font-weight:700">'+escHtml(n.title)+'</div>';
+      importantNewsHtml+='<div style="font-size:12px;line-height:1.5;color:var(--tx)">'+n.body.slice(0,300)+(n.body.length>300?'…':'')+'</div>';
+      importantNewsHtml+='</div>';
+    });
+    importantNewsHtml+='<button class="btn-s" style="margin-top:8px;font-size:11px" onclick="setView(\x27news\x27)">Alle News &#8594;</button></div>';
   }
     document.getElementById('main').innerHTML=`
     <div class="ph"><div class="pt">&#128196; \u00dcbersicht <span>${u?.name||''}</span></div></div>
@@ -1766,21 +1798,36 @@ function renderHome(){
       </div>`;}).join('')}
     </div>`:''}
 
-    ${hoHtml}${vacHtml}
-    <div style="display:flex;flex-direction:column;gap:14px">
-      <div class="dash-card" style="width:100%;box-sizing:border-box">
-        <h3>&#128101; Online (${online.length+1})</h3>
-        <div class="online-list" style="flex-wrap:wrap">
-          <div class="online-user">${avHtml(u?.initials||'?',u?.color||'#888',22,9,true)}<span>${u?.name} (du)</span></div>
-          ${online.map(x=>`<div class="online-user">${avHtml(x.initials,x.color,22,9,true)}<span>${x.name}</span></div>`).join('')}
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-        <div class="dash-card">
-          <h3>&#128197; Meine Eintr&auml;ge</h3>
-          ${(()=>{const myEvs=S.events.filter(ev=>!ev.isGeneral&&ev.userId===S.currentUser).sort((a,b)=>a.dateFrom.localeCompare(b.dateFrom)).slice(0,8);if(!myEvs.length)return'<div style="color:var(--di);font-size:12px;padding:4px 0">Keine Einträge</div>';return myEvs.map(ev=>{const cat=S.categories.find(c=>c.id===ev.category);const st=ev.approvalStatus==='approved'?'<span class="bdg ap-bdg-approved" style="font-size:10px">✓</span>':ev.approvalStatus==='rejected'?'<span class="bdg ap-bdg-rejected" style="font-size:10px">✗</span>':ev.isGeneral?'':'<span class="bdg ap-bdg-pending" style="font-size:10px">⌛</span>';return`<div style="padding:4px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;font-size:12px"><span style="color:var(--mu);flex-shrink:0;min-width:42px">${ev.dateFrom.slice(5)}</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${cat?cat.emoji+' ':''}<strong>${ev.reason||'—'}</strong></span>${st}</div>`;}).join('');})()}
-        </div>
-        <div class="dash-card"><h3>&#127931; Relevante Tickets (${relevantTks.length})${relevantTks.some(tkIsNew)?`<span class="tk-new-badge" style="margin-left:8px;font-size:10px">&#128276; NEU</span>`:''}</h3>
+    ${importantNewsHtml}${hoHtml}${vacHtml}
+    <div class="dash-grid">
+      <div class="dash-card"><details data-cc-id="online" open><summary><h3 style="margin:0">&#128101; Online (${online.length+1})</h3></summary><div class="online-list">
+        <div class="online-user">${avHtml(u?.initials||'?',u?.color||'#888',22,9,true)}<span>${u?.name} (du)</span></div>
+        ${online.map(x=>`<div class="online-user">${avHtml(x.initials,x.color,22,9,true)}<span>${x.name}</span></div>`).join('')}
+        ${!online.length?'<span style="font-size:12px;color:var(--mu)">Keine anderen online</span>':''}
+      </div></div>
+      ${(()=>{// Für Standard-User: eigene Tausche (auch entschiedene ungesehene)
+      const pendingDt=(S.diensttausch||[]).filter(dt=>{
+        if(dt.isSeen)return false;
+        if(dt.isRelevant)return true;
+        if(dt.createdBy===S.currentUser)return true; // eigene
+        return false;
+      });return pendingDt.length?`
+      <div class="dash-card" style="border-top:2px solid var(--warn)">
+        <h3 style="display:flex;align-items:center;gap:8px">&#128257; Diensttausch <span class="tk-new-badge">${pendingDt.length} NEU</span></h3>
+        ${pendingDt.slice(0,5).map(dt=>{
+          const creator=getU(dt.createdBy);
+          const stBadge=dt.status==='pending'?'<span class="bdg ap-bdg-pending" style="font-size:10px">Ausstehend</span>':dt.status==='approved'?'<span class="bdg ap-bdg-approved" style="font-size:10px">&#10003;</span>':'<span class="bdg ap-bdg-rejected" style="font-size:10px">&#10007;</span>';
+          return`<div style="padding:6px 0;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:8px;cursor:pointer" onclick="markDtSeen('${dt.id}').then(()=>setView('diensttausch'))">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:11px;font-weight:600">${creator?.name||'?'} <span style="color:var(--mu);font-weight:400">&middot; ${fdt(dt.createdAt)}</span></div>
+              <div style="font-size:11px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${dt.text.slice(0,80)}${dt.text.length>80?'…':''}</div>
+            </div>
+            ${stBadge}
+          </div>`;
+        }).join('')}
+        <button class="btn-s" style="width:100%;margin-top:8px;font-size:11px" onclick="setView('diensttausch')">Alle anzeigen &#8594;</button>
+      </div>`:'';})()}
+            <div class="dash-card"><h3>&#127931; Relevante Tickets (${relevantTks.length})${relevantTks.some(tkIsNew)?`<span class="tk-new-badge" style="margin-left:8px;font-size:10px">&#128276; NEU</span>`:''}</h3>
         ${relevantTks.length?relevantTks.map(tk=>{
           const n=tkIsNew(tk);
           return`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);gap:8px;${n?'background:rgba(245,158,11,.04);margin:0 -8px;padding:6px 8px;border-left:3px solid var(--warn);':''}">
@@ -1794,7 +1841,6 @@ function renderHome(){
             </div>
           </div>`;
         }).join(''):'<div style="color:var(--mu);font-size:12px">Keine relevanten Tickets</div>'}
-      </div>
       </div>
     </div>`;
 }
@@ -1989,11 +2035,7 @@ function renderCalendar(){
 // ══════════════════════════════════════════
 function renderDiensttausch() {
   const canDecide = S.p.canApproveEvents;
-  const _now=new Date(),_thisMonthKey=_now.getFullYear()+'-'+String(_now.getMonth()+1).padStart(2,'0');
-  const list=(S.diensttausch||[]).filter(dt=>!dt.createdAt||dt.createdAt.slice(0,7)>=_thisMonthKey);
-  const _archRaw=(S.diensttausch||[]).filter(dt=>dt.createdAt&&dt.createdAt.slice(0,7)<_thisMonthKey);
-  const archiveGroups={};
-  _archRaw.forEach(dt=>{const k=dt.createdAt.slice(0,7);if(!archiveGroups[k])archiveGroups[k]=[];archiveGroups[k].push(dt);});
+  const list = S.diensttausch;
   // Sichtbarkeit wird server-seitig gefiltert (data.js)
   // Ungesehen hervorheben
   function dtRow(dt) {
@@ -2029,16 +2071,6 @@ function renderDiensttausch() {
       </div>
     </div>`;
   }
-  // Archiv HTML (dtRow ist hier bereits definiert)
-  var dtArchiveHtml='';
-  if(Object.keys(archiveGroups).length){
-    var _moAr=['Jänner','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
-    dtArchiveHtml=Object.keys(archiveGroups).sort().reverse().map(function(k){
-      var p2=k.split('-'),lbl=_moAr[parseInt(p2[1])-1]+' '+p2[0];
-      return '<div class="tw" style="margin-top:10px"><div class="tt"><h2>&#128450; Archiv: '+lbl+' ('+archiveGroups[k].length+')</h2></div>'
-        +'<details><summary style="padding:8px 14px;cursor:pointer;color:var(--mu);font-size:12px">Eintr&auml;ge anzeigen</summary>'+archiveGroups[k].map(dtRow).join('')+'</details></div>';
-    }).join('');
-  }
   document.getElementById('main').innerHTML = `
     <div class="ph"><div class="pt">&#128257; Diensttausch</div></div>
     <div class="tw" style="margin-bottom:14px">
@@ -2053,10 +2085,9 @@ function renderDiensttausch() {
       </div>
     </div>
     ${list.length?`<div class="tw">
-      <div class="tt"><h2>Aktuelle Eintr&auml;ge (${list.length})</h2></div>
+      <div class="tt"><h2>Alle Einträge (${list.length})</h2></div>
       ${list.map(dtRow).join('')}
-    </div>`:`<div class="empty" style="padding:14px;color:var(--mu)">Noch keine Einträge diesen Monat</div>`}
-    ${dtArchiveHtml}`;
+    </div>`:'<div class="empty">Noch keine Diensttausch-Einträge</div>'}`;
 }
 
 async function createDt() {
@@ -2890,9 +2921,7 @@ function startAutoRefresh(){
       S.users=data.users||[];S.events=data.events||[];S.tickets=data.tickets||[];
       S.messages=data.messages||[];S.notifications=data.notifications||[];
       S.allowances=data.allowances||[];S.checklists=data.checklists||[];
-      S.abrechnung=data.abrechnung||{einspringer:[],homeoffice:[]};S.dienstplaene=data.dienstplaene||[];
-      S.diensttausch=data.diensttausch||[];S.homeoffice=data.homeoffice||{slots:[],config:[],boxes:[],dienste:[]};
-      S.vacationConfig=data.vacationConfig||[];loadNews();S.diensttausch=data.diensttausch||[];
+      S.abrechnung=data.abrechnung||{einspringer:[],homeoffice:[]};S.dienstplaene=data.dienstplaene||[];S.diensttausch=data.diensttausch||[];S.homeoffice=data.homeoffice||{slots:[],config:[],boxes:[],dienste:[]};S.vacationConfig=data.vacationConfig||[];S.diensttausch=data.diensttausch||[];
       updateBadges();
       if(_lastMsgCount>=0&&newMsgCount>_lastMsgCount)toast('\uD83D\uDCEC Neue Nachricht eingegangen!');
       if(_lastTkCount>=0&&newTkCount>_lastTkCount)toast('\uD83C\uDFAB Neues Ticket in deinem Bereich!');
@@ -3129,7 +3158,7 @@ function renderVacation(){
   if(myVac.length){
     h+='<div class="tw" style="margin-bottom:14px"><div class="tt"><h2>&#128197; Meine Urlaube (90 Tage)</h2></div>';
     h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;padding:12px">';
-    myVac.forEach(function(ev){var cat=S.categories.find(function(c){return c.id===ev.category;});var st=ev.approvalStatus==='approved'?'<span class="bdg ap-bdg-approved" style="font-size:10px">&#10003;</span>':ev.approvalStatus==='rejected'?'<span class="bdg ap-bdg-rejected" style="font-size:10px">&#10007;</span>':'<span class="bdg ap-bdg-pending" style="font-size:10px">&#8987;</span>';h+='<div style="background:var(--sf);border:1px solid var(--border);border-radius:var(--r);padding:10px;border-left:3px solid '+(cat&&cat.color||'var(--ok)')+'"><div style="font-size:12px;font-weight:700">'+ev.dateFrom.slice(5)+' – '+ev.dateTo.slice(5)+'</div><div style="font-size:11px;color:var(--mu)">'+(ev.reason||'Urlaub')+'</div>'+st+'</div>';});
+    myVac.forEach(function(ev){var cat=S.categories.find(function(c){return c.id===ev.category;});var st=ev.approvalStatus==='approved'?'<span class="bdg ap-bdg-approved" style="font-size:10px">&#10003;</span>':ev.approvalStatus==='rejected'?'<span class="bdg ap-bdg-rejected" style="font-size:10px">&#10007;</span>':'<span class="bdg ap-bdg-pending" style="font-size:10px">&#8987;</span>';h+='<div style="background:var(--sf);border:1px solid var(--border);border-radius:var(--r);padding:10px;border-left:3px solid '+(cat&&cat.color||'var(--ok)')+'"><div style="font-size:12px;font-weight:700">'+fmtDateShort(ev.dateFrom)+' – '+fmtDateShort(ev.dateTo)+'</div><div style="font-size:11px;color:var(--mu)">'+(ev.reason||'Urlaub')+'</div>'+st+'</div>';});
     h+='</div></div>';
   }
   h+='<div class="tw"><div class="tt"><h2>&#128197; '+moName+' '+year+'</h2></div><div style="overflow-x:auto"><table><thead><tr>';
@@ -3152,16 +3181,20 @@ function renderVacation(){
 async function vacSaveConfig(date){var maxSlots=parseInt(document.getElementById('vacMax_'+date)?.value??8);var note=document.getElementById('vacNote_'+date)?.value||'';try{await api('PUT','/vacation/config',{date:date,maxSlots:maxSlots,note:note});await fetchData();renderVacation();toast('✓ Gespeichert.');}catch(e){toast('⚠️ '+e.message,'err');}}
 
 
-async function saveMyColor() {
-  const color = document.getElementById('myColorPicker')?.value;
-  if (!color) return;
-  try { await api('PUT','/users/'+S.currentUser,{color}); await fetchData(); toast('\u2705 Farbe gespeichert!'); }
-  catch(e) { toast('\u26A0\uFE0F '+e.message,'err'); }
-}
-function initMyColorPicker() {
-  const u=getU(S.currentUser);
-  const p=document.getElementById('myColorPicker');
-  if(p&&u) p.value=u.color||'#3b6dd4';
+// Persistent collapsible cards via <details>
+document.addEventListener('toggle', function(e) {
+  if(e.target.tagName === 'DETAILS' && e.target.dataset.ccId) {
+    try { localStorage.setItem('cc_'+e.target.dataset.ccId, e.target.open ? '1' : '0'); } catch(ex) {}
+  }
+}, true);
+function initPersistCards() {
+  document.querySelectorAll('details[data-cc-id]').forEach(function(d) {
+    try {
+      var v = localStorage.getItem('cc_'+d.dataset.ccId);
+      if(v === '0') d.removeAttribute('open');
+      else d.setAttribute('open','');
+    } catch(ex) {}
+  });
 }
 
 // BOOT
