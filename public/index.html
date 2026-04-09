@@ -246,7 +246,7 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
 .dt-row-new{border-left:3px solid var(--warn);background:rgba(245,158,11,.04)}
 .dt-row-new:hover{background:rgba(245,158,11,.08)}
 
-.dash-card details > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
+details.dash-card > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding: 4px 0; }
 .dash-card details > summary::-webkit-details-marker { display: none; }
 .dash-card details > summary::after { content: '\25BC'; font-size: 10px; color: var(--mu); margin-left: 8px; transition: transform .2s; }
 .dash-card details[open] > summary::after { transform: rotate(-180deg); }
@@ -1757,6 +1757,56 @@ function renderHome(){
     });
     importantNewsHtml+='<button class="btn-s" style="margin-top:8px;font-size:11px" onclick="setView(\x27news\x27)">Alle News &#8594;</button></div>';
   }
+  
+  // ── Precompute card HTML (avoids template literal nesting issues) ──
+  function _ccWrap(id,title,bodyHtml){
+    var open;
+    try{open=localStorage.getItem('cc_'+id);open=open===null?true:open==='1';}catch(ex){open=true;}
+    return '<details class="dash-card" data-cc-id="'+id+'"'+(open?' open':'')+' style="width:100%;box-sizing:border-box">'
+      +'<summary><h3 style="margin:0;display:inline">'+title+'</h3></summary>'
+      +bodyHtml+'</details>';
+  }
+
+  // Online
+  var _onlineHtml='<div class="online-list" style="flex-wrap:wrap;padding-top:8px">';
+  _onlineHtml+='<div class="online-user">'+avHtml(u?u.initials:'?',u?u.color:'#888',22,9,true)+'<span>'+(u?u.name:'')+'<span style="color:var(--mu);font-size:10px"> (du)</span></span></div>';
+  online.forEach(function(x){_onlineHtml+='<div class="online-user">'+avHtml(x.initials,x.color,22,9,true)+'<span>'+x.name+'</span></div>';});
+  _onlineHtml+='</div>';
+
+  // Meine Einträge
+  var _myEntriesHtml='';
+  var _myEvs=S.events.filter(function(ev){return !ev.isGeneral&&ev.userId===S.currentUser;}).sort(function(a,b){return a.dateFrom.localeCompare(b.dateFrom);}).slice(0,8);
+  if(_myEvs.length){
+    _myEvs.forEach(function(ev){
+      var cat=S.categories.find(function(c){return c.id===ev.category;});
+      var st=ev.approvalStatus==='approved'?'<span class="bdg ap-bdg-approved" style="font-size:10px">&#10003;</span>':ev.approvalStatus==='rejected'?'<span class="bdg ap-bdg-rejected" style="font-size:10px">&#10007;</span>':ev.isGeneral?'':'<span class="bdg ap-bdg-pending" style="font-size:10px">&#8987;</span>';
+      _myEntriesHtml+='<div style="padding:4px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;font-size:12px">';
+      _myEntriesHtml+='<span style="color:var(--mu);flex-shrink:0;min-width:72px">'+fmtDateShort(ev.dateFrom)+'</span>';
+      _myEntriesHtml+='<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(cat?cat.emoji+' ':'')+'<strong>'+(ev.reason||'\u2014')+'</strong></span>'+st+'</div>';
+    });
+  } else {
+    _myEntriesHtml='<div style="color:var(--di);font-size:12px;padding:8px 0">Keine Eintr\u00e4ge</div>';
+  }
+
+  // Relevante Tickets
+  var _ticketsHtml='';
+  if(relevantTks.length){
+    var _hasNew=relevantTks.some(tkIsNew);
+    _ticketsHtml+=(_hasNew?'<div style="font-size:11px;color:var(--warn);font-weight:600;margin-bottom:4px">&#128276; '+relevantTks.filter(tkIsNew).length+' neue Eintr\u00e4ge</div>':'');
+    relevantTks.forEach(function(tk){
+      var n=tkIsNew(tk);
+      _ticketsHtml+='<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);gap:8px;'+(n?'background:rgba(245,158,11,.04);margin:0 -8px;padding:5px 8px;border-left:3px solid var(--warn);':'')+'">';
+      _ticketsHtml+='<div style="min-width:0;flex:1;cursor:pointer" onclick="openTkDetail(\''+tk.id+'\')">';
+      _ticketsHtml+='<div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(n?'<span class="tk-new-badge">NEU</span> ':'')+tk.number+': '+tk.title+'</div>';
+      _ticketsHtml+='<div style="font-size:10px;color:var(--mu)">'+(tk.assigneeId===S.currentUser?'&#128100; Dir zugewiesen':'&#128202; '+(DEPT_LABELS[tk.department]||tk.department))+'</div>';
+      _ticketsHtml+='</div>';
+      _ticketsHtml+='<div style="display:flex;gap:4px;align-items:center;flex-shrink:0">'+prioBdg(tk.priority);
+      if(n)_ticketsHtml+='<button class="btn-ok" style="font-size:10px;padding:2px 7px;white-space:nowrap" onclick="event.stopPropagation();markTkSeen('+JSON.stringify(tk.id)+')">&#10003; Gesehen</button>';
+      _ticketsHtml+='</div></div>';
+    });
+  } else {
+    _ticketsHtml='<div style="color:var(--mu);font-size:12px">Keine relevanten Tickets</div>';
+  }
     document.getElementById('main').innerHTML=`
     <div class="ph"><div class="pt">&#128196; \u00dcbersicht <span>${u?.name||''}</span></div></div>
     ${pinnedMsg.length?`<div style="background:rgba(59,109,212,.04);border:1px solid rgba(59,109,212,.2);border-radius:var(--r);padding:14px;margin-bottom:14px">
@@ -1799,49 +1849,10 @@ function renderHome(){
     </div>`:''}
 
     ${importantNewsHtml}${hoHtml}${vacHtml}
-    <div class="dash-grid">
-      <div class="dash-card"><details data-cc-id="online" open><summary><h3 style="margin:0">&#128101; Online (${online.length+1})</h3></summary><div class="online-list">
-        <div class="online-user">${avHtml(u?.initials||'?',u?.color||'#888',22,9,true)}<span>${u?.name} (du)</span></div>
-        ${online.map(x=>`<div class="online-user">${avHtml(x.initials,x.color,22,9,true)}<span>${x.name}</span></div>`).join('')}
-        ${!online.length?'<span style="font-size:12px;color:var(--mu)">Keine anderen online</span>':''}
-      </div></div>
-      ${(()=>{// Für Standard-User: eigene Tausche (auch entschiedene ungesehene)
-      const pendingDt=(S.diensttausch||[]).filter(dt=>{
-        if(dt.isSeen)return false;
-        if(dt.isRelevant)return true;
-        if(dt.createdBy===S.currentUser)return true; // eigene
-        return false;
-      });return pendingDt.length?`
-      <div class="dash-card" style="border-top:2px solid var(--warn)">
-        <h3 style="display:flex;align-items:center;gap:8px">&#128257; Diensttausch <span class="tk-new-badge">${pendingDt.length} NEU</span></h3>
-        ${pendingDt.slice(0,5).map(dt=>{
-          const creator=getU(dt.createdBy);
-          const stBadge=dt.status==='pending'?'<span class="bdg ap-bdg-pending" style="font-size:10px">Ausstehend</span>':dt.status==='approved'?'<span class="bdg ap-bdg-approved" style="font-size:10px">&#10003;</span>':'<span class="bdg ap-bdg-rejected" style="font-size:10px">&#10007;</span>';
-          return`<div style="padding:6px 0;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:8px;cursor:pointer" onclick="markDtSeen('${dt.id}').then(()=>setView('diensttausch'))">
-            <div style="flex:1;min-width:0">
-              <div style="font-size:11px;font-weight:600">${creator?.name||'?'} <span style="color:var(--mu);font-weight:400">&middot; ${fdt(dt.createdAt)}</span></div>
-              <div style="font-size:11px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${dt.text.slice(0,80)}${dt.text.length>80?'…':''}</div>
-            </div>
-            ${stBadge}
-          </div>`;
-        }).join('')}
-        <button class="btn-s" style="width:100%;margin-top:8px;font-size:11px" onclick="setView('diensttausch')">Alle anzeigen &#8594;</button>
-      </div>`:'';})()}
-            <div class="dash-card"><h3>&#127931; Relevante Tickets (${relevantTks.length})${relevantTks.some(tkIsNew)?`<span class="tk-new-badge" style="margin-left:8px;font-size:10px">&#128276; NEU</span>`:''}</h3>
-        ${relevantTks.length?relevantTks.map(tk=>{
-          const n=tkIsNew(tk);
-          return`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);gap:8px;${n?'background:rgba(245,158,11,.04);margin:0 -8px;padding:6px 8px;border-left:3px solid var(--warn);':''}">
-            <div style="min-width:0;flex:1;cursor:pointer" onclick="openTkDetail('${tk.id}')">
-              <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${n?'<span class=\"tk-new-badge\">NEU</span> ':''}${tk.number}: ${tk.title}</div>
-              <div style="font-size:10px;color:var(--mu)">${tk.assigneeId===S.currentUser?'&#128100; Dir zugewiesen':'&#128202; '+(DEPT_LABELS[tk.department]||tk.department)}</div>
-            </div>
-            <div style="display:flex;gap:4px;align-items:center;flex-shrink:0">
-              ${prioBdg(tk.priority)}
-              ${n?`<button class="btn-ok" style="font-size:10px;padding:2px 7px;white-space:nowrap" onclick="event.stopPropagation();markTkSeen('${tk.id}')">&#10003; Gesehen</button>`:''}
-            </div>
-          </div>`;
-        }).join(''):'<div style="color:var(--mu);font-size:12px">Keine relevanten Tickets</div>'}
-      </div>
+    ${_ccWrap('online','&#128101; Online ('+(online.length+1)+')',_onlineHtml)}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      ${_ccWrap('myentries','&#128197; Meine Einträge',_myEntriesHtml)}
+      ${_ccWrap('tickets','&#127931; Relevante Tickets',_ticketsHtml)}
     </div>`;
 }
 async function confirmEventNotif(notifId){try{await api('POST','/notifications/'+notifId+'/read');await fetchData();renderHome();}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}}
@@ -3010,9 +3021,9 @@ function renderHomeoffice() {
     h+='<td style="text-align:center"><span style="font-size:12px;font-weight:700;color:'+(day.free>0?'var(--ok)':'var(--danger)')+'">'+day.free+'/'+day.maxS+'</span></td>';
     h+='<td>'+(slotHtml||'<span style="color:var(--di);font-size:11px">—</span>')+'</td>';
     h+='<td style="white-space:nowrap">';
-    if(day.free>0)h+='<button class="btn-ok" style="font-size:11px;padding:2px 8px;margin-right:3px" onclick="hoEintragen('+JSON.stringify(day.iso)+')">&#43; Eintragen</button>';
-    if(canManage&&day.slots.length>0){day.slots.forEach(function(sl){var u=getU(sl.userId);h+='<button class="btn-d" style="font-size:10px;padding:1px 5px;margin:1px" onclick="hoAustragen('+JSON.stringify(sl.id)+')" title="'+(u?u.name:'?')+'">&#10005; '+(u?u.initials:'?')+'</button>';});}
-    else if(day.mySlot)h+='<button class="btn-d" style="font-size:11px;padding:2px 6px" onclick="hoAustragen('+JSON.stringify(day.mySlot.id)+')">&#10005;</button>';
+    if(day.free>0)h+='<button class="btn-ok" style="font-size:11px;padding:2px 8px;margin-right:3px" onclick="hoEintragen(\''+day.iso+'\')">&#43; Eintragen</button>';
+    if(canManage&&day.slots.length>0){day.slots.forEach(function(sl){var u=getU(sl.userId);h+='<button class="btn-d" style="font-size:10px;padding:1px 5px;margin:1px" onclick="hoAustragen(\''+sl.id+'\')\" title="'+(u?u.name:'?')+'">&#10005; '+(u?u.initials:'?')+'</button>';});}
+    else if(day.mySlot)h+='<button class="btn-d" style="font-size:11px;padding:2px 6px" onclick="hoAustragen(\''+day.mySlot.id+'\')">"&#10005;</button>';
     h+='</td></tr>';
   });
   h+='</tbody></table></div></div>';
@@ -3057,7 +3068,18 @@ async function hoAddBox(){var label=document.getElementById('hoNewBox')?document
 async function hoDeleteBox(id){try{await api('DELETE','/homeoffice/boxes/'+id);await fetchData();renderHoAdmin();}catch(e){toast('⚠️ '+e.message,'err');}}
 async function hoAddDienst(){var label=document.getElementById('hoNewDienst')?document.getElementById('hoNewDienst').value.trim():'';if(!label)return;try{await api('POST','/homeoffice/dienste',{label:label});await fetchData();renderHoAdmin();}catch(e){toast('⚠️ '+e.message,'err');}}
 async function hoDeleteDienst(id){try{await api('DELETE','/homeoffice/dienste/'+id);await fetchData();renderHoAdmin();}catch(e){toast('⚠️ '+e.message,'err');}}
-function renderHoAdmin(){var bl=document.getElementById('hoBoxList'),dl=document.getElementById('hoDienstList');if(!bl||!dl)return;var boxes=S.homeoffice&&S.homeoffice.boxes||[],dienste=S.homeoffice&&S.homeoffice.dienste||[];bl.innerHTML=boxes.length?boxes.map(function(b){return '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)"><span>'+b.label+'</span><button class="btn-d" style="font-size:10px;padding:2px 6px" onclick="hoDeleteBox('+JSON.stringify(b.id)+')">&#10005;</button></div>';}).join(''):'<div style="color:var(--di);font-size:12px">Keine Boxen</div>';dl.innerHTML=dienste.length?dienste.map(function(d){return '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)"><span>'+d.label+'</span><button class="btn-d" style="font-size:10px;padding:2px 6px" onclick="hoDeleteDienst('+JSON.stringify(d.id)+')">&#10005;</button></div>';}).join(''):'<div style="color:var(--di);font-size:12px">Keine Dienste</div>';}
+function renderHoAdmin(){
+  var bl=document.getElementById('hoBoxList'),dl=document.getElementById('hoDienstList');
+  if(!bl||!dl)return;
+  var boxes=(S.homeoffice&&S.homeoffice.boxes)||[];
+  var dienste=(S.homeoffice&&S.homeoffice.dienste)||[];
+  bl.innerHTML='';
+  if(boxes.length){boxes.forEach(function(b){var row=document.createElement('div');row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)';row.innerHTML='<span>'+b.label+'</span>';var btn=document.createElement('button');btn.className='btn-d';btn.style.cssText='font-size:10px;padding:2px 6px';btn.innerHTML='&#10005;';btn.onclick=(function(id){return function(){hoDeleteBox(id);};})(b.id);row.appendChild(btn);bl.appendChild(row);});}
+  else bl.innerHTML='<div style="color:var(--di);font-size:12px">Keine Boxen</div>';
+  dl.innerHTML='';
+  if(dienste.length){dienste.forEach(function(d){var row=document.createElement('div');row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)';row.innerHTML='<span>'+d.label+'</span>';var btn=document.createElement('button');btn.className='btn-d';btn.style.cssText='font-size:10px;padding:2px 6px';btn.innerHTML='&#10005;';btn.onclick=(function(id){return function(){hoDeleteDienst(id);};})(d.id);row.appendChild(btn);dl.appendChild(row);});}
+  else dl.innerHTML='<div style="color:var(--di);font-size:12px">Keine Dienste</div>';
+}
 
 // ══════════════════════════════════════════
 // SECTION: Diensttausch @Mention
@@ -3096,9 +3118,9 @@ function renderNews(){
     h+='<div style="font-size:11px;color:var(--mu);margin-top:8px">Von: <strong>'+(getU(n.createdBy)?.name||'?')+'</strong>'+(n.fromDate?' · Ab: '+fmtDate(n.fromDate):'')+(n.toDate?' · Bis: '+fmtDate(n.toDate):'')+'</div>';
     h+='</div>';
     h+='<div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end;flex-shrink:0">';
-    h+='<button class="btn-s" style="font-size:11px" onclick="toggleNewsPin('+JSON.stringify(n.id)+','+n.isPinned+')">'+(n.isPinned?'&#128204; Lospinnen':'&#128203; Anpinnen')+'</button>';
-    if(canEdit)h+='<button class="btn-e" style="font-size:11px" onclick="openNewsForm('+JSON.stringify(n.id)+')">&#10000;</button>';
-    if(canEdit)h+='<button class="btn-d" style="font-size:11px" onclick="deleteNews('+JSON.stringify(n.id)+')">&#10005;</button>';
+    h+='<button class="btn-s" style="font-size:11px" onclick="toggleNewsPin(\''+n.id+'\','+n.isPinned+')">'+(n.isPinned?'&#128204; Lospinnen':'&#128203; Anpinnen')+'</button>';
+    if(canEdit)h+='<button class="btn-e" style="font-size:11px" onclick="openNewsForm(\''+n.id+'\')">&#10000;</button>';
+    if(canEdit)h+='<button class="btn-d" style="font-size:11px" onclick="deleteNews(\''+n.id+'\')">&#10005;</button>';
     h+='</div></div></div>';
   });
   document.getElementById('main').innerHTML=h;
@@ -3172,7 +3194,7 @@ function renderVacation(){
     h+='<td style="white-space:nowrap;font-size:12px">'+label+'</td>';
     h+='<td style="text-align:center"><span style="font-weight:700;color:'+cc+'">'+day.vacEntries.length+'/'+day.maxS+'</span></td>';
     h+='<td>'+(users||'<span style="color:var(--di);font-size:11px">—</span>')+(day.note?'<div style="font-size:10px;color:var(--mu);font-style:italic">'+escHtml(day.note)+'</div>':'')+'</td>';
-    if(canManage)h+='<td><div style="display:flex;gap:4px;align-items:center"><input type="number" min="0" max="20" value="'+day.maxS+'" style="width:50px;font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:3px" id="vacMax_'+day.iso+'"><input type="text" placeholder="Bemerkung" value="'+escHtml(day.note)+'" style="flex:1;font-size:11px;padding:2px 6px;border:1px solid var(--border);border-radius:3px" id="vacNote_'+day.iso+'"><button class="btn-ok" style="font-size:10px;padding:2px 6px;white-space:nowrap" onclick="vacSaveConfig('+JSON.stringify(day.iso)+')">&#128190;</button></div></td>';
+    if(canManage)h+='<td><div style="display:flex;gap:4px;align-items:center"><input type="number" min="0" max="20" value="'+day.maxS+'" style="width:50px;font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:3px" id="vacMax_'+day.iso+'"><input type="text" placeholder="Bemerkung" value="'+escHtml(day.note)+'" style="flex:1;font-size:11px;padding:2px 6px;border:1px solid var(--border);border-radius:3px" id="vacNote_'+day.iso+'"><button class="btn-ok" style="font-size:10px;padding:2px 6px;white-space:nowrap" onclick="vacSaveConfig(\''+day.iso+'\')">&#128190;</button></div></td>';
     h+='</tr>';
   });
   h+='</tbody></table></div></div>';
