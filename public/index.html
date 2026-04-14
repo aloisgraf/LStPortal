@@ -289,7 +289,7 @@ details.dash-card > summary { list-style: none; cursor: pointer; display: flex; 
   <button class="ib2 hbg" onclick="toggleSidebar()">&#9776;</button>
   <div class="logo"><div class="lm">&#128203;</div><div class="ln">LSt <em>Portal</em></div></div>
   <div class="hsp"></div>
-  <div id="clockDisplay" style="font-size:11px;font-weight:600;color:var(--mu);text-align:right;line-height:1.4;white-space:nowrap;padding-right:4px;display:none"></div>
+  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;padding-right:4px"><div id="clockDisplay" style="font-size:11px;font-weight:600;color:var(--mu);white-space:nowrap;display:none"></div><div id="lastRefreshDisplay" style="font-size:10px;color:var(--di);white-space:nowrap;display:none">↻ —</div></div>
   <button class="ib2" id="thBtn" onclick="toggleTheme()">&#127769;</button>
   <button class="ib2" onclick="openModal('helpOv')" title="Hilfe / Anleitung" style="font-weight:700;font-size:13px">?</button>
   <button class="ib2" id="adminBtn" onclick="openAdminModal()" title="Administration" style="display:none">&#9881;&#65039;</button>
@@ -1367,8 +1367,11 @@ function showHelpSection(id){
     <div class="mh"><h2>&#128203; Changelog</h2><button class="mc" onclick="closeModal('changelogOv')">&#10005;</button></div>
     <div class="mb2" style="gap:10px">
       <div style="padding:12px;background:rgba(59,109,212,0.06));border:1px solid rgba(59,109,212,.20);border-radius:8px">
-        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.2.3</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.2.4</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
         <ul style="font-size:12px;line-height:1.8;padding-left:18px">
+          <li>News: Wichtig/Angepinnt-Badges in &Uuml;bersicht (auch kombiniert)</li>
+          <li>&Uuml;bersicht: Letzter Refresh-Zeitstempel im Header</li>
+          <li>&Uuml;bersicht: Homeoffice + Urlaub nebeneinander</li>
           <li>Datumsformat in &Uuml;bersicht: 06.07.2026 statt 07-06</li>
           <li>Wichtige aktive News werden allen Mitarbeitern in der &Uuml;bersicht angezeigt</li>
           <li>Online-Kachel ein-/ausklappbar (Einstellung gespeichert)</li>
@@ -1460,7 +1463,7 @@ function showHelpSection(id){
 </div>
 
 <script>
-const APP_VERSION='2.2.3';
+const APP_VERSION='2.2.4';
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
@@ -1743,16 +1746,22 @@ function renderHome(){
       vacHtml+='</div><button class="btn-s" style="margin-top:8px;font-size:11px" onclick="setView(\'vacation\')">Urlaubsübersicht &#8594;</button></div>';
     }
   }
-    // Wichtige aktive News
+    // News: Wichtig und/oder Angepinnt → oben in Übersicht
   var importantNewsHtml='';
-  var _impNews=(S.news||[]).filter(function(n){return n.isImportant&&n.isActive&&!n.isExpired;});
+  var _impNews=(S.news||[]).filter(function(n){return n.isActive&&!n.isExpired&&(n.isImportant||n.isPinned);});
   if(_impNews.length){
-    importantNewsHtml='<div style="background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.2);border-radius:var(--r);padding:14px;margin-bottom:14px">';
-    importantNewsHtml+='<div style="font-size:13px;font-weight:700;color:var(--danger);margin-bottom:8px">&#9888;&#65039; Wichtige News</div>';
+    importantNewsHtml='<div style="background:rgba(239,68,68,.04);border:1px solid rgba(239,68,68,.18);border-radius:var(--r);padding:14px;margin-bottom:14px">';
     _impNews.forEach(function(n){
-      importantNewsHtml+='<div style="padding:6px 0;border-bottom:1px solid rgba(239,68,68,.12)">';
-      importantNewsHtml+='<div style="font-size:13px;font-weight:700">'+escHtml(n.title)+'</div>';
-      importantNewsHtml+='<div style="font-size:12px;line-height:1.5;color:var(--tx)">'+n.body.slice(0,300)+(n.body.length>300?'…':'')+'</div>';
+      var badges='';
+      if(n.isImportant&&n.isPinned) badges='<span class="bdg ap-bdg-rejected" style="font-size:10px;margin-right:4px">&#9888;&#65039; Wichtig</span><span class="bdg" style="font-size:10px;background:rgba(59,109,212,.12);color:var(--acc)">&#128204; Angepinnt</span>';
+      else if(n.isImportant) badges='<span class="bdg ap-bdg-rejected" style="font-size:10px">&#9888;&#65039; Wichtig</span>';
+      else badges='<span class="bdg" style="font-size:10px;background:rgba(59,109,212,.12);color:var(--acc)">&#128204; Angepinnt</span>';
+      importantNewsHtml+='<div style="padding:8px 0;border-bottom:1px solid rgba(239,68,68,.1);display:flex;align-items:flex-start;gap:10px">';
+      importantNewsHtml+='<div style="flex:1">';
+      importantNewsHtml+='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px">'+badges+'<span style="font-size:13px;font-weight:700">'+escHtml(n.title)+'</span></div>';
+      importantNewsHtml+='<div style="font-size:12px;line-height:1.5;color:var(--tx)">'+n.body.slice(0,200)+(n.body.length>200?'…':'')+'</div>';
+      importantNewsHtml+='</div>';
+      importantNewsHtml+='<button class="btn-s" style="font-size:10px;padding:2px 6px;flex-shrink:0" onclick="toggleNewsPin(\''+n.id+'\','+n.isPinned+')">'+(n.isPinned?'Lospinnen':'Anpinnen')+'</button>';
       importantNewsHtml+='</div>';
     });
     importantNewsHtml+='<button class="btn-s" style="margin-top:8px;font-size:11px" onclick="setView(\x27news\x27)">Alle News &#8594;</button></div>';
@@ -1848,7 +1857,7 @@ function renderHome(){
       </div>`;}).join('')}
     </div>`:''}
 
-    ${importantNewsHtml}${hoHtml}${vacHtml}
+    ${importantNewsHtml}${(hoHtml||vacHtml)?('<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">'+hoHtml+vacHtml+'</div>'):''}
     ${_ccWrap('online','&#128101; Online ('+(online.length+1)+')',_onlineHtml)}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
       ${_ccWrap('myentries','&#128197; Meine Einträge',_myEntriesHtml)}
@@ -2940,6 +2949,7 @@ function startAutoRefresh(){
       if(S.view==='home')renderHome();
       else if(S.view==='messages'||S.view==='messages_sent')renderMessages();
       else if(S.view==='tickets'||S.view==='tickets_closed')renderTickets();
+    var _rd=document.getElementById('lastRefreshDisplay');if(_rd){var _n=new Date();_rd.textContent='↻ '+_n.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit',second:'2-digit'});_rd.style.display='block';}
     }catch(e){}
   },60000);
 }
