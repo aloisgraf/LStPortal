@@ -517,8 +517,8 @@ router.get('/news', auth, async (req,res) => {
       isActive: (!n.from_date||(today>=String(n.from_date).slice(0,10)))&&(!n.to_date||(today<=String(n.to_date).slice(0,10))),
       isExpired: n.to_date && today>String(n.to_date).slice(0,10),
     }));
-    // Non-managers only see active news
-    ok(res, canManage ? mapped : mapped.filter(n=>n.isActive&&!n.isExpired));
+    // All users see active news; expired = archiv (visible to all)
+    ok(res, mapped);
   } catch(e) { bad(res,e.message,500); }
 });
 
