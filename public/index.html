@@ -1615,9 +1615,9 @@ function loginOK(){
   const pa=document.getElementById('pillAv');pa.textContent=u?.initials||'?';pa.style.background=(u?.color||'#888')+'22';pa.style.color=u?.color||'#888';
   const ab=document.getElementById('adminBtn');if(ab)ab.style.display=S.p.manageUsers?'flex':'none';
   loadNews().then(function(){setView('home');});startAutoRefresh();
-  const canNews=S.p.manageUsers||(getU(S.currentUser)?.roles||[]).includes('leitung');
+  // archivNav for all users
   const archivNav=document.getElementById('ni-news_archiv');
-  if(archivNav)archivNav.style.display=canNews?'block':'none';
+  if(archivNav)archivNav.style.display='block';
   toast('\uD83D\uDC4B Willkommen, '+(u?.name||'')+'!');
 }
 async function logout(){
@@ -1749,6 +1749,9 @@ function renderHome(){
     // News: Wichtig und/oder Angepinnt → oben in Übersicht
   var importantNewsHtml='';
   var _impNews=(S.news||[]).filter(function(n){return n.isActive&&!n.isExpired&&(n.isImportant||n.isPinned);});
+  // Debug: log news state (temporary)
+  console.log('[News Debug] S.news.length='+S.news.length+', _impNews.length='+_impNews.length);
+  if(S.news.length>0)console.log('[News Debug] first news:', JSON.stringify({isActive:S.news[0].isActive,isImportant:S.news[0].isImportant,isPinned:S.news[0].isPinned,isExpired:S.news[0].isExpired}));
   if(_impNews.length){
     importantNewsHtml='<div style="background:rgba(239,68,68,.04);border:1px solid rgba(239,68,68,.18);border-radius:var(--r);padding:14px;margin-bottom:14px">';
     _impNews.forEach(function(n){
@@ -3107,15 +3110,15 @@ async function loadNews(){
     var data=await api('GET','/news');
     S.news=data||[];
     updateBadges();
-    // Re-render home if visible so news appear immediately
     if(S.view==='home')renderHome();
-  }catch(e){}
+  }catch(e){console.error('loadNews error:',e);}
 }
 function renderNews(){
   var isArchiv=S.view==='news_archiv';
   var canEdit=S.p.manageUsers||(getU(S.currentUser)?.roles||[]).includes('leitung');
   var today=new Date().toISOString().slice(0,10);
   var news=S.news||[];
+  var canEdit=S.p.manageUsers||(getU(S.currentUser)?.roles||[]).includes('leitung');
   var display=isArchiv?news.filter(function(n){return n.isExpired;}):news.filter(function(n){return !n.isExpired;});
   function fmtDate(d){if(!d)return'';var p=String(d).slice(0,10);return p.slice(8)+'.'+p.slice(5,7)+'.'+p.slice(0,4);}
   var h='<div class="ph"><div class="pt">&#128240; '+(isArchiv?'News-Archiv':'Aktuelle News')+'</div>'+(canEdit&&!isArchiv?'<button class="btn-p" onclick="openNewsForm(null)">&#65291; News erstellen</button>':'')+'</div>';
