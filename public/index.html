@@ -1614,7 +1614,7 @@ function loginOK(){
   document.getElementById('pillNm').textContent=u?.name||'?';
   const pa=document.getElementById('pillAv');pa.textContent=u?.initials||'?';pa.style.background=(u?.color||'#888')+'22';pa.style.color=u?.color||'#888';
   const ab=document.getElementById('adminBtn');if(ab)ab.style.display=S.p.manageUsers?'flex':'none';
-  setView('home');startAutoRefresh();loadNews();
+  loadNews().then(function(){setView('home');});startAutoRefresh();
   const canNews=S.p.manageUsers||(getU(S.currentUser)?.roles||[]).includes('leitung');
   const archivNav=document.getElementById('ni-news_archiv');
   if(archivNav)archivNav.style.display=canNews?'block':'none';
@@ -3102,7 +3102,15 @@ function dtMentionKey(e){var box=document.getElementById('dtMentionBox');if(!box
 // ══════════════════════════════════════════
 // SECTION: News
 // ══════════════════════════════════════════
-async function loadNews(){try{var data=await api('GET','/news');S.news=data||[];updateBadges();}catch(e){}}
+async function loadNews(){
+  try{
+    var data=await api('GET','/news');
+    S.news=data||[];
+    updateBadges();
+    // Re-render home if visible so news appear immediately
+    if(S.view==='home')renderHome();
+  }catch(e){}
+}
 function renderNews(){
   var isArchiv=S.view==='news_archiv';
   var canEdit=S.p.manageUsers||(getU(S.currentUser)?.roles||[]).includes('leitung');
