@@ -838,13 +838,13 @@ details.dash-card > summary { list-style: none; cursor: pointer; display: flex; 
   <rect x="422" y="112" width="50" height="18" rx="4" fill="var(--sf2)" stroke="var(--border)" stroke-width="1"/>
   <text x="447" y="124" text-anchor="middle" fill="var(--tx)" font-size="10">0</text>
   <rect x="14" y="150" width="492" height="30" rx="6" fill="rgba(59,109,212,0.06))" stroke="rgba(59,109,212,.20)" stroke-width="1"/>
-  <text x="26" y="169" fill="var(--acc)" font-size="9">ℹ️ Im Monats-Modus: Alle Felder direkt editierbar. Sidebar: Jahr, Zeitraum und Monat wählen.</text>
+  <text x="26" y="169" fill="var(--acc)" font-size="9">ℹ️ Im Monats-Modus: Alle Felder direkt editierbar. Filter-Leiste: Jahr, Zeitraum und Monat wählen.</text>
 </svg>
 <h4>Funktionen:</h4>
 <ul>
 <li><strong>Monatsansicht</strong> – Alle Mitarbeiter mit direkten Eingabefeldern. Werte ändern und mit <em>Alle speichern</em> übernehmen.</li>
 <li><strong>Halbjahres-/Jahresansicht</strong> – Aggregierte Summen, schreibgeschützt (nur zur Auswertung).</li>
-<li><strong>Zeitraum wählen</strong> – In der Sidebar: Jahr, Zeitraum (Monat / 1. Halbjahr / 2. Halbjahr / Gesamt) und bei Monatsansicht den Monat.</li>
+<li><strong>Zeitraum wählen</strong> – Direkt über der Tabelle: Jahr (‹ ›), Zeitraum (Monatlich / 1. Hj. / 2. Hj. / Gesamt) und bei Monatsansicht den Monat auswählen.</li>
 </ul>
 <h4>Wer kann bearbeiten?</h4>
 <p>Nur Benutzer mit den Rollen <strong>Admin, Leitung</strong> oder <strong>Dienstplanung</strong> können Werte eintragen. Andere Rollen sehen die Übersicht nur lesend.</p>
@@ -909,7 +909,7 @@ details.dash-card > summary { list-style: none; cursor: pointer; display: flex; 
 <li>Die Änderung wird sofort gespeichert.</li>
 <li>Dienstplanung sieht eine Übersichtstabelle aller Mitarbeiter rechts daneben.</li>
 </ul>
-<p>💡 <em>In der Sidebar kannst du Jahr und Monat filtern. Bei „Alle" werden alle Monate des Jahres angezeigt.</em></p>
+<p>💡 <em>Direkt über den Tabellen befinden sich die Filter: Jahr (‹ ›), Monat (oder „Alle") und bei Dienstplanung ein Mitarbeiter-Dropdown. Bei „Alle" werden alle Monate des Jahres angezeigt.</em></p>
 
 </div>
 <div id="hsec-dienstplaene" style="display:none">
@@ -1376,7 +1376,18 @@ function showHelpSection(id){
     <div class="mh"><h2>&#128203; Changelog</h2><button class="mc" onclick="closeModal('changelogOv')">&#10005;</button></div>
     <div class="mb2" style="gap:10px">
       <div style="padding:12px;background:rgba(59,109,212,0.06));border:1px solid rgba(59,109,212,.20);border-radius:8px">
-        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.3.0</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.3.1</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
+        <ul style="font-size:12px;line-height:1.8;padding-left:18px">
+          <li>Bugfix: News-Datumsvergleich korrigiert &ndash; wichtige/angepinnte News erscheinen nun korrekt in der &Uuml;bersicht</li>
+          <li>Bugfix: Abgelaufene News werden jetzt zuverl&auml;ssig ins Archiv verschoben</li>
+          <li>Filter Zulagendienste: Jahr, Zeitraum und Monat direkt im Hauptfenster</li>
+          <li>Filter Abrechnung: Jahr, Monat und Mitarbeiter direkt im Hauptfenster</li>
+          <li>Filter Homeoffice: Einheitliche Jahres- und Monatsauswahl wie in anderen Ansichten</li>
+          <li>Alle Filter-Leisten einheitlich gestaltet (gleicher Stil in allen Ansichten)</li>
+        </ul>
+      </div>
+      <div style="padding:12px;background:rgba(59,109,212,0.06));border:1px solid rgba(59,109,212,.20);border-radius:8px">
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--sf3);color:var(--mu);padding:2px 8px;border-radius:4px">v2.3.0</span></div>
         <ul style="font-size:12px;line-height:1.8;padding-left:18px">
           <li>News: Angepinnte &amp; wichtige News erscheinen in der &Uuml;bersicht</li>
           <li>News: Abgelaufene News werden automatisch ins Archiv verschoben</li>
@@ -1482,7 +1493,7 @@ function showHelpSection(id){
 </div>
 
 <script>
-const APP_VERSION='2.3.0';
+const APP_VERSION='2.3.1';
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
@@ -1683,19 +1694,9 @@ function renderSBF(){
   if(S.view==='schedule'||S.view==='calendar'){
     el.innerHTML='';
   }else if(S.view==='allw'){
-    el.innerHTML=`<div><div class="sfl">Jahr</div>
-      <div class="yr-row"><button class="yb" onclick="S.allwYear--;renderSBF();renderMain()">&lsaquo;</button><span class="yv">${S.allwYear}</span><button class="yb" onclick="S.allwYear++;renderSBF();renderMain()">&rsaquo;</button></div>
-      <div class="sfl" style="margin-top:10px">Zeitraum</div>
-      <div style="display:flex;flex-direction:column;gap:3px">${['month','h1','h2','year'].map(p2=>`<button class="mb ${S.allwPeriod===p2?'on':''}" style="text-align:left;padding:5px 8px" onclick="S.allwPeriod='${p2}';renderSBF();renderMain()">${p2==='month'?'Monatlich':p2==='h1'?'1. Halbjahr':p2==='h2'?'2. Halbjahr':'Gesamtjahr'}</button>`).join('')}</div>
-      ${S.allwPeriod==='month'?`<div style="margin-top:8px"><div class="sfl">Monat</div><div class="mgrid">${MONTHS.map((m,i)=>`<button class="mb ${S.allwMonth===i+1?'on':''}" onclick="S.allwMonth=${i+1};renderSBF();renderMain()">${m.slice(0,3)}</button>`).join('')}</div></div>`:''}
-    </div>`;
+    el.innerHTML='';
   }else if(S.view==='abrechnung'){
-    el.innerHTML=`<div><div class="sfl">Jahr</div>
-      <div class="yr-row"><button class="yb" onclick="S.abrYear--;renderMain()">&lsaquo;</button><span class="yv">${S.abrYear}</span><button class="yb" onclick="S.abrYear++;renderMain()">&rsaquo;</button></div>
-      <div class="sfl" style="margin-top:8px">Monat</div>
-      <div class="mgrid"><button class="mb ${!S.abrMonth?'on':''}" onclick="S.abrMonth=null;renderMain()">Alle</button>${MONTHS.map((m,i)=>`<button class="mb ${S.abrMonth===i+1?'on':''}" onclick="S.abrMonth=${i+1};renderMain()">${m.slice(0,3)}</button>`).join('')}</div>
-      ${S.p.seeAllAbrechnung?`<div style="margin-top:8px"><div class="sfl">Mitarbeiter</div><select class="flt" style="width:100%" onchange="S.abrUser=this.value||null;renderMain()"><option value="">Alle Mitarbeiter</option>${S.users.filter(u=>!(u.roles||[]).includes('admin')).sort((a,b)=>a.name.localeCompare(b.name,'de')).map(u=>`<option value="${u.id}"${S.abrUser===u.id?'selected':''}>${u.name}</option>`).join('')}</select></div>`:''}
-    </div>`;
+    el.innerHTML='';
   }else if(S.view==='tickets'||S.view==='tickets_closed'){
     el.innerHTML='';
   }else el.innerHTML='';
@@ -2202,6 +2203,13 @@ function renderAllw(){
     <div class="ph"><div class="pt">Zulagendienste <span>${pLbl} ${yr}</span></div>
       ${isBulk?`<button class="btn-p" onclick="saveAllBulk()">&#128190; Alle speichern</button>`:''}
     </div>
+    <div class="fbar" style="flex-wrap:wrap;gap:6px;align-items:center">
+      <div class="yr-row" style="margin:0"><button class="yb" onclick="S.allwYear--;renderMain()">&lsaquo;</button><span class="yv">${yr}</span><button class="yb" onclick="S.allwYear++;renderMain()">&rsaquo;</button></div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
+        ${['month','h1','h2','year'].map(p2=>`<button class="mb ${S.allwPeriod===p2?'on':''}" style="padding:4px 8px;font-size:12px" onclick="S.allwPeriod='${p2}';renderMain()">${p2==='month'?'Monatlich':p2==='h1'?'1. Hj.':p2==='h2'?'2. Hj.':'Gesamt'}</button>`).join('')}
+      </div>
+      ${S.allwPeriod==='month'?`<div style="display:flex;gap:4px;flex-wrap:wrap">${MONTHS.map((m,i)=>`<button class="mb ${S.allwMonth===i+1?'on':''}" style="padding:4px 8px;font-size:12px" onclick="S.allwMonth=${i+1};renderMain()">${m.slice(0,3)}</button>`).join('')}</div>`:''}
+    </div>
     ${!S.p.editAllw?`<div class="ib3" style="margin-bottom:12px">&#8505;&#65039; Nur Lesezugriff &ndash; Eintr&#228;ge k&#246;nnen nur von Dienstplanung/Leitung/Admin bearbeitet werden.</div>`:''}
     <div class="tw"><div class="tt"><h2>\u00dcbersicht</h2></div>
       <div style="overflow-x:auto"><table><thead><tr><th>Mitarbeiter</th>
@@ -2287,6 +2295,14 @@ function renderAbrechnung(){
   const allHO=S.abrechnung.homeoffice.filter(h2=>h2.year===yr&&(mo?h2.month===mo:true)&&(!S.abrUser||h2.userId===S.abrUser)&&(canSeeAll||h2.userId===myUid)).sort((a,b)=>{const na=getU(a.userId)?.name||'',nb=getU(b.userId)?.name||'';return na.localeCompare(nb,'de')||a.month-b.month;});
   document.getElementById('main').innerHTML=`
     <div class="ph"><div class="pt">Abrechnung <span>${moLabel} ${yr}</span></div></div>
+    <div class="fbar" style="flex-wrap:wrap;gap:6px;align-items:center">
+      <div class="yr-row" style="margin:0"><button class="yb" onclick="S.abrYear--;renderMain()">&lsaquo;</button><span class="yv">${yr}</span><button class="yb" onclick="S.abrYear++;renderMain()">&rsaquo;</button></div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
+        <button class="mb ${!mo?'on':''}" style="padding:4px 8px;font-size:12px" onclick="S.abrMonth=null;renderMain()">Alle</button>
+        ${MONTHS.map((m,i)=>`<button class="mb ${mo===i+1?'on':''}" style="padding:4px 8px;font-size:12px" onclick="S.abrMonth=${i+1};renderMain()">${m.slice(0,3)}</button>`).join('')}
+      </div>
+      ${canSeeAll?`<select class="flt" onchange="S.abrUser=this.value||null;renderMain()"><option value="">Alle Mitarbeiter</option>${S.users.filter(u=>!(u.roles||[]).includes('admin')).sort((a,b)=>a.name.localeCompare(b.name,'de')).map(u=>`<option value="${u.id}"${S.abrUser===u.id?'selected':''}>${u.name}</option>`).join('')}</select>`:''}
+    </div>
     <div class="abr-grid">
       <div>
         <div class="tw" style="margin-bottom:14px">
@@ -3030,11 +3046,12 @@ function renderHomeoffice() {
   function rowBg(d){if(d.isHol)return'rgba(124,58,237,.06)';if(d.dow===0)return'rgba(239,68,68,.05)';if(d.dow===6)return'rgba(245,158,11,.04)';return'';}
   function rowBl(d){if(d.isHol)return'border-left:3px solid rgba(124,58,237,.5)';if(d.dow===0)return'border-left:3px solid rgba(239,68,68,.3)';if(d.dow===6)return'border-left:3px solid rgba(245,158,11,.3)';return'';}
   var confInMonth=(S.homeoffice&&S.homeoffice.config||[]).filter(function(c){return normDate(c.date).startsWith(year+'-'+pad(month+1));});
-  var h='<div class="ph"><div class="pt">&#127968; Homeoffice</div>';
-  h+='<div style="display:flex;align-items:center;gap:8px">';
-  h+='<button class="btn-s" style="padding:4px 10px" onclick="'+"S.month=S.month!==null?(S.month===0?(S.year--,S.month=11):S.month-1):new Date().getMonth();renderMain()"+'">&#8249;</button>';
-  h+='<span style="font-weight:700;font-size:14px">'+moName+' '+year+'</span>';
-  h+='<button class="btn-s" style="padding:4px 10px" onclick="'+"S.month=S.month!==null?(S.month===11?(S.year++,0):S.month+1):new Date().getMonth()+1;if(S.month>11){S.month=0;S.year++;}renderMain()"+'">&#8250;</button>';
+  var hoShort=['Jän','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+  var h='<div class="ph"><div class="pt">&#127968; Homeoffice</div></div>';
+  h+='<div class="fbar" style="flex-wrap:wrap;gap:6px;align-items:center">';
+  h+='<div class="yr-row" style="margin:0"><button class="yb" onclick="S.year--;renderMain()">&#8249;</button><span class="yv">'+year+'</span><button class="yb" onclick="S.year++;renderMain()">&#8250;</button></div>';
+  h+='<div style="display:flex;gap:4px;flex-wrap:wrap">';
+  for(var _mi=0;_mi<12;_mi++){h+='<button class="mb '+(_mi===month?'on':'')+'" style="padding:4px 8px;font-size:12px" onclick="S.month='+_mi+';renderMain()">'+hoShort[_mi]+'</button>';}
   h+='</div></div>';
   if(canManage){
     h+='<div class="tw" style="margin-bottom:14px"><div class="tt"><h2>&#9881;&#65039; Slot-Konfiguration</h2></div><div style="padding:12px">';

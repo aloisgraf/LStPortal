@@ -507,15 +507,18 @@ router.get('/news', auth, async (req,res) => {
     const all = await q('SELECT * FROM news ORDER BY created_at DESC');
     const pins = await q('SELECT news_id FROM news_pins WHERE user_id=$1',[req.uid]);
     const pinSet = new Set(pins.map(p=>p.news_id));
-    const mapped = all.map(n=>({
-      id:n.id, title:n.title, body:n.body,
-      fromDate:n.from_date?.toISOString?.()?.slice(0,10)||n.from_date?.slice?.(0,10)||n.from_date,
-      toDate:n.to_date?.toISOString?.()?.slice(0,10)||n.to_date?.slice?.(0,10)||n.to_date,
-      isImportant:n.is_important, createdBy:n.created_by, createdAt:n.created_at,
-      isPinned:pinSet.has(n.id),
-      isActive: (!n.from_date||(today>=String(n.from_date).slice(0,10)))&&(!n.to_date||(today<=String(n.to_date).slice(0,10))),
-      isExpired: n.to_date && today>String(n.to_date).slice(0,10),
-    }));
+    const mapped = all.map(n=>{
+      const fDate = n.from_date ? (n.from_date.toISOString?.()?.slice(0,10)||String(n.from_date).slice(0,10)) : null;
+      const tDate = n.to_date  ? (n.to_date.toISOString?.()?.slice(0,10) ||String(n.to_date).slice(0,10))  : null;
+      return {
+        id:n.id, title:n.title, body:n.body,
+        fromDate:fDate, toDate:tDate,
+        isImportant:n.is_important, createdBy:n.created_by, createdAt:n.created_at,
+        isPinned:pinSet.has(n.id),
+        isActive: (!fDate||(today>=fDate))&&(!tDate||(today<=tDate)),
+        isExpired: !!(tDate && today>tDate),
+      };
+    });
     // All users see active news; expired = archiv (visible to all)
     ok(res, mapped);
   } catch(e) { bad(res,e.message,500); }
