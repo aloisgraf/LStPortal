@@ -196,6 +196,15 @@ async function initDB() {
       viewed_at TIMESTAMPTZ DEFAULT NOW(),
       PRIMARY KEY (ticket_id, user_id)
     )`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_sequences WHERE sequencename='ticket_number_seq') THEN
+        CREATE SEQUENCE ticket_number_seq;
+        PERFORM setval('ticket_number_seq', COALESCE(
+          (SELECT MAX(CAST(REPLACE(number,'TK-','') AS INTEGER)) FROM tickets WHERE number ~ '^TK-[0-9]+$'),
+          1000
+        ));
+      END IF;
+    END $$`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }

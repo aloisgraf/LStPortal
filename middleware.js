@@ -9,8 +9,8 @@ async function auth(req, res, next) {
     if (!user) { req.session.destroy(()=>{}); return res.status(401).json({ success:false, error:'Benutzer nicht gefunden' }); }
     req.uid  = user.id;
     req.user = user;
-    req.p    = await getP(user.id);
-    req.tp   = await getTP(user.id);
+    req.p    = await getP(user.id, user);
+    req.tp   = await getTP(user.id, user);
     req.clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || '';
     require('./db').pool.query('UPDATE users SET last_seen=NOW() WHERE id=$1',[user.id]).catch(()=>{});
     next();

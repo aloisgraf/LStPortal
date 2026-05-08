@@ -1,7 +1,7 @@
 'use strict';
 const router = require('express').Router();
 const bcrypt = require('bcryptjs');
-const { q, q1, newId, pool, parseRoles, logAct } = require('../db');
+const { q, q1, newId, pool, parseRoles, logAct, nextTicketNumber, getUser, createNotification } = require('../db');
 const { auth, adminOnly, ok, bad } = require('../middleware');
 
 
@@ -167,11 +167,14 @@ router.post('/users', auth, adminOnly, async (req,res) => {
   } catch(e) { bad(res,e.message,500); }
 });
 router.put('/users/:id', auth, async (req,res) => {
-  // Allow user to update own color only; full edit requires admin
   const isSelf = req.params.id === req.uid;
   const colorOnly = isSelf && Object.keys(req.body).every(k=>k==='color');
   if(!colorOnly && !req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
   try {
+    if (colorOnly) {
+      await pool.query('UPDATE users SET color=$1 WHERE id=$2',[req.body.color||'#64748b',req.params.id]);
+      return ok(res);
+    }
     const {name,initials,roles,color,resetPassword}=req.body;
     if (!name?.trim()||!initials?.trim()) return bad(res,'Name und Kürzel erforderlich');
     await pool.query('UPDATE users SET name=$1,initials=$2,roles=$3,color=$4 WHERE id=$5',
@@ -358,11 +361,7 @@ router.post('/webhook/mailgun', async (req,res) => {
     const dept      = process.env.MAILGUN_DEFAULT_DEPT || 'technik';
 
     const id     = newId();
-    const number = await (async () => {
-      const row = await q1(`SELECT number FROM tickets ORDER BY CAST(REPLACE(number,'TK-','') AS INTEGER) DESC LIMIT 1`);
-      if (!row) return 'TK-1001';
-      return `TK-${(parseInt(row.number.replace('TK-',''))+1).toString().padStart(4,'0')}`;
-    })();
+    const number = await nextTicketNumber();
 
     // Find a system user (first admin)
     const sysUser = await q1(`SELECT id,name FROM users WHERE roles::text LIKE '%admin%' LIMIT 1`);

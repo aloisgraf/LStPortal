@@ -17,8 +17,8 @@ const parseTags  = t => !t ? [] : Array.isArray(t) ? t : (()=>{ try{return JSON.
 const getUser    = id => q1('SELECT * FROM users WHERE id=$1', [id]);
 const DEPTS = ['technik','leitung','dienstplanung','ausbildung','qm','frei'];
 
-async function getP(uid) {
-  const u = await getUser(uid);
+async function getP(uid, userObj=null) {
+  const u = userObj || await getUser(uid);
   const roles = parseRoles(u?.roles);
   const has = (...r) => r.some(x => roles.includes(x));
   const full = has('admin','leitung','dienstplanung');
@@ -35,8 +35,8 @@ async function getP(uid) {
   };
 }
 
-async function getTP(uid) {
-  const u = await getUser(uid);
+async function getTP(uid, userObj=null) {
+  const u = userObj || await getUser(uid);
   const roles = parseRoles(u?.roles);
   const has = (...r) => r.some(x => roles.includes(x));
   return {
@@ -54,9 +54,8 @@ const canSeeTk  = (tp,tk,uid) => {
 const canEditTk = (tp,tk,uid) => tp.editAll || tk.created_by===uid || tp.myDepts.includes(tk.department);
 
 async function nextTicketNumber() {
-  const row = await q1(`SELECT number FROM tickets ORDER BY CAST(REPLACE(number,'TK-','') AS INTEGER) DESC LIMIT 1`);
-  if (!row) return 'TK-1001';
-  return `TK-${(parseInt(row.number.replace('TK-',''))+1).toString().padStart(4,'0')}`;
+  const row = await q1(`SELECT nextval('ticket_number_seq') as n`);
+  return `TK-${parseInt(row.n).toString().padStart(4,'0')}`;
 }
 
 async function auditNote(ticketId, userId, text) {
