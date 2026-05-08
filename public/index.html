@@ -300,7 +300,7 @@ details.dash-card > summary { list-style: none; cursor: pointer; display: flex; 
   <div class="ibw">
     <div class="notif-dot" id="notifDot" style="display:none"></div>
   </div>
-  <div class="upill" onclick="openModal('pwModal')">
+  <div class="upill" onclick="openPwModal()">
     <div class="pav" id="pillAv"></div><span id="pillNm">&#8212;</span>
   </div>
   <button class="ib2" onclick="logout()" title="Abmelden">&#9211;</button>
@@ -357,16 +357,25 @@ details.dash-card > summary { list-style: none; cursor: pointer; display: flex; 
   <main id="main"></main>
 </div>
 
-<!-- PW MODAL -->
+<!-- EINSTELLUNGEN MODAL -->
 <div class="ov" id="pwModal">
   <div class="modal sm">
-    <div class="mh"><h2>&#128272; Passwort &#228;ndern</h2><button class="mc" onclick="closeModal('pwModal')">&#10005;</button></div>
+    <div class="mh"><h2>&#9881;&#65039; Einstellungen</h2><button class="mc" onclick="closeModal('pwModal')">&#10005;</button></div>
     <div class="mb2">
+      <div class="fg">
+        <label>&#127912; Meine Farbe</label>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="cr" id="myCR"></div>
+          <button class="btn-s" style="flex-shrink:0;font-size:12px" onclick="saveMyColor()">&#10003; Speichern</button>
+        </div>
+      </div>
+      <div style="border-top:1px solid var(--border);margin:4px 0 8px"></div>
+      <div style="font-size:12px;font-weight:600;color:var(--mu);margin-bottom:6px">&#128272; Passwort &#228;ndern</div>
       <div class="fg"><label>Aktuelles Passwort</label><div class="pw-w"><input type="password" id="cpw0"><button class="eye" onclick="eyeToggle('cpw0',this)">&#128065;</button></div></div>
       <div class="fg"><label>Neues Passwort</label><div class="pw-w"><input type="password" id="cpw1"><button class="eye" onclick="eyeToggle('cpw1',this)">&#128065;</button></div></div>
       <div class="fg"><label>Best&#228;tigen</label><div class="pw-w"><input type="password" id="cpw2"><button class="eye" onclick="eyeToggle('cpw2',this)">&#128065;</button></div></div>
     </div>
-    <div class="mf"><button class="btn-s" onclick="closeModal('pwModal')">Abbrechen</button><button class="btn-p" onclick="doChangePW()">&#10003; &#196;ndern</button></div>
+    <div class="mf"><button class="btn-s" onclick="closeModal('pwModal')">Schlie&#223;en</button><button class="btn-p" onclick="doChangePW()">&#10003; Passwort &#228;ndern</button></div>
   </div>
 </div>
 
@@ -685,7 +694,7 @@ details.dash-card > summary { list-style: none; cursor: pointer; display: flex; 
 <li><strong>Passwort eingeben</strong> – Gib dein Passwort ein. Das Standard-Passwort lautet <code>Passwort1</code> (muss beim ersten Login geändert werden).</li>
 <li><strong>Passwort ändern</strong> – Beim ersten Login wirst du automatisch aufgefordert, ein neues Passwort (min. 6 Zeichen) zu vergeben.</li>
 </ol>
-<p>Du kannst dein Passwort jederzeit über dein <strong>Benutzerkürzel oben rechts</strong> ändern. Nach 10 Stunden Inaktivität wirst du automatisch abgemeldet.</p>
+<p>Du kannst dein Passwort jederzeit über dein <strong>Benutzerkürzel oben rechts</strong> ändern. Über dasselbe Menü (⚙️ Einstellungen) kannst du auch deine persönliche <strong>Profilfarbe</strong> anpassen. Nach 10 Stunden Inaktivität wirst du automatisch abgemeldet.</p>
 
 </div>
 <div id="hsec-uebersicht" style="display:none">
@@ -788,7 +797,7 @@ details.dash-card > summary { list-style: none; cursor: pointer; display: flex; 
 <li>Nur der Ersteller kann seinen eigenen Eintrag bearbeiten (solange noch nicht genehmigt).</li>
 </ul>
 <h4>Filter & Suche:</h4>
-<p>Über die <strong>Sidebar links</strong> kannst du Jahr und Monat wählen. Mit dem Mitarbeiter-Dropdown (nur für berechtigte Rollen) kannst du nach einzelnen Personen filtern. In der Tabellenleiste gibt es eine Textsuche und Filter nach Kategorie und Genehmigungsstatus.</p>
+<p>Direkt <strong>über der Tabelle</strong> befinden sich alle Filter: Jahr/Monat-Navigation, Mitarbeiter-Dropdown (nur für berechtigte Rollen), Textsuche sowie Filter nach Kategorie und Genehmigungsstatus.</p>
 
 </div>
 <div id="hsec-zulagen" style="display:none">
@@ -1019,7 +1028,7 @@ details.dash-card > summary { list-style: none; cursor: pointer; display: flex; 
 <h4>Untertickets:</h4>
 <p>Ein Ticket kann einem anderen als „Elternticket" zugeordnet werden. Im Elternticket erscheinen alle Untertickets mit direktem Link.</p>
 <h4>Filter:</h4>
-<p>In der Sidebar: Filter nach Status, Fachbereich und Priorität. In der Titelleiste: Textsuche, Tags, Bearbeiter-Filter.</p>
+<p>Direkt <strong>über der Ticketliste</strong>: Textsuche, Status, Fachbereich, Priorität, Tags und Bearbeiter-Filter – alles auf einen Blick, ohne Seitenleiste.</p>
 
 </div>
 <div id="hsec-checklisten" style="display:none">
@@ -1367,7 +1376,18 @@ function showHelpSection(id){
     <div class="mh"><h2>&#128203; Changelog</h2><button class="mc" onclick="closeModal('changelogOv')">&#10005;</button></div>
     <div class="mb2" style="gap:10px">
       <div style="padding:12px;background:rgba(59,109,212,0.06));border:1px solid rgba(59,109,212,.20);border-radius:8px">
-        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.2.4</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.3.0</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
+        <ul style="font-size:12px;line-height:1.8;padding-left:18px">
+          <li>News: Angepinnte &amp; wichtige News erscheinen in der &Uuml;bersicht</li>
+          <li>News: Abgelaufene News werden automatisch ins Archiv verschoben</li>
+          <li>Einstellungen: Pers&ouml;nliche Farbe direkt &auml;nderbar (Einstellungen-Modal)</li>
+          <li>Filter Eintragsuebersicht: Jahr/Monat und Mitarbeiter jetzt direkt im Fenster</li>
+          <li>Filter Tickets: Status, Fachbereich und Priorit&auml;t direkt &uuml;ber der Ticketliste</li>
+          <li>Sidebar zeigt nur noch relevante Navigationselemente</li>
+        </ul>
+      </div>
+      <div style="padding:12px;background:rgba(59,109,212,0.06));border:1px solid rgba(59,109,212,.20);border-radius:8px">
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--sf3);color:var(--mu);padding:2px 8px;border-radius:4px">v2.2.4</span></div>
         <ul style="font-size:12px;line-height:1.8;padding-left:18px">
           <li>News: Wichtig/Angepinnt-Badges in &Uuml;bersicht (auch kombiniert)</li>
           <li>&Uuml;bersicht: Letzter Refresh-Zeitstempel im Header</li>
@@ -1376,7 +1396,6 @@ function showHelpSection(id){
           <li>Wichtige aktive News werden allen Mitarbeitern in der &Uuml;bersicht angezeigt</li>
           <li>Online-Kachel ein-/ausklappbar (Einstellung gespeichert)</li>
           <li>Homeoffice- und Urlaubstage in der &Uuml;bersicht</li>
-          <li>Pers&ouml;nliche Farbe &auml;ndern (Passwort-Modal)</li>
           <li>Diensttausch Archiv (Vormonat-Eintr&auml;ge aufklappbar)</li>
         </ul>
       </div>
@@ -1463,7 +1482,7 @@ function showHelpSection(id){
 </div>
 
 <script>
-const APP_VERSION='2.2.4';
+const APP_VERSION='2.3.0';
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
@@ -1626,6 +1645,23 @@ async function logout(){
   S.currentUser=null;document.getElementById('hdr').style.display='none';document.getElementById('APP').style.display='none';
   await loadLoginUsers();document.getElementById('LS').classList.add('open');
 }
+function openPwModal(){
+  const u=getU(S.currentUser);
+  S.myColor=u?.color||pal()[0];
+  buildCP('myCR',S.myColor,'pickMyColor');
+  document.getElementById('cpw0').value='';document.getElementById('cpw1').value='';document.getElementById('cpw2').value='';
+  openModal('pwModal');
+}
+function pickMyColor(col,cid){S.myColor=col;document.querySelectorAll('#'+cid+' .cp').forEach(el=>el.classList.toggle('on',el.style.backgroundColor===h2r(col)));}
+async function saveMyColor(){
+  try{
+    await api('PUT','/users/'+S.currentUser,{color:S.myColor});
+    await fetchData();
+    const u=getU(S.currentUser);
+    const pa=document.getElementById('pillAv');if(pa){pa.style.background=(u?.color||'#888')+'22';pa.style.color=u?.color||'#888';}
+    toast('\u2705 Farbe gespeichert!');
+  }catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
+}
 async function doChangePW(){
   const c=document.getElementById('cpw0').value,n=document.getElementById('cpw1').value,n2=document.getElementById('cpw2').value;
   if(n.length<6){toast('\u26A0\uFE0F Mindestens 6 Zeichen!');return;}
@@ -1645,10 +1681,7 @@ function setView(v){
 function renderSBF(){
   const el=document.getElementById('sbf');if(!el)return;
   if(S.view==='schedule'||S.view==='calendar'){
-    el.innerHTML=`<div><div class="sfl">Jahr &amp; Monat</div>
-      <div class="yr-row"><button class="yb" onclick="S.year--;renderSBF();renderMain()">&lsaquo;</button><span class="yv">${S.year}</span><button class="yb" onclick="S.year++;renderSBF();renderMain()">&rsaquo;</button></div>
-      <div class="mgrid"><button class="mb ${S.month===null?'on':''}" onclick="S.month=null;renderSBF();renderMain()">Alle</button>${MONTHS.map((m,i)=>`<button class="mb ${S.month===i?'on':''}" onclick="S.month=${i};renderSBF();renderMain()">${m.slice(0,3)}</button>`).join('')}</div></div>
-      ${S.p.seeAllEntries?`<div><div class="sfl">Mitarbeiter</div><select class="flt" style="width:100%" onchange="S.filterUser=this.value||null;renderMain()"><option value="">Alle Mitarbeiter</option>${S.users.filter(u=>!(u.roles||[]).includes('admin')).map(u=>`<option value="${u.id}"${S.filterUser===u.id?'selected':''}>${u.name}</option>`).join('')}</select></div>`:''}`;
+    el.innerHTML='';
   }else if(S.view==='allw'){
     el.innerHTML=`<div><div class="sfl">Jahr</div>
       <div class="yr-row"><button class="yb" onclick="S.allwYear--;renderSBF();renderMain()">&lsaquo;</button><span class="yv">${S.allwYear}</span><button class="yb" onclick="S.allwYear++;renderSBF();renderMain()">&rsaquo;</button></div>
@@ -1664,19 +1697,7 @@ function renderSBF(){
       ${S.p.seeAllAbrechnung?`<div style="margin-top:8px"><div class="sfl">Mitarbeiter</div><select class="flt" style="width:100%" onchange="S.abrUser=this.value||null;renderMain()"><option value="">Alle Mitarbeiter</option>${S.users.filter(u=>!(u.roles||[]).includes('admin')).sort((a,b)=>a.name.localeCompare(b.name,'de')).map(u=>`<option value="${u.id}"${S.abrUser===u.id?'selected':''}>${u.name}</option>`).join('')}</select></div>`:''}
     </div>`;
   }else if(S.view==='tickets'||S.view==='tickets_closed'){
-    const myD=S.tp.seeAll?DEPTS:S.tp.myDepts;
-    el.innerHTML=`<div><div class="sfl">Status</div><div style="display:flex;flex-direction:column;gap:3px">
-      <button class="mb ${!S.tkFiltStatus?'on':''}" onclick="S.tkFiltStatus='';renderMain()" style="text-align:left;padding:5px 8px">Alle</button>
-      ${STATUSES.filter(s=>S.view==='tickets_closed'?(s.id==='closed'):(s.id!=='closed')).map(s=>`<button class="mb ${S.tkFiltStatus===s.id?'on':''}" onclick="S.tkFiltStatus='${s.id}';renderMain()" style="text-align:left;padding:5px 8px;font-size:11px">${s.label}</button>`).join('')}
-    </div></div>
-    <div><div class="sfl">Fachbereich</div><div style="display:flex;flex-direction:column;gap:3px">
-      <button class="mb ${!S.tkFiltDept?'on':''}" onclick="S.tkFiltDept='';renderMain()" style="text-align:left;padding:5px 8px">Alle</button>
-      ${myD.map(d=>`<button class="mb ${S.tkFiltDept===d?'on':''}" onclick="S.tkFiltDept='${d}';renderMain()" style="text-align:left;padding:5px 8px;font-size:11px">${DEPT_LABELS[d]}</button>`).join('')}
-    </div></div>
-    <div><div class="sfl">Priorit\u00e4t</div><div style="display:flex;flex-direction:column;gap:3px">
-      <button class="mb ${!S.tkFiltPrio?'on':''}" onclick="S.tkFiltPrio='';renderMain()" style="text-align:left;padding:5px 8px">Alle</button>
-      ${PRIORITIES.map(p2=>`<button class="mb ${S.tkFiltPrio===p2.id?'on':''}" onclick="S.tkFiltPrio='${p2.id}';renderMain()" style="text-align:left;padding:5px 8px;font-size:11px">${p2.label}</button>`).join('')}
-    </div></div>`;
+    el.innerHTML='';
   }else el.innerHTML='';
 }
 function renderMain(){
@@ -1749,9 +1770,6 @@ function renderHome(){
     // News: Wichtig und/oder Angepinnt → oben in Übersicht
   var importantNewsHtml='';
   var _impNews=(S.news||[]).filter(function(n){return n.isActive&&!n.isExpired&&(n.isImportant||n.isPinned);});
-  // Debug: log news state (temporary)
-  console.log('[News Debug] S.news.length='+S.news.length+', _impNews.length='+_impNews.length);
-  if(S.news.length>0)console.log('[News Debug] first news:', JSON.stringify({isActive:S.news[0].isActive,isImportant:S.news[0].isImportant,isPinned:S.news[0].isPinned,isExpired:S.news[0].isExpired}));
   if(_impNews.length){
     importantNewsHtml='<div style="background:rgba(239,68,68,.04);border:1px solid rgba(239,68,68,.18);border-radius:var(--r);padding:14px;margin-bottom:14px">';
     _impNews.forEach(function(n){
@@ -1891,9 +1909,18 @@ function renderSchedule(){
   const evs=getVisEvts();const ml=S.month!==null?MONTHS[S.month]:'Alle';
   const filterU=S.filterUser?getU(S.filterUser):null;
   document.getElementById('main').innerHTML=`
-    <div class="ph"><div><div class="pt">Eintrags\u00fcbersicht <span>${ml} ${S.year}</span></div>${filterU?`<div style="margin-top:5px"><span class="filter-hint">&#128100; Ansicht von ${filterU.name}</span></div>`:''}</div>
+    <div class="ph"><div class="pt">Eintrags\u00fcbersicht</div>
       <button class="btn-p" onclick="openEvtModal()">&#65291; Eintrag</button></div>
-    <div class="tw"><div class="tt"><h2>Eintr\u00e4ge (${evs.length})</h2>
+    <div class="fbar" style="flex-wrap:wrap;gap:6px">
+      <div class="yr-row" style="margin:0"><button class="yb" onclick="S.year--;renderSBF();renderMain()">&lsaquo;</button><span class="yv">${S.year}</span><button class="yb" onclick="S.year++;renderSBF();renderMain()">&rsaquo;</button></div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
+        <button class="mb ${S.month===null?'on':''}" onclick="S.month=null;renderMain()" style="padding:4px 8px;font-size:12px">Alle</button>
+        ${MONTHS.map((m,i)=>`<button class="mb ${S.month===i?'on':''}" onclick="S.month=${i};renderMain()" style="padding:4px 8px;font-size:12px">${m.slice(0,3)}</button>`).join('')}
+      </div>
+      ${S.p.seeAllEntries?`<select class="flt" style="width:auto;min-width:140px" onchange="S.filterUser=this.value||null;renderMain()"><option value="">Alle Mitarbeiter</option>${S.users.filter(u=>!(u.roles||[]).includes('admin')).map(u=>`<option value="${u.id}"${S.filterUser===u.id?'selected':''}>${u.name}</option>`).join('')}</select>`:''}
+      ${filterU?`<span class="filter-hint">&#128100; ${filterU.name}</span>`:''}
+    </div>
+    <div class="tw"><div class="tt"><h2>Eintr\u00e4ge (${evs.length}) <span style="font-size:13px;font-weight:400;color:var(--mu)">${ml} ${S.year}</span></h2>
       <input class="srch" type="text" placeholder="Suchen \u2026" oninput="filtSched(this.value)">
       <select class="flt" onchange="filtSched(undefined,this.value)" id="scFlt"><option value="">Alle Kategorien</option>${S.categories.map(c=>`<option value="${c.id}">${c.emoji} ${c.label}</option>`).join('')}</select>
       <select class="flt" onchange="_scApFilt=this.value;filtSched()"><option value="">Alle Status</option><option value="pending">\u23f3 Ausstehend</option><option value="approved">\u2713 Genehmigt</option><option value="rejected">\u2717 Abgelehnt</option></select>
@@ -2470,11 +2497,15 @@ function tkIsNew(tk) {
 
 function renderTickets(){
   const closed=S.view==='tickets_closed';const tks=getVisTks(closed);
+  const myD=S.tp.seeAll?DEPTS:S.tp.myDepts;
   document.getElementById('main').innerHTML=`
     <div class="ph"><div class="pt">${closed?'Abgeschlossene':'Offene'} Tickets <span style="font-size:16px;color:var(--mu)">(${tks.length})</span></div>
       <button class="btn-p" onclick="openTkForm(null)">&#65291; Ticket</button></div>
-    <div class="fbar">
-      <input class="srch" type="text" placeholder="Suchen \u2026" value="${S.tkSearch}" oninput="S.tkSearch=this.value;renderMain()" style="width:180px">
+    <div class="fbar" style="flex-wrap:wrap;gap:6px">
+      <input class="srch" type="text" placeholder="Suchen \u2026" value="${S.tkSearch}" oninput="S.tkSearch=this.value;renderMain()" style="width:160px">
+      <select class="flt" onchange="S.tkFiltStatus=this.value;renderMain()"><option value="">Alle Status</option>${STATUSES.filter(s=>closed?(s.id==='closed'):(s.id!=='closed')).map(s=>`<option value="${s.id}"${S.tkFiltStatus===s.id?' selected':''}>${s.label}</option>`).join('')}</select>
+      <select class="flt" onchange="S.tkFiltDept=this.value;renderMain()"><option value="">Alle Bereiche</option>${myD.map(d=>`<option value="${d}"${S.tkFiltDept===d?' selected':''}>${DEPT_LABELS[d]}</option>`).join('')}</select>
+      <select class="flt" onchange="S.tkFiltPrio=this.value;renderMain()"><option value="">Alle Priorit\u00e4ten</option>${PRIORITIES.map(p2=>`<option value="${p2.id}"${S.tkFiltPrio===p2.id?' selected':''}>${p2.label}</option>`).join('')}</select>
       <select class="flt" onchange="S.tkFiltTag=this.value;renderMain()"><option value="">Alle Tags</option>${S.tags.map(t=>`<option value="${t.id}"${S.tkFiltTag===t.id?' selected':''}>${t.label}</option>`).join('')}</select>
       <select class="flt" onchange="S.tkFiltAssignee=this.value;renderMain()"><option value="">Alle Bearbeiter</option>${S.users.map(u=>`<option value="${u.id}"${S.tkFiltAssignee===u.id?' selected':''}>${u.name}</option>`).join('')}</select>
     </div>
