@@ -2061,10 +2061,3 @@ async function doZahnarztUpload(){
   }catch(e){toast('⚠️ '+e.message,'err');}
   finally{loading(false);}
 }
-    });
-    document.getElementById('zahnarztUploadOv')?.remove();
-    await renderZahnarzt();
-    toast(`✅ ${result.count} Einträge importiert!`);
-  } catch(e) { toast('⚠️ ' + e.message, 'err'); }
-  finally { loading(false); }
-}
