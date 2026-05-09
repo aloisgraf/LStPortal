@@ -625,38 +625,37 @@ function renderCalendar(){
 function renderDiensttausch() {
   const canDecide = S.p.canApproveEvents;
   const list = S.diensttausch;
-  // Sichtbarkeit wird server-seitig gefiltert (data.js)
-  // Ungesehen hervorheben
-  function dtRow(dt) {
+  function dtCard(dt) {
     const isNew = !dt.isSeen && dt.isRelevant;
     const creator = getU(dt.createdBy);
     const decider = dt.decidedBy ? getU(dt.decidedBy) : null;
+    const accent = dt.status==='approved'?'var(--ok)':dt.status==='rejected'?'var(--danger)':'var(--warn)';
     const stBadge = dt.status==='pending'
       ? '<span class="bdg ap-bdg-pending">&#8987; Ausstehend</span>'
       : dt.status==='approved'
       ? '<span class="bdg ap-bdg-approved">&#10003; Angenommen</span>'
       : '<span class="bdg ap-bdg-rejected">&#10007; Abgelehnt</span>';
-    return `<div class="dt-row${isNew?' dt-row-new':''}" onclick="markDtSeen('${dt.id}')">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap">
-        <div style="flex:1;min-width:0">
-          <div style="font-size:11px;color:var(--mu);margin-bottom:4px">
-            <strong>${creator?.name||'?'}</strong> &middot; ${fdt(dt.createdAt)}
-            ${isNew?'<span class="tk-new-badge" style="margin-left:6px">NEU</span>':''}
-          </div>
-          <div style="font-size:13px;line-height:1.5;white-space:pre-wrap">${highlightMentions(dt.text||'')}</div>
-          ${dt.rejectReason?`<div style="margin-top:6px;font-size:11px;color:var(--danger);background:rgba(239,68,68,.08);padding:4px 8px;border-radius:4px">&#128680; Grund: ${dt.rejectReason}</div>`:''}
-          ${dt.decidedAt?`<div style="font-size:10px;color:var(--mu);margin-top:4px">Entschieden von ${decider?.name||'?'} am ${fdt(dt.decidedAt)}</div>`:''}
+    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-top:1px solid var(--border)${isNew?';background:rgba(245,158,11,.04)':''}" onclick="markDtSeen('${dt.id}')">
+      <div style="width:3px;align-self:stretch;background:${accent};border-radius:2px;flex-shrink:0"></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:2px">
+          ${isNew?'<span class="tk-new-badge" style="margin-right:4px">NEU</span>':''}${creator?.name||'?'}
         </div>
-        <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end;flex-shrink:0">
+        <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--mu);margin-bottom:6px">
+          <span>${fdt(dt.createdAt)}</span>
           ${stBadge}
-          ${canDecide&&dt.status==='pending'?`
-            <div style="display:flex;gap:4px;margin-top:4px">
-              <button class="btn-ok" style="font-size:11px" onclick="event.stopPropagation();decideDt('${dt.id}','approved')">&#10003; Annehmen</button>
-              <button class="btn-d" style="font-size:11px" onclick="event.stopPropagation();openDtReject('${dt.id}')">&#10007; Ablehnen</button>
-            </div>`:''}
-          ${dt.createdBy===S.currentUser&&dt.status==='pending'?`
-            <button class="btn-d" style="font-size:10px;padding:2px 6px;margin-top:4px" onclick="event.stopPropagation();deleteDt('${dt.id}')">&#128465; L&ouml;schen</button>`:''}
         </div>
+        <div style="font-size:12px;line-height:1.5;white-space:pre-wrap;color:var(--tx)">${highlightMentions(dt.text||'')}</div>
+        ${dt.rejectReason?`<div style="margin-top:6px;font-size:11px;color:var(--danger);background:rgba(239,68,68,.08);padding:4px 8px;border-radius:4px">&#128680; Grund: ${dt.rejectReason}</div>`:''}
+        ${dt.decidedAt?`<div style="font-size:10px;color:var(--mu);margin-top:4px">Entschieden von ${decider?.name||'?'} am ${fdt(dt.decidedAt)}</div>`:''}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end;flex-shrink:0" onclick="event.stopPropagation()">
+        ${canDecide&&dt.status==='pending'?`
+          <button class="btn-ok" style="font-size:11px" onclick="decideDt('${dt.id}','approved')">&#10003; Annehmen</button>
+          <button class="btn-d" style="font-size:11px" onclick="openDtReject('${dt.id}')">&#10007; Ablehnen</button>
+        `:''}
+        ${dt.createdBy===S.currentUser&&dt.status==='pending'?`
+          <button class="btn-d" style="font-size:10px;padding:2px 6px" onclick="deleteDt('${dt.id}')">&#128465; L&ouml;schen</button>`:''}
       </div>
     </div>`;
   }
@@ -673,12 +672,11 @@ function renderDiensttausch() {
         <button class="btn-p" style="margin-top:8px" onclick="createDt()">&#128257; Eintragen</button>
       </div>
     </div>
-    ${list.length?`<div class="tw">
-      <div class="tt"><h2>Alle Einträge (${list.length})</h2></div>
-      ${list.map(dtRow).join('')}
+    ${list.length?`<div style="background:var(--sf);border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px;overflow:hidden">
+      <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:12px;font-weight:700;color:var(--mu)">Alle Einträge (${list.length})</div>
+      ${list.map(dtCard).join('')}
     </div>`:'<div class="empty">Noch keine Diensttausch-Einträge</div>'}`;
 }
-
 async function createDt() {
   const text = document.getElementById('dtText')?.value?.trim();
   if (!text) { toast('&#9888;&#65039; Bitte Text eingeben!'); return; }
@@ -873,18 +871,21 @@ function renderAbrechnung(){
         </div>
         ${canSeeAll?`<div class="tw">
           <div class="tt"><h2>&#128203; Alle Einspringerdienste (${allEinsp.length})</h2></div>
-          ${allEinsp.length?`<table><thead><tr><th>Mitarbeiter</th><th>Datum</th><th>Notiz</th><th>Status</th><th></th></tr></thead><tbody>
-            ${allEinsp.map(e=>{const u=getU(e.userId);const rej=!!e.rejectedBy;return`<tr style="${rej?'opacity:.75':''}">
-              <td><div style="display:flex;align-items:center;gap:5px">${avHtml(u?.initials||'?',u?.color||'#888',20,8)}<span style="font-size:12px;font-weight:600">${u?.name||'?'}</span></div></td>
-              <td style="font-size:12px;white-space:nowrap">${fd(e.date)}</td>
-              <td style="font-size:12px;color:var(--mu)">${e.note||''}</td>
-              <td>${rej?`<span class="bdg pr-high" title="${e.rejectedReason||''}">\u2717 Abgelehnt</span>`:'<span class="bdg ap-bdg-approved">\u2713</span>'}</td>
-              <td><div style="display:flex;gap:4px">
+          ${allEinsp.length?`<div>${allEinsp.map(e=>{const u=getU(e.userId);const rej=!!e.rejectedBy;return`<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--border)${rej?';opacity:.75':''}">
+              <div style="width:3px;align-self:stretch;background:${rej?'var(--danger)':'var(--ok)'};border-radius:2px;flex-shrink:0"></div>
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+                  ${avHtml(u?.initials||'?',u?.color||'#888',18,7)}<span style="font-size:13px;font-weight:600">${u?.name||'?'}</span>
+                  ${rej?`<span class="bdg pr-high" style="font-size:10px" title="${e.rejectedReason||''}">\u2717 Abgelehnt</span>`:'<span class="bdg ap-bdg-approved" style="font-size:10px">\u2713</span>'}
+                </div>
+                <div style="font-size:11px;color:var(--mu)">${fd(e.date)}${e.note?' &middot; '+e.note:''}</div>
+                ${rej&&e.rejectedReason?`<div style="font-size:11px;color:var(--danger);margin-top:2px">Grund: ${e.rejectedReason}</div>`:''}
+              </div>
+              <div style="display:flex;gap:4px;flex-shrink:0">
                 ${!rej?`<button class="btn-warn" onclick="openRejectEinsp('${e.id}')" style="font-size:10px;padding:3px 7px">Ablehnen</button>`:''}
                 ${rej?`<button class="btn-ok" onclick="undoRejectEinsp('${e.id}')" style="font-size:10px;padding:3px 7px">R\u00fccksetzen</button>`:''}
-              </div></td>
-            </tr>`;}).join('')}
-          </tbody></table>`:`<div class="empty">Keine Einspringerdienste</div>`}
+              </div>
+            </div>`;}).join('')}</div>`:`<div class="empty">Keine Einspringerdienste</div>`}
         </div>`:``}
       </div>
       <div>
@@ -904,9 +905,14 @@ function renderAbrechnung(){
         </div>
         ${canSeeAll?`<div class="tw">
           <div class="tt"><h2>&#127968; HO \u00dcbersicht alle MA</h2></div>
-          ${allHO.length?`<table><thead><tr><th>Mitarbeiter</th><th>Monat</th><th style="text-align:center">Tage</th></tr></thead><tbody>
-            ${allHO.map(h=>{const u=getU(h.userId);return`<tr><td><div style="display:flex;align-items:center;gap:5px">${avHtml(u?.initials||'?',u?.color||'#888',20,8)}<span style="font-size:12px">${u?.name||'?'}</span></div></td><td style="font-size:12px">${MONTHS[h.month-1].slice(0,3)} ${h.year}</td><td style="text-align:center;font-weight:600">${h.days}</td></tr>`;}).join('')}
-          </tbody></table>`:`<div class="empty">Keine HO-Eintr\u00e4ge</div>`}
+          ${allHO.length?`<div>${allHO.map(h=>{const u=getU(h.userId);return`<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-top:1px solid var(--border)">
+              <div style="width:3px;align-self:stretch;background:#0ea5e9;border-radius:2px;flex-shrink:0"></div>
+              <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0">
+                ${avHtml(u?.initials||'?',u?.color||'#888',18,7)}<span style="font-size:12px;font-weight:600">${u?.name||'?'}</span>
+                <span style="font-size:11px;color:var(--mu)">${MONTHS[h.month-1].slice(0,3)} ${h.year}</span>
+              </div>
+              <span style="font-size:13px;font-weight:700;color:#0ea5e9">${h.days} Tage</span>
+            </div>`;}).join('')}</div>`:`<div class="empty">Keine HO-Eintr\u00e4ge</div>`}
         </div>`:``}
       </div>
     </div>`;
@@ -971,32 +977,31 @@ function renderDienstplaene(){
     <div class="ph"><div class="pt">&#128196; Dienstpl\u00e4ne</div>${canUp?`<button class="btn-p" onclick="openDpUpload()">&#128228; PDF hochladen</button>`:''}</div>
     <div class="tw" style="margin-bottom:14px">
       <div class="tt"><h2>&#128196; Aktuelle Pl\u00e4ne (${active.length})</h2></div>
-      ${active.length?`<table><thead><tr><th>Monat</th><th>Bezeichnung</th><th>Version</th><th>Hochgeladen</th><th>Von</th><th></th></tr></thead><tbody>
-        ${active.map(d=>`<tr>
-          <td style="font-weight:600;white-space:nowrap">${MONTHS[d.month-1]} ${d.year}</td>
-          <td>${d.label}</td><td><span class="bdg st-open">v${d.version}</span></td>
-          <td style="font-size:11px;color:var(--mu)">${fdt(d.createdAt)}</td>
-          <td style="font-size:12px">${getU(d.createdBy)?.name||'?'}</td>
-          <td><div style="display:flex;gap:5px">
+      ${active.length?`<div>${active.map(d=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--border)">
+          <div style="width:3px;align-self:stretch;background:var(--acc);border-radius:2px;flex-shrink:0"></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:700">${MONTHS[d.month-1]} ${d.year} <span class="bdg st-open" style="margin-left:4px;font-size:10px">v${d.version}</span></div>
+            <div style="font-size:11px;color:var(--mu);margin-top:2px">${d.label} &middot; ${fdt(d.createdAt)} &middot; ${getU(d.createdBy)?.name||'?'}</div>
+          </div>
+          <div style="display:flex;gap:5px;flex-shrink:0">
             <button class="btn-ok" style="font-size:11px;padding:4px 8px" onclick="showPdf('/api/dienstplaene/${d.id}/file','${MONTHS[d.month-1]} ${d.year}')">&#128065; &#214;ffnen</button>
             ${canUp?`<button class="btn-d" onclick="deleteDp('${d.id}')" style="padding:4px 8px">\u2715</button>`:''}
-          </div></td>
-        </tr>`).join('')}
-      </tbody></table>`:`<div class="empty">Noch keine Dienstpl\u00e4ne hochgeladen</div>`}
+          </div>
+        </div>`).join('')}</div>`:`<div class="empty">Noch keine Dienstpl\u00e4ne hochgeladen</div>`}
     </div>
     ${archived.length?`<div class="tw">
       <div class="tt" style="cursor:pointer" onclick="toggleArchiv()"><h2>&#128230; Archiv (${archived.length})</h2><span id="archivBtn" style="font-size:11px;color:var(--mu)">Einblenden</span></div>
-      <div id="archivContent" style="display:none"><table><thead><tr><th>Monat</th><th>Bezeichnung</th><th>Version</th><th>Archiviert</th><th></th></tr></thead><tbody>
-        ${archived.map(d=>`<tr style="opacity:.75">
-          <td style="font-weight:600;white-space:nowrap">${MONTHS[d.month-1]} ${d.year}</td>
-          <td>${d.label}</td><td><span class="bdg st-on_hold">v${d.version}</span></td>
-          <td style="font-size:11px;color:var(--mu)">${fdt(d.archivedAt)}</td>
-          <td><div style="display:flex;gap:5px">
+      <div id="archivContent" style="display:none">${archived.map(d=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--border);opacity:.75">
+          <div style="width:3px;align-self:stretch;background:var(--di);border-radius:2px;flex-shrink:0"></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:700">${MONTHS[d.month-1]} ${d.year} <span class="bdg st-on_hold" style="margin-left:4px;font-size:10px">v${d.version}</span></div>
+            <div style="font-size:11px;color:var(--mu);margin-top:2px">Archiviert: ${fdt(d.archivedAt)}</div>
+          </div>
+          <div style="display:flex;gap:5px;flex-shrink:0">
             <button class="btn-s" style="font-size:11px;padding:4px 8px" onclick="showPdf('/api/dienstplaene/${d.id}/file','${MONTHS[d.month-1]} ${d.year}')">&#128065;</button>
             ${canUp?`<button class="btn-d" onclick="deleteDp('${d.id}')" style="padding:4px 8px;font-size:10px">\u2715</button>`:''}
-          </div></td>
-        </tr>`).join('')}
-      </tbody></table></div>
+          </div>
+        </div>`).join('')}</div>
     </div>`:``}`;
 }
 function toggleArchiv(){const c=document.getElementById('archivContent'),b=document.getElementById('archivBtn');if(!c)return;const s=c.style.display==='none';c.style.display=s?'block':'none';if(b)b.textContent=s?'Ausblenden':'Einblenden';}
@@ -1052,6 +1057,35 @@ function tkIsNew(tk) {
 function renderTickets(){
   const closed=S.view==='tickets_closed';const tks=getVisTks(closed);
   const myD=S.tp.seeAll?DEPTS:S.tp.myDepts;
+  // Sort: parent tickets first, then children directly below their parent
+  const parents=tks.filter(t=>!t.parentTicketId);
+  const children=tks.filter(t=>t.parentTicketId);
+  const sorted=[];
+  parents.forEach(p=>{sorted.push(p);children.filter(c=>c.parentTicketId===p.id).forEach(c=>sorted.push(c));});
+  children.filter(c=>!parents.find(p=>p.id===c.parentTicketId)).forEach(c=>sorted.push(c));
+  const _tkPrioColor={high:'#ef4444',medium:'#f59e0b',low:'#94a3b8',urgent:'#7c3aed'};
+  const cardsHtml=sorted.length?`<div style="background:var(--sf);border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px;overflow:hidden">${sorted.map(tk=>{
+    const asn=getU(tk.assigneeId);const par=tk.parentTicketId?getTk(tk.parentTicketId):null;
+    const nc=tk.notes.filter(n=>n.noteType==='note').length;
+    const isChild=!!tk.parentTicketId;const isNew=tkIsNew(tk);
+    const accent=_tkPrioColor[tk.priority]||'#94a3b8';
+    return`<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--border)${isNew?';background:rgba(245,158,11,.04)':''}" onclick="openTkDetail('${tk.id}')" class="clickable">
+      <div style="width:3px;align-self:stretch;background:${accent};border-radius:2px;flex-shrink:0"></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+          ${isNew?'<span class="tk-new-badge">NEU</span> ':''}${isChild?'<span style="color:var(--di);margin-right:3px">\u21b3</span>':''}<span style="font-family:monospace;font-size:11px;color:var(--mu)">${tk.number}</span> ${tk.title}
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--mu);align-items:center">
+          ${deptBdg(tk.department)}${prioBdg(tk.priority)}${stBdg(tk.status)}
+          ${tagChips(tk.tags)}
+          ${asn?`<div style="display:flex;align-items:center;gap:3px">${avHtml(asn.initials,asn.color,14,6)}<span>${asn.name}</span></div>`:''}
+          ${isChild&&par?`<span style="color:var(--di)">\u2191 ${par.number}</span>`:''}
+          ${nc?`<span>&#128172; ${nc}</span>`:''}
+          <span style="color:var(--di)">${fd(tk.createdAt)}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('')}</div>`:`<div class="empty">&#128235; Keine Tickets</div>`;
   document.getElementById('main').innerHTML=`
     <div class="ph"><div class="pt">${closed?'Abgeschlossene':'Offene'} Tickets <span style="font-size:16px;color:var(--mu)">(${tks.length})</span></div>
       <button class="btn-p" onclick="openTkForm(null)">&#65291; Ticket</button></div>
@@ -1063,32 +1097,7 @@ function renderTickets(){
       <select class="flt" onchange="S.tkFiltTag=this.value;renderMain()"><option value="">Alle Tags</option>${S.tags.map(t=>`<option value="${t.id}"${S.tkFiltTag===t.id?' selected':''}>${t.label}</option>`).join('')}</select>
       <select class="flt" onchange="S.tkFiltAssignee=this.value;renderMain()"><option value="">Alle Bearbeiter</option>${S.users.map(u=>`<option value="${u.id}"${S.tkFiltAssignee===u.id?' selected':''}>${u.name}</option>`).join('')}</select>
     </div>
-    <div class="tw"><div class="tt"><h2>Tickets</h2></div>
-      <div style="overflow-x:auto"><table><thead><tr><th>#</th><th>Titel</th><th>Bereich</th><th>Prio</th><th>Status</th><th>Tags</th><th>Zust\u00e4ndig</th><th>Datum</th></tr></thead>
-      <tbody>${tks.length?(()=>{
-        // Sort: parent tickets first, then children directly below their parent
-        const parents=tks.filter(t=>!t.parentTicketId);
-        const children=tks.filter(t=>t.parentTicketId);
-        const sorted=[];
-        parents.forEach(p=>{sorted.push(p);children.filter(c=>c.parentTicketId===p.id).forEach(c=>sorted.push(c));});
-        // Also add orphan children (parent not in current view)
-        children.filter(c=>!parents.find(p=>p.id===c.parentTicketId)).forEach(c=>sorted.push(c));
-        return sorted.map(tk=>{
-          const asn=getU(tk.assigneeId);const par=tk.parentTicketId?getTk(tk.parentTicketId):null;
-          const nc=tk.notes.filter(n=>n.noteType==='note').length;
-          const isChild=!!tk.parentTicketId;
-          const isNew=tkIsNew(tk);
-          return`<tr class="clickable${isChild?' tk-child-row':''}${isNew?' tk-new-row':''}" onclick="openTkDetail('${tk.id}')">
-            <td style="font-family:monospace;font-size:11px;color:var(--mu);white-space:nowrap${isChild?';padding-left:28px':''}">${isChild?'<span style="color:var(--di);margin-right:3px">↳</span>':''}${tk.number}${isNew?'<span class="tk-new-badge">NEU</span>':''}</td>
-            <td style="max-width:220px"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis${isChild?';padding-left:10px;border-left:3px solid rgba(59,109,212,.3);margin-left:2px':''}">${tk.title}</div>${isChild&&par?`<div style="font-size:10px;color:var(--di);padding-left:10px">↑ ${par.number}: ${par.title.slice(0,25)}</div>`:''}${nc?`<div style="font-size:10px;color:var(--mu)">&#128172; ${nc}</div>`:''}</td>
-            <td>${deptBdg(tk.department)}</td><td>${prioBdg(tk.priority)}</td><td>${stBdg(tk.status)}</td>
-            <td>${tagChips(tk.tags)}</td>
-            <td>${asn?`<div style="display:flex;align-items:center;gap:4px">${avHtml(asn.initials,asn.color,18,8)}<span style="font-size:11px">${asn.name}</span></div>`:'<span style="color:var(--di);font-size:11px">\u2014</span>'}</td>
-            <td style="font-size:11px;color:var(--mu);white-space:nowrap">${fd(tk.createdAt)}</td>
-          </tr>`;
-        }).join('');
-      })():`<tr><td colspan="8"><div class="empty">&#128235; Keine Tickets</div></td></tr>`}
-      </tbody></table></div></div>`;
+    ${cardsHtml}`;
 }
 function openTkDetail(id){
   S.currentTicketId=id;
@@ -1313,9 +1322,8 @@ function renderMessages(){
   const isSent=S.view==='messages_sent';
   const msgs=isSent
     ?S.messages.filter(m=>m.senderId===S.currentUser).sort((a,b)=>b.createdAt.localeCompare(a.createdAt))
-    :S.messages.filter(m=>m.senderId!==S.currentUser) // alle empfangenen bleiben im Eingang
+    :S.messages.filter(m=>m.senderId!==S.currentUser)
       .sort((a,b)=>{
-        // Angepinnte zuerst, dann ungelesene, dann nach Datum
         if(a.pinned&&!b.pinned)return -1;
         if(!a.pinned&&b.pinned)return 1;
         if(!a.isRead&&b.isRead)return -1;
@@ -1323,6 +1331,30 @@ function renderMessages(){
         return b.createdAt.localeCompare(a.createdAt);
       });
   const unread=isSent?[]:msgs.filter(m=>!m.isRead);
+  const cardsHtml=msgs.length?`<div style="background:var(--sf);border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px;overflow:hidden">${msgs.map(m=>{
+    const from=getU(m.senderId);const toUser=m.targetType==='user'?getU(m.targetValue):null;
+    const isPinned=m.pinned||false;
+    const isUnread=!isSent&&!m.isRead;
+    const accent=isPinned?'var(--warn)':isUnread?'var(--acc)':'var(--border)';
+    return`<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--border);cursor:pointer${isUnread?';background:rgba(59,109,212,.03)':''}" onclick="openMsg('${m.id}')">
+      <div style="width:3px;align-self:stretch;background:${accent};border-radius:2px;flex-shrink:0"></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${isPinned?'&#128204; ':''}${isUnread?'&#128276; ':''}${m.title}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--mu);align-items:center">
+          ${isSent?`<span>An: <strong>${toUser?toUser.name:'Alle Mitarbeiter'}</strong></span>`:`<span>Von: <strong>${from?.name||'?'}</strong></span>`}
+          <span>${fdt(m.createdAt)}</span>
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">${m.body.slice(0,80)}${m.body.length>80?'&#8230;':''}</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:5px;flex-shrink:0;align-items:center" onclick="event.stopPropagation()">
+        ${isUnread?`<span class="bdg ap-bdg-pending" style="font-size:10px">&#128276; Neu</span>`:''}
+        ${!isSent&&m.isRead?`<span class="bdg ap-bdg-approved" style="font-size:10px">&#10003; Best&auml;tigt</span>`:''}
+        ${isSent?`<span class="bdg ${m.isRead?'ap-bdg-approved':'ap-bdg-pending'}" style="font-size:10px">${m.isRead?'&#10003; Gelesen':'&#8987; Ausstehend'}</span>`:''}
+        <button class="btn-s" style="font-size:10px;padding:3px 7px" onclick="toggleMsgPinDirect('${m.id}',${isPinned})" title="${isPinned?'Lospinnen':'Anpinnen'}">${isPinned?'&#128204;':'&#128203;'}</button>
+        ${m.senderId===S.currentUser||S.p.manageUsers?`<button class="btn-d" onclick="deleteMsg('${m.id}')" style="padding:4px 8px;font-size:11px">&#10005;</button>`:''}
+      </div>
+    </div>`;
+  }).join('')}</div>`:`<div class="empty" style="padding:30px">&#128235; ${isSent?'Keine gesendeten Nachrichten':'Keine Nachrichten'}</div>`;
   document.getElementById('main').innerHTML=`
     <div class="ph"><div class="pt">Nachrichten</div>${S.p.canSendMessages?`<button class="btn-p" onclick="openMsgForm()">&#9993;&#65039; Verfassen</button>`:''}</div>
     <div class="atabs" style="margin-bottom:14px;border-bottom:1px solid var(--border)">
@@ -1330,25 +1362,7 @@ function renderMessages(){
       <button class="tb ${isSent?'on':''}" onclick="setView('messages_sent')">&#128228; Gesendet (${S.messages.filter(m=>m.senderId===S.currentUser).length})</button>
     </div>
     ${!isSent&&unread.length?`<div style="padding:10px 14px;margin-bottom:12px;background:rgba(239,68,68,0.04));border:1px solid rgba(239,68,68,.20);border-radius:var(--r);font-size:12px;font-weight:600;color:var(--danger)">&#128276; ${unread.length} unbest\u00e4tigte Nachricht${unread.length>1?'en':''}</div>`:''}
-    ${msgs.length?msgs.map(m=>{
-      const from=getU(m.senderId);const toUser=m.targetType==='user'?getU(m.targetValue):null;
-      const isPinned=m.pinned||false;
-      return`<div class="msg-card${!isSent&&!m.isRead?' unread':''}" style="${isPinned?'border-left-color:var(--warn)':''};cursor:pointer" onclick="openMsg('${m.id}')">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap">
-          <div style="flex:1;min-width:0">
-            <div class="msg-title">${isPinned?'&#128204; ':''}${!isSent&&!m.isRead?'&#128276; ':''}${m.title}</div>
-            <div class="msg-meta">${isSent?`An: <strong>${toUser?toUser.name:'Alle Mitarbeiter'}</strong> &middot; `:`Von: <strong>${from?.name||'?'}</strong> &middot; `}${fdt(m.createdAt)}</div>
-            <div class="msg-body" style="margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.body.slice(0,120)}${m.body.length>120?'&#8230;':''}</div>
-          </div>
-          <div style="display:flex;gap:5px;flex-shrink:0;align-items:flex-start" onclick="event.stopPropagation()">
-            ${!isSent&&!m.isRead?`<span class="bdg ap-bdg-pending" style="font-size:10px">&#128276; Neu</span>`:''}            ${!isSent&&m.isRead?`<span class="bdg ap-bdg-approved" style="font-size:10px">&#10003; Best&auml;tigt</span>`:''}
-            ${isSent?`<span class="bdg ${m.isRead?'ap-bdg-approved':'ap-bdg-pending'}" style="font-size:10px">${m.isRead?'&#10003; Gelesen':'&#8987; Ausstehend'}</span>`:''}
-            <button class="btn-s" style="font-size:10px;padding:3px 7px" onclick="toggleMsgPinDirect('${m.id}',${isPinned})" title="${isPinned?'Lospinnen':'Anpinnen'}">${isPinned?'&#128204;':'&#128203;'}</button>
-            ${m.senderId===S.currentUser||S.p.manageUsers?`<button class="btn-d" onclick="deleteMsg('${m.id}')" style="padding:4px 8px;font-size:11px">&#10005;</button>`:''}
-          </div>
-        </div>
-      </div>`;
-    }).join(''):`<div class="empty" style="padding:30px">&#128235; ${isSent?'Keine gesendeten Nachrichten':'Keine Nachrichten'}</div>`}  `;
+    ${cardsHtml}`;
 }
 var _currentMsgId=null;
 function openMsg(id){
@@ -1704,32 +1718,36 @@ function renderNews(){
   var canEdit=S.p.manageUsers||(getU(S.currentUser)?.roles||[]).includes('leitung');
   var today=new Date().toISOString().slice(0,10);
   var news=S.news||[];
-  var canEdit=S.p.manageUsers||(getU(S.currentUser)?.roles||[]).includes('leitung');
   var display=isArchiv?news.filter(function(n){return n.isExpired;}):news.filter(function(n){return !n.isExpired;});
   function fmtDate(d){if(!d)return'';var p=String(d).slice(0,10);return p.slice(8)+'.'+p.slice(5,7)+'.'+p.slice(0,4);}
   var h='<div class="ph"><div class="pt">&#128240; '+(isArchiv?'News-Archiv':'Aktuelle News')+'</div>'+(canEdit&&!isArchiv?'<button class="btn-p" onclick="openNewsForm(null)">&#65291; News erstellen</button>':'')+'</div>';
   if(!display.length){h+='<div class="empty">&#128240; Noch keine News</div>';document.getElementById('main').innerHTML=h;return;}
+  h+='<div style="background:var(--sf);border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px;overflow:hidden">';
   display.forEach(function(n){
     var isPast=n.fromDate&&today<n.fromDate;
-    var opac=(canEdit&&isPast)?'opacity:.6;':'';
-    var bg=n.isImportant?'rgba(239,68,68,.05);border-left:3px solid var(--danger)':'var(--sf);border-left:3px solid var(--acc)';
-    h+='<div style="padding:14px;background:'+bg+';border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px;'+opac+'">';
-    h+='<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap">';
-    h+='<div style="flex:1">';
-    h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">';
-    if(n.isImportant)h+='<span class="bdg ap-bdg-rejected" style="font-size:10px">&#9888;&#65039; Wichtig</span>';
-    h+='<span style="font-size:15px;font-weight:700">'+escHtml(n.title)+'</span>';
-    if(isPast&&canEdit)h+='<span class="bdg ap-bdg-pending" style="font-size:10px">Ab '+fmtDate(n.fromDate)+'</span>';
+    var opac=(canEdit&&isPast)?';opacity:.6':'';
+    var accent=n.isImportant?'#ef4444':'var(--acc)';
+    var badges='';
+    if(n.isImportant)badges+='<span class="bdg ap-bdg-rejected" style="font-size:10px">&#9888;&#65039; Wichtig</span> ';
+    if(isPast&&canEdit)badges+='<span class="bdg ap-bdg-pending" style="font-size:10px">Ab '+fmtDate(n.fromDate)+'</span>';
+    h+='<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--border)'+opac+'">';
+    h+='<div style="width:3px;align-self:stretch;background:'+accent+';border-radius:2px;flex-shrink:0"></div>';
+    h+='<div style="flex:1;min-width:0">';
+    h+='<div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:2px">'+badges+escHtml(n.title)+'</div>';
+    h+='<div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--mu)">';
+    h+='<span>Von: <strong>'+(getU(n.createdBy)?.name||'?')+'</strong></span>';
+    if(n.fromDate)h+='<span>Ab: '+fmtDate(n.fromDate)+'</span>';
+    if(n.toDate)h+='<span>Bis: '+fmtDate(n.toDate)+'</span>';
     h+='</div>';
-    h+='<div style="font-size:13px;line-height:1.6;white-space:pre-wrap">'+n.body+'</div>';
-    h+='<div style="font-size:11px;color:var(--mu);margin-top:8px">Von: <strong>'+(getU(n.createdBy)?.name||'?')+'</strong>'+(n.fromDate?' · Ab: '+fmtDate(n.fromDate):'')+(n.toDate?' · Bis: '+fmtDate(n.toDate):'')+'</div>';
+    h+='<div style="font-size:12px;line-height:1.5;color:var(--tx);margin-top:6px;white-space:pre-wrap">'+n.body.slice(0,300)+(n.body.length>300?'\u2026':'')+'</div>';
     h+='</div>';
     h+='<div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end;flex-shrink:0">';
     h+='<button class="btn-s" style="font-size:11px" onclick="toggleNewsPin(\''+n.id+'\','+n.isPinned+')">'+(n.isPinned?'&#128204; Lospinnen':'&#128203; Anpinnen')+'</button>';
     if(canEdit)h+='<button class="btn-e" style="font-size:11px" onclick="openNewsForm(\''+n.id+'\')">&#10000;</button>';
     if(canEdit)h+='<button class="btn-d" style="font-size:11px" onclick="deleteNews(\''+n.id+'\')">&#10005;</button>';
-    h+='</div></div></div>';
+    h+='</div></div>';
   });
+  h+='</div>';
   document.getElementById('main').innerHTML=h;
 }
 function openNewsForm(id){
