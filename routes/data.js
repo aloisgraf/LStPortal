@@ -66,6 +66,7 @@ router.get('/', auth, async (req,res) => {
         seeAllAbrechnung:p.seeAllAbrechnung,
         myDepts:tp.myDepts, seeAllTickets:tp.seeAll,
         canSetPublic:tp.canSetPublic, canAssign:tp.canAssign,
+        roles: p.roles,
       },
       users: usersRaw.map(u=>({
         id:u.id, name:u.name, initials:u.initials, roles:parseRoles(u.roles),
