@@ -110,6 +110,14 @@ async function initDB() {
       archived_at TIMESTAMPTZ,
       created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
     );
+    CREATE TABLE IF NOT EXISTS zahnarzt_dienste (
+      id TEXT PRIMARY KEY, bezirk TEXT NOT NULL DEFAULT '',
+      datum DATE NOT NULL, tag TEXT NOT NULL DEFAULT '',
+      uhrzeit TEXT NOT NULL DEFAULT '', erreichbarkeit TEXT NOT NULL DEFAULT '',
+      zahnarzt TEXT NOT NULL,
+      created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
   `);
 
   const migs = [
@@ -238,11 +246,12 @@ app.use(session({
 }));
 
 // ── ROUTES ──
-app.use('/api/auth',    require('./routes/auth'));
-app.use('/api/data',    require('./routes/data'));
-app.use('/api/events',  require('./routes/events'));
-app.use('/api/tickets', require('./routes/tickets'));
-app.use('/api',         require('./routes/misc'));
+app.use('/api/auth',     require('./routes/auth'));
+app.use('/api/data',     require('./routes/data'));
+app.use('/api/events',   require('./routes/events'));
+app.use('/api/tickets',  require('./routes/tickets'));
+app.use('/api/zahnarzt', require('./routes/zahnarzt'));
+app.use('/api',          require('./routes/misc'));
 
 app.get('*', (req,res) => res.sendFile(path.join(__dirname,'public','index.html')));
 
