@@ -442,38 +442,55 @@ function renderSchedule(){
       ${S.p.seeAllEntries?`<select class="flt" style="width:auto;min-width:140px" onchange="S.filterUser=this.value||null;renderMain()"><option value="">Alle Mitarbeiter</option>${S.users.filter(u=>!(u.roles||[]).includes('admin')).map(u=>`<option value="${u.id}"${S.filterUser===u.id?'selected':''}>${u.name}</option>`).join('')}</select>`:''}
       ${filterU?`<span class="filter-hint">&#128100; ${filterU.name}</span>`:''}
     </div>
-    <div class="tw"><div class="tt"><h2>Eintr\u00e4ge (${evs.length}) <span style="font-size:13px;font-weight:400;color:var(--mu)">${ml} ${S.year}</span></h2>
-      <input class="srch" type="text" placeholder="Suchen \u2026" oninput="filtSched(this.value)">
+    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+      <h2 style="margin:0;font-size:15px">Eintr\u00e4ge (${evs.length}) <span style="font-size:13px;font-weight:400;color:var(--mu)">${ml} ${S.year}</span></h2>
+      <input class="srch" type="text" placeholder="Suchen \u2026" oninput="filtSched(this.value)" style="margin-left:auto">
       <select class="flt" onchange="filtSched(undefined,this.value)" id="scFlt"><option value="">Alle Kategorien</option>${S.categories.map(c=>`<option value="${c.id}">${c.emoji} ${c.label}</option>`).join('')}</select>
       <select class="flt" onchange="_scApFilt=this.value;filtSched()"><option value="">Alle Status</option><option value="pending">\u23f3 Ausstehend</option><option value="approved">\u2713 Genehmigt</option><option value="rejected">\u2717 Abgelehnt</option></select>
     </div>
-    <div style="overflow-x:auto"><table><thead><tr><th>Datum</th><th>Zeit</th><th>Mitarbeiter</th><th>Kategorie</th><th>Beschreibung</th><th>Status</th><th>Aktionen</th></tr></thead>
-    <tbody id="scTb">${buildEvRows(evs)}</tbody></table></div>
-    ${!evs.length?'<div class="empty">&#128235; Keine Eintr\u00e4ge</div>':''}
-    </div>`;
+    <div id="scTb">${buildEvCards(evs)}</div>
+    ${!evs.length?'<div class="empty">&#128235; Keine Eintr\u00e4ge</div>':''}`;
 }
-function buildEvRows(evs){
-  return evs.map(ev=>{
-    const anon=ev._anonymized||false;
-    const cat=getCat(ev.category)||{label:'?',color:'#888',emoji:'&#128204;'};
-    const emp=ev.isGeneral?null:anon?null:(getU(ev.userId)||{name:'?',color:'#888',initials:'?'});
-    const ds=ev.dateTo&&ev.dateTo!==ev.dateFrom?`${fd(ev.dateFrom)} \u2013 ${fd(ev.dateTo)}`:fd(ev.dateFrom);
-    const ts=ev.timeFrom?(ev.timeTo?`${ev.timeFrom}\u2013${ev.timeTo}`:ev.timeFrom):'\u2014';
-    const canDel=(ev.isGeneral&&S.p.addGeneral)||ev._canEdit||S.p.canApproveEvents||S.p.manageUsers;
-    const empCell=ev.isGeneral?`<span class="bdg" style="background:rgba(16,185,129,.12);color:var(--ok)">&#127760; Allgemein</span>`
-      :anon?`<span class="bdg" style="background:var(--sf2);color:var(--di)">&#128274; Anonym</span>`
-      :`<div style="display:flex;align-items:center;gap:5px">${avHtml(emp.initials,emp.color,20,9)}<span>${emp.name}</span></div>`;
-    const catCell=anon?`<span style="color:var(--di)">\u2014</span>`:`<span class="bdg" style="background:${cat.color}1a;color:${cat.color}">${cat.emoji} ${cat.label}</span>`;
-    const apActions=(!ev.isGeneral&&S.p.canApproveEvents&&!anon&&ev.approvalStatus!=='approved'&&ev.approvalStatus!=='rejected')?
-      `<button class="btn-ok" onclick="approveEvt('${ev.id}','approved')">\u2713</button><button class="btn-d" onclick="approveEvt('${ev.id}','rejected')">\u2717</button>`:'';
-    return`<tr${ev.isGeneral?' style="background:rgba(16,185,129,.03)"':anon?' style="opacity:.7"':''}>
-      <td style="white-space:nowrap;font-size:12px;color:var(--mu)">${ds}</td><td style="font-size:11px;color:var(--mu)">${ts}</td>
-      <td>${empCell}</td><td>${catCell}</td>
-      <td style="max-width:170px;font-size:12px">${anon?'<span style="color:var(--di);font-style:italic">Anonymisiert</span>':(ev.reason||'').slice(0,50)}</td>
-      <td>${ev.isGeneral?'':apBdg(ev.approvalStatus||'pending')}</td>
-      <td><div style="display:flex;gap:4px">${apActions}${ev._canEdit?`<button class="btn-e" onclick="openEditEvt('${ev.id}')">\u270e</button>`:''}${canDel?`<button class="btn-d" onclick="deleteEvt('${ev.id}')">\u2715</button>`:''}</div></td>
-    </tr>`;
-  }).join('');
+function buildEvCards(evs){
+  if(!evs.length)return'';
+  // Group by month when viewing "all", otherwise flat
+  const grouped=S.month!==null?{null:evs}:(()=>{const g={};evs.forEach(ev=>{const d=new Date(ev.dateFrom);const k=d.getFullYear()+'-'+String(d.getMonth()).padStart(2,'0');if(!g[k])g[k]={month:d.getMonth(),year:d.getFullYear(),evs:[]};g[k].evs.push(ev);});return g;})();
+  let html='';
+  Object.values(grouped).forEach(grp=>{
+    const items=S.month!==null?evs:grp.evs;
+    if(S.month===null)html+=`<div style="font-size:12px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;margin:14px 0 6px">${MONTHS[grp.month]} ${grp.year}</div>`;
+    html+=`<div style="background:var(--sf);border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px;overflow:hidden">`;
+    html+=items.map(ev=>{
+      const anon=ev._anonymized||false;
+      const cat=getCat(ev.category)||{label:'?',color:'#888',emoji:'&#128204;'};
+      const emp=ev.isGeneral?null:anon?null:(getU(ev.userId)||{name:'?',color:'#888',initials:'?'});
+      const ds=ev.dateTo&&ev.dateTo!==ev.dateFrom?`${fd(ev.dateFrom)} \u2013 ${fd(ev.dateTo)}`:fd(ev.dateFrom);
+      const ts=ev.timeFrom?(ev.timeTo?`${ev.timeFrom}\u2013${ev.timeTo}`:ev.timeFrom):'\u2014';
+      const accentColor=anon?'#94a3b8':cat.color||'var(--acc)';
+      const canDel=(ev.isGeneral&&S.p.addGeneral)||ev._canEdit||S.p.canApproveEvents||S.p.manageUsers;
+      const empChip=ev.isGeneral?`<span class="bdg" style="background:rgba(16,185,129,.12);color:var(--ok)">&#127760; Allgemein</span>`
+        :anon?`<span class="bdg" style="background:var(--sf2);color:var(--di)">&#128274; Anonym</span>`
+        :`<span>${avHtml(emp.initials,emp.color,16,7)}</span><span>${emp.name}</span>`;
+      const catChip=anon?`<span style="color:var(--di)">\u2014</span>`:`<span class="bdg" style="background:${cat.color}1a;color:${cat.color}">${cat.emoji} ${cat.label}</span>`;
+      const apActions=(!ev.isGeneral&&S.p.canApproveEvents&&!anon&&ev.approvalStatus!=='approved'&&ev.approvalStatus!=='rejected')?
+        `<button class="btn-ok" onclick="approveEvt('${ev.id}','approved')">\u2713</button><button class="btn-d" onclick="approveEvt('${ev.id}','rejected')">\u2717</button>`:'';
+      return`<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--border)${anon?';opacity:.7':''}">
+        <div style="width:3px;align-self:stretch;background:${accentColor};border-radius:2px;flex-shrink:0"></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:2px">${anon?'<span style="color:var(--di);font-style:italic">Anonymisiert</span>':(ev.reason||'\u2014').slice(0,80)}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--mu);align-items:center">
+            <span>&#128197; ${ds}</span>${ts!=='\u2014'?`<span>&#128336; ${ts}</span>`:''}
+            ${empChip}${catChip}
+            ${ev.isGeneral?'':apBdg(ev.approvalStatus||'pending')}
+          </div>
+        </div>
+        <div style="display:flex;gap:4px;flex-shrink:0">${apActions}${ev._canEdit?`<button class="btn-e" onclick="openEditEvt('${ev.id}')">\u270e</button>`:''}${canDel?`<button class="btn-d" onclick="deleteEvt('${ev.id}')">\u2715</button>`:''}</div>
+      </div>`;
+    }).join('');
+    if(S.month===null)html+=`</div>`;
+    else html+=`</div>`;
+  });
+  return html;
 }
 let _scApFilt='';
 function filtSched(srch,cat){
@@ -484,7 +501,7 @@ function filtSched(srch,cat){
   if(s)evs=evs.filter(ev=>{const un=getU(ev.userId)?.name.toLowerCase()||'';return(ev.reason||'').toLowerCase().includes(s)||un.includes(s);});
   if(c)evs=evs.filter(ev=>ev.category===c);
   if(_scApFilt)evs=evs.filter(ev=>(ev.approvalStatus||'pending')===_scApFilt);
-  tb.innerHTML=buildEvRows(evs);
+  tb.innerHTML=buildEvCards(evs);
 }
 function openEvtModal(){
   document.getElementById('fEvId').value='';document.getElementById('evtOvT').textContent='Neuer Eintrag';
