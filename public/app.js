@@ -1824,12 +1824,14 @@ function initPersistCards() {
 // SECTION: Zahnarzt Dienstplan
 // ══════════════════════════════════════════
 
-// Week helpers
+// Entry lookup – avoids JSON-in-onclick bugs
+const _zdMap = {};
+function _zdGet(id) { return _zdMap[id]; }
+
 function weekMonday(isoDate) {
   const d = new Date(isoDate + 'T00:00:00');
-  const dow = d.getDay(); // 0=Sun
-  const diff = (dow === 0 ? -6 : 1 - dow);
-  d.setDate(d.getDate() + diff);
+  const dow = d.getDay();
+  d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
   return d.toISOString().slice(0, 10);
 }
 function addDays(iso, n) {
@@ -1846,16 +1848,16 @@ function fmtWeekLabel(monISO) {
 async function loadZahnarztData() {
   try {
     const today = new Date().toISOString().slice(0, 10);
-    let from, to;
+    let qs = '';
     if (S.zahnarztWeek) {
-      from = S.zahnarztWeek;
-      to   = addDays(S.zahnarztWeek, 6);
+      qs = '?from=' + S.zahnarztWeek + '&to=' + addDays(S.zahnarztWeek, 6);
     } else {
-      from = today; // from today, no upper limit
+      qs = '?from=' + today;
     }
-    const params = from ? ('?from=' + from + (to ? '&to=' + to : '')) : '';
-    S.zahnarztData = await api('GET', '/zahnarzt/dienste' + params) || [];
-  } catch(e) { S.zahnarztData = []; console.error('loadZahnarzt:', e); }
+    S.zahnarztData = await api('GET', '/zahnarzt/dienste' + qs) || [];
+    // rebuild lookup
+    for (const e of S.zahnarztData) _zdMap[e.id] = e;
+  } catch(e) { S.zahnarztData = []; }
 }
 
 async function renderZahnarzt() {
@@ -1864,180 +1866,162 @@ async function renderZahnarzt() {
 }
 
 function _renderZahnarzt() {
-  const today    = new Date().toISOString().slice(0, 10);
-  const holidays = getAustrianHolidays(new Date().getFullYear());
-  // also check next year for upcoming holidays
-  const holidays2 = getAustrianHolidays(new Date().getFullYear() + 1);
-  const allHolidays = new Set([...holidays, ...holidays2]);
-
-  const canUpload = (S.p.roles||[]).some(r => ['admin','technik'].includes(r));
-  const weekLbl   = S.zahnarztWeek ? fmtWeekLabel(S.zahnarztWeek) : 'Ab heute';
+  const today   = new Date().toISOString().slice(0, 10);
+  const hols    = new Set([...getAustrianHolidays(new Date().getFullYear()),
+                           ...getAustrianHolidays(new Date().getFullYear()+1)]);
+  const canEdit = !!(S.p.roles||[]).some(r=>['admin','technik','leitung','dienstplanung'].includes(r));
+  const canDel  = !!(S.p.roles||[]).some(r=>['admin','technik'].includes(r));
 
   // Group by date
   const byDate = {};
   for (const e of S.zahnarztData) {
-    if (!byDate[e.datum]) byDate[e.datum] = [];
-    byDate[e.datum].push(e);
+    (byDate[e.datum] = byDate[e.datum]||[]).push(e);
   }
   const dates = Object.keys(byDate).sort();
 
-  function rowStyle(datum) {
-    if (datum === today) return 'background:rgba(16,185,129,.07);border-left:4px solid var(--ok)';
-    const isWeOrHol = allHolidays.has(datum) || (()=>{ const dow=(new Date(datum+'T00:00:00')).getDay(); return dow===0||dow===6; })();
-    if (datum > today && isWeOrHol) return 'background:rgba(245,158,11,.05);border-left:4px solid var(--warn)';
-    if (datum < today) return 'opacity:.55';
-    return '';
-  }
-  function dateLbl(datum) {
-    const dow = ['So','Mo','Di','Mi','Do','Fr','Sa'][(new Date(datum+'T00:00:00')).getDay()];
-    const p = datum.split('-');
-    return `${dow}, ${p[2]}.${p[1]}.${p[0]}`;
-  }
-  function dateClass(datum) {
-    if (datum === today) return 'color:var(--ok);font-weight:800';
-    const dow = (new Date(datum+'T00:00:00')).getDay();
-    if (allHolidays.has(datum) || dow===0 || dow===6) return 'color:var(--warn);font-weight:700';
-    if (datum < today) return 'color:var(--di)';
-    return 'color:var(--mu)';
+  const DOW = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+  function dayInfo(datum) {
+    const d = new Date(datum+'T00:00:00');
+    const dow = d.getDay();
+    const isHol = hols.has(datum);
+    const isWe  = dow===0||dow===6;
+    const isTod = datum===today;
+    const isPast= datum<today;
+    return { dow, isHol, isWe, isTod, isPast,
+      label: DOW[dow]+', '+datum.slice(8)+'.'+datum.slice(5,7)+'.'+datum.slice(0,4) };
   }
 
-  let rows = '';
-  for (const datum of dates) {
-    const entries = byDate[datum];
-    const rs = rowStyle(datum);
-    const dc = dateClass(datum);
-    const isToday = datum === today;
-    rows += `<tr style="${rs}">
-      <td rowspan="${entries.length}" style="white-space:nowrap;vertical-align:top;padding-top:10px">
-        <span style="${dc}">${dateLbl(datum)}</span>
-        ${isToday ? '<span class="bdg ap-bdg-approved" style="font-size:10px;display:inline-block;margin-left:4px">Heute</span>' : ''}
-        ${allHolidays.has(datum) ? '<div style="font-size:10px;color:var(--warn)">Feiertag</div>' : ''}
-      </td>
-      ${_zahnarztEntryRow(entries[0])}
-    </tr>`;
-    for (let i = 1; i < entries.length; i++) {
-      rows += `<tr style="${rs}">${_zahnarztEntryRow(entries[i])}</tr>`;
+  function dayHeader(datum) {
+    const { isHol, isWe, isTod, isPast, label } = dayInfo(datum);
+    let bg='', border='', textCol='var(--tx)', badge='';
+    if (isTod)       { bg='rgba(16,185,129,.10)'; border='#10b981'; textCol='var(--ok)'; badge='<span class="bdg ap-bdg-approved" style="font-size:10px">Heute</span>'; }
+    else if (isPast) { bg='var(--sf2)'; border='var(--border)'; textCol='var(--di)'; }
+    else if (isHol)  { bg='rgba(124,58,237,.06)'; border='#7c3aed'; textCol='var(--info)'; badge='<span class="bdg" style="font-size:10px;background:rgba(124,58,237,.12);color:var(--info)">Feiertag</span>'; }
+    else if (isWe)   { bg='rgba(245,158,11,.07)'; border='var(--warn)'; textCol='var(--warn)'; badge='<span class="bdg" style="font-size:10px;background:rgba(245,158,11,.12);color:var(--warn)">Wochenende</span>'; }
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;background:${bg};border-left:4px solid ${border};border-radius:var(--r) var(--r) 0 0">
+      <span style="font-size:13px;font-weight:700;color:${textCol}">${label}</span>
+      ${badge}
+    </div>`;
+  }
+
+  function entryCard(e) {
+    const { isPast } = dayInfo(e.datum);
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--border);${isPast?'opacity:.6':''}">
+      <div style="width:3px;align-self:stretch;background:var(--acc);border-radius:2px;flex-shrink:0"></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:2px">${escHtml(e.zahnarzt)}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--mu)">
+          ${e.bezirk?`<span>&#127757; ${escHtml(e.bezirk)}</span>`:''}
+          ${e.uhrzeit?`<span>&#128336; ${escHtml(e.uhrzeit)}</span>`:''}
+          ${e.erreichbarkeit&&e.erreichbarkeit!=='-'?`<span>&#128222; ${escHtml(e.erreichbarkeit)}</span>`:''}
+        </div>
+      </div>
+      <button class="btn-e" style="flex-shrink:0;font-size:12px;padding:5px 8px" onclick="_zdOpen('${e.id}')">&#9998;</button>
+    </div>`;
+  }
+
+  let cards = '';
+  if (!dates.length) {
+    cards = `<div class="empty" style="padding:40px">&#129464; Keine Eintr&auml;ge f&uuml;r diesen Zeitraum</div>`;
+  } else {
+    for (const datum of dates) {
+      cards += `<div style="background:var(--sf);border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px;overflow:hidden">
+        ${dayHeader(datum)}
+        ${byDate[datum].map(entryCard).join('')}
+      </div>`;
     }
   }
-  if (!rows) rows = `<tr><td colspan="6" class="empty">Keine Einträge für diesen Zeitraum</td></tr>`;
 
+  const weekLbl = S.zahnarztWeek ? fmtWeekLabel(S.zahnarztWeek) : '';
   document.getElementById('main').innerHTML = `
-    <div class="ph"><div class="pt">&#129464; Dienstplan Zahn&#228;rzte</div>
-      ${canUpload ? `<button class="btn-p" onclick="openZahnarztUpload()">&#128196; Excel importieren</button>` : ''}
+    <div class="ph">
+      <div class="pt">&#129464; Dienstplan Zahn&#228;rzte</div>
+      <div style="display:flex;gap:6px">
+        ${canEdit?`<button class="btn-s" onclick="_zdOpen(null)">&#65291; Eintrag</button>`:''}
+        ${canDel?`<button class="btn-p" onclick="openZahnarztUpload()">&#128196; Excel</button>`:''}
+      </div>
     </div>
-    <div class="fbar" style="flex-wrap:wrap;gap:6px;align-items:center">
+    <div class="fbar" style="gap:6px;align-items:center;flex-wrap:wrap">
       <button class="yb" onclick="zahnarztWeekPrev()">&#8249;</button>
       <button class="mb ${!S.zahnarztWeek?'on':''}" style="padding:4px 10px;font-size:12px" onclick="S.zahnarztWeek=null;renderZahnarzt()">Ab heute</button>
-      <span style="font-size:13px;font-weight:600;min-width:140px;text-align:center">${S.zahnarztWeek ? weekLbl : ''}</span>
+      ${S.zahnarztWeek?`<span style="font-size:13px;font-weight:600;color:var(--acc)">${weekLbl}</span>`:''}
       <button class="yb" onclick="zahnarztWeekNext()">&#8250;</button>
+      <span style="font-size:11px;color:var(--di);margin-left:4px">${dates.length} Tag${dates.length!==1?'e':''}, ${S.zahnarztData.length} Eintrag${S.zahnarztData.length!==1?'e':''}</span>
     </div>
-    <div class="tw"><div style="overflow-x:auto">
-      <table>
-        <thead><tr>
-          <th style="min-width:130px">Datum</th>
-          <th>Bezirk</th>
-          <th>Zahnarzt / Ordination</th>
-          <th>Uhrzeit</th>
-          <th>Erreichbarkeit</th>
-          <th style="width:80px"></th>
-        </tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>
-    ${canUpload ? `<div style="padding:10px 14px;border-top:1px solid var(--border)">
-      <button class="btn-p" onclick="openZahnarztAdd()">&#65291; Eintrag hinzufügen</button>
-    </div>` : ''}
-    </div>`;
-}
-
-function _zahnarztEntryRow(e) {
-  return `<td style="font-size:12px">${escHtml(e.bezirk)}</td>
-    <td style="font-size:12px;font-weight:500">${escHtml(e.zahnarzt)}</td>
-    <td style="font-size:12px;white-space:nowrap">${escHtml(e.uhrzeit)}</td>
-    <td style="font-size:12px">${escHtml(e.erreichbarkeit)}</td>
-    <td><button class="btn-e" style="font-size:11px" onclick="openZahnarztEdit(${JSON.stringify(e)})">&#9998;</button>
-    </td>`;
+    <div>${cards}</div>`;
 }
 
 function zahnarztWeekPrev() {
-  const cur = S.zahnarztWeek || weekMonday(new Date().toISOString().slice(0,10));
-  S.zahnarztWeek = addDays(cur, -7);
+  S.zahnarztWeek = addDays(S.zahnarztWeek||weekMonday(new Date().toISOString().slice(0,10)), -7);
   renderZahnarzt();
 }
 function zahnarztWeekNext() {
-  const cur = S.zahnarztWeek || weekMonday(new Date().toISOString().slice(0,10));
-  S.zahnarztWeek = addDays(cur, 7);
+  S.zahnarztWeek = addDays(S.zahnarztWeek||weekMonday(new Date().toISOString().slice(0,10)), 7);
   renderZahnarzt();
 }
 
-// ── Edit / Add modal ──────────────────────────────────────────────
-function openZahnarztEdit(e) {
-  _openZahnarztForm(e);
-}
-function openZahnarztAdd() {
-  _openZahnarztForm(null);
-}
-
-function _openZahnarztForm(e) {
-  const isEdit = !!e;
+// ── Edit modal (ID-based, no JSON-in-onclick) ─────────────────────
+function _zdOpen(id) {
+  const e = id ? _zdGet(id) : null;
+  const canDel = id && !!(S.p.roles||[]).some(r=>['admin','technik'].includes(r));
   const ov = document.createElement('div');
-  ov.className = 'ov'; ov.id = 'zahnarztFormOv';
-  ov.innerHTML = `<div class="modal sm">
-    <div class="mh"><h2>${isEdit ? '&#9998; Eintrag bearbeiten' : '&#65291; Neuer Eintrag'}</h2>
+  ov.className='ov'; ov.id='zahnarztFormOv';
+  ov.innerHTML=`<div class="modal sm">
+    <div class="mh"><h2>${e?'&#9998; Bearbeiten':'&#65291; Neuer Eintrag'}</h2>
       <button class="mc" onclick="this.closest('.ov').remove()">&#10005;</button></div>
     <div class="mb2">
-      <div class="fg"><label>Bezirk</label><input id="zfBezirk" class="flt" style="width:100%" value="${escHtml(e?.bezirk||'')}"></div>
       <div class="fg"><label>Datum</label><input type="date" id="zfDatum" class="flt" style="width:100%" value="${e?.datum||new Date().toISOString().slice(0,10)}"></div>
+      <div class="fg"><label>Bezirk</label><input id="zfBezirk" class="flt" style="width:100%" value="${escHtml(e?.bezirk||'')}"></div>
       <div class="fg"><label>Zahnarzt / Ordination</label><input id="zfZahnarzt" class="flt" style="width:100%" value="${escHtml(e?.zahnarzt||'')}"></div>
       <div class="fg"><label>Uhrzeit</label><input id="zfUhr" class="flt" style="width:100%" value="${escHtml(e?.uhrzeit||'')}"></div>
       <div class="fg"><label>Erreichbarkeit / Telefon</label><input id="zfErr" class="flt" style="width:100%" value="${escHtml(e?.erreichbarkeit||'')}"></div>
     </div>
     <div class="mf">
-      ${isEdit && (S.p.roles||[]).some(r=>['admin','technik'].includes(r)) ? `<button class="btn-d" onclick="deleteZahnarzt('${e.id}')">&#128465; Löschen</button>` : '<span></span>'}
+      ${canDel?`<button class="btn-d" onclick="deleteZahnarzt('${id}')">&#128465; L&ouml;schen</button>`:'<span></span>'}
       <div style="display:flex;gap:8px">
         <button onclick="this.closest('.ov').remove()">Abbrechen</button>
-        <button class="btn-p" onclick="saveZahnarzt(${isEdit ? `'${e.id}'` : 'null'})">&#10003; Speichern</button>
+        <button class="btn-p" onclick="saveZahnarzt(${id?`'${id}'`:'null'})">&#10003; Speichern</button>
       </div>
     </div>
   </div>`;
   document.body.appendChild(ov);
-  requestAnimationFrame(() => ov.classList.add('open'));
+  requestAnimationFrame(()=>ov.classList.add('open'));
 }
 
 async function saveZahnarzt(id) {
   const payload = {
-    bezirk: document.getElementById('zfBezirk')?.value.trim() || '',
-    datum:  document.getElementById('zfDatum')?.value || '',
-    zahnarzt: document.getElementById('zfZahnarzt')?.value.trim() || '',
-    uhrzeit:  document.getElementById('zfUhr')?.value.trim() || '',
-    erreichbarkeit: document.getElementById('zfErr')?.value.trim() || '',
-    tag: '',
+    bezirk: document.getElementById('zfBezirk')?.value.trim()||'',
+    datum:  document.getElementById('zfDatum')?.value||'',
+    zahnarzt: document.getElementById('zfZahnarzt')?.value.trim()||'',
+    uhrzeit:  document.getElementById('zfUhr')?.value.trim()||'',
+    erreichbarkeit: document.getElementById('zfErr')?.value.trim()||'',
+    tag:'',
   };
-  if (!payload.datum || !payload.zahnarzt) { toast('Datum und Zahnarzt erforderlich!'); return; }
-  try {
-    if (id) await api('PUT', '/zahnarzt/dienste/' + id, payload);
-    else    await api('POST', '/zahnarzt/dienste', payload);
+  if(!payload.datum||!payload.zahnarzt){toast('Datum und Zahnarzt erforderlich!');return;}
+  try{
+    if(id) await api('PUT','/zahnarzt/dienste/'+id,payload);
+    else   await api('POST','/zahnarzt/dienste',payload);
     document.getElementById('zahnarztFormOv')?.remove();
     await renderZahnarzt();
     toast('✅ Gespeichert!');
-  } catch(e) { toast('⚠️ ' + e.message, 'err'); }
+  }catch(e){toast('⚠️ '+e.message,'err');}
 }
 
-async function deleteZahnarzt(id) {
-  if (!confirm('Eintrag löschen?')) return;
-  try {
-    await api('DELETE', '/zahnarzt/dienste/' + id);
+async function deleteZahnarzt(id){
+  if(!confirm('Eintrag löschen?'))return;
+  try{
+    await api('DELETE','/zahnarzt/dienste/'+id);
     document.getElementById('zahnarztFormOv')?.remove();
     await renderZahnarzt();
     toast('Gelöscht.');
-  } catch(e) { toast('⚠️ ' + e.message, 'err'); }
+  }catch(e){toast('⚠️ '+e.message,'err');}
 }
 
 // ── Upload modal ──────────────────────────────────────────────────
-function openZahnarztUpload() {
-  const ov = document.createElement('div');
-  ov.className = 'ov'; ov.id = 'zahnarztUploadOv';
-  ov.innerHTML = `<div class="modal sm">
+function openZahnarztUpload(){
+  const ov=document.createElement('div');
+  ov.className='ov';ov.id='zahnarztUploadOv';
+  ov.innerHTML=`<div class="modal sm">
     <div class="mh"><h2>&#128196; Excel importieren</h2>
       <button class="mc" onclick="this.closest('.ov').remove()">&#10005;</button></div>
     <div class="mb2">
@@ -2046,7 +2030,7 @@ function openZahnarztUpload() {
         <input type="file" id="zUpFile" accept=".xlsx,.xls" style="font-size:13px"></div>
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
         <input type="checkbox" id="zUpReplace" checked style="width:auto">
-        Bestehende Einträge für importierte Daten ersetzen
+        Bestehende Eintr&auml;ge f&uuml;r importierte Daten ersetzen
       </label>
     </div>
     <div class="mf">
@@ -2055,23 +2039,28 @@ function openZahnarztUpload() {
     </div>
   </div>`;
   document.body.appendChild(ov);
-  requestAnimationFrame(() => ov.classList.add('open'));
+  requestAnimationFrame(()=>ov.classList.add('open'));
 }
 
-async function doZahnarztUpload() {
-  const file = document.getElementById('zUpFile')?.files?.[0];
-  if (!file) { toast('Bitte Datei wählen!'); return; }
-  const replace = document.getElementById('zUpReplace')?.checked ?? true;
+async function doZahnarztUpload(){
+  const file=document.getElementById('zUpFile')?.files?.[0];
+  if(!file){toast('Bitte Datei wählen!');return;}
+  const replace=document.getElementById('zUpReplace')?.checked??true;
   loading(true);
-  try {
-    const b64 = await new Promise((res, rej) => {
-      const fr = new FileReader();
-      fr.onload = e => res(e.target.result.split(',')[1]);
-      fr.onerror = rej;
+  try{
+    const b64=await new Promise((res,rej)=>{
+      const fr=new FileReader();
+      fr.onload=e=>res(e.target.result.split(',')[1]);
+      fr.onerror=rej;
       fr.readAsDataURL(file);
     });
-    const result = await api('POST', '/zahnarzt/upload', {
-      fileData: b64, fileName: file.name, replaceExisting: replace,
+    const result=await api('POST','/zahnarzt/upload',{fileData:b64,fileName:file.name,replaceExisting:replace});
+    document.getElementById('zahnarztUploadOv')?.remove();
+    await renderZahnarzt();
+    toast('✅ '+result.count+' Einträge importiert!');
+  }catch(e){toast('⚠️ '+e.message,'err');}
+  finally{loading(false);}
+}
     });
     document.getElementById('zahnarztUploadOv')?.remove();
     await renderZahnarzt();
