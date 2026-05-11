@@ -130,6 +130,18 @@
         </div>
       </div>
       <div style="border-top:1px solid var(--border);margin:4px 0 8px"></div>
+      <div style="font-size:12px;font-weight:600;color:var(--mu);margin-bottom:8px">&#127931; Ticket-Ansicht</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:4px">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px">
+          <input type="radio" name="tkView" id="tkViewCards" value="cards" onchange="saveTkViewPref(this.value)">
+          <span>&#9646; Cards mit Akzentstreifen (aktuell)</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px">
+          <input type="radio" name="tkView" id="tkViewTable" value="table" onchange="saveTkViewPref(this.value)">
+          <span>&#9776; Tabellenansicht (klassisch)</span>
+        </label>
+      </div>
+      <div style="border-top:1px solid var(--border);margin:8px 0 8px"></div>
       <div style="font-size:12px;font-weight:600;color:var(--mu);margin-bottom:6px">&#128272; Passwort &#228;ndern</div>
       <div class="fg"><label>Aktuelles Passwort</label><div class="pw-w"><input type="password" id="cpw0"><button class="eye" onclick="eyeToggle('cpw0',this)">&#128065;</button></div></div>
       <div class="fg"><label>Neues Passwort</label><div class="pw-w"><input type="password" id="cpw1"><button class="eye" onclick="eyeToggle('cpw1',this)">&#128065;</button></div></div>

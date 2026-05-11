@@ -181,6 +181,9 @@ function openPwModal(){
   S.myColor=u?.color||pal()[0];
   buildCP('myCR',S.myColor,'pickMyColor');
   document.getElementById('cpw0').value='';document.getElementById('cpw1').value='';document.getElementById('cpw2').value='';
+  const pref=getTkViewPref();
+  const r=document.getElementById('tkView'+pref.charAt(0).toUpperCase()+pref.slice(1));
+  if(r)r.checked=true;
   openModal('pwModal');
 }
 function pickMyColor(col,cid){S.myColor=col;document.querySelectorAll('#'+cid+' .cp').forEach(el=>el.classList.toggle('on',el.style.backgroundColor===h2r(col)));}
@@ -293,21 +296,24 @@ function renderHome(){
   var importantNewsHtml='';
   var _impNews=(S.news||[]).filter(function(n){return n.isActive&&!n.isExpired&&(n.isImportant||n.isPinned);});
   if(_impNews.length){
-    importantNewsHtml='<div style="background:rgba(239,68,68,.04);border:1px solid rgba(239,68,68,.18);border-radius:var(--r);padding:14px;margin-bottom:14px">';
+    var _newsBody='';
     _impNews.forEach(function(n){
       var badges='';
       if(n.isImportant&&n.isPinned) badges='<span class="bdg ap-bdg-rejected" style="font-size:10px;margin-right:4px">&#9888;&#65039; Wichtig</span><span class="bdg" style="font-size:10px;background:rgba(59,109,212,.12);color:var(--acc)">&#128204; Angepinnt</span>';
       else if(n.isImportant) badges='<span class="bdg ap-bdg-rejected" style="font-size:10px">&#9888;&#65039; Wichtig</span>';
       else badges='<span class="bdg" style="font-size:10px;background:rgba(59,109,212,.12);color:var(--acc)">&#128204; Angepinnt</span>';
-      importantNewsHtml+='<div style="padding:8px 0;border-bottom:1px solid rgba(239,68,68,.1);display:flex;align-items:flex-start;gap:10px">';
-      importantNewsHtml+='<div style="flex:1">';
-      importantNewsHtml+='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px">'+badges+'<span style="font-size:13px;font-weight:700">'+escHtml(n.title)+'</span></div>';
-      importantNewsHtml+='<div style="font-size:12px;line-height:1.5;color:var(--tx)">'+n.body.slice(0,200)+(n.body.length>200?'…':'')+'</div>';
-      importantNewsHtml+='</div>';
-      importantNewsHtml+='<button class="btn-s" style="font-size:10px;padding:2px 6px;flex-shrink:0" onclick="toggleNewsPin(\''+n.id+'\','+n.isPinned+')">'+(n.isPinned?'Lospinnen':'Anpinnen')+'</button>';
-      importantNewsHtml+='</div>';
+      var accent=n.isImportant?'#ef4444':'var(--acc)';
+      _newsBody+='<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 14px;border-top:1px solid var(--border)">';
+      _newsBody+='<div style="width:3px;align-self:stretch;background:'+accent+';border-radius:2px;flex-shrink:0"></div>';
+      _newsBody+='<div style="flex:1;min-width:0">';
+      _newsBody+='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px">'+badges+'<span style="font-size:13px;font-weight:700">'+escHtml(n.title)+'</span></div>';
+      _newsBody+='<div style="font-size:12px;line-height:1.5;color:var(--tx)">'+n.body.slice(0,200)+(n.body.length>200?'…':'')+'</div>';
+      _newsBody+='</div>';
+      _newsBody+='<button class="btn-s" style="font-size:10px;padding:2px 6px;flex-shrink:0" onclick="toggleNewsPin(\''+n.id+'\','+n.isPinned+')">'+(n.isPinned?'Lospinnen':'Anpinnen')+'</button>';
+      _newsBody+='</div>';
     });
-    importantNewsHtml+='<button class="btn-s" style="margin-top:8px;font-size:11px" onclick="setView(\x27news\x27)">Alle News &#8594;</button></div>';
+    _newsBody+='<div style="padding:8px 14px;border-top:1px solid var(--border)"><button class="btn-s" style="font-size:11px" onclick="setView(\x27news\x27)">Alle News &#8594;</button></div>';
+    importantNewsHtml=_ccWrap('imp_news','&#128240; News &amp; Wichtiges ('+_impNews.length+')','<div class="card-rows">'+_newsBody+'</div>');
   }
   
   // ── Precompute card HTML (avoids template literal nesting issues) ──
@@ -361,13 +367,16 @@ function renderHome(){
   }
     document.getElementById('main').innerHTML=`
     <div class="ph"><div class="pt">&#128196; \u00dcbersicht <span>${u?.name||''}</span></div></div>
-    ${pinnedMsg.length?`<div style="background:rgba(59,109,212,.04);border:1px solid rgba(59,109,212,.2);border-radius:var(--r);padding:14px;margin-bottom:14px">
-      <div style="font-size:13px;font-weight:700;color:var(--acc);margin-bottom:10px">&#128204; ${pinnedMsg.length} angepinnte Nachricht${pinnedMsg.length>1?'en':''}</div>
-      ${pinnedMsg.map(m=>`<div style="padding:8px 12px;background:var(--sf);border-radius:6px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;cursor:pointer" onclick="openMsg('${m.id}')">
-        <div><div style="font-weight:600;font-size:13px">&#128204; ${m.title}</div><div style="font-size:11px;color:var(--mu)">von ${getU(m.senderId)?.name||'?'}</div></div>
-        <button class="btn-s" style="font-size:10px;padding:2px 8px" onclick="event.stopPropagation();toggleMsgPinDirect('${m.id}',true)">Lospinnen</button>
-      </div>`).join('')}
-    </div>`:''}
+    ${pinnedMsg.length?_ccWrap('pinned_msgs','&#128204; Angepinnte Nachrichten ('+pinnedMsg.length+')','<div class="card-rows">'+
+      pinnedMsg.map(m=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="openMsg('${m.id}')">
+        <div style="width:3px;align-self:stretch;background:var(--warn);border-radius:2px;flex-shrink:0"></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">&#128204; ${m.title}</div>
+          <div style="font-size:11px;color:var(--mu)">von ${getU(m.senderId)?.name||'?'}</div>
+        </div>
+        <button class="btn-s" style="font-size:10px;padding:2px 8px;flex-shrink:0" onclick="event.stopPropagation();toggleMsgPinDirect('${m.id}',true)">Lospinnen</button>
+      </div>`).join('')+'</div>'
+    ):''}
     ${unreadMsg.length?`<div style="background:rgba(239,68,68,0.05));border:1px solid rgba(239,68,68,.20);border-radius:var(--r);padding:14px;margin-bottom:14px">
       <div style="font-size:13px;font-weight:700;color:var(--danger);margin-bottom:10px">&#128276; ${unreadMsg.length} ungelesene Nachricht${unreadMsg.length>1?'en':''}</div>
       ${unreadMsg.map(m=>`<div style="padding:8px 12px;background:var(--sf);border-radius:6px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
@@ -1054,9 +1063,13 @@ function tkIsNew(tk) {
   return updated > viewed;
 }
 
+function getTkViewPref(){try{return localStorage.getItem('tkViewPref')||'cards';}catch(e){return'cards';}}
+function saveTkViewPref(v){try{localStorage.setItem('tkViewPref',v);}catch(e){}if(S.view==='tickets'||S.view==='tickets_closed')renderTickets();}
+
 function renderTickets(){
   const closed=S.view==='tickets_closed';const tks=getVisTks(closed);
   const myD=S.tp.seeAll?DEPTS:S.tp.myDepts;
+  const useTable=getTkViewPref()==='table';
   // Sort: parent tickets first, then children directly below their parent
   const parents=tks.filter(t=>!t.parentTicketId);
   const children=tks.filter(t=>t.parentTicketId);
@@ -1064,28 +1077,52 @@ function renderTickets(){
   parents.forEach(p=>{sorted.push(p);children.filter(c=>c.parentTicketId===p.id).forEach(c=>sorted.push(c));});
   children.filter(c=>!parents.find(p=>p.id===c.parentTicketId)).forEach(c=>sorted.push(c));
   const _tkPrioColor={high:'#ef4444',medium:'#f59e0b',low:'#94a3b8',urgent:'#7c3aed'};
-  const cardsHtml=sorted.length?`<div style="background:var(--sf);border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px;overflow:hidden">${sorted.map(tk=>{
-    const asn=getU(tk.assigneeId);const par=tk.parentTicketId?getTk(tk.parentTicketId):null;
-    const nc=tk.notes.filter(n=>n.noteType==='note').length;
-    const isChild=!!tk.parentTicketId;const isNew=tkIsNew(tk);
-    const accent=_tkPrioColor[tk.priority]||'#94a3b8';
-    return`<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--border)${isNew?';background:rgba(245,158,11,.04)':''}" onclick="openTkDetail('${tk.id}')" class="clickable">
-      <div style="width:3px;align-self:stretch;background:${accent};border-radius:2px;flex-shrink:0"></div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-          ${isNew?'<span class="tk-new-badge">NEU</span> ':''}${isChild?'<span style="color:var(--di);margin-right:3px">\u21b3</span>':''}<span style="font-family:monospace;font-size:11px;color:var(--mu)">${tk.number}</span> ${tk.title}
+  let listHtml;
+  if(useTable){
+    listHtml=sorted.length?`<div class="tw" style="overflow-x:auto"><table><thead><tr><th>#</th><th>Titel</th><th>Bereich</th><th>Prio</th><th>Status</th><th>Tags</th><th>Zust\u00e4ndig</th><th>Datum</th></tr></thead><tbody>
+      ${sorted.map(tk=>{
+        const asn=getU(tk.assigneeId);const par=tk.parentTicketId?getTk(tk.parentTicketId):null;
+        const nc=tk.notes.filter(n=>n.noteType==='note').length;
+        const isChild=!!tk.parentTicketId;const isNew=tkIsNew(tk);
+        return`<tr class="clickable${isChild?' tk-child-row':''}${isNew?' tk-new-row':''}" onclick="openTkDetail('${tk.id}')">
+          <td style="font-family:monospace;font-size:11px;color:var(--mu);white-space:nowrap${isChild?';padding-left:28px':''}">
+            ${isChild?'<span style="color:var(--di);margin-right:3px">\u21b3</span>':''}${tk.number}${isNew?'<span class="tk-new-badge">NEU</span>':''}
+          </td>
+          <td style="max-width:220px"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${tk.title}</div>${nc?`<span style="font-size:10px;color:var(--mu)">\ud83d\udcac ${nc}</span>`:''}</td>
+          <td>${deptBdg(tk.department)}</td>
+          <td>${prioBdg(tk.priority)}</td>
+          <td>${stBdg(tk.status)}</td>
+          <td style="max-width:140px">${tagChips(tk.tags)}</td>
+          <td style="font-size:12px">${asn?`<div style="display:flex;align-items:center;gap:3px">${avHtml(asn.initials,asn.color,16,7)}<span>${asn.name}</span></div>`:'-'}</td>
+          <td style="font-size:11px;color:var(--mu);white-space:nowrap">${fd(tk.createdAt)}</td>
+        </tr>`;
+      }).join('')}
+    </tbody></table></div>`:`<div class="empty">&#128235; Keine Tickets</div>`;
+  } else {
+    listHtml=sorted.length?`<div style="background:var(--sf);border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px;overflow:hidden">${sorted.map(tk=>{
+      const asn=getU(tk.assigneeId);const par=tk.parentTicketId?getTk(tk.parentTicketId):null;
+      const nc=tk.notes.filter(n=>n.noteType==='note').length;
+      const isChild=!!tk.parentTicketId;const isNew=tkIsNew(tk);
+      const accent=_tkPrioColor[tk.priority]||'#94a3b8';
+      return`<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--border)${isNew?';background:rgba(245,158,11,.04)':''}" onclick="openTkDetail('${tk.id}')" class="clickable">
+        <div style="width:3px;align-self:stretch;background:${accent};border-radius:2px;flex-shrink:0"></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+            ${isNew?'<span class="tk-new-badge">NEU</span> ':''}${isChild?'<span style="color:var(--di);margin-right:3px">\u21b3</span>':''}<span style="font-family:monospace;font-size:11px;color:var(--mu)">${tk.number}</span> ${tk.title}
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--mu);align-items:center">
+            ${deptBdg(tk.department)}${prioBdg(tk.priority)}${stBdg(tk.status)}
+            ${tagChips(tk.tags)}
+            ${asn?`<div style="display:flex;align-items:center;gap:3px">${avHtml(asn.initials,asn.color,14,6)}<span>${asn.name}</span></div>`:''}
+            ${isChild&&par?`<span style="color:var(--di)">\u2191 ${par.number}</span>`:''}
+            ${nc?`<span>&#128172; ${nc}</span>`:''}
+            <span style="color:var(--di)">${fd(tk.createdAt)}</span>
+          </div>
         </div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--mu);align-items:center">
-          ${deptBdg(tk.department)}${prioBdg(tk.priority)}${stBdg(tk.status)}
-          ${tagChips(tk.tags)}
-          ${asn?`<div style="display:flex;align-items:center;gap:3px">${avHtml(asn.initials,asn.color,14,6)}<span>${asn.name}</span></div>`:''}
-          ${isChild&&par?`<span style="color:var(--di)">\u2191 ${par.number}</span>`:''}
-          ${nc?`<span>&#128172; ${nc}</span>`:''}
-          <span style="color:var(--di)">${fd(tk.createdAt)}</span>
-        </div>
-      </div>
-    </div>`;
-  }).join('')}</div>`:`<div class="empty">&#128235; Keine Tickets</div>`;
+      </div>`;
+    }).join('')}</div>`:`<div class="empty">&#128235; Keine Tickets</div>`;
+  }
+  const cardsHtml=listHtml;
   document.getElementById('main').innerHTML=`
     <div class="ph"><div class="pt">${closed?'Abgeschlossene':'Offene'} Tickets <span style="font-size:16px;color:var(--mu)">(${tks.length})</span></div>
       <button class="btn-p" onclick="openTkForm(null)">&#65291; Ticket</button></div>
