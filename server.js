@@ -213,6 +213,12 @@ async function initDB() {
         ));
       END IF;
     END $$`,
+    `CREATE TABLE IF NOT EXISTS ticket_subcategories (
+      id TEXT PRIMARY KEY, department TEXT NOT NULL,
+      label TEXT NOT NULL, sort_order INTEGER DEFAULT 0,
+      created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
+    `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS subcategory TEXT DEFAULT ''`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }

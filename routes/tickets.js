@@ -6,17 +6,25 @@ const { auth, ok, bad } = require('../middleware');
 
 router.post('/', auth, async (req,res) => {
   try {
-    const {title,description,department,tags,priority,status,bucket,assigneeId,parentTicketId} = req.body;
+    const {title,description,department,subcategory,tags,priority,status,bucket,assigneeId,parentTicketId} = req.body;
     if (!title?.trim()) return bad(res,'Titel erforderlich');
     const id=newId(), number=await nextTicketNumber();
-    await pool.query('INSERT INTO tickets (id,number,title,description,department,tags,priority,status,bucket,assignee_id,parent_ticket_id,created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
-      [id,number,title.trim(),description||'',department||'technik',JSON.stringify(tags||[]),priority||'medium',status||'open',bucket||'',assigneeId||null,parentTicketId||null,req.uid]);
+    const subcat = subcategory||'';
+    await pool.query('INSERT INTO tickets (id,number,title,description,department,subcategory,tags,priority,status,bucket,assignee_id,parent_ticket_id,created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',
+      [id,number,title.trim(),description||'',department||'technik',subcat,JSON.stringify(tags||[]),priority||'medium',status||'open',bucket||'',assigneeId||null,parentTicketId||null,req.uid]);
     const uname = (await getUser(req.uid))?.name||'?';
-    await auditNote(id,req.uid,`✅ Ticket erstellt von ${uname}`);
+    await auditNote(id,req.uid,`✅ Ticket erstellt von ${uname}${subcat?' ['+subcat+']':''}`);
     const deptUsers = await q('SELECT id FROM users WHERE roles @> $1::jsonb AND id != $2',
       [JSON.stringify([department]), req.uid]);
     for (const u of deptUsers)
       await createNotification(u.id,'new_ticket',`Neues Ticket in ${department}: ${title.trim()}`,id,null,req.uid);
+    if (subcat) {
+      const subcatUsers = await q(
+        "SELECT DISTINCT id FROM users WHERE (roles::text LIKE '%schichtleiter%' OR roles::text LIKE '%leitung%' OR roles::text LIKE '%qm%') AND id != $1",
+        [req.uid]);
+      for (const u of subcatUsers)
+        await createNotification(u.id,'new_ticket',`Neue Beschwerde: ${title.trim()}`,id,null,req.uid);
+    }
     if (assigneeId && assigneeId!==req.uid)
       await createNotification(assigneeId,'assigned',`Dir wurde zugewiesen: ${title.trim()}`,id,null,req.uid);
     await logAct(req.uid,req.user.name,'create_ticket',{number,title:title.trim()});
@@ -58,6 +66,7 @@ router.put('/:id', auth, async (req,res) => {
     if (b.isPublic!==undefined) add('is_public',!!b.isPublic);
     if (b.assigneeId!==undefined) add('assignee_id',b.assigneeId||null);
     if (b.parentTicketId!==undefined) add('parent_ticket_id',b.parentTicketId||null);
+    if (b.subcategory!==undefined) add('subcategory',b.subcategory||'');
     if (!setClauses.length) return ok(res);
     add('updated_at',new Date().toISOString());
     vals.push(req.params.id);

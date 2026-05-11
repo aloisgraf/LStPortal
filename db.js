@@ -43,15 +43,23 @@ async function getTP(uid, userObj=null) {
     seeAll: has('admin','leitung'), editAll: has('admin','leitung'),
     myDepts: DEPTS.filter(d => roles.includes(d)),
     canSetPublic: !has('standard'), canAssign: !has('standard'),
+    canSeeSubcat: has('admin','leitung','schichtleiter','qm'),
+    canEditSubcat: has('admin','leitung','schichtleiter','qm'),
+    roles,
   };
 }
 
-const canSeeTk  = (tp,tk,uid) => {
+const canSeeTk = (tp,tk,uid) => {
   if(tp.seeAll||tk.is_public||tk.created_by===uid||tk.department==='frei') return true;
   if(tp.myDepts.includes(tk.department)) return true;
+  if(tk.subcategory && tp.canSeeSubcat) return true;
   try { return JSON.parse(tk.mentioned_users||'[]').includes(uid); } catch { return false; }
 };
-const canEditTk = (tp,tk,uid) => tp.editAll || tk.created_by===uid || tp.myDepts.includes(tk.department);
+const canEditTk = (tp,tk,uid) => {
+  if(tp.editAll || tk.created_by===uid || tp.myDepts.includes(tk.department)) return true;
+  if(tk.subcategory && tp.canEditSubcat) return true;
+  return false;
+};
 
 async function nextTicketNumber() {
   const row = await q1(`SELECT nextval('ticket_number_seq') as n`);

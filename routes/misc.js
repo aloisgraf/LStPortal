@@ -386,9 +386,6 @@ router.post('/webhook/mailgun', async (req,res) => {
   }
 });
 
-
-module.exports = router;
-
 // ── HOMEOFFICE ──
 router.get('/homeoffice/config', auth, async (req,res) => {
   try {
@@ -598,3 +595,41 @@ router.put('/vacation/config', auth, async (req,res) => {
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
+
+
+// ── TICKET SUBCATEGORIES ──────────────────────────────────────────
+router.get('/ticket-subcategories', auth, async (req,res) => {
+  try {
+    const rows = await q('SELECT * FROM ticket_subcategories ORDER BY department,sort_order,label');
+    ok(res, rows);
+  } catch(e) { bad(res,e.message,500); }
+});
+router.post('/ticket-subcategories', auth, async (req,res) => {
+  try {
+    if(!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+    const {department,label,sort_order} = req.body;
+    if(!department||!label) return bad(res,'department und label erforderlich');
+    const id = newId();
+    await pool.query('INSERT INTO ticket_subcategories (id,department,label,sort_order,created_by) VALUES ($1,$2,$3,$4,$5)',
+      [id,department,label.trim(),parseInt(sort_order)||0,req.uid]);
+    ok(res,{id});
+  } catch(e) { bad(res,e.message,500); }
+});
+router.put('/ticket-subcategories/:id', auth, async (req,res) => {
+  try {
+    if(!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+    const {label,sort_order} = req.body;
+    await pool.query('UPDATE ticket_subcategories SET label=$1,sort_order=$2 WHERE id=$3',
+      [label.trim(),parseInt(sort_order)||0,req.params.id]);
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
+router.delete('/ticket-subcategories/:id', auth, async (req,res) => {
+  try {
+    if(!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+    await pool.query('DELETE FROM ticket_subcategories WHERE id=$1',[req.params.id]);
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
+
+module.exports = router;

@@ -130,18 +130,6 @@
         </div>
       </div>
       <div style="border-top:1px solid var(--border);margin:4px 0 8px"></div>
-      <div style="font-size:12px;font-weight:600;color:var(--mu);margin-bottom:8px">&#127931; Ticket-Ansicht</div>
-      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:4px">
-        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px">
-          <input type="radio" name="tkView" id="tkViewCards" value="cards" onchange="saveTkViewPref(this.value)">
-          <span>&#9646; Cards mit Akzentstreifen (aktuell)</span>
-        </label>
-        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px">
-          <input type="radio" name="tkView" id="tkViewTable" value="table" onchange="saveTkViewPref(this.value)">
-          <span>&#9776; Tabellenansicht (klassisch)</span>
-        </label>
-      </div>
-      <div style="border-top:1px solid var(--border);margin:8px 0 8px"></div>
       <div style="font-size:12px;font-weight:600;color:var(--mu);margin-bottom:6px">&#128272; Passwort &#228;ndern</div>
       <div class="fg"><label>Aktuelles Passwort</label><div class="pw-w"><input type="password" id="cpw0"><button class="eye" onclick="eyeToggle('cpw0',this)">&#128065;</button></div></div>
       <div class="fg"><label>Neues Passwort</label><div class="pw-w"><input type="password" id="cpw1"><button class="eye" onclick="eyeToggle('cpw1',this)">&#128065;</button></div></div>
@@ -195,7 +183,7 @@
       <div class="fg full"><label>Ticketname *</label><input type="text" id="tkFNm"></div>
       <div class="fg full"><label>Beschreibung</label><textarea id="tkFDesc" rows="4"></textarea></div>
       <div class="fr">
-        <div class="fg"><label>Fachbereich *</label><select id="tkFDept">
+        <div class="fg"><label>Fachbereich *</label><select id="tkFDept" onchange="onTkDeptChange()">
               <option value="frei">&#127760; Frei (für alle sichtbar)</option>
           <option value="technik">&#128295; Technik</option><option value="leitung">&#11088; Leitung</option>
           <option value="dienstplanung">&#128203; Dienstplanung</option><option value="ausbildung">&#127891; Ausbildung</option>
@@ -204,6 +192,9 @@
         <div class="fg"><label>Priorit&#228;t</label><select id="tkFPrio">
           <option value="low">&#128994; Gering</option><option value="medium" selected>&#128993; Mittel</option><option value="high">&#128308; Hoch</option>
         </select></div>
+      </div>
+      <div class="fr" id="tkFSubcatRow" style="display:none">
+        <div class="fg full"><label>Unterkategorie</label><select id="tkFSubcat"><option value="">&#8212; keine &#8212;</option></select></div>
       </div>
       <div class="fr" id="tkFAdvRow">
         <div class="fg"><label>Status</label><select id="tkFSt">
@@ -367,12 +358,27 @@
         <button class="tb" id="atb-cats" onclick="swTab('cats')">&#127912; Kategorien</button>
         <button class="tb" id="atb-tags" onclick="swTab('tags')">&#127991;&#65039; Tags</button>
         <button class="tb" id="atb-rights" onclick="swTab('rights')">&#128272; Rechte</button>
+        <button class="tb" id="atb-subcats" onclick="swTab('subcats')">&#127991; Unterkategorien</button>
         <button class="tb" id="atb-log" onclick="swTab('log');loadLog(true)">&#128221; Aktivitätslog</button>
       </div>
       <div class="tp on" id="atp-users"><div class="al" id="usrList"></div><button class="btn-p" style="width:100%;justify-content:center" onclick="openUF(null)">&#65291; Benutzer</button></div>
       <div class="tp" id="atp-cats"><div class="al" id="catList"></div><button class="btn-p" style="width:100%;justify-content:center" onclick="openCF(null)">&#65291; Kategorie</button></div>
       <div class="tp" id="atp-tags"><div class="al" id="tagList"></div><button class="btn-p" style="width:100%;justify-content:center" onclick="openTF(null)">&#65291; Tag</button></div>
       <div class="tp" id="atp-rights"><div id="rightsMatrix" style="overflow-x:auto"></div></div>
+      <div class="tp" id="atp-subcats">
+        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:flex-end">
+          <div class="fg" style="margin:0;flex:1;min-width:140px"><label style="font-size:11px">Fachbereich</label><select id="scFDept" style="font-size:12px;padding:5px 8px">
+            <option value="qm">&#9989; QM</option>
+            <option value="technik">&#128295; Technik</option>
+            <option value="leitung">&#11088; Leitung</option>
+            <option value="dienstplanung">&#128203; Dienstplanung</option>
+            <option value="ausbildung">&#127891; Ausbildung</option>
+          </select></div>
+          <div class="fg" style="margin:0;flex:2;min-width:180px"><label style="font-size:11px">Bezeichnung</label><input type="text" id="scFLabel" placeholder="z.B. Beschwerdemanagement" style="font-size:12px;padding:5px 8px"></div>
+          <button class="btn-p" style="font-size:12px;white-space:nowrap" onclick="addSubcat()">&#65291; Hinzuf&#252;gen</button>
+        </div>
+        <div id="subcatList"></div>
+      </div>
       <div class="tp" id="atp-ho">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
           <div>
@@ -1134,7 +1140,19 @@
     <div class="mh"><h2>&#128203; Changelog</h2><button class="mc" onclick="closeModal('changelogOv')">&#10005;</button></div>
     <div class="mb2" style="gap:10px">
       <div style="padding:12px;background:rgba(59,109,212,0.06));border:1px solid rgba(59,109,212,.20);border-radius:8px">
-        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.4.0</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.5.0</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
+        <ul style="font-size:12px;line-height:1.8;padding-left:18px">
+          <li>Neue Rolle: Schichtleiter (&#x1F506;)</li>
+          <li>Tickets: Unterkategorien f&uuml;r Fachbereiche (admin-verwaltbar)</li>
+          <li>Beschwerdemanagement als erste Unterkategorie unter QM</li>
+          <li>Tickets mit Unterkategorie sichtbar/bearbeitbar f&uuml;r Schichtleiter, Leitung, QM</li>
+          <li>Ticketliste nach Fachbereich gruppiert</li>
+          <li>&Uuml;bersicht: &ldquo;Zu erledigen&rdquo;-Box f&uuml;r Beschwerden</li>
+          <li>Ansichts-Toggle (Cards/Tabelle) direkt in der Ticketliste</li>
+        </ul>
+      </div>
+      <div style="padding:12px;background:rgba(59,109,212,0.06));border:1px solid rgba(59,109,212,.20);border-radius:8px">
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--sf3);color:var(--mu);padding:2px 8px;border-radius:4px">v2.4.0</span></div>
         <ul style="font-size:12px;line-height:1.8;padding-left:18px">
           <li>Neu: Bereich &ldquo;Dienstbetrieb&rdquo; im Men&uuml;</li>
           <li>Neu: Dienstplan Zahn&auml;rzte &ndash; Excel-Import (Technik-Rolle), Tagesanzeige farbkodiert</li>
