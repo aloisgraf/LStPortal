@@ -323,7 +323,7 @@ function renderHome(){
     var open;
     try{open=localStorage.getItem('cc_'+id);open=open===null?true:open==='1';}catch(ex){open=true;}
     var accentStyle=accent?';border-top:3px solid '+accent+';background:'+accent+'0d':'';
-    return '<details class="dash-card" data-cc-id="'+id+'"'+(open?' open':'')+' style="width:100%;box-sizing:border-box'+accentStyle+'">'
+    return '<details class="dash-card" data-cc-id="'+id+'"'+(open?' open':'')+' style="width:100%;box-sizing:border-box;margin-bottom:14px'+accentStyle+'">'
       +'<summary><h3 style="margin:0;display:inline;color:'+(accent||'var(--tx)')+'">'+title+'</h3></summary>'
       +bodyHtml+'</details>';
   }
