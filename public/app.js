@@ -11,7 +11,7 @@ function showHelpSection(id){
   if(c)c.scrollTop=0;
 }
 
-const APP_VERSION='2.5.0';
+const APP_VERSION='2.5.1';
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
@@ -315,15 +315,16 @@ function renderHome(){
       _newsBody+='</div>';
     });
     _newsBody+='<div style="padding:8px 14px;border-top:1px solid var(--border)"><button class="btn-s" style="font-size:11px" onclick="setView(\x27news\x27)">Alle News &#8594;</button></div>';
-    importantNewsHtml=_ccWrap('imp_news','&#128240; News &amp; Wichtiges ('+_impNews.length+')','<div class="card-rows">'+_newsBody+'</div>');
+    importantNewsHtml=_ccWrap('imp_news','&#128240; News &amp; Wichtiges ('+_impNews.length+')','<div class="card-rows">'+_newsBody+'</div>','#3b82f6');
   }
   
   // ── Precompute card HTML (avoids template literal nesting issues) ──
-  function _ccWrap(id,title,bodyHtml){
+  function _ccWrap(id,title,bodyHtml,accent){
     var open;
     try{open=localStorage.getItem('cc_'+id);open=open===null?true:open==='1';}catch(ex){open=true;}
-    return '<details class="dash-card" data-cc-id="'+id+'"'+(open?' open':'')+' style="width:100%;box-sizing:border-box">'
-      +'<summary><h3 style="margin:0;display:inline">'+title+'</h3></summary>'
+    var accentStyle=accent?';border-top:3px solid '+accent+';background:'+accent+'0d':'';
+    return '<details class="dash-card" data-cc-id="'+id+'"'+(open?' open':'')+' style="width:100%;box-sizing:border-box'+accentStyle+'">'
+      +'<summary><h3 style="margin:0;display:inline;color:'+(accent||'var(--tx)')+'">'+title+'</h3></summary>'
       +bodyHtml+'</details>';
   }
 
@@ -397,13 +398,13 @@ function renderHome(){
     <div class="ph"><div class="pt">&#128196; \u00dcbersicht <span>${u?.name||''}</span></div></div>
     ${pinnedMsg.length?_ccWrap('pinned_msgs','&#128204; Angepinnte Nachrichten ('+pinnedMsg.length+')','<div class="card-rows">'+
       pinnedMsg.map(m=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="openMsg('${m.id}')">
-        <div style="width:3px;align-self:stretch;background:var(--warn);border-radius:2px;flex-shrink:0"></div>
+        <div style="width:3px;align-self:stretch;background:#f59e0b;border-radius:2px;flex-shrink:0"></div>
         <div style="flex:1;min-width:0">
           <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">&#128204; ${m.title}</div>
           <div style="font-size:11px;color:var(--mu)">von ${getU(m.senderId)?.name||'?'}</div>
         </div>
         <button class="btn-s" style="font-size:10px;padding:2px 8px;flex-shrink:0" onclick="event.stopPropagation();toggleMsgPinDirect('${m.id}',true)">Lospinnen</button>
-      </div>`).join('')+'</div>'
+      </div>`).join('')+'</div>','#f59e0b'
     ):''}
     ${unreadMsg.length?`<div style="background:rgba(239,68,68,0.05));border:1px solid rgba(239,68,68,.20);border-radius:var(--r);padding:14px;margin-bottom:14px">
       <div style="font-size:13px;font-weight:700;color:var(--danger);margin-bottom:10px">&#128276; ${unreadMsg.length} ungelesene Nachricht${unreadMsg.length>1?'en':''}</div>
@@ -438,11 +439,11 @@ function renderHome(){
     </div>`:''}
 
     ${importantNewsHtml}${(hoHtml||vacHtml)?('<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">'+hoHtml+vacHtml+'</div>'):''}
-    ${_beschwerdenHtml?_ccWrap('beschwerden','&#128680; Zu erledigen &ndash; Beschwerden','<div class="card-rows">'+_beschwerdenHtml+'</div>'):''}
-    ${_ccWrap('online','&#128101; Online ('+(online.length+1)+')',_onlineHtml)}
+    ${_beschwerdenHtml?_ccWrap('beschwerden','&#128680; Zu erledigen &ndash; Beschwerden','<div class="card-rows">'+_beschwerdenHtml+'</div>','#7c3aed'):''}
+    ${_ccWrap('online','&#128101; Online ('+(online.length+1)+')',_onlineHtml,'#10b981')}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-      ${_ccWrap('myentries','&#128197; Meine Einträge',_myEntriesHtml)}
-      ${_ccWrap('tickets','&#127931; Relevante Tickets',_ticketsHtml)}
+      ${_ccWrap('myentries','&#128197; Meine Einträge',_myEntriesHtml,'#3b6dd4')}
+      ${_ccWrap('tickets','&#127931; Relevante Tickets',_ticketsHtml,'#ef4444')}
     </div>`;
 }
 async function confirmEventNotif(notifId){try{await api('POST','/notifications/'+notifId+'/read');await fetchData();renderHome();}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}}
@@ -1133,17 +1134,19 @@ function renderTickets(){
       const nc=tk.notes.filter(n=>n.noteType==='note').length;
       const isChild=!!tk.parentTicketId;const isNew=tkIsNew(tk);
       const accent=_tkPrioColor[tk.priority]||'#94a3b8';
-      return`<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--border)${isNew?';background:rgba(245,158,11,.04)':''}" onclick="openTkDetail('${tk.id}')" class="clickable">
+      const childStyle=isChild?'margin-left:20px;border-left:2px solid var(--border);background:var(--sf2);':'';
+      return`<div style="display:flex;align-items:center;gap:10px;padding:${isChild?'7px 12px 7px 10px':'10px 14px'};border-top:1px solid var(--border);${childStyle}${isNew?'background:rgba(245,158,11,.04);':''}" onclick="openTkDetail('${tk.id}')" class="clickable">
+        ${isChild?`<span style="font-size:14px;color:var(--di);flex-shrink:0;margin-right:-4px">&#x21b3;</span>`:''}
         <div style="width:3px;align-self:stretch;background:${accent};border-radius:2px;flex-shrink:0"></div>
         <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-            ${isNew?'<span class="tk-new-badge">NEU</span> ':''}${isChild?'<span style="color:var(--di);margin-right:3px">\u21b3</span>':''}<span style="font-family:monospace;font-size:11px;color:var(--mu)">${tk.number}</span> ${tk.title}
+          <div style="font-size:${isChild?'12px':'13px'};font-weight:600;color:var(--tx);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+            ${isNew?'<span class="tk-new-badge">NEU</span> ':''}<span style="font-family:monospace;font-size:11px;color:var(--mu)">${tk.number}</span> ${tk.title}
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--mu);align-items:center">
             ${deptBdg(tk.department)}${prioBdg(tk.priority)}${stBdg(tk.status)}
             ${tagChips(tk.tags)}
             ${asn?`<div style="display:flex;align-items:center;gap:3px">${avHtml(asn.initials,asn.color,14,6)}<span>${asn.name}</span></div>`:''}
-            ${isChild&&par?`<span style="color:var(--di)">\u2191 ${par.number}</span>`:''}
+            ${isChild&&par?`<span style="color:var(--di);font-size:10px">&#x2191; ${par.number}</span>`:''}
             ${nc?`<span>&#128172; ${nc}</span>`:''}
             <span style="color:var(--di)">${fd(tk.createdAt)}</span>
           </div>
@@ -1167,15 +1170,18 @@ function renderTickets(){
           const nc=tk.notes.filter(n=>n.noteType==='note').length;
           const isChild=!!tk.parentTicketId;const isNew=tkIsNew(tk);
           const accent=_tkPrioColor[tk.priority]||'#94a3b8';
-          return`<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--border)${isNew?';background:rgba(245,158,11,.04)':''}" onclick="openTkDetail('${tk.id}')" class="clickable">
+          const childStyle=isChild?'margin-left:20px;border-left:2px solid var(--border);background:var(--sf2);':'';
+          return`<div style="display:flex;align-items:center;gap:10px;padding:${isChild?'7px 12px 7px 10px':'10px 14px'};border-top:1px solid var(--border);${childStyle}${isNew?'background:rgba(245,158,11,.04);':''}" onclick="openTkDetail('${tk.id}')" class="clickable">
+            ${isChild?`<span style="font-size:14px;color:var(--di);flex-shrink:0;margin-right:-4px">&#x21b3;</span>`:''}
             <div style="width:3px;align-self:stretch;background:${accent};border-radius:2px;flex-shrink:0"></div>
             <div style="flex:1;min-width:0">
-              <div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-                ${isNew?'<span class="tk-new-badge">NEU</span> ':''}${isChild?'<span style="color:var(--di);margin-right:3px">\u21b3</span>':''}<span style="font-family:monospace;font-size:11px;color:var(--mu)">${tk.number}</span> ${tk.title}${tk.subcategory?` <span class="bdg" style="font-size:10px;background:rgba(124,58,237,.12);color:#7c3aed">${tk.subcategory}</span>`:''}
+              <div style="font-size:${isChild?'12px':'13px'};font-weight:600;color:var(--tx);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                ${isNew?'<span class="tk-new-badge">NEU</span> ':''}<span style="font-family:monospace;font-size:11px;color:var(--mu)">${tk.number}</span> ${tk.title}${tk.subcategory?` <span class="bdg" style="font-size:10px;background:rgba(124,58,237,.12);color:#7c3aed">${tk.subcategory}</span>`:''}
               </div>
               <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--mu);align-items:center">
                 ${prioBdg(tk.priority)}${stBdg(tk.status)}${tagChips(tk.tags)}
                 ${asn?`<div style="display:flex;align-items:center;gap:3px">${avHtml(asn.initials,asn.color,14,6)}<span>${asn.name}</span></div>`:''}
+                ${isChild&&par?`<span style="color:var(--di);font-size:10px">&#x2191; ${par.number}</span>`:''}
                 ${nc?`<span>\ud83d\udcac ${nc}</span>`:''}
                 <span style="color:var(--di)">${fd(tk.createdAt)}</span>
               </div>
@@ -1405,6 +1411,10 @@ function openClForm(id){
 }
 function renderClItems(){
   document.getElementById('clFItems').innerHTML=_clItems.map((it,i)=>`<div class="item-row">
+    <div style="display:flex;flex-direction:column;gap:1px;flex-shrink:0">
+      <button class="btn-s" style="padding:1px 6px;font-size:10px;line-height:1.4" ${i===0?'disabled':''} onclick="_clMoveItem(${i},-1)" title="Nach oben">&#9650;</button>
+      <button class="btn-s" style="padding:1px 6px;font-size:10px;line-height:1.4" ${i===_clItems.length-1?'disabled':''} onclick="_clMoveItem(${i},1)" title="Nach unten">&#9660;</button>
+    </div>
     <select class="item-type-sel" onchange="_clItems[${i}].itemType=this.value">
       <option value="check"${it.itemType==='check'?' selected':''}>\u2611 Checkbox</option>
       <option value="check_text"${it.itemType==='check_text'?' selected':''}>\u2611 + Notizfeld</option>
@@ -1413,6 +1423,7 @@ function renderClItems(){
     <button class="btn-d" onclick="_clItems.splice(${i},1);renderClItems()" style="padding:6px 9px">\u2715</button>
   </div>`).join('');
 }
+function _clMoveItem(i,dir){var to=i+dir;if(to<0||to>=_clItems.length)return;var tmp=_clItems[i];_clItems[i]=_clItems[to];_clItems[to]=tmp;renderClItems();}
 function addClItem(){_clItems.push({text:'',itemType:'check'});renderClItems();setTimeout(()=>{const ins=document.querySelectorAll('#clFItems .item-row input[type=text]');if(ins.length)ins[ins.length-1].focus();},50);}
 async function saveChecklist(){
   const name=document.getElementById('clFNm').value.trim();document.getElementById('clFErr').textContent='';
