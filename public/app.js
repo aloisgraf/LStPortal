@@ -46,7 +46,7 @@ let S={
   zahnarztWeek:null, // null = all from today, otherwise ISO Mon of week
   zahnarztData:[],
   events:[],users:[],categories:[],tags:[],allowances:[],tickets:[],ticketSubcategories:[],noteTemplates:[],
-  tkBatchMode:false,tkBatchSel:new Set(),_tkFeedFilter:'all',
+  tkBatchMode:false,tkBatchSel:new Set(),_tkFeedFilter:'all',_tkTab:'details',
   checklists:[],messages:[],notifications:[],abrechnung:{einspringer:[],homeoffice:[]},dienstplaene:[],
   p:{canApproveEvents:false,canSendMessages:false,seeAllEntries:true,editAllPersonal:false,addForOthers:false,addGeneral:false,manageUsers:false,seeAllAllw:false,editAllw:false,seeAllAbrechnung:false},
   p:{canApproveEvents:false,canSendMessages:false,seeAllEntries:true,editAllPersonal:false,addForOthers:false,addGeneral:false,manageUsers:false,seeAllAllw:false,editAllw:false,seeAllAbrechnung:false},
@@ -327,7 +327,7 @@ function renderHome(){
       _newsBody+='</div>';
     });
     _newsBody+='<div style="padding:8px 14px;border-top:1px solid var(--border)"><button class="btn-s" style="font-size:11px" onclick="setView(\x27news\x27)">Alle News &#8594;</button></div>';
-    importantNewsHtml=_ccWrap('imp_news','&#128240; News &amp; Wichtiges ('+_impNews.length+')','<div class="card-rows">'+_newsBody+'</div>','#3b82f6');
+    importantNewsHtml=_ccWrap('imp_news','&#128240; News &amp; Wichtiges ('+_impNews.length+')','<div class="card-rows">'+_newsBody+'</div>');
   }
   
   // ── Precompute card HTML (avoids template literal nesting issues) ──
@@ -438,7 +438,7 @@ function renderHome(){
           <div style="font-size:11px;color:var(--mu)">von ${getU(m.senderId)?.name||'?'}</div>
         </div>
         <button class="btn-s" style="font-size:10px;padding:2px 8px;flex-shrink:0" onclick="event.stopPropagation();toggleMsgPinDirect('${m.id}',true)">Lospinnen</button>
-      </div>`).join('')+'</div>','#f59e0b'
+      </div>`).join('')+'</div>'
     ):''}
     ${unreadMsg.length?`<div style="background:rgba(239,68,68,0.05));border:1px solid rgba(239,68,68,.20);border-radius:var(--r);padding:14px;margin-bottom:14px">
       <div style="font-size:13px;font-weight:700;color:var(--danger);margin-bottom:10px">&#128276; ${unreadMsg.length} ungelesene Nachricht${unreadMsg.length>1?'en':''}</div>
@@ -473,12 +473,12 @@ function renderHome(){
     </div>`:''}
 
     ${importantNewsHtml}${(hoHtml||vacHtml)?('<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">'+hoHtml+vacHtml+'</div>'):''}
-    ${_dueFaelligHtml?_ccWrap('due_week','&#128197; Diese Woche fällig','<div class="card-rows">'+_dueFaelligHtml+'</div>','#ea580c'):''}
-    ${_beschwerdenHtml?_ccWrap('beschwerden','&#128680; Zu erledigen &ndash; Beschwerden','<div class="card-rows">'+_beschwerdenHtml+'</div>','#7c3aed'):''}
-    ${_ccWrap('online','&#128101; Online ('+(online.length+1)+')',_onlineHtml,'#10b981')}
+    ${_dueFaelligHtml?_ccWrap('due_week','&#128197; Diese Woche fällig','<div class="card-rows">'+_dueFaelligHtml+'</div>'):''}
+    ${_beschwerdenHtml?_ccWrap('beschwerden','&#128680; Zu erledigen &ndash; Beschwerden','<div class="card-rows">'+_beschwerdenHtml+'</div>'):''}
+    ${_ccWrap('online','&#128101; Online ('+(online.length+1)+')',_onlineHtml)}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-      ${_ccWrap('myentries','&#128197; Meine Einträge',_myEntriesHtml,'#3b6dd4')}
-      ${_ccWrap('tickets','&#127931; Relevante Tickets',_ticketsHtml,'#ef4444')}
+      ${_ccWrap('myentries','&#128197; Meine Einträge',_myEntriesHtml)}
+      ${_ccWrap('tickets','&#127931; Relevante Tickets',_ticketsHtml)}
     </div>`;
 }
 async function confirmEventNotif(notifId){try{await api('POST','/notifications/'+notifId+'/read');await fetchData();renderHome();}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}}
@@ -1348,7 +1348,9 @@ function renderTkDetail(){
   document.getElementById('tkDetSt').innerHTML=stBdg(tk.status);
   document.getElementById('tkDetEditBtn').style.display=canEdit?'':'none';
   const notes=tk.notes||[];
-  document.getElementById('tkDetMain').innerHTML=`
+  const tab=S._tkTab||'details';
+  const tabBtn=(id,label)=>`<button onclick="S._tkTab='${id}';renderTkDetail()" style="padding:8px 16px;font-size:13px;font-weight:${tab===id?'600':'500'};background:none;border:none;border-bottom:2px solid ${tab===id?'var(--acc)':'transparent'};color:${tab===id?'var(--acc)':'var(--mu)'};cursor:pointer;font-family:inherit;transition:.15s;margin-bottom:-1px">${label}</button>`;
+  const detailsHtml=`
     <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di);margin-bottom:6px">BESCHREIBUNG</div>
       <div style="font-size:13px;line-height:1.6;color:${tk.description?'var(--tx)':'var(--di)'}">${tk.description||'Keine Beschreibung.'}</div></div>
     ${subs.length||canEdit?`<div>
@@ -1375,28 +1377,30 @@ function renderTkDetail(){
           ${it.itemType==='check_text'?`<div class="cl-user-note"><input type="text" placeholder="Notiz \u2026" value="${(it.userNote||'').replace(/"/g,'&quot;')}" onchange="saveClItemNote('${tk.id}','${cl.id}','${it.id}',this.value)"></div>`:''}
         </div>`).join('')}</div>
       </div>`).join('')}
-    </div>`:''}
-    <div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di)">VERLAUF &amp; PROTOKOLL</div>
-        <div style="display:flex;gap:2px;background:var(--sf2);border:1px solid var(--border);border-radius:6px;padding:2px">
-          ${['all','audit','note'].map(f=>`<button onclick="_tkFeedFilter='${f}';renderTkDetail()" style="font-size:11px;padding:3px 10px;border:none;border-radius:4px;cursor:pointer;font-family:inherit;transition:.15s;background:${(S._tkFeedFilter||'all')===f?'var(--acc)':'transparent'};color:${(S._tkFeedFilter||'all')===f?'var(--act)':'var(--mu)'}">${f==='all'?'Alle':f==='audit'?'Protokoll':'Notizen'}</button>`).join('')}
-        </div>
-      </div>
-      <div class="nfeed">${_renderFeed(notes,tk.id,canEdit,S._tkFeedFilter||'all')}</div>
-      ${canEdit?`<div style="margin-top:10px">
-        ${S.noteTemplates.length?`<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px">
-          ${S.noteTemplates.map(t=>`<button class="btn-s" style="font-size:11px;padding:3px 9px" onclick="applyNoteTpl(${JSON.stringify(t.body)})">${t.label}</button>`).join('')}
-        </div>`:''}
-        <div style="display:flex;gap:7px;align-items:flex-end">
-          <div class="note-input-wrap" style="flex:1">
-            <div class="mention-suggestions" id="mentionSug"></div>
-            <textarea id="noteInput" rows="2" placeholder="Notiz \u2026 @Name f\u00fcr Erw\u00e4hnung" style="font-size:13px;width:100%" onkeyup="onNoteKey(event,'${tk.id}')"></textarea>
-          </div>
-          <button class="btn-p" onclick="addNote('${tk.id}')" style="padding:8px 12px;flex-shrink:0">Senden</button>
-        </div>
+    </div>`:''}`;
+  const protocolHtml=`
+    <div style="display:flex;gap:2px;background:var(--sf2);border:1px solid var(--border);border-radius:6px;padding:2px;margin-bottom:12px;width:fit-content">
+      ${['all','audit','note'].map(f=>`<button onclick="S._tkFeedFilter='${f}';renderTkDetail()" style="font-size:11px;padding:3px 10px;border:none;border-radius:4px;cursor:pointer;font-family:inherit;transition:.15s;background:${(S._tkFeedFilter||'all')===f?'var(--acc)':'transparent'};color:${(S._tkFeedFilter||'all')===f?'var(--act)':'var(--mu)'}">${f==='all'?'Alle':f==='audit'?'\u00c4nderungen':'Notizen'}</button>`).join('')}
+    </div>
+    <div class="nfeed">${_renderFeed(notes,tk.id,canEdit,S._tkFeedFilter||'all')}</div>
+    ${canEdit?`<div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+      ${S.noteTemplates.length?`<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px">
+        ${S.noteTemplates.map(t=>`<button class="btn-s" style="font-size:11px;padding:3px 9px" onclick="applyNoteTpl(${JSON.stringify(t.body)})">${t.label}</button>`).join('')}
       </div>`:''}
-    </div>`;
+      <div style="display:flex;gap:7px;align-items:flex-end">
+        <div class="note-input-wrap" style="flex:1">
+          <div class="mention-suggestions" id="mentionSug"></div>
+          <textarea id="noteInput" rows="2" placeholder="Notiz \u2026 @Name f\u00fcr Erw\u00e4hnung" style="font-size:13px;width:100%" onkeyup="onNoteKey(event,'${tk.id}')"></textarea>
+        </div>
+        <button class="btn-p" onclick="addNote('${tk.id}')" style="padding:8px 12px;flex-shrink:0">Senden</button>
+      </div>
+    </div>`:''}`;
+  document.getElementById('tkDetMain').innerHTML=`
+    <div style="border-bottom:1px solid var(--border);margin:-18px -18px 14px;padding:0 18px;display:flex;gap:0">
+      ${tabBtn('details','\ud83d\udccb Details')}
+      ${tabBtn('protocol','\ud83d\udd50 Protokoll'+(notes.length?` (${notes.length})`:''))}
+    </div>
+    ${tab==='details'?detailsHtml:protocolHtml}`;
   document.getElementById('tkDetSB').innerHTML=`
     ${canEdit?`
     <div class="tkf"><label>Status</label><select onchange="updateTkField('${tk.id}','status',this.value)">${STATUSES.map(s=>`<option value="${s.id}"${tk.status===s.id?' selected':''}>${s.label}</option>`).join('')}</select></div>

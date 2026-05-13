@@ -355,7 +355,8 @@
 <div class="ov" id="admOv">
   <div class="modal wide">
     <div class="mh"><h2>&#9881;&#65039; Administration</h2><button class="mc" onclick="closeModal('admOv')">&#10005;</button></div>
-    <div class="mb2">
+    <div class="mb2" style="padding:0;overflow:hidden">
+      <div class="adm-layout">
       <div class="atabs">
         <button class="tb on" id="atb-users" onclick="swTab('users')">&#128100; Benutzer</button>
         <button class="tb" id="atb-cats" onclick="swTab('cats')">&#127912; Kategorien</button>
@@ -420,6 +421,7 @@
         </div>
         <button class="btn-s" id="logMoreBtn" onclick="loadLog(false)" style="width:100%;margin-top:8px;display:none">Mehr laden …</button>
       </div>
+      </div><!-- /adm-layout -->
     </div>
   </div>
 </div>
