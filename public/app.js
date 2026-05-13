@@ -91,6 +91,7 @@ const getTag=id=>S.tags.find(t=>t.id===id);
 const getTk=id=>S.tickets.find(t=>t.id===id);
 const getAllw=(uid,year,month)=>S.allowances.find(a=>a.userId===uid&&a.year===year&&a.month===month)||{nd:0,fd:0,fw:0,c10:0};
 const getRoleDef=r=>ROLES.find(x=>x.id===r)||ROLES[6];
+const isAssignable=u=>{const r=u?.roles||['standard'];return !(r.length===0||r.every(x=>x==='standard'));}
 const fd=s=>{if(!s)return'\u2014';const p=s.split('T')[0].split('-');return`${p[2]}.${p[1]}.${p[0]}`;};
 
 function fmtDateShort(s) {
@@ -1247,7 +1248,7 @@ function renderTickets(){
     ${S.tkBatchMode&&S.tkBatchSel.size?`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px;background:rgba(59,109,212,.06);border:1px solid rgba(59,109,212,.2);border-radius:var(--r);margin-bottom:10px">
       <span style="font-size:13px;font-weight:600;color:var(--acc)">${S.tkBatchSel.size} ausgewählt</span>
       <select id="batchStatus" class="flt" style="font-size:12px"><option value="">Status ändern…</option>${STATUSES.map(s=>`<option value="${s.id}">${s.label}</option>`).join('')}</select>
-      <select id="batchAssignee" class="flt" style="font-size:12px"><option value="">Zuständig ändern…</option><option value="__none__">— niemand —</option>${S.users.map(u=>`<option value="${u.id}">${u.name}</option>`).join('')}</select>
+      <select id="batchAssignee" class="flt" style="font-size:12px"><option value="">Zuständig ändern…</option><option value="__none__">— niemand —</option>${S.users.filter(isAssignable).map(u=>`<option value="${u.id}">${u.name}</option>`).join('')}</select>
       <button class="btn-p" style="font-size:12px" onclick="batchApply()">&#10003; Anwenden</button>
       <button class="btn-s" style="font-size:12px" onclick="S.tkBatchSel.clear();renderTickets()">Auswahl aufheben</button>
     </div>`:''}
@@ -1257,7 +1258,7 @@ function renderTickets(){
       <select class="flt" onchange="S.tkFiltDept=this.value;renderMain()"><option value="">Alle Bereiche</option>${myD.map(d=>`<option value="${d}"${S.tkFiltDept===d?' selected':''}>${DEPT_LABELS[d]}</option>`).join('')}</select>
       <select class="flt" onchange="S.tkFiltPrio=this.value;renderMain()"><option value="">Alle Priorit\u00e4ten</option>${PRIORITIES.map(p2=>`<option value="${p2.id}"${S.tkFiltPrio===p2.id?' selected':''}>${p2.label}</option>`).join('')}</select>
       <select class="flt" onchange="S.tkFiltTag=this.value;renderMain()"><option value="">Alle Tags</option>${S.tags.map(t=>`<option value="${t.id}"${S.tkFiltTag===t.id?' selected':''}>${t.label}</option>`).join('')}</select>
-      <select class="flt" onchange="S.tkFiltAssignee=this.value;renderMain()"><option value="">Alle Bearbeiter</option>${S.users.map(u=>`<option value="${u.id}"${S.tkFiltAssignee===u.id?' selected':''}>${u.name}</option>`).join('')}</select>
+      <select class="flt" onchange="S.tkFiltAssignee=this.value;renderMain()"><option value="">Alle Bearbeiter</option>${S.users.filter(isAssignable).map(u=>`<option value="${u.id}"${S.tkFiltAssignee===u.id?' selected':''}>${u.name}</option>`).join('')}</select>
     </div>
     ${groupedHtml}`;
 }
@@ -1411,7 +1412,7 @@ function renderTkDetail(){
     <div class="tkf"><label>Fachbereich</label><select onchange="updateTkField('${tk.id}','department',this.value)">${DEPTS.map(d=>`<option value="${d}"${tk.department===d?' selected':''}>${DEPT_LABELS[d]}</option>`).join('')}</select></div>
     <div class="tkf"><label>Bucket</label><select onchange="updateTkField('${tk.id}','bucket',this.value)"><option value="">\u2014</option>${BUCKETS.map(b=>`<option value="${b.id}"${tk.bucket===b.id?' selected':''}>${b.label}</option>`).join('')}</select></div>
     <div class="tkf"><label>Zust\u00e4ndig</label><div style="display:flex;gap:5px">
-      <select onchange="updateTkField('${tk.id}','assigneeId',this.value||null)" style="flex:1"><option value="">\u2014</option>${S.users.map(u=>`<option value="${u.id}"${tk.assigneeId===u.id?' selected':''}>${u.name}</option>`).join('')}</select>
+      <select onchange="updateTkField('${tk.id}','assigneeId',this.value||null)" style="flex:1"><option value="">\u2014</option>${S.users.filter(isAssignable).map(u=>`<option value="${u.id}"${tk.assigneeId===u.id?' selected':''}>${u.name}</option>`).join('')}</select>
       ${S.tp.canAssign&&tk.assigneeId!==S.currentUser?`<button class="btn-ok" onclick="updateTkField('${tk.id}','assigneeId','${S.currentUser}')">Ich</button>`:''}
     </div></div>
     ${S.tp.canSetPublic?`<div class="tkf"><label>Sichtbarkeit</label><button class="bdg ${tk.isPublic?'pub-on':'pub-off'}" onclick="updateTkField('${tk.id}','isPublic',${!tk.isPublic})" style="cursor:pointer;padding:5px 10px;border-radius:6px;font-size:12px">${tk.isPublic?'&#127760; \u00d6ffentlich':'&#128274; Privat'}</button></div>`:''}
@@ -1505,7 +1506,7 @@ function openTkForm(id,parentId){
   if(advRow)advRow.style.display=isStd?'none':'flex';
   document.getElementById('tkFBkt').innerHTML='<option value="">\u2014</option>'+BUCKETS.map(b=>`<option value="${b.id}"${tk?.bucket===b.id?' selected':''}>${b.label}</option>`).join('');
   document.getElementById('tkFTags').innerHTML=S.tags.map(t=>`<option value="${t.id}"${tk?.tags?.includes(t.id)?' selected':''}>${t.label}</option>`).join('');
-  document.getElementById('tkFAsgn').innerHTML='<option value="">\u2014 niemand \u2014</option>'+S.users.map(u=>`<option value="${u.id}"${tk?.assigneeId===u.id?' selected':''}>${u.name}</option>`).join('');
+  document.getElementById('tkFAsgn').innerHTML='<option value="">\u2014 niemand \u2014</option>'+S.users.filter(isAssignable).map(u=>`<option value="${u.id}"${tk?.assigneeId===u.id?' selected':''}>${u.name}</option>`).join('');
   const pid=parentId||tk?.parentTicketId||'';
   document.getElementById('tkFPar').innerHTML='<option value="">\u2014</option>'+S.tickets.filter(t=>!id||t.id!==id).map(t=>`<option value="${t.id}"${t.id===pid?' selected':''}>${t.number}: ${t.title.slice(0,35)}</option>`).join('');
   const dueFld=document.getElementById('tkFDue');if(dueFld)dueFld.value=tk?.dueDate||'';
