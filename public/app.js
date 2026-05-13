@@ -2628,3 +2628,75 @@ function gSearchKey(e){
   else if(e.key==='ArrowUp'){e.preventDefault();_gSearchIdx=(_gSearchIdx-1+n)%n;_gsHover(_gSearchIdx);}
   else if(e.key==='Enter'){e.preventDefault();_gsGo(_gSearchIdx);}
 }
+
+// SECTION: Platzübersicht
+const ELP_ROWS = [
+  [{name:'ELP 1'},{name:'ELP 2'}],
+  [{name:'ELP 7',center:true}],
+  [{name:'ELP 4'},{name:'ELP 3'}],
+  [{name:'ELP 6'},{name:'ELP 5'}],
+];
+function renderPlatz(){
+  const mySess=S.stationSessions.find(s=>s.userId===S.currentUser);
+  const isAlreadyIn=!!mySess;
+  function card(st){
+    const sess=S.stationSessions.find(s=>s.stationName===st.name);
+    const occ=!!sess;
+    const mine=sess?.userId===S.currentUser;
+    const u=occ?getU(sess.userId):null;
+    const shift=sess?.shiftId?S.stationShifts.find(sh=>sh.id===sess.shiftId):null;
+    const cls=mine?'elp-mine':occ?'elp-occ':'elp-free';
+    return `<div class="elp-station ${cls}">
+      <div class="elp-sname">${st.name}</div>
+      ${occ?`
+        <div class="elp-urow">${avHtml(u?.initials||'?',u?.color||'#888',34,13,true)}<div><div class="elp-uname">${u?.name||'?'}</div>${shift?`<div class="elp-sch">${shift.label}</div>`:''}</div></div>
+        <div class="elp-badge ${mine?'elp-badge-me':'elp-badge-occ'}">${mine?'● Du bist hier':'● Besetzt'}</div>
+        ${mine?`<button class="btn-d" style="width:100%;margin-top:10px;font-size:12px" onclick="logoutStation('${st.name}')">Abmelden</button>`:''}
+      `:`
+        <div class="elp-badge elp-badge-free">● Frei</div>
+        ${!isAlreadyIn?`<button class="btn-p" style="width:100%;margin-top:10px;font-size:12px" onclick="openStationLogin('${st.name}')">Anmelden</button>`:`<div style="font-size:11px;color:var(--di);margin-top:10px;text-align:center">Du bist bereits an ${mySess.stationName} angemeldet</div>`}
+      `}
+    </div>`;
+  }
+  document.getElementById('main').innerHTML=`
+    <div class="ph"><div class="pt">&#128225; Platz&#252;bersicht</div>
+      <button class="btn-s" style="font-size:12px" onclick="fetchData().then(renderPlatz)">&#8635; Aktualisieren</button>
+    </div>
+    <div class="elp-wrap">
+      ${ELP_ROWS.map(row=>`<div class="elp-row${row[0].center?' elp-center':''}">${row.map(card).join('')}</div>`).join('')}
+    </div>`;
+}
+function openStationLogin(name){
+  document.getElementById('stLoginStation').value=name;
+  document.getElementById('stLoginTitle').textContent='📡 Anmelden – '+name;
+  const sel=document.getElementById('stLoginShift');
+  sel.innerHTML='<option value="">— keine Angabe —</option>'+S.stationShifts.map(s=>`<option value="${s.id}">${s.label}</option>`).join('');
+  openModal('stLoginOv');
+}
+async function confirmStationLogin(){
+  const name=document.getElementById('stLoginStation').value;
+  const shiftId=document.getElementById('stLoginShift').value||null;
+  try{
+    await api('POST','/stations/'+encodeURIComponent(name),{shiftId});
+    await fetchData();closeModal('stLoginOv');renderPlatz();toast('✅ Angemeldet an '+name);
+  }catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function logoutStation(name){
+  try{
+    await api('DELETE','/stations/'+encodeURIComponent(name));
+    await fetchData();renderPlatz();toast('✅ Abgemeldet von '+name);
+  }catch(e){toast('⚠️ '+e.message,'err');}
+}
+// Shifts Admin
+function renderShiftsAdmin(){
+  const el=document.getElementById('shiftList');if(!el)return;
+  el.innerHTML=S.stationShifts.length?S.stationShifts.map(s=>`<div class="ai"><div class="aii"><div class="ain">&#128336; ${s.label}</div></div><div class="aia"><button class="btn-d" onclick="deleteShift('${s.id}')">&#10005;</button></div></div>`).join(''):'<div style="color:var(--di);font-size:12px;padding:8px 0">Noch keine Schichten. Füge eine hinzu.</div>';
+}
+async function addShift(){
+  const lbl=document.getElementById('shiftFLabel');if(!lbl?.value.trim())return toast('Bezeichnung eingeben!','err');
+  try{await api('POST','/station-shifts',{label:lbl.value.trim()});lbl.value='';await fetchData();renderShiftsAdmin();toast('✅ Schicht hinzugefügt');}catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function deleteShift(id){
+  if(!confirm('Schicht löschen?'))return;
+  try{await api('DELETE','/station-shifts/'+id);await fetchData();renderShiftsAdmin();toast('✅ Schicht gelöscht');}catch(e){toast('⚠️ '+e.message,'err');}
+}

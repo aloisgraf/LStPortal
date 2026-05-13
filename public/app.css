@@ -244,3 +244,19 @@ details.dash-card > summary { list-style: none; cursor: pointer; display: flex; 
 .dash-card details > summary::-webkit-details-marker { display: none; }
 .dash-card details > summary::after { content: '\25BC'; font-size: 10px; color: var(--mu); margin-left: 8px; transition: transform .2s; }
 .dash-card details[open] > summary::after { transform: rotate(-180deg); }
+
+.elp-wrap{display:flex;flex-direction:column;gap:18px;padding:24px;max-width:760px}
+.elp-row{display:flex;gap:18px}
+.elp-center{justify-content:center}
+.elp-center .elp-station{width:calc(50% - 9px);flex:0 0 auto}
+.elp-station{flex:1;background:var(--sf);border:2px solid var(--border);border-radius:14px;padding:18px;min-height:150px;display:flex;flex-direction:column;transition:.2s;box-shadow:var(--sh)}
+.elp-mine{border-color:var(--acc);background:rgba(59,109,212,.05)}
+.elp-occ{border-color:var(--ok);background:rgba(16,185,129,.04)}
+.elp-sname{font-size:20px;font-weight:800;letter-spacing:-.5px;margin-bottom:12px}
+.elp-urow{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.elp-uname{font-size:13px;font-weight:600}
+.elp-sch{font-size:11px;color:var(--mu);margin-top:2px}
+.elp-badge{font-size:11px;font-weight:700;padding:3px 0}
+.elp-badge-me{color:var(--acc)}
+.elp-badge-occ{color:var(--ok)}
+.elp-badge-free{color:var(--di);margin-top:auto}
