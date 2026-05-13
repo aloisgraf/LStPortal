@@ -190,6 +190,41 @@ router.delete('/:id/checklists/:cid', auth, async (req,res) => {
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
+router.put('/:id/checklists/:cid/sync', auth, async (req,res) => {
+  try {
+    const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
+    if (!tk||!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
+    const cl = await q1('SELECT * FROM ticket_checklists WHERE id=$1',[req.params.cid]);
+    if (!cl||!cl.template_id) return bad(res,'Keine Vorlage verknüpft',400);
+    const tmpl = await q1('SELECT * FROM checklist_templates WHERE id=$1',[cl.template_id]);
+    if (!tmpl) return bad(res,'Vorlage nicht gefunden',404);
+    const tplItems = await q('SELECT * FROM checklist_template_items WHERE template_id=$1 ORDER BY sort_order',[cl.template_id]);
+    const existing = await q('SELECT * FROM ticket_checklist_items WHERE checklist_id=$1',[req.params.cid]);
+    // match by text to preserve completion state
+    const existMap = {};
+    for (const e of existing) existMap[e.text] = e;
+    const tplTexts = new Set(tplItems.map(i=>i.text));
+    // delete items no longer in template
+    for (const e of existing) {
+      if (!tplTexts.has(e.text))
+        await pool.query('DELETE FROM ticket_checklist_items WHERE id=$1',[e.id]);
+    }
+    // add new items, update sort_order for existing
+    for (const ti of tplItems) {
+      if (existMap[ti.text]) {
+        await pool.query('UPDATE ticket_checklist_items SET sort_order=$1,item_type=$2 WHERE id=$3',
+          [ti.sort_order, ti.item_type||'check', existMap[ti.text].id]);
+      } else {
+        await pool.query('INSERT INTO ticket_checklist_items (id,checklist_id,text,item_type,sort_order) VALUES ($1,$2,$3,$4,$5)',
+          [newId(), req.params.cid, ti.text, ti.item_type||'check', ti.sort_order]);
+      }
+    }
+    // update checklist name in case template was renamed
+    await pool.query('UPDATE ticket_checklists SET name=$1 WHERE id=$2',[tmpl.name, req.params.cid]);
+    await auditNote(req.params.id, req.uid, `🔄 Checkliste aktualisiert: "${tmpl.name}"`);
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
 router.put('/:id/checklists/:cid/items/:iid', auth, async (req,res) => {
   try {
     const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);

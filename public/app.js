@@ -1350,6 +1350,19 @@ function renderTkDetail(){
   const notes=tk.notes||[];
   const tab=S._tkTab||'details';
   const tabBtn=(id,label)=>`<button onclick="S._tkTab='${id}';renderTkDetail()" style="padding:8px 16px;font-size:13px;font-weight:${tab===id?'600':'500'};background:none;border:none;border-bottom:2px solid ${tab===id?'var(--acc)':'transparent'};color:${tab===id?'var(--acc)':'var(--mu)'};cursor:pointer;font-family:inherit;transition:.15s;margin-bottom:-1px">${label}</button>`;
+  const noteInputHtml=canEdit?`<div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di);margin-bottom:8px">TEXT</div>
+      ${S.noteTemplates.length?`<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px">
+        ${S.noteTemplates.map(t=>`<button class="btn-s" style="font-size:11px;padding:3px 9px" onclick="applyNoteTpl(${JSON.stringify(t.body)})">${t.label}</button>`).join('')}
+      </div>`:''}
+      <div style="display:flex;gap:7px;align-items:flex-end">
+        <div class="note-input-wrap" style="flex:1">
+          <div class="mention-suggestions" id="mentionSug"></div>
+          <textarea id="noteInput" rows="2" placeholder="Text \u2026 @Name f\u00fcr Erw\u00e4hnung" style="font-size:13px;width:100%" onkeyup="onNoteKey(event,'${tk.id}')"></textarea>
+        </div>
+        <button class="btn-p" onclick="addNote('${tk.id}')" style="padding:8px 12px;flex-shrink:0">Senden</button>
+      </div>
+    </div>`:'';
   const detailsHtml=`
     <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di);margin-bottom:6px">BESCHREIBUNG</div>
       <div style="font-size:13px;line-height:1.6;color:${tk.description?'var(--tx)':'var(--di)'}">${tk.description||'Keine Beschreibung.'}</div></div>
@@ -1365,6 +1378,7 @@ function renderTkDetail(){
           <span style="font-size:12px;font-weight:700">${cl.name}</span>
           <div style="display:flex;gap:5px;align-items:center">
             <span style="font-size:10px;color:var(--mu)">${cl.items.filter(i=>i.completedBy).length}/${cl.items.length}</span>
+            ${canEdit&&cl.templateId?`<button class="btn-s" style="padding:2px 6px;font-size:10px" title="Checkliste auf aktuelle Vorlage aktualisieren" onclick="syncCl('${tk.id}','${cl.id}')">&#x1F504; Aktualisieren</button>`:''}
             ${canEdit?`<button class="btn-d" style="padding:2px 6px;font-size:10px" onclick="removeCl('${tk.id}','${cl.id}')">\u2715</button>`:''}
           </div>
         </div>
@@ -1377,24 +1391,13 @@ function renderTkDetail(){
           ${it.itemType==='check_text'?`<div class="cl-user-note"><input type="text" placeholder="Notiz \u2026" value="${(it.userNote||'').replace(/"/g,'&quot;')}" onchange="saveClItemNote('${tk.id}','${cl.id}','${it.id}',this.value)"></div>`:''}
         </div>`).join('')}</div>
       </div>`).join('')}
-    </div>`:''}`;
+    </div>`:''}
+    ${noteInputHtml}`;
   const protocolHtml=`
     <div style="display:flex;gap:2px;background:var(--sf2);border:1px solid var(--border);border-radius:6px;padding:2px;margin-bottom:12px;width:fit-content">
-      ${['all','audit','note'].map(f=>`<button onclick="S._tkFeedFilter='${f}';renderTkDetail()" style="font-size:11px;padding:3px 10px;border:none;border-radius:4px;cursor:pointer;font-family:inherit;transition:.15s;background:${(S._tkFeedFilter||'all')===f?'var(--acc)':'transparent'};color:${(S._tkFeedFilter||'all')===f?'var(--act)':'var(--mu)'}">${f==='all'?'Alle':f==='audit'?'\u00c4nderungen':'Notizen'}</button>`).join('')}
+      ${['all','audit','note'].map(f=>`<button onclick="S._tkFeedFilter='${f}';renderTkDetail()" style="font-size:11px;padding:3px 10px;border:none;border-radius:4px;cursor:pointer;font-family:inherit;transition:.15s;background:${(S._tkFeedFilter||'all')===f?'var(--acc)':'transparent'};color:${(S._tkFeedFilter||'all')===f?'var(--act)':'var(--mu)'}">${f==='all'?'Alle':f==='audit'?'\u00c4nderungen':'Text'}</button>`).join('')}
     </div>
-    <div class="nfeed">${_renderFeed(notes,tk.id,canEdit,S._tkFeedFilter||'all')}</div>
-    ${canEdit?`<div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
-      ${S.noteTemplates.length?`<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px">
-        ${S.noteTemplates.map(t=>`<button class="btn-s" style="font-size:11px;padding:3px 9px" onclick="applyNoteTpl(${JSON.stringify(t.body)})">${t.label}</button>`).join('')}
-      </div>`:''}
-      <div style="display:flex;gap:7px;align-items:flex-end">
-        <div class="note-input-wrap" style="flex:1">
-          <div class="mention-suggestions" id="mentionSug"></div>
-          <textarea id="noteInput" rows="2" placeholder="Notiz \u2026 @Name f\u00fcr Erw\u00e4hnung" style="font-size:13px;width:100%" onkeyup="onNoteKey(event,'${tk.id}')"></textarea>
-        </div>
-        <button class="btn-p" onclick="addNote('${tk.id}')" style="padding:8px 12px;flex-shrink:0">Senden</button>
-      </div>
-    </div>`:''}`;
+    <div class="nfeed">${_renderFeed(notes,tk.id,canEdit,S._tkFeedFilter||'all')}</div>`;
   document.getElementById('tkDetMain').innerHTML=`
     <div style="border-bottom:1px solid var(--border);margin:-18px -18px 14px;padding:0 18px;display:flex;gap:0">
       ${tabBtn('details','\ud83d\udccb Details')}
@@ -1587,6 +1590,7 @@ async function doAttachCl(){
   catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
 }
 async function removeCl(tkId,clId){try{await api('DELETE','/tickets/'+tkId+'/checklists/'+clId);await fetchData();renderTkDetail();}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}}
+async function syncCl(tkId,clId){try{await api('PUT','/tickets/'+tkId+'/checklists/'+clId+'/sync');await fetchData();renderTkDetail();toast('\u2705 Checkliste aktualisiert!');}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}}
 async function toggleClItem(tkId,clId,iId,checked){try{await api('PUT','/tickets/'+tkId+'/checklists/'+clId+'/items/'+iId,{completed:checked});await fetchData();renderTkDetail();}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}}
 async function saveClItemNote(tkId,clId,iId,note){try{await api('PUT','/tickets/'+tkId+'/checklists/'+clId+'/items/'+iId,{userNote:note});}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}}
 // MESSAGES
