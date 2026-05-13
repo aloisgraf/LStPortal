@@ -8,7 +8,7 @@ router.get('/', auth, async (req,res) => {
   try {
     const uid=req.uid, p=req.p, tp=req.tp, roles=p.roles;
     const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
-           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw] = await Promise.all([
+           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw] = await Promise.all([
       q('SELECT id,name,initials,roles,color,must_change_pw,last_seen FROM users ORDER BY name'),
       q('SELECT * FROM categories ORDER BY sort_order,label'),
       q('SELECT * FROM tags ORDER BY label'),
@@ -40,6 +40,7 @@ router.get('/', auth, async (req,res) => {
       q('SELECT * FROM homeoffice_dienste ORDER BY sort_order,label').catch(()=>[]),
       q('SELECT * FROM vacation_config ORDER BY date').catch(()=>[]),
       q('SELECT * FROM ticket_subcategories ORDER BY department,sort_order,label').catch(()=>[]),
+      q('SELECT * FROM note_templates ORDER BY sort_order,label').catch(()=>[]),
     ]);
 
     const tkViewMap = new Map((tkViewsRaw||[]).map(v=>[v.ticket_id, v.viewed_at]));
@@ -108,6 +109,8 @@ router.get('/', auth, async (req,res) => {
         department:tk.department, subcategory:tk.subcategory||'', tags:parseTags(tk.tags), priority:tk.priority,
         status:tk.status, bucket:tk.bucket||'', isPublic:tk.is_public,
         assigneeId:tk.assignee_id, parentTicketId:tk.parent_ticket_id,
+        dueDate:tk.due_date?(typeof tk.due_date==='string'?tk.due_date.slice(0,10):tk.due_date.toISOString().slice(0,10)):null,
+        snoozedUntil:tk.snoozed_until?(typeof tk.snoozed_until==='string'?tk.snoozed_until.slice(0,10):tk.snoozed_until.toISOString().slice(0,10)):null,
         createdBy:tk.created_by, createdAt:tk.created_at, updatedAt:tk.updated_at, lastViewedAt:tkViewMap.get(tk.id)||null,
         mentionedUsers:[...new Set((noteMap[tk.id]||[]).flatMap(n=>n.mentionedUsers||[]))].filter(Boolean),
         notes:noteMap[tk.id]||[], checklists:tkClMap[tk.id]||[],
@@ -167,6 +170,7 @@ router.get('/', auth, async (req,res) => {
           (p.canApproveEvents && dt.status==='pending'),
       })),
       ticketSubcategories: (tkSubcatsRaw||[]).map(s=>({id:s.id,department:s.department,label:s.label,sortOrder:s.sort_order})),
+      noteTemplates: (noteTmplsRaw||[]).map(t=>({id:t.id,label:t.label,body:t.body})),
     });
   } catch(e) { console.error('[/api/data FEHLER]', e.message, e.stack?.split('\n')[1]); bad(res,e.message,500); }
 });

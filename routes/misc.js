@@ -632,4 +632,78 @@ router.delete('/ticket-subcategories/:id', auth, async (req,res) => {
   } catch(e) { bad(res,e.message,500); }
 });
 
+// ── Note Templates ──
+router.get('/note-templates', auth, async (req,res) => {
+  try { ok(res, await q('SELECT * FROM note_templates ORDER BY sort_order,label')); } catch(e) { bad(res,e.message,500); }
+});
+router.post('/note-templates', auth, async (req,res) => {
+  try {
+    if(!req.p.manageUsers) return bad(res,'Kein Zugriff',403);
+    const {label,body} = req.body;
+    if(!label?.trim()||!body?.trim()) return bad(res,'Label und Text erforderlich');
+    await pool.query('INSERT INTO note_templates (id,label,body,created_by) VALUES ($1,$2,$3,$4)',
+      [newId(),label.trim(),body.trim(),req.uid]);
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
+router.put('/note-templates/:id', auth, async (req,res) => {
+  try {
+    if(!req.p.manageUsers) return bad(res,'Kein Zugriff',403);
+    const {label,body} = req.body;
+    await pool.query('UPDATE note_templates SET label=$1,body=$2 WHERE id=$3',[label,body,req.params.id]);
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
+router.delete('/note-templates/:id', auth, async (req,res) => {
+  try {
+    if(!req.p.manageUsers) return bad(res,'Kein Zugriff',403);
+    await pool.query('DELETE FROM note_templates WHERE id=$1',[req.params.id]);
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
+
+// ── iCal Export ──
+router.get('/ical/:userId', async (req,res) => {
+  try {
+    const user = await getUser(req.params.userId);
+    if(!user) return res.status(404).send('Not found');
+    const events = await q(
+      `SELECT e.*, c.label as cat_label, c.emoji as cat_emoji FROM events e
+       LEFT JOIN categories c ON c.id=e.category
+       WHERE e.user_id=$1 AND e.is_general=false ORDER BY e.date_from`,
+      [req.params.userId]
+    );
+    const esc = s => (s||'').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\n/g,'\\n');
+    const fdt = d => {
+      const dt = new Date(d);
+      return dt.getFullYear()
+        + String(dt.getMonth()+1).padStart(2,'0')
+        + String(dt.getDate()).padStart(2,'0');
+    };
+    const uid_domain = '@lstportal.local';
+    const lines = [
+      'BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//LSt Portal//DE',
+      'CALSCALE:GREGORIAN','METHOD:PUBLISH',
+      `X-WR-CALNAME:${esc(user.name)} – Dienstplan`,
+      'X-WR-TIMEZONE:Europe/Vienna',
+    ];
+    for(const ev of events){
+      const dtEnd = new Date(ev.date_to||ev.date_from);
+      dtEnd.setDate(dtEnd.getDate()+1);
+      const summary = `${ev.cat_emoji||'📅'} ${esc(ev.reason||ev.cat_label||'Eintrag')}`;
+      lines.push('BEGIN:VEVENT');
+      lines.push(`UID:${ev.id}${uid_domain}`);
+      lines.push(`DTSTART;VALUE=DATE:${fdt(ev.date_from)}`);
+      lines.push(`DTEND;VALUE=DATE:${fdt(dtEnd)}`);
+      lines.push(`SUMMARY:${summary}`);
+      if(ev.description) lines.push(`DESCRIPTION:${esc(ev.description)}`);
+      lines.push('END:VEVENT');
+    }
+    lines.push('END:VCALENDAR');
+    res.setHeader('Content-Type','text/calendar;charset=utf-8');
+    res.setHeader('Content-Disposition',`attachment;filename="dienstplan-${user.name.replace(/\s+/g,'-')}.ics"`);
+    res.send(lines.join('\r\n'));
+  } catch(e) { res.status(500).send(e.message); }
+});
+
 module.exports = router;

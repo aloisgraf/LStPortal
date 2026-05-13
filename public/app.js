@@ -11,7 +11,7 @@ function showHelpSection(id){
   if(c)c.scrollTop=0;
 }
 
-const APP_VERSION='2.5.1';
+const APP_VERSION='2.6.0';
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
@@ -45,7 +45,8 @@ let S={
   abrYear:new Date().getFullYear(),abrMonth:new Date().getMonth()+1,abrUser:null,
   zahnarztWeek:null, // null = all from today, otherwise ISO Mon of week
   zahnarztData:[],
-  events:[],users:[],categories:[],tags:[],allowances:[],tickets:[],ticketSubcategories:[],
+  events:[],users:[],categories:[],tags:[],allowances:[],tickets:[],ticketSubcategories:[],noteTemplates:[],
+  tkBatchMode:false,tkBatchSel:new Set(),
   checklists:[],messages:[],notifications:[],abrechnung:{einspringer:[],homeoffice:[]},dienstplaene:[],
   p:{canApproveEvents:false,canSendMessages:false,seeAllEntries:true,editAllPersonal:false,addForOthers:false,addGeneral:false,manageUsers:false,seeAllAllw:false,editAllw:false,seeAllAbrechnung:false},
   p:{canApproveEvents:false,canSendMessages:false,seeAllEntries:true,editAllPersonal:false,addForOthers:false,addGeneral:false,manageUsers:false,seeAllAllw:false,editAllw:false,seeAllAbrechnung:false},
@@ -71,6 +72,7 @@ async function fetchData(){
     S.notifications=data.notifications||[];S.abrechnung=data.abrechnung||{einspringer:[],homeoffice:[]};S.diensttausch=data.diensttausch||[];S.homeoffice=data.homeoffice||{slots:[],config:[],boxes:[],dienste:[]};S.vacationConfig=data.vacationConfig||[];
     S.dienstplaene=data.dienstplaene||[];S.diensttausch=data.diensttausch||[];
     S.ticketSubcategories=data.ticketSubcategories||[];
+    S.noteTemplates=data.noteTemplates||[];
     S.currentUser=data.currentUser;S.p=data.permissions||{};
     const u=getU(S.currentUser);const roles=u?.roles||['standard'];
     const has=(...r)=>r.some(x=>roles.includes(x));
@@ -104,6 +106,16 @@ const prioBdg=p=>{const d=PRIORITIES.find(x=>x.id===p)||PRIORITIES[1];return`<sp
 const stBdg=s=>{const d=STATUSES.find(x=>x.id===s)||STATUSES[0];return`<span class="bdg st-${s}">${d.label}</span>`;};
 const deptBdg=d=>`<span class="bdg dp-${d}">${DEPT_LABELS[d]||d}</span>`;
 const tagChips=tgs=>(tgs||[]).map(tid=>{const t=getTag(tid);if(!t)return'';return`<span class="tag-chip" style="background:${t.color}1a;color:${t.color};border:1px solid ${t.color}30">${t.label}</span>`;}).join('');
+const dueBdg=tk=>{
+  if(!tk.dueDate||tk.status==='closed')return'';
+  const today=new Date();today.setHours(0,0,0,0);
+  const due=new Date(tk.dueDate);due.setHours(0,0,0,0);
+  const diff=Math.round((due-today)/(1000*60*60*24));
+  if(diff<0)return`<span class="bdg" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;font-weight:700">⚠️ Überfällig ${Math.abs(diff)}T</span>`;
+  if(diff===0)return`<span class="bdg" style="background:#fff7ed;color:#ea580c;border:1px solid #fdba74;font-weight:700">⏰ Heute fällig</span>`;
+  if(diff<=3)return`<span class="bdg" style="background:#fffbeb;color:#d97706;border:1px solid #fcd34d">📅 ${diff}T</span>`;
+  return`<span class="bdg" style="background:var(--sf2);color:var(--mu)">📅 ${due.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}</span>`;
+};
 const apBdg=s=>s==='approved'?'<span class="bdg ap-bdg-approved">\u2713 Genehmigt</span>':s==='rejected'?'<span class="bdg ap-bdg-rejected">\u2717 Abgelehnt</span>':'<span class="bdg ap-bdg-pending">\u23F3 Ausstehend</span>';
 const pal=()=>document.documentElement.getAttribute('data-theme')==='dark'?PAL_DARK:PALETTE;
 const h2r=hex=>{const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return`rgb(${r}, ${g}, ${b})`;};
@@ -349,6 +361,28 @@ function renderHome(){
     _myEntriesHtml='<div style="color:var(--di);font-size:12px;padding:8px 0">Keine Eintr\u00e4ge</div>';
   }
 
+  // Diese Woche fällig
+  var _dueFaelligHtml='';
+  (function(){
+    var today=new Date();today.setHours(0,0,0,0);
+    var weekEnd=new Date(today);weekEnd.setDate(today.getDate()+7);
+    var dueTks=S.tickets.filter(function(tk){
+      if(!tk.dueDate||tk.status==='closed')return false;
+      var d=new Date(tk.dueDate);d.setHours(0,0,0,0);
+      return d<=weekEnd;
+    }).sort(function(a,b){return (a.dueDate||'').localeCompare(b.dueDate||'');}).slice(0,10);
+    if(!dueTks.length)return;
+    dueTks.forEach(function(tk){
+      var asn=getU(tk.assigneeId);
+      _dueFaelligHtml+='<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="openTkDetail(\''+tk.id+'\')">';
+      _dueFaelligHtml+='<div style="width:3px;align-self:stretch;background:#ea580c;border-radius:2px;flex-shrink:0"></div>';
+      _dueFaelligHtml+='<div style="flex:1;min-width:0">';
+      _dueFaelligHtml+='<div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+tk.number+': '+tk.title+'</div>';
+      _dueFaelligHtml+='<div style="font-size:10px;color:var(--mu)">'+dueBdg(tk)+(asn?' · '+asn.name:' · nicht zugewiesen')+'</div>';
+      _dueFaelligHtml+='</div></div>';
+    });
+  })();
+
   // Beschwerden (subcategory tickets) für berechtigte Rollen
   var _beschwerdenHtml='';
   if(S.tp.canSeeSubcat){
@@ -439,6 +473,7 @@ function renderHome(){
     </div>`:''}
 
     ${importantNewsHtml}${(hoHtml||vacHtml)?('<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">'+hoHtml+vacHtml+'</div>'):''}
+    ${_dueFaelligHtml?_ccWrap('due_week','&#128197; Diese Woche fällig','<div class="card-rows">'+_dueFaelligHtml+'</div>','#ea580c'):''}
     ${_beschwerdenHtml?_ccWrap('beschwerden','&#128680; Zu erledigen &ndash; Beschwerden','<div class="card-rows">'+_beschwerdenHtml+'</div>','#7c3aed'):''}
     ${_ccWrap('online','&#128101; Online ('+(online.length+1)+')',_onlineHtml,'#10b981')}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
@@ -471,7 +506,10 @@ function renderSchedule(){
   const filterU=S.filterUser?getU(S.filterUser):null;
   document.getElementById('main').innerHTML=`
     <div class="ph"><div class="pt">Eintrags\u00fcbersicht</div>
-      <button class="btn-p" onclick="openEvtModal()">&#65291; Eintrag</button></div>
+      <div style="display:flex;gap:6px">
+        <a href="/api/ical/${S.currentUser}" download class="btn-s" style="font-size:12px;text-decoration:none;padding:6px 10px">&#128197; iCal</a>
+        <button class="btn-p" onclick="openEvtModal()">&#65291; Eintrag</button>
+      </div></div>
     <div class="fbar" style="flex-wrap:wrap;gap:6px">
       <div class="yr-row" style="margin:0"><button class="yb" onclick="S.year--;renderSBF();renderMain()">&lsaquo;</button><span class="yv">${S.year}</span><button class="yb" onclick="S.year++;renderSBF();renderMain()">&rsaquo;</button></div>
       <div style="display:flex;gap:4px;flex-wrap:wrap">
@@ -1122,7 +1160,7 @@ function renderTickets(){
           <td>${deptBdg(tk.department)}</td>
           <td>${prioBdg(tk.priority)}</td>
           <td>${stBdg(tk.status)}</td>
-          <td style="max-width:140px">${tagChips(tk.tags)}</td>
+          <td style="max-width:140px">${tagChips(tk.tags)}${dueBdg(tk)}</td>
           <td style="font-size:12px">${asn?`<div style="display:flex;align-items:center;gap:3px">${avHtml(asn.initials,asn.color,16,7)}<span>${asn.name}</span></div>`:'-'}</td>
           <td style="font-size:11px;color:var(--mu);white-space:nowrap">${fd(tk.createdAt)}</td>
         </tr>`;
@@ -1135,15 +1173,17 @@ function renderTickets(){
       const isChild=!!tk.parentTicketId;const isNew=tkIsNew(tk);
       const accent=_tkPrioColor[tk.priority]||'#94a3b8';
       const childStyle=isChild?'margin-left:20px;border-left:2px solid var(--border);background:var(--sf2);':'';
-      return`<div style="display:flex;align-items:center;gap:10px;padding:${isChild?'7px 12px 7px 10px':'10px 14px'};border-top:1px solid var(--border);${childStyle}${isNew?'background:rgba(245,158,11,.04);':''}" onclick="openTkDetail('${tk.id}')" class="clickable">
+      const isSel=S.tkBatchSel.has(tk.id);
+      return`<div style="display:flex;align-items:center;gap:10px;padding:${isChild?'7px 12px 7px 10px':'10px 14px'};border-top:1px solid var(--border);${childStyle}${isSel?'background:rgba(59,109,212,.07);':isNew?'background:rgba(245,158,11,.04);':''}" onclick="${S.tkBatchMode?`batchToggleTk('${tk.id}')`:''}" class="${S.tkBatchMode?'clickable':'clickable'}" ${S.tkBatchMode?'':''}>
+        ${S.tkBatchMode?`<input type="checkbox" ${isSel?'checked':''} onclick="event.stopPropagation();batchToggleTk('${tk.id}')" style="width:16px;height:16px;flex-shrink:0;cursor:pointer">`:''}
         ${isChild?`<span style="font-size:14px;color:var(--di);flex-shrink:0;margin-right:-4px">&#x21b3;</span>`:''}
         <div style="width:3px;align-self:stretch;background:${accent};border-radius:2px;flex-shrink:0"></div>
-        <div style="flex:1;min-width:0">
+        <div style="flex:1;min-width:0" ${S.tkBatchMode?'':''} onclick="${S.tkBatchMode?'':'openTkDetail(\''+tk.id+'\')'}">
           <div style="font-size:${isChild?'12px':'13px'};font-weight:600;color:var(--tx);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
             ${isNew?'<span class="tk-new-badge">NEU</span> ':''}<span style="font-family:monospace;font-size:11px;color:var(--mu)">${tk.number}</span> ${tk.title}
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--mu);align-items:center">
-            ${deptBdg(tk.department)}${prioBdg(tk.priority)}${stBdg(tk.status)}
+            ${deptBdg(tk.department)}${prioBdg(tk.priority)}${stBdg(tk.status)}${dueBdg(tk)}${snoozeBdg(tk)}
             ${tagChips(tk.tags)}
             ${asn?`<div style="display:flex;align-items:center;gap:3px">${avHtml(asn.initials,asn.color,14,6)}<span>${asn.name}</span></div>`:''}
             ${isChild&&par?`<span style="color:var(--di);font-size:10px">&#x2191; ${par.number}</span>`:''}
@@ -1171,15 +1211,17 @@ function renderTickets(){
           const isChild=!!tk.parentTicketId;const isNew=tkIsNew(tk);
           const accent=_tkPrioColor[tk.priority]||'#94a3b8';
           const childStyle=isChild?'margin-left:20px;border-left:2px solid var(--border);background:var(--sf2);':'';
-          return`<div style="display:flex;align-items:center;gap:10px;padding:${isChild?'7px 12px 7px 10px':'10px 14px'};border-top:1px solid var(--border);${childStyle}${isNew?'background:rgba(245,158,11,.04);':''}" onclick="openTkDetail('${tk.id}')" class="clickable">
+          const isSel2=S.tkBatchSel.has(tk.id);
+          return`<div style="display:flex;align-items:center;gap:10px;padding:${isChild?'7px 12px 7px 10px':'10px 14px'};border-top:1px solid var(--border);${childStyle}${isSel2?'background:rgba(59,109,212,.07);':isNew?'background:rgba(245,158,11,.04);':''}" onclick="${S.tkBatchMode?`batchToggleTk('${tk.id}')`:''}" class="clickable">
+            ${S.tkBatchMode?`<input type="checkbox" ${isSel2?'checked':''} onclick="event.stopPropagation();batchToggleTk('${tk.id}')" style="width:16px;height:16px;flex-shrink:0;cursor:pointer">`:''}
             ${isChild?`<span style="font-size:14px;color:var(--di);flex-shrink:0;margin-right:-4px">&#x21b3;</span>`:''}
             <div style="width:3px;align-self:stretch;background:${accent};border-radius:2px;flex-shrink:0"></div>
-            <div style="flex:1;min-width:0">
+            <div style="flex:1;min-width:0" onclick="${S.tkBatchMode?'':'openTkDetail(\''+tk.id+'\')'}">
               <div style="font-size:${isChild?'12px':'13px'};font-weight:600;color:var(--tx);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
                 ${isNew?'<span class="tk-new-badge">NEU</span> ':''}<span style="font-family:monospace;font-size:11px;color:var(--mu)">${tk.number}</span> ${tk.title}${tk.subcategory?` <span class="bdg" style="font-size:10px;background:rgba(124,58,237,.12);color:#7c3aed">${tk.subcategory}</span>`:''}
               </div>
               <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--mu);align-items:center">
-                ${prioBdg(tk.priority)}${stBdg(tk.status)}${tagChips(tk.tags)}
+                ${prioBdg(tk.priority)}${stBdg(tk.status)}${dueBdg(tk)}${snoozeBdg(tk)}${tagChips(tk.tags)}
                 ${asn?`<div style="display:flex;align-items:center;gap:3px">${avHtml(asn.initials,asn.color,14,6)}<span>${asn.name}</span></div>`:''}
                 ${isChild&&par?`<span style="color:var(--di);font-size:10px">&#x2191; ${par.number}</span>`:''}
                 ${nc?`<span>\ud83d\udcac ${nc}</span>`:''}
@@ -1199,8 +1241,16 @@ function renderTickets(){
     <div class="ph"><div class="pt">${closed?'Abgeschlossene':'Offene'} Tickets <span style="font-size:16px;color:var(--mu)">(${tks.length})</span></div>
       <div style="display:flex;gap:6px">
         <button class="btn-s" title="${useTable?'Card-Ansicht':'Tabellen-Ansicht'}" onclick="saveTkViewPref('${useTable?'cards':'table'}')" style="font-size:16px;padding:4px 10px">${viewIcon}</button>
+        <button class="btn-s${S.tkBatchMode?' on':''}" onclick="toggleTkBatch()" title="Mehrfachauswahl" style="font-size:13px;padding:5px 10px">&#9745; Auswahl</button>
         <button class="btn-p" onclick="openTkForm(null)">&#65291; Ticket</button>
       </div></div>
+    ${S.tkBatchMode&&S.tkBatchSel.size?`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px;background:rgba(59,109,212,.06);border:1px solid rgba(59,109,212,.2);border-radius:var(--r);margin-bottom:10px">
+      <span style="font-size:13px;font-weight:600;color:var(--acc)">${S.tkBatchSel.size} ausgewählt</span>
+      <select id="batchStatus" class="flt" style="font-size:12px"><option value="">Status ändern…</option>${STATUSES.map(s=>`<option value="${s.id}">${s.label}</option>`).join('')}</select>
+      <select id="batchAssignee" class="flt" style="font-size:12px"><option value="">Zuständig ändern…</option><option value="__none__">— niemand —</option>${S.users.map(u=>`<option value="${u.id}">${u.name}</option>`).join('')}</select>
+      <button class="btn-p" style="font-size:12px" onclick="batchApply()">&#10003; Anwenden</button>
+      <button class="btn-s" style="font-size:12px" onclick="S.tkBatchSel.clear();renderTickets()">Auswahl aufheben</button>
+    </div>`:''}
     <div class="fbar" style="flex-wrap:wrap;gap:6px">
       <input class="srch" type="text" placeholder="Suchen \u2026" value="${S.tkSearch}" oninput="S.tkSearch=this.value;renderMain()" style="width:160px">
       <select class="flt" onchange="S.tkFiltStatus=this.value;renderMain()"><option value="">Alle Status</option>${STATUSES.filter(s=>closed?(s.id==='closed'):(s.id!=='closed')).map(s=>`<option value="${s.id}"${S.tkFiltStatus===s.id?' selected':''}>${s.label}</option>`).join('')}</select>
@@ -1272,12 +1322,17 @@ function renderTkDetail(){
           <div class="nt${isAudit?' audit':''}">${isAudit?n.text:highlightMentions(n.text)}</div>
         </div>`;}).join('')||'<div style="color:var(--di);font-size:12px">Noch keine Notizen.</div>'}
       </div>
-      ${canEdit?`<div style="margin-top:10px;display:flex;gap:7px;align-items:flex-end">
-        <div class="note-input-wrap">
-          <div class="mention-suggestions" id="mentionSug"></div>
-          <textarea id="noteInput" rows="2" placeholder="Notiz \u2026 @Name f\u00fcr Erw\u00e4hnung" style="flex:1;font-size:13px;width:100%" onkeyup="onNoteKey(event,'${tk.id}')"></textarea>
+      ${canEdit?`<div style="margin-top:10px">
+        ${S.noteTemplates.length?`<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px">
+          ${S.noteTemplates.map(t=>`<button class="btn-s" style="font-size:11px;padding:3px 9px" onclick="applyNoteTpl(${JSON.stringify(t.body)})">${t.label}</button>`).join('')}
+        </div>`:''}
+        <div style="display:flex;gap:7px;align-items:flex-end">
+          <div class="note-input-wrap" style="flex:1">
+            <div class="mention-suggestions" id="mentionSug"></div>
+            <textarea id="noteInput" rows="2" placeholder="Notiz \u2026 @Name f\u00fcr Erw\u00e4hnung" style="font-size:13px;width:100%" onkeyup="onNoteKey(event,'${tk.id}')"></textarea>
+          </div>
+          <button class="btn-p" onclick="addNote('${tk.id}')" style="padding:8px 12px;flex-shrink:0">Senden</button>
         </div>
-        <button class="btn-p" onclick="addNote('${tk.id}')" style="padding:8px 12px;flex-shrink:0">Senden</button>
       </div>`:''}
     </div>`;
   document.getElementById('tkDetSB').innerHTML=`
@@ -1291,13 +1346,22 @@ function renderTkDetail(){
       ${S.tp.canAssign&&tk.assigneeId!==S.currentUser?`<button class="btn-ok" onclick="updateTkField('${tk.id}','assigneeId','${S.currentUser}')">Ich</button>`:''}
     </div></div>
     ${S.tp.canSetPublic?`<div class="tkf"><label>Sichtbarkeit</label><button class="bdg ${tk.isPublic?'pub-on':'pub-off'}" onclick="updateTkField('${tk.id}','isPublic',${!tk.isPublic})" style="cursor:pointer;padding:5px 10px;border-radius:6px;font-size:12px">${tk.isPublic?'&#127760; \u00d6ffentlich':'&#128274; Privat'}</button></div>`:''}
-    <div class="tkf"><label>Elternticket</label><select onchange="updateTkField('${tk.id}','parentTicketId',this.value||null)"><option value="">\u2014</option>${S.tickets.filter(t=>t.id!==tk.id).map(t=>`<option value="${t.id}"${tk.parentTicketId===t.id?' selected':''}>${t.number}: ${t.title.slice(0,25)}</option>`).join('')}</select></div>`
+    <div class="tkf"><label>Elternticket</label><select onchange="updateTkField('${tk.id}','parentTicketId',this.value||null)"><option value="">\u2014</option>${S.tickets.filter(t=>t.id!==tk.id).map(t=>`<option value="${t.id}"${tk.parentTicketId===t.id?' selected':''}>${t.number}: ${t.title.slice(0,25)}</option>`).join('')}</select></div>
+    <div class="tkf"><label>&#128197; F\u00e4lligkeit</label><input type="date" value="${tk.dueDate||''}" onchange="updateTkField('${tk.id}','dueDate',this.value||null)" style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:var(--r);background:var(--sf);color:var(--tx);width:100%;box-sizing:border-box"></div>`
     :`<div class="tkf"><label>Status</label><div class="val">${stBdg(tk.status)}</div></div>
     <div class="tkf"><label>Priorit\u00e4t</label><div class="val">${prioBdg(tk.priority)}</div></div>
     <div class="tkf"><label>Fachbereich</label><div class="val">${deptBdg(tk.department)}</div></div>
     <div class="tkf"><label>Zust\u00e4ndig</label><div class="val">${getU(tk.assigneeId)?`<div style="display:flex;align-items:center;gap:5px">${avHtml(getU(tk.assigneeId).initials,getU(tk.assigneeId).color,18,8)}<span style="font-size:12px">${getU(tk.assigneeId).name}</span></div>`:'\u2014'}</div></div>`}
     <div class="tkdiv"></div>
     <div class="tkf"><label>Tags</label><div>${tagChips(tk.tags)||'<span style="color:var(--di);font-size:11px">\u2014</span>'}</div></div>
+    <div class="tkf"><label>&#128164; Wiedervorlage</label>
+      ${canEdit?`<div style="display:flex;gap:5px;align-items:center">
+        <input type="date" value="${tk.snoozedUntil||''}" id="snoozeDate" style="flex:1;font-size:12px;padding:4px 7px;border:1px solid var(--border);border-radius:var(--r);background:var(--sf);color:var(--tx)">
+        <button class="btn-s" style="font-size:11px;padding:3px 7px" onclick="setSnooze('${tk.id}')">&#10003;</button>
+        ${tk.snoozedUntil?`<button class="btn-d" style="font-size:11px;padding:3px 7px" onclick="updateTkField('${tk.id}','snoozedUntil',null);toast('\u2705 Wiedervorlage entfernt')">\u2715</button>`:''}
+      </div>`:
+      `<div style="font-size:12px;color:var(--mu)">${tk.snoozedUntil?'bis '+new Date(tk.snoozedUntil).toLocaleDateString('de-DE'):'\u2014'}</div>`}
+    </div>
     <div class="tkf"><label>Erstellt von</label><div style="font-size:12px">${getU(tk.createdBy)?.name||'?'}</div></div>
     <div class="tkf"><label>Erstellt am</label><div style="font-size:11px;color:var(--mu)">${fdt(tk.createdAt)}</div></div>
     ${par?`<div class="tkf"><label>Elternticket</label><div class="subi" onclick="S.currentTicketId='${par.id}';renderTkDetail()" style="margin-top:4px"><span style="font-family:monospace;font-size:11px">${par.number}</span><span style="font-size:12px;flex:1">${par.title.slice(0,22)}</span></div></div>`:''}
@@ -1328,6 +1392,7 @@ function insertMention(name){
 async function updateTkField(id,field,value){
   try{await api('PUT','/tickets/'+id,{[field]:value});await fetchData();renderMain();const tk=getTk(id);if(tk){S.currentTicketId=id;renderTkDetail();}}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
 }
+function applyNoteTpl(body){const inp=document.getElementById('noteInput');if(inp){inp.value=body;inp.focus();inp.setSelectionRange(body.length,body.length);}}
 async function addNote(tkId){
   const inp=document.getElementById('noteInput');if(!inp?.value.trim())return;
   try{await api('POST','/tickets/'+tkId+'/notes',{text:inp.value.trim()});inp.value='';await fetchData();renderTkDetail();}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
@@ -1369,13 +1434,14 @@ function openTkForm(id,parentId){
   document.getElementById('tkFAsgn').innerHTML='<option value="">\u2014 niemand \u2014</option>'+S.users.map(u=>`<option value="${u.id}"${tk?.assigneeId===u.id?' selected':''}>${u.name}</option>`).join('');
   const pid=parentId||tk?.parentTicketId||'';
   document.getElementById('tkFPar').innerHTML='<option value="">\u2014</option>'+S.tickets.filter(t=>!id||t.id!==id).map(t=>`<option value="${t.id}"${t.id===pid?' selected':''}>${t.number}: ${t.title.slice(0,35)}</option>`).join('');
+  const dueFld=document.getElementById('tkFDue');if(dueFld)dueFld.value=tk?.dueDate||'';
   closeModal('tkDetOv');openModal('tkFormOv');
 }
 async function saveTicket(){
   const nm=document.getElementById('tkFNm').value.trim();if(!nm){toast('\u26A0\uFE0F Name erforderlich!');return;}
   const id=document.getElementById('tkFId').value;
   const tags=Array.from(document.getElementById('tkFTags').selectedOptions).map(o=>o.value);
-  const body={title:nm,description:document.getElementById('tkFDesc').value.trim(),department:document.getElementById('tkFDept').value,subcategory:document.getElementById('tkFSubcat')?.value||'',priority:document.getElementById('tkFPrio').value,status:document.getElementById('tkFSt').value,bucket:document.getElementById('tkFBkt').value,tags,assigneeId:document.getElementById('tkFAsgn').value||null,parentTicketId:document.getElementById('tkFPar').value||null};
+  const body={title:nm,description:document.getElementById('tkFDesc').value.trim(),department:document.getElementById('tkFDept').value,subcategory:document.getElementById('tkFSubcat')?.value||'',priority:document.getElementById('tkFPrio').value,status:document.getElementById('tkFSt').value,bucket:document.getElementById('tkFBkt').value,tags,assigneeId:document.getElementById('tkFAsgn').value||null,parentTicketId:document.getElementById('tkFPar').value||null,dueDate:document.getElementById('tkFDue')?.value||null};
   try{
     if(id)await api('PUT','/tickets/'+id,body);else await api('POST','/tickets',body);
     await fetchData();closeModal('tkFormOv');renderMain();toast(id?'\u2705 Aktualisiert!':'\u2705 Erstellt!');
@@ -1592,7 +1658,7 @@ async function loadLog(reset){
 function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 function openAdminModal(){renderUsrList();renderCatList();renderTagList();renderRightsMatrix();openModal('admOv');}
-function swTab(t){['users','cats','tags','rights','subcats','log','ho'].forEach(x=>{document.getElementById('atb-'+x)?.classList.toggle('on',x===t);document.getElementById('atp-'+x)?.classList.toggle('on',x===t);});if(t==='ho')renderHoAdmin();if(t==='subcats')renderSubcatAdmin();}
+function swTab(t){['users','cats','tags','stats','rights','subcats','notetpls','log','ho'].forEach(x=>{document.getElementById('atb-'+x)?.classList.toggle('on',x===t);document.getElementById('atp-'+x)?.classList.toggle('on',x===t);});if(t==='ho')renderHoAdmin();if(t==='subcats')renderSubcatAdmin();if(t==='notetpls')renderNoteTplAdmin();if(t==='stats')renderStatsPanel();}
 function backToAdmin(tab='users'){['ufOv','cfOv','tfOv'].forEach(closeModal);openAdminModal();swTab(tab);}
 function renderUsrList(){document.getElementById('usrList').innerHTML=S.users.map(u=>`<div class="ai">${avHtml(u.initials,u.color,34,13,u.isOnline)}<div class="aii"><div class="ain">${u.name} ${roleBadges(u.id)}${u.isOnline?'<span style="font-size:10px;color:var(--ok)">\u25cf online</span>':''}</div><div class="ais">${u.mustChangePW?'\u26A0\uFE0F PW ausstehend':'\u2713 Aktiv'}</div></div><div class="aia"><button class="btn-e" onclick="openUF('${u.id}')">\u270e</button>${S.users.length>1&&u.id!==S.currentUser?`<button class="btn-d" onclick="delUser('${u.id}')">\u2715</button>`:''}</div></div>`).join('');}
 function renderCatList(){document.getElementById('catList').innerHTML=S.categories.map(c=>`<div class="ai"><div style="width:14px;height:14px;border-radius:3px;background:${c.color};flex-shrink:0"></div><div class="aii"><div class="ain">${c.emoji} ${c.label}</div></div><div class="aia"><button class="btn-e" onclick="openCF('${c.id}')">\u270e</button>${S.categories.length>1?`<button class="btn-d" onclick="delCat('${c.id}')">\u2715</button>`:''}</div></div>`).join('');}
@@ -1637,8 +1703,11 @@ function openModal(id){document.getElementById(id)?.classList.add('open');}
 function closeModal(id){document.getElementById(id)?.classList.remove('open');}
 function eyeToggle(inputId,btn){const inp=document.getElementById(inputId);const show=inp.type==='password';inp.type=show?'text':'password';btn.textContent=show?'\uD83D\uDE48':'\uD83D\uDC41';}
 function toast(msg,type=''){const t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3200);}
-const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOr','clFormOv','attachClOv','changelogOv','dpOv','rejectEinspOv','helpOv','msgFormOv','msgDetOv'];
-document.addEventListener('keydown',e=>{if(e.key==='Escape')ALL_MODALS.forEach(closeModal);});
+const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOr','clFormOv','attachClOv','changelogOv','dpOv','rejectEinspOv','helpOv','msgFormOv','msgDetOv','gSearchOv'];
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();openGSearch();return;}
+  if(e.key==='Escape'){ALL_MODALS.forEach(closeModal);closeGSearch();}
+});
 ALL_MODALS.forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('click',e=>{if(e.target===el)closeModal(id);});});
 document.addEventListener('click',e=>{if(!e.target.closest('.note-input-wrap'))document.getElementById('mentionSug')?.classList.remove('open');});
 // AUTO-REFRESH
@@ -1847,6 +1916,91 @@ async function deleteSubcat(id){
     renderSubcatAdmin();
     toast('✅ Gelöscht');
   }catch(e){toast('⚠️ '+e.message,'err');}
+}
+function renderStatsPanel(){
+  const el=document.getElementById('statsPanel');if(!el)return;
+  const tks=S.tickets;
+  const open=tks.filter(t=>t.status!=='closed');
+  const closed=tks.filter(t=>t.status==='closed');
+  const today=new Date();today.setHours(0,0,0,0);
+  const overdue=open.filter(t=>t.dueDate&&new Date(t.dueDate)<today);
+  // Count by dept
+  const byDept={};DEPTS.forEach(d=>{byDept[d]={open:0,closed:0};});
+  tks.forEach(t=>{if(byDept[t.department]){if(t.status==='closed')byDept[t.department].closed++;else byDept[t.department].open++;}});
+  // Count by prio
+  const byPrio={high:0,medium:0,low:0};open.forEach(t=>{if(byPrio[t.priority]!==undefined)byPrio[t.priority]++;});
+  // Count by status
+  const byStatus={};STATUSES.forEach(s=>{byStatus[s.id]=0;});tks.forEach(t=>{if(byStatus[t.status]!==undefined)byStatus[t.status]++;});
+  // Bar chart helper
+  function barChart(data,colors){
+    const max=Math.max(...data.map(d=>d.value),1);
+    return`<div style="display:flex;align-items:flex-end;gap:6px;height:80px;padding-top:8px">`+
+      data.map(d=>`<div style="display:flex;flex-direction:column;align-items:center;flex:1;gap:3px">
+        <span style="font-size:10px;font-weight:700;color:var(--tx)">${d.value}</span>
+        <div style="width:100%;background:${colors[d.key]||'#3b6dd4'};border-radius:4px 4px 0 0;height:${Math.round((d.value/max)*60)+4}px;min-height:4px;transition:.3s"></div>
+        <span style="font-size:9px;color:var(--mu);text-align:center;line-height:1.2">${d.label}</span>
+      </div>`).join('')+`</div>`;
+  }
+  const deptData=DEPTS.filter(d=>d!=='frei').map(d=>({key:d,label:(DEPT_LABELS[d]||d).replace(/^[^\s]+\s/,''),value:byDept[d]?.open||0}));
+  const deptColors={technik:'#f59e0b',leitung:'#3b6dd4',dienstplanung:'#10b981',ausbildung:'#8b5cf6',qm:'#06b6d4'};
+  const prioData=[{key:'high',label:'Hoch',value:byPrio.high},{key:'medium',label:'Mittel',value:byPrio.medium},{key:'low',label:'Gering',value:byPrio.low}];
+  const prioColors={high:'#ef4444',medium:'#f59e0b',low:'#10b981'};
+  const stData=STATUSES.map(s=>({key:s.id,label:s.label,value:byStatus[s.id]||0}));
+  const stColors={open:'#3b6dd4',in_progress:'#f59e0b',on_hold:'#8b5cf6',closed:'#10b981'};
+  el.innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div style="padding:14px;background:var(--sf);border:1px solid var(--border);border-radius:var(--r);text-align:center">
+        <div style="font-size:32px;font-weight:800;color:var(--acc)">${open.length}</div>
+        <div style="font-size:11px;color:var(--mu)">Offene Tickets</div>
+      </div>
+      <div style="padding:14px;background:var(--sf);border:1px solid var(--border);border-radius:var(--r);text-align:center">
+        <div style="font-size:32px;font-weight:800;color:#10b981">${closed.length}</div>
+        <div style="font-size:11px;color:var(--mu)">Abgeschlossen</div>
+      </div>
+      <div style="padding:14px;background:var(--sf);border:1px solid var(--border);border-radius:var(--r);text-align:center">
+        <div style="font-size:32px;font-weight:800;color:#dc2626">${overdue.length}</div>
+        <div style="font-size:11px;color:var(--mu)">Überfällig</div>
+      </div>
+      <div style="padding:14px;background:var(--sf);border:1px solid var(--border);border-radius:var(--r);text-align:center">
+        <div style="font-size:32px;font-weight:800;color:#8b5cf6">${tks.filter(t=>!t.assigneeId&&t.status!=='closed').length}</div>
+        <div style="font-size:11px;color:var(--mu)">Ohne Zuständigen</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+      <div style="padding:14px;background:var(--sf);border:1px solid var(--border);border-radius:var(--r)">
+        <div style="font-size:12px;font-weight:700;margin-bottom:4px">Offen nach Fachbereich</div>
+        ${barChart(deptData,deptColors)}
+      </div>
+      <div style="padding:14px;background:var(--sf);border:1px solid var(--border);border-radius:var(--r)">
+        <div style="font-size:12px;font-weight:700;margin-bottom:4px">Offene nach Priorität</div>
+        ${barChart(prioData,prioColors)}
+      </div>
+      <div style="padding:14px;background:var(--sf);border:1px solid var(--border);border-radius:var(--r)">
+        <div style="font-size:12px;font-weight:700;margin-bottom:4px">Tickets nach Status</div>
+        ${barChart(stData,stColors)}
+      </div>
+    </div>`;
+}
+function renderNoteTplAdmin(){
+  const list=document.getElementById('noteTplList');if(!list)return;
+  if(!S.noteTemplates.length){list.innerHTML='<p style="font-size:12px;color:var(--mu)">Noch keine Vorlagen.</p>';return;}
+  list.innerHTML=S.noteTemplates.map(t=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--sf);border-radius:6px;margin-bottom:4px;font-size:13px">
+    <span style="font-weight:600;min-width:100px">${t.label}</span>
+    <span style="flex:1;color:var(--mu);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.body}</span>
+    <button class="btn-d" style="padding:2px 8px" onclick="deleteNoteTpl('${t.id}')">✕</button>
+  </div>`).join('');
+}
+async function addNoteTpl(){
+  const label=(document.getElementById('ntFLabel')?.value||'').trim();
+  const body=(document.getElementById('ntFBody')?.value||'').trim();
+  if(!label||!body)return toast('⚠️ Label und Text erforderlich','err');
+  try{await api('POST','/note-templates',{label,body});await fetchData();renderNoteTplAdmin();document.getElementById('ntFLabel').value='';document.getElementById('ntFBody').value='';toast('✅ Vorlage gespeichert');}
+  catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function deleteNoteTpl(id){
+  if(!confirm('Vorlage löschen?'))return;
+  try{await api('DELETE','/note-templates/'+id);await fetchData();renderNoteTplAdmin();toast('✅ Gelöscht');}
+  catch(e){toast('⚠️ '+e.message,'err');}
 }
 async function hoAddBox(){var label=document.getElementById('hoNewBox')?document.getElementById('hoNewBox').value.trim():'';if(!label)return;try{await api('POST','/homeoffice/boxes',{label:label});await fetchData();renderHoAdmin();}catch(e){toast('⚠️ '+e.message,'err');}}
 async function hoDeleteBox(id){try{await api('DELETE','/homeoffice/boxes/'+id);await fetchData();renderHoAdmin();}catch(e){toast('⚠️ '+e.message,'err');}}
@@ -2266,4 +2420,134 @@ async function doZahnarztUpload(){
     toast('✅ '+result.count+' Einträge importiert!');
   }catch(e){toast('⚠️ '+e.message,'err');}
   finally{loading(false);}
+}
+
+// ── Wiedervorlage ──
+async function setSnooze(tkId){
+  const val=document.getElementById('snoozeDate')?.value;
+  if(!val)return toast('⚠️ Datum wählen','err');
+  try{await api('PUT','/tickets/'+tkId,{snoozedUntil:val});await fetchData();renderTkDetail();toast('✅ Wiedervorlage gesetzt: '+new Date(val).toLocaleDateString('de-DE'));}
+  catch(e){toast('⚠️ '+e.message,'err');}
+}
+const snoozeBdg=tk=>{
+  if(!tk.snoozedUntil||tk.status==='closed')return'';
+  const today=new Date();today.setHours(0,0,0,0);
+  const d=new Date(tk.snoozedUntil);d.setHours(0,0,0,0);
+  if(d>today)return`<span class="bdg" style="background:#f0f9ff;color:#0284c7;border:1px solid #7dd3fc">💤 bis ${d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}</span>`;
+  return'';
+};
+
+// ── Batch-Aktionen ──
+function toggleTkBatch(){S.tkBatchMode=!S.tkBatchMode;S.tkBatchSel.clear();renderTickets();}
+function batchToggleTk(id){if(S.tkBatchSel.has(id))S.tkBatchSel.delete(id);else S.tkBatchSel.add(id);renderTickets();}
+async function batchApply(){
+  const ids=[...S.tkBatchSel];if(!ids.length)return;
+  const status=document.getElementById('batchStatus')?.value;
+  const assignee=document.getElementById('batchAssignee')?.value;
+  if(!status&&!assignee)return toast('⚠️ Bitte Status oder Bearbeiter wählen','err');
+  const body={};
+  if(status)body.status=status;
+  if(assignee)body.assigneeId=assignee==='__none__'?null:assignee;
+  loading(true);
+  try{
+    await Promise.all(ids.map(id=>api('PUT','/tickets/'+id,body)));
+    await fetchData();S.tkBatchSel.clear();renderTickets();
+    toast('✅ '+ids.length+' Tickets aktualisiert');
+  }catch(e){toast('⚠️ '+e.message,'err');}finally{loading(false);}
+}
+
+// ── Quick-Action-Button ──
+function _qaItems(){
+  const items=[];
+  items.push({icon:'🎫',label:'Ticket erstellen',action:()=>openTkForm(null)});
+  if(S.p.canSendMessages)items.push({icon:'✉️',label:'Nachricht senden',action:()=>openMsgForm()});
+  items.push({icon:'🏠',label:'Homeoffice eintragen',action:()=>setView('homeoffice')});
+  items.push({icon:'📅',label:'Eintrag anlegen',action:()=>openEvtModal()});
+  return items;
+}
+function toggleQA(){
+  const menu=document.getElementById('qaMenu');
+  const fab=document.getElementById('qaFab');
+  if(!menu)return;
+  const open=menu.style.display==='flex';
+  if(open){menu.style.display='none';fab.style.transform='';fab.style.boxShadow='';}
+  else{
+    menu.innerHTML=_qaItems().map((it,i)=>`
+      <button onclick="qaAction(${i})" style="display:flex;align-items:center;gap:8px;background:var(--sf);border:1px solid var(--border);border-radius:20px;padding:7px 14px 7px 10px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.12);white-space:nowrap;font-family:inherit;color:var(--tx);transition:.15s" onmouseover="this.style.borderColor='var(--acc)';this.style.color='var(--acc)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--tx)'">
+        <span style="font-size:16px">${it.icon}</span>${it.label}
+      </button>`).join('');
+    menu.style.display='flex';
+    fab.style.transform='rotate(45deg)';
+    fab.style.boxShadow='0 6px 20px rgba(0,0,0,.3)';
+  }
+}
+function qaAction(i){
+  toggleQA();
+  _qaItems()[i]?.action();
+}
+document.addEventListener('click',function(e){
+  const wrap=document.getElementById('qaWrap');
+  if(wrap&&!wrap.contains(e.target)){
+    const menu=document.getElementById('qaMenu');
+    const fab=document.getElementById('qaFab');
+    if(menu&&menu.style.display==='flex'){menu.style.display='none';if(fab){fab.style.transform='';fab.style.boxShadow='';}}
+  }
+});
+
+// ── Globale Suche ──
+let _gSearchIdx=0;
+function openGSearch(){
+  const ov=document.getElementById('gSearchOv');if(!ov)return;
+  ov.style.display='flex';
+  const inp=document.getElementById('gSearchInput');if(inp){inp.value='';inp.focus();}
+  document.getElementById('gSearchResults').innerHTML='<div style="padding:20px;text-align:center;color:var(--mu);font-size:13px">Suchbegriff eingeben…</div>';
+  _gSearchIdx=0;
+}
+function closeGSearch(){const ov=document.getElementById('gSearchOv');if(ov)ov.style.display='none';}
+function _gsEsc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+function _gsHl(s,q){if(!q)return _gsEsc(s);const re=new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');return _gsEsc(s).replace(re,'<mark style="background:#fef08a;color:#713f12;border-radius:2px;padding:0 1px">$1</mark>');}
+function renderGSearch(){
+  const q=(document.getElementById('gSearchInput')?.value||'').trim().toLowerCase();
+  const box=document.getElementById('gSearchResults');if(!box)return;
+  _gSearchIdx=0;
+  if(q.length<2){box.innerHTML='<div style="padding:20px;text-align:center;color:var(--mu);font-size:13px">Mindestens 2 Zeichen eingeben</div>';return;}
+  const results=[];
+  // Tickets
+  S.tickets.filter(t=>(t.title+' '+t.number+' '+(t.description||'')).toLowerCase().includes(q)).slice(0,6).forEach(t=>{
+    const overdue=t.dueDate&&t.status!=='closed'&&new Date(t.dueDate)<new Date();
+    results.push({type:'ticket',icon:'🎫',label:t.number+': '+t.title,sub:(DEPT_LABELS[t.department]||t.department)+' · '+STATUSES.find(s=>s.id===t.status)?.label+(overdue?' · ⚠️ Überfällig':''),action:()=>openTkDetail(t.id),accent:'#3b6dd4'});
+  });
+  // Nachrichten
+  (S.messages||[]).filter(m=>((m.title||'')+(m.body||'')).toLowerCase().includes(q)).slice(0,4).forEach(m=>{
+    results.push({type:'msg',icon:'✉️',label:m.title||'(kein Betreff)',sub:'von '+(getU(m.senderId)?.name||'?')+' · '+fdt(m.createdAt),action:()=>{closeGSearch();setView('messages');setTimeout(()=>openMsg(m.id),100);},accent:'#10b981'});
+  });
+  // Mitarbeiter
+  S.users.filter(u=>(u.name||'').toLowerCase().includes(q)).slice(0,4).forEach(u=>{
+    const roles=(u.roles||[]).map(r=>ROLES.find(x=>x.id===r)?.label||r).join(', ');
+    results.push({type:'user',icon:'👤',label:u.name,sub:roles||'',action:()=>{closeGSearch();if(S.p.manageUsers)openUF(u.id);},accent:'#f59e0b'});
+  });
+  // News
+  (S.news||[]).filter(n=>(n.title+(n.body||'')).toLowerCase().includes(q)).slice(0,3).forEach(n=>{
+    results.push({type:'news',icon:'📰',label:n.title,sub:n.body?.slice(0,60)||'',action:()=>{closeGSearch();setView('news');},accent:'#8b5cf6'});
+  });
+  if(!results.length){box.innerHTML='<div style="padding:20px;text-align:center;color:var(--mu);font-size:13px">Keine Ergebnisse für „'+_gsEsc(q)+'"</div>';return;}
+  box.innerHTML=results.map((r,i)=>`
+    <div class="gs-item" data-i="${i}" onclick="_gsGo(${i})" onmouseover="_gsHover(${i})" style="display:flex;align-items:center;gap:12px;padding:10px 18px;cursor:pointer;transition:.1s;${i===0?'background:var(--sf2)':''}">
+      <span style="font-size:20px;flex-shrink:0">${r.icon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_gsHl(r.label,q)}</div>
+        <div style="font-size:11px;color:var(--mu)">${_gsEsc(r.sub)}</div>
+      </div>
+      <div style="width:4px;height:36px;background:${r.accent};border-radius:2px;flex-shrink:0"></div>
+    </div>`).join('');
+  box._gsResults=results;
+}
+function _gsHover(i){_gSearchIdx=i;document.querySelectorAll('#gSearchResults .gs-item').forEach((el,j)=>el.style.background=j===i?'var(--sf2)':'');}
+function _gsGo(i){const r=document.getElementById('gSearchResults')?._gsResults?.[i];if(r){closeGSearch();r.action();}}
+function gSearchKey(e){
+  const items=document.querySelectorAll('#gSearchResults .gs-item');const n=items.length;
+  if(!n)return;
+  if(e.key==='ArrowDown'){e.preventDefault();_gSearchIdx=(_gSearchIdx+1)%n;_gsHover(_gSearchIdx);}
+  else if(e.key==='ArrowUp'){e.preventDefault();_gSearchIdx=(_gSearchIdx-1+n)%n;_gsHover(_gSearchIdx);}
+  else if(e.key==='Enter'){e.preventDefault();_gsGo(_gSearchIdx);}
 }

@@ -6,12 +6,12 @@ const { auth, ok, bad } = require('../middleware');
 
 router.post('/', auth, async (req,res) => {
   try {
-    const {title,description,department,subcategory,tags,priority,status,bucket,assigneeId,parentTicketId} = req.body;
+    const {title,description,department,subcategory,tags,priority,status,bucket,assigneeId,parentTicketId,dueDate} = req.body;
     if (!title?.trim()) return bad(res,'Titel erforderlich');
     const id=newId(), number=await nextTicketNumber();
     const subcat = subcategory||'';
-    await pool.query('INSERT INTO tickets (id,number,title,description,department,subcategory,tags,priority,status,bucket,assignee_id,parent_ticket_id,created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',
-      [id,number,title.trim(),description||'',department||'technik',subcat,JSON.stringify(tags||[]),priority||'medium',status||'open',bucket||'',assigneeId||null,parentTicketId||null,req.uid]);
+    await pool.query('INSERT INTO tickets (id,number,title,description,department,subcategory,tags,priority,status,bucket,assignee_id,parent_ticket_id,created_by,due_date) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)',
+      [id,number,title.trim(),description||'',department||'technik',subcat,JSON.stringify(tags||[]),priority||'medium',status||'open',bucket||'',assigneeId||null,parentTicketId||null,req.uid,dueDate||null]);
     const uname = (await getUser(req.uid))?.name||'?';
     await auditNote(id,req.uid,`✅ Ticket erstellt von ${uname}${subcat?' ['+subcat+']':''}`);
     const deptUsers = await q('SELECT id FROM users WHERE roles @> $1::jsonb AND id != $2',
@@ -67,6 +67,8 @@ router.put('/:id', auth, async (req,res) => {
     if (b.assigneeId!==undefined) add('assignee_id',b.assigneeId||null);
     if (b.parentTicketId!==undefined) add('parent_ticket_id',b.parentTicketId||null);
     if (b.subcategory!==undefined) add('subcategory',b.subcategory||'');
+    if (b.dueDate!==undefined) add('due_date',b.dueDate||null);
+    if (b.snoozedUntil!==undefined) add('snoozed_until',b.snoozedUntil||null);
     if (!setClauses.length) return ok(res);
     add('updated_at',new Date().toISOString());
     vals.push(req.params.id);

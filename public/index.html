@@ -208,6 +208,9 @@
         <div class="fg"><label>Zust&#228;ndig</label><select id="tkFAsgn"><option value="">&#8212; niemand &#8212;</option></select></div>
       </div>
       <div class="fg full"><label>Elternticket</label><select id="tkFPar"><option value="">&#8212; kein &#8212;</option></select></div>
+      <div class="fr">
+        <div class="fg"><label>&#128197; F&#228;lligkeit</label><input type="date" id="tkFDue"></div>
+      </div>
     </div>
     <div class="mf"><button class="btn-s" onclick="closeModal('tkFormOv')">Abbrechen</button><button class="btn-p" onclick="saveTicket()">&#128190; Speichern</button></div>
   </div>
@@ -357,13 +360,16 @@
         <button class="tb on" id="atb-users" onclick="swTab('users')">&#128100; Benutzer</button>
         <button class="tb" id="atb-cats" onclick="swTab('cats')">&#127912; Kategorien</button>
         <button class="tb" id="atb-tags" onclick="swTab('tags')">&#127991;&#65039; Tags</button>
+        <button class="tb" id="atb-stats" onclick="swTab('stats')">&#128202; Statistiken</button>
         <button class="tb" id="atb-rights" onclick="swTab('rights')">&#128272; Rechte</button>
         <button class="tb" id="atb-subcats" onclick="swTab('subcats')">&#127991; Unterkategorien</button>
+        <button class="tb" id="atb-notetpls" onclick="swTab('notetpls')">&#128172; Notizvorlagen</button>
         <button class="tb" id="atb-log" onclick="swTab('log');loadLog(true)">&#128221; Aktivitätslog</button>
       </div>
       <div class="tp on" id="atp-users"><div class="al" id="usrList"></div><button class="btn-p" style="width:100%;justify-content:center" onclick="openUF(null)">&#65291; Benutzer</button></div>
       <div class="tp" id="atp-cats"><div class="al" id="catList"></div><button class="btn-p" style="width:100%;justify-content:center" onclick="openCF(null)">&#65291; Kategorie</button></div>
       <div class="tp" id="atp-tags"><div class="al" id="tagList"></div><button class="btn-p" style="width:100%;justify-content:center" onclick="openTF(null)">&#65291; Tag</button></div>
+      <div class="tp" id="atp-stats"><div id="statsPanel"></div></div>
       <div class="tp" id="atp-rights"><div id="rightsMatrix" style="overflow-x:auto"></div></div>
       <div class="tp" id="atp-subcats">
         <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:flex-end">
@@ -378,6 +384,14 @@
           <button class="btn-p" style="font-size:12px;white-space:nowrap" onclick="addSubcat()">&#65291; Hinzuf&#252;gen</button>
         </div>
         <div id="subcatList"></div>
+      </div>
+      <div class="tp" id="atp-notetpls">
+        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:flex-end">
+          <div class="fg" style="margin:0;flex:1;min-width:120px"><label style="font-size:11px">Bezeichnung (Button-Label)</label><input type="text" id="ntFLabel" placeholder="z.B. In Bearbeitung" style="font-size:12px;padding:5px 8px"></div>
+          <div class="fg" style="margin:0;flex:3;min-width:200px"><label style="font-size:11px">Text der Vorlage</label><input type="text" id="ntFBody" placeholder="Wird bearbeitet, Rückmeldung folgt." style="font-size:12px;padding:5px 8px"></div>
+          <button class="btn-p" style="font-size:12px;white-space:nowrap" onclick="addNoteTpl()">&#65291; Hinzuf&#252;gen</button>
+        </div>
+        <div id="noteTplList"></div>
       </div>
       <div class="tp" id="atp-ho">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
@@ -1140,15 +1154,23 @@
     <div class="mh"><h2>&#128203; Changelog</h2><button class="mc" onclick="closeModal('changelogOv')">&#10005;</button></div>
     <div class="mb2" style="gap:10px">
       <div style="padding:12px;background:rgba(59,109,212,0.06));border:1px solid rgba(59,109,212,.20);border-radius:8px">
-        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.5.1</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.6.0</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
         <ul style="font-size:12px;line-height:1.8;padding-left:18px">
-          <li>Checklistenvorlagen: Reihenfolge der Punkte per &#9650;/&#9660; verschiebbar</li>
-          <li>&Uuml;bersicht: Kacheln farblich akzentuiert f&uuml;r bessere Abgrenzung</li>
-          <li>Tickets Card-Ansicht: Untertickets einr&uuml;cken mit &#x21b3;-Symbol</li>
+          <li>Quick-Action-Button (&#43;) unten rechts: Ticket, Nachricht, HO, Eintrag</li>
+          <li>Ticket-F&auml;lligkeit: Datum, Warnung &uuml;berf&auml;llig/bald f&auml;llig, &Uuml;bersichts-Box</li>
+          <li>Globale Suche (Strg+K): Tickets, Nachrichten, Mitarbeiter, News</li>
+          <li>Kommentar-Vorlagen: admin-verwaltbare Schnellantworten im Ticket</li>
+          <li>Batch-Aktionen: Mehrere Tickets ausw&auml;hlen und Status/Bearbeiter &auml;ndern</li>
+          <li>iCal-Export: Pers&ouml;nlichen Dienstplan in Kalender-App einbinden</li>
+          <li>Dashboard-Statistiken: Ticket-Kennzahlen mit Balkendiagrammen im Admin</li>
+          <li>Wiedervorlage: Ticket bis Datum zur&uuml;ckstellen, Badge in der Liste</li>
+          <li>Checklistenvorlagen: Reihenfolge per &#9650;/&#9660; verschiebbar</li>
+          <li>&Uuml;bersicht: Kacheln farblich akzentuiert, Abstand erh&ouml;ht</li>
+          <li>Untertickets einr&uuml;cken mit &#x21b3;-Symbol in Card-Ansicht</li>
         </ul>
       </div>
       <div style="padding:12px;background:rgba(59,109,212,0.06));border:1px solid rgba(59,109,212,.20);border-radius:8px">
-        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--sf3);color:var(--mu);padding:2px 8px;border-radius:4px">v2.5.0</span></div>
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--sf3);color:var(--mu);padding:2px 8px;border-radius:4px">v2.5.1</span></div>
         <ul style="font-size:12px;line-height:1.8;padding-left:18px">
           <li>Neue Rolle: Schichtleiter (&#x1F506;)</li>
           <li>Tickets: Unterkategorien f&uuml;r Fachbereiche (admin-verwaltbar)</li>
@@ -1282,6 +1304,23 @@
       </div>
     </div>
   </div>
+</div>
+
+<!-- GLOBAL SEARCH -->
+<div class="ov" id="gSearchOv" onclick="if(event.target===this)closeGSearch()" style="align-items:flex-start;padding-top:80px">
+  <div style="background:var(--sf);border:1px solid var(--border);border-radius:12px;width:100%;max-width:600px;box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden">
+    <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border)">
+      <span style="font-size:18px">🔍</span>
+      <input type="text" id="gSearchInput" placeholder="Suchen… (Tickets, Nachrichten, Mitarbeiter, News)" oninput="renderGSearch()" onkeydown="gSearchKey(event)" style="flex:1;font-size:15px;border:none;outline:none;background:transparent;color:var(--tx);font-family:inherit">
+      <kbd style="font-size:11px;color:var(--mu);background:var(--sf2);border:1px solid var(--border);border-radius:4px;padding:2px 7px">Esc</kbd>
+    </div>
+    <div id="gSearchResults" style="max-height:420px;overflow-y:auto;padding:8px 0"></div>
+  </div>
+</div>
+
+<div id="qaWrap" style="position:fixed;bottom:24px;right:24px;z-index:1100;display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+  <div id="qaMenu" style="display:none;flex-direction:column;align-items:flex-end;gap:6px"></div>
+  <button id="qaFab" onclick="toggleQA()" style="width:52px;height:52px;border-radius:50%;background:var(--acc);color:#fff;font-size:26px;font-weight:300;border:none;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;transition:transform .2s,box-shadow .2s;line-height:1">+</button>
 </div>
 
 <script src="/app.js"></script>

@@ -219,6 +219,12 @@ async function initDB() {
       created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
     )`,
     `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS subcategory TEXT DEFAULT ''`,
+    `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS due_date DATE`,
+    `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS snoozed_until DATE`,
+    `CREATE TABLE IF NOT EXISTS note_templates (
+      id TEXT PRIMARY KEY, label TEXT NOT NULL, body TEXT NOT NULL,
+      sort_order INTEGER DEFAULT 0, created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }
