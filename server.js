@@ -225,6 +225,16 @@ async function initDB() {
       id TEXT PRIMARY KEY, label TEXT NOT NULL, body TEXT NOT NULL,
       sort_order INTEGER DEFAULT 0, created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
     )`,
+    `CREATE TABLE IF NOT EXISTS station_shifts (
+      id TEXT PRIMARY KEY, label TEXT NOT NULL,
+      sort_order INTEGER DEFAULT 0, created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS station_sessions (
+      id TEXT PRIMARY KEY, station_name TEXT NOT NULL,
+      user_id TEXT NOT NULL, shift_id TEXT,
+      logged_in_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(station_name), UNIQUE(user_id)
+    )`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }

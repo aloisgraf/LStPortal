@@ -90,6 +90,7 @@
       <div class="nsh open" id="dbHdr" onclick="toggleNS('db')"><span>&#9874;&#65039; Dienstbetrieb</span><span class="arr">&#9660;</span></div>
       <div class="nsub open" id="dbSub">
         <div class="ni" id="ni-zahnarzt" onclick="setView('zahnarzt')">&#129464; Dienstplan Zahn&#228;rzte</div>
+        <div class="ni" id="ni-platz" onclick="setView('platz')">&#128225; Platz&#252;bersicht</div>
       </div>
       <div class="ndiv"></div>
       <div class="nsh open" id="tkHdr" onclick="toggleNS('tk')"><span>&#127931; Ticketsystem</span><span class="arr">&#9660;</span></div>
@@ -366,6 +367,7 @@
         <button class="tb" id="atb-subcats" onclick="swTab('subcats')">&#127991; Unterkategorien</button>
         <button class="tb" id="atb-notetpls" onclick="swTab('notetpls')">&#128172; Notizvorlagen</button>
         <button class="tb" id="atb-log" onclick="swTab('log');loadLog(true)">&#128221; Aktivitätslog</button>
+        <button class="tb" id="atb-shifts" onclick="swTab('shifts')">&#128336; Schichten</button>
       </div>
       <div class="tp on" id="atp-users"><div class="al" id="usrList"></div><button class="btn-p" style="width:100%;justify-content:center" onclick="openUF(null)">&#65291; Benutzer</button></div>
       <div class="tp" id="atp-cats"><div class="al" id="catList"></div><button class="btn-p" style="width:100%;justify-content:center" onclick="openCF(null)">&#65291; Kategorie</button></div>
@@ -421,6 +423,13 @@
         </div>
         <button class="btn-s" id="logMoreBtn" onclick="loadLog(false)" style="width:100%;margin-top:8px;display:none">Mehr laden …</button>
       </div>
+      <div class="tp" id="atp-shifts">
+        <div style="display:flex;gap:8px;margin-bottom:12px;align-items:flex-end;flex-wrap:wrap">
+          <div class="fg" style="margin:0;flex:1;min-width:160px"><label style="font-size:11px">Bezeichnung</label><input type="text" id="shiftFLabel" placeholder="z.B. Frühschicht" style="font-size:12px;padding:5px 8px"></div>
+          <button class="btn-p" style="font-size:12px;white-space:nowrap" onclick="addShift()">&#43; Hinzufügen</button>
+        </div>
+        <div id="shiftList"></div>
+      </div>
       </div><!-- /adm-layout -->
     </div>
   </div>
@@ -429,6 +438,26 @@
 <div class="ov" id="cfOv"><div class="modal sm"><div class="mh"><h2 id="cfT">Kategorie</h2><button class="mc" onclick="backToAdmin('cats')">&#10005;</button></div><div class="mb2"><input type="hidden" id="cfId"><div class="fr"><div class="fg"><label>Bezeichnung *</label><input type="text" id="cfLb"></div><div class="fg"><label>Emoji</label><input type="text" id="cfEm" maxlength="4"></div></div><div class="fg"><label>Farbe</label><div class="cr" id="cfCR"></div></div><div id="cfErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div></div><div class="mf"><button class="btn-s" onclick="backToAdmin('cats')">Abbrechen</button><button class="btn-p" onclick="saveCategory()">&#128190; Speichern</button></div></div></div>
 <div class="ov" id="tfOv"><div class="modal sm"><div class="mh"><h2 id="tfT">Tag</h2><button class="mc" onclick="backToAdmin('tags')">&#10005;</button></div><div class="mb2"><input type="hidden" id="tfId"><div class="fg"><label>Bezeichnung *</label><input type="text" id="tfLb"></div><div class="fg"><label>Farbe</label><div class="cr" id="tfCR"></div></div><div id="tfErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div></div><div class="mf"><button class="btn-s" onclick="backToAdmin('tags')">Abbrechen</button><button class="btn-p" onclick="saveTag()">&#128190; Speichern</button></div></div></div>
 
+
+<!-- STATION LOGIN MODAL -->
+<div class="ov" id="stLoginOv">
+  <div class="modal sm">
+    <div class="mh"><h2 id="stLoginTitle">&#128225; Anmelden</h2><button class="mc" onclick="closeModal('stLoginOv')">&#10005;</button></div>
+    <div class="mb2">
+      <input type="hidden" id="stLoginStation">
+      <div style="font-size:13px;color:var(--mu);margin-bottom:12px">Wähle deine aktuelle Dienstschicht:</div>
+      <div class="fg"><label>Dienstschicht</label>
+        <select id="stLoginShift" style="font-size:13px">
+          <option value="">— keine Angabe —</option>
+        </select>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn-s" onclick="closeModal('stLoginOv')">Abbrechen</button>
+      <button class="btn-p" onclick="confirmStationLogin()">&#10003; Anmelden</button>
+    </div>
+  </div>
+</div>
 
 <!-- HILFE OVERLAY -->
 <div class="ov" id="helpOv" style="align-items:stretch;padding:0">

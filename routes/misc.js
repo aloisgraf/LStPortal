@@ -706,4 +706,56 @@ router.get('/ical/:userId', async (req,res) => {
   } catch(e) { res.status(500).send(e.message); }
 });
 
+// STATION SESSIONS
+router.get('/stations', auth, async (req,res) => {
+  try {
+    const sessions = await q('SELECT * FROM station_sessions ORDER BY logged_in_at');
+    ok(res, sessions.map(s=>({id:s.id,stationName:s.station_name,userId:s.user_id,shiftId:s.shift_id,loggedInAt:s.logged_in_at})));
+  } catch(e) { bad(res,e.message,500); }
+});
+router.post('/stations/:name/login', auth, async (req,res) => {
+  try {
+    const name = decodeURIComponent(req.params.name);
+    const {shiftId} = req.body;
+    await pool.query('DELETE FROM station_sessions WHERE user_id=$1 OR station_name=$2',[req.uid,name]);
+    await pool.query('INSERT INTO station_sessions (id,station_name,user_id,shift_id) VALUES ($1,$2,$3,$4)',
+      [newId(),name,req.uid,shiftId||null]);
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
+router.delete('/stations/:name/logout', auth, async (req,res) => {
+  try {
+    const name = decodeURIComponent(req.params.name);
+    const sess = await q1('SELECT * FROM station_sessions WHERE station_name=$1',[name]);
+    if (!sess) return ok(res);
+    if (sess.user_id!==req.uid && !req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+    await pool.query('DELETE FROM station_sessions WHERE station_name=$1',[name]);
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
+// STATION SHIFTS (admin)
+router.get('/station-shifts', auth, async (req,res) => {
+  try {
+    const shifts = await q('SELECT * FROM station_shifts ORDER BY sort_order,label');
+    ok(res, shifts.map(s=>({id:s.id,label:s.label,sortOrder:s.sort_order})));
+  } catch(e) { bad(res,e.message,500); }
+});
+router.post('/station-shifts', auth, async (req,res) => {
+  try {
+    if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+    const {label} = req.body;
+    if (!label?.trim()) return bad(res,'Bezeichnung erforderlich');
+    await pool.query('INSERT INTO station_shifts (id,label,sort_order,created_by) VALUES ($1,$2,$3,$4)',
+      [newId(),label.trim(),0,req.uid]);
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
+router.delete('/station-shifts/:id', auth, async (req,res) => {
+  try {
+    if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+    await pool.query('DELETE FROM station_shifts WHERE id=$1',[req.params.id]);
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
+
 module.exports = router;
