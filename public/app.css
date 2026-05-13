@@ -115,7 +115,7 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
 .tk-sb{padding:14px;overflow-y:auto;max-height:calc(92vh - 110px);display:flex;flex-direction:column;gap:10px}
 .tkf{display:flex;flex-direction:column;gap:4px}.tkf label{font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--di)}.tkf .val{font-size:13px;font-weight:500}
 .tkdiv{height:1px;background:var(--border);margin:4px 0}
-.nfeed{display:flex;flex-direction:column;gap:8px}
+.nfeed{display:flex;flex-direction:column;gap:0}
 .ni2{background:var(--sf2);border:1px solid var(--border);border-radius:8px;padding:9px 12px}
 .ni2.audit{background:rgba(124,58,237,0.04));border-color:rgba(124,58,237,0.18)}
 .na{font-size:11px;font-weight:600;color:var(--mu)}.na.audit{color:var(--info)}.nd{font-size:10px;color:var(--di);margin-left:6px}

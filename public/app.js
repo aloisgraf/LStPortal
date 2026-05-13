@@ -11,7 +11,7 @@ function showHelpSection(id){
   if(c)c.scrollTop=0;
 }
 
-const APP_VERSION='2.6.0';
+const APP_VERSION='2.6.1';
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
@@ -46,7 +46,7 @@ let S={
   zahnarztWeek:null, // null = all from today, otherwise ISO Mon of week
   zahnarztData:[],
   events:[],users:[],categories:[],tags:[],allowances:[],tickets:[],ticketSubcategories:[],noteTemplates:[],
-  tkBatchMode:false,tkBatchSel:new Set(),
+  tkBatchMode:false,tkBatchSel:new Set(),_tkFeedFilter:'all',
   checklists:[],messages:[],notifications:[],abrechnung:{einspringer:[],homeoffice:[]},dienstplaene:[],
   p:{canApproveEvents:false,canSendMessages:false,seeAllEntries:true,editAllPersonal:false,addForOthers:false,addGeneral:false,manageUsers:false,seeAllAllw:false,editAllw:false,seeAllAbrechnung:false},
   p:{canApproveEvents:false,canSendMessages:false,seeAllEntries:true,editAllPersonal:false,addForOthers:false,addGeneral:false,manageUsers:false,seeAllAllw:false,editAllw:false,seeAllAbrechnung:false},
@@ -1275,6 +1275,69 @@ function openTkDetail(id){
   api('PUT','/tickets/'+id+'/view').catch(()=>{});
 }
 function highlightMentions(text){return text.replace(/@(\S+)/g,(match,name)=>{const u=S.users.find(u=>u.name.toLowerCase()===name.toLowerCase());return u?`<span class="mention">@${u.name}</span>`:match;});}
+// ── Ticket Feed Renderer ──
+const _AUDIT_ICONS={
+  status:'🔄',priority:'⚡',department:'🏢',title:'✏️',bucket:'📦',
+  visibility:'🔓',subcategory:'🏷️',due_date:'📅',snoozed_until:'💤',
+  assignee:'👤',parent:'🔗',tags:'🏷️',note:'💬',created:'✅',closed:'🔒'
+};
+const _AUDIT_LABELS={
+  status:'Status',priority:'Priorität',department:'Fachbereich',title:'Titel',
+  bucket:'Bucket',visibility:'Sichtbarkeit',subcategory:'Unterkategorie',
+  due_date:'Fälligkeit',snoozed_until:'Wiedervorlage',assignee:'Zuständig',
+  parent:'Elternticket',tags:'Tags'
+};
+function _parseAudit(text){
+  if(!text.startsWith('FIELD:'))return null;
+  const [,field,from,to]=text.split(':');
+  return{field,from,to};
+}
+function _renderFeed(notes,tkId,canEdit,filter){
+  const filtered=notes.filter(n=>filter==='all'?true:filter==='audit'?n.noteType==='audit':n.noteType==='note');
+  if(!filtered.length)return`<div style="color:var(--di);font-size:12px;padding:8px 0">Keine Einträge.</div>`;
+  return filtered.map((n,i)=>{
+    const a=getU(n.authorId);
+    const isAudit=n.noteType==='audit';
+    const parsed=isAudit?_parseAudit(n.text):null;
+    const icon=parsed?(_AUDIT_ICONS[parsed.field]||'📝'):(isAudit?'⚙️':'💬');
+    const label=parsed?_AUDIT_LABELS[parsed.field]||parsed.field:'';
+    const isFirst=i===0;const isLast=i===filtered.length-1;
+    if(isAudit){
+      return`<div style="display:flex;gap:10px;position:relative">
+        <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0">
+          <div style="width:28px;height:28px;border-radius:50%;background:var(--sf2);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;z-index:1;flex-shrink:0">${icon}</div>
+          ${!isLast?`<div style="width:2px;flex:1;background:var(--border);margin:2px 0;min-height:12px"></div>`:''}
+        </div>
+        <div style="padding:2px 0 ${isLast?'0':'10px'} 0;flex:1;min-width:0">
+          ${parsed?`<div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap">
+            <span style="font-size:12px;font-weight:700;color:var(--tx)">${label}</span>
+            <span style="font-size:11px;color:var(--mu);text-decoration:line-through;word-break:break-word">${parsed.from}</span>
+            <span style="font-size:11px;color:var(--mu)">→</span>
+            <span style="font-size:12px;font-weight:600;color:var(--acc);word-break:break-word">${parsed.to}</span>
+          </div>`:`<div style="font-size:12px;color:var(--mu)">${n.text}</div>`}
+          <div style="font-size:10px;color:var(--di);margin-top:2px">
+            ${a?`${avHtml(a.initials,a.color,12,5)} ${a.name} · `:''}${fdt(n.createdAt)}
+          </div>
+        </div>
+      </div>`;
+    } else {
+      return`<div style="display:flex;gap:10px;position:relative">
+        <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0">
+          <div style="width:28px;height:28px;border-radius:50%;flex-shrink:0;z-index:1;overflow:hidden;border:2px solid var(--border)">${a?avHtml(a.initials,a.color,24,10):`<div style="width:28px;height:28px;background:var(--sf2);display:flex;align-items:center;justify-content:center;font-size:14px">💬</div>`}</div>
+          ${!isLast?`<div style="width:2px;flex:1;background:var(--border);margin:2px 0;min-height:12px"></div>`:''}
+        </div>
+        <div style="background:var(--sf);border:1px solid var(--border);border-radius:8px;padding:9px 12px;flex:1;min-width:0;margin-bottom:${isLast?'0':'10px'}">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+            <span style="font-size:12px;font-weight:700">${a?.name||'?'}</span>
+            <span style="font-size:10px;color:var(--di)">${fdt(n.createdAt)}</span>
+            ${canEdit&&n.authorId===S.currentUser?`<button class="btn-d" style="padding:1px 6px;font-size:10px;margin-left:auto" onclick="deleteNote('${tkId}','${n.id}')">✕</button>`:''}
+          </div>
+          <div style="font-size:13px;line-height:1.5">${highlightMentions(n.text)}</div>
+        </div>
+      </div>`;
+    }
+  }).join('');
+}
 function renderTkDetail(){
   const tk=getTk(S.currentTicketId);if(!tk)return;
   const canEdit=tk._canEdit;const bkt=BUCKETS.find(b=>b.id===tk.bucket);const par=tk.parentTicketId?getTk(tk.parentTicketId):null;
@@ -1314,14 +1377,13 @@ function renderTkDetail(){
       </div>`).join('')}
     </div>`:''}
     <div>
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di);margin-bottom:8px">VERLAUF &amp; NOTIZEN</div>
-      <div class="nfeed">
-        ${notes.map(n=>{const a=getU(n.authorId);const isAudit=n.noteType==='audit';return`<div class="ni2${isAudit?' audit':''}">
-          <div>${isAudit?'<span class="na audit">&#9881; System</span>':(a?`${avHtml(a.initials,a.color,16,7)}<span class="na">${a.name}</span>`:'')}
-          <span class="nd">${fdt(n.createdAt)}</span></div>
-          <div class="nt${isAudit?' audit':''}">${isAudit?n.text:highlightMentions(n.text)}</div>
-        </div>`;}).join('')||'<div style="color:var(--di);font-size:12px">Noch keine Notizen.</div>'}
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di)">VERLAUF &amp; PROTOKOLL</div>
+        <div style="display:flex;gap:2px;background:var(--sf2);border:1px solid var(--border);border-radius:6px;padding:2px">
+          ${['all','audit','note'].map(f=>`<button onclick="_tkFeedFilter='${f}';renderTkDetail()" style="font-size:11px;padding:3px 10px;border:none;border-radius:4px;cursor:pointer;font-family:inherit;transition:.15s;background:${(S._tkFeedFilter||'all')===f?'var(--acc)':'transparent'};color:${(S._tkFeedFilter||'all')===f?'var(--act)':'var(--mu)'}">${f==='all'?'Alle':f==='audit'?'Protokoll':'Notizen'}</button>`).join('')}
+        </div>
       </div>
+      <div class="nfeed">${_renderFeed(notes,tk.id,canEdit,S._tkFeedFilter||'all')}</div>
       ${canEdit?`<div style="margin-top:10px">
         ${S.noteTemplates.length?`<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px">
           ${S.noteTemplates.map(t=>`<button class="btn-s" style="font-size:11px;padding:3px 9px" onclick="applyNoteTpl(${JSON.stringify(t.body)})">${t.label}</button>`).join('')}
@@ -1396,6 +1458,11 @@ function applyNoteTpl(body){const inp=document.getElementById('noteInput');if(in
 async function addNote(tkId){
   const inp=document.getElementById('noteInput');if(!inp?.value.trim())return;
   try{await api('POST','/tickets/'+tkId+'/notes',{text:inp.value.trim()});inp.value='';await fetchData();renderTkDetail();}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
+}
+async function deleteNote(tkId,noteId){
+  if(!confirm('Notiz l\u00F6schen?'))return;
+  try{await api('DELETE','/tickets/'+tkId+'/notes/'+noteId);await fetchData();renderTkDetail();toast('\u2705 Notiz gel\u00F6scht');}
+  catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
 }
 function editCurrentTicket(){openTkForm(S.currentTicketId);}
 function onTkDeptChange(){

@@ -44,17 +44,45 @@ router.put('/:id', auth, async (req,res) => {
     const uname=(await getUser(req.uid))?.name||'?';
     const PL={low:'Gering',medium:'Mittel',high:'Hoch'};
     const SL={open:'Offen',in_progress:'In Bearbeitung',on_hold:'Zurückgestellt',closed:'Abgeschlossen'};
-    const DL={technik:'Technik',leitung:'Leitung',dienstplanung:'Dienstplanung',ausbildung:'Ausbildung',qm:'QM'};
-    if (b.status!==undefined&&b.status!==tk.status) await auditNote(tk.id,req.uid,`🔄 Status: ${SL[tk.status]} → ${SL[b.status]} (${uname})`);
-    if (b.priority!==undefined&&b.priority!==tk.priority) await auditNote(tk.id,req.uid,`⚡ Priorität: ${PL[tk.priority]} → ${PL[b.priority]} (${uname})`);
-    if (b.department!==undefined&&b.department!==tk.department) await auditNote(tk.id,req.uid,`🏢 Fachbereich: ${DL[tk.department]} → ${DL[b.department]} (${uname})`);
-    if (b.assigneeId!==undefined&&b.assigneeId!==tk.assignee_id) {
-      const oldN=tk.assignee_id?(await getUser(tk.assignee_id))?.name||'?':'niemand';
-      const newN=b.assigneeId?(await getUser(b.assigneeId))?.name||'?':'niemand';
-      const msg = b.assigneeId===req.uid ? `🙋 ${uname} hat das Ticket übernommen` : `👤 Zuständigkeit: ${oldN} → ${newN} (${uname})`;
-      await auditNote(tk.id,req.uid,msg);
+    const DL={frei:'Frei',technik:'Technik',leitung:'Leitung',dienstplanung:'Dienstplanung',ausbildung:'Ausbildung',qm:'QM'};
+    const BL={urgent:'Dringend',week:'Diese Woche',sched:'Dienstplanung',wait:'Wartet',it:'IT',proj:'Projekte',org:'Organisation',ideas:'Ideen'};
+    const fmtDate = d => d ? new Date(d).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
+    // Audit: alle relevanten Feldänderungen protokollieren
+    if (b.status!==undefined&&b.status!==tk.status)
+      await auditNote(tk.id,req.uid,`FIELD:status:${SL[tk.status]||tk.status}:${SL[b.status]||b.status}`);
+    if (b.priority!==undefined&&b.priority!==tk.priority)
+      await auditNote(tk.id,req.uid,`FIELD:priority:${PL[tk.priority]||tk.priority}:${PL[b.priority]||b.priority}`);
+    if (b.department!==undefined&&b.department!==tk.department)
+      await auditNote(tk.id,req.uid,`FIELD:department:${DL[tk.department]||tk.department}:${DL[b.department]||b.department}`);
+    if (b.title!==undefined&&b.title!==tk.title)
+      await auditNote(tk.id,req.uid,`FIELD:title:${tk.title}:${b.title}`);
+    if (b.bucket!==undefined&&(b.bucket||'')!==(tk.bucket||''))
+      await auditNote(tk.id,req.uid,`FIELD:bucket:${BL[tk.bucket]||tk.bucket||'—'}:${BL[b.bucket]||b.bucket||'—'}`);
+    if (b.isPublic!==undefined&&!!b.isPublic!==!!tk.is_public)
+      await auditNote(tk.id,req.uid,`FIELD:visibility:${tk.is_public?'Öffentlich':'Privat'}:${b.isPublic?'Öffentlich':'Privat'}`);
+    if (b.subcategory!==undefined&&(b.subcategory||'')!==(tk.subcategory||''))
+      await auditNote(tk.id,req.uid,`FIELD:subcategory:${tk.subcategory||'—'}:${b.subcategory||'—'}`);
+    if (b.dueDate!==undefined&&(b.dueDate||null)!==(tk.due_date?tk.due_date.toISOString?.().slice(0,10)||String(tk.due_date).slice(0,10):null))
+      await auditNote(tk.id,req.uid,`FIELD:due_date:${fmtDate(tk.due_date)}:${fmtDate(b.dueDate)}`);
+    if (b.snoozedUntil!==undefined&&(b.snoozedUntil||null)!==(tk.snoozed_until?String(tk.snoozed_until).slice(0,10):null))
+      await auditNote(tk.id,req.uid,`FIELD:snoozed_until:${fmtDate(tk.snoozed_until)}:${fmtDate(b.snoozedUntil)}`);
+    if (b.assigneeId!==undefined&&(b.assigneeId||null)!==(tk.assignee_id||null)) {
+      const oldN=tk.assignee_id?(await getUser(tk.assignee_id))?.name||'?':'—';
+      const newN=b.assigneeId?(await getUser(b.assigneeId))?.name||'?':'—';
+      await auditNote(tk.id,req.uid,`FIELD:assignee:${oldN}:${newN}`);
       if (b.assigneeId && b.assigneeId!==req.uid)
         await createNotification(b.assigneeId,'assigned',`Dir wurde zugewiesen: ${tk.title}`,tk.id,null,req.uid);
+    }
+    if (b.parentTicketId!==undefined&&(b.parentTicketId||null)!==(tk.parent_ticket_id||null)) {
+      const oldP=tk.parent_ticket_id?(await q1('SELECT number FROM tickets WHERE id=$1',[tk.parent_ticket_id]))?.number||'?':'—';
+      const newP=b.parentTicketId?(await q1('SELECT number FROM tickets WHERE id=$1',[b.parentTicketId]))?.number||'?':'—';
+      await auditNote(tk.id,req.uid,`FIELD:parent:${oldP}:${newP}`);
+    }
+    if (b.tags!==undefined) {
+      const oldTags=(()=>{try{return JSON.parse(tk.tags||'[]');}catch{return[];}})();
+      const newTags=b.tags||[];
+      if (JSON.stringify([...oldTags].sort())!==JSON.stringify([...newTags].sort()))
+        await auditNote(tk.id,req.uid,`FIELD:tags:${oldTags.length}:${newTags.length}`);
     }
     if (b.title!==undefined) add('title',b.title);
     if (b.description!==undefined) add('description',b.description);
@@ -122,6 +150,17 @@ router.post('/:id/notes', auth, async (req,res) => {
       await createNotification(u.id,'mention',`${author?.name||'?'} erwähnte dich in ${tk.number}`,tk.id,id,req.uid);
     }
     ok(res,{id,createdAt:now});
+  } catch(e) { bad(res,e.message,500); }
+});
+
+router.delete('/:id/notes/:noteId', auth, async (req,res) => {
+  try {
+    const note = await q1('SELECT * FROM ticket_notes WHERE id=$1 AND ticket_id=$2',[req.params.noteId,req.params.id]);
+    if (!note) return bad(res,'Nicht gefunden',404);
+    if (note.author_id!==req.uid && !req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+    if (note.note_type==='audit') return bad(res,'Protokolleinträge können nicht gelöscht werden',403);
+    await pool.query('DELETE FROM ticket_notes WHERE id=$1',[req.params.noteId]);
+    ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
 
