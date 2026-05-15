@@ -46,7 +46,7 @@ let S={
   zahnarztWeek:null, // null = all from today, otherwise ISO Mon of week
   zahnarztData:[],
   events:[],users:[],categories:[],tags:[],allowances:[],tickets:[],ticketSubcategories:[],noteTemplates:[],stationSessions:[],stationShifts:[],
-  stationOutages:[],links:[],rolePermissions:[],
+  stationOutages:[],links:[],rolePermissions:[],_onBreak:false,
   docs:[],docCategories:[],_docFilter:'all',_docSearch:'',
   tkBatchMode:false,tkBatchSel:new Set(),_tkFeedFilter:'all',_tkTab:'details',
   checklists:[],messages:[],notifications:[],abrechnung:{einspringer:[],homeoffice:[]},dienstplaene:[],
@@ -1909,7 +1909,7 @@ function toggleTheme(){const dark=document.documentElement.getAttribute('data-th
 function openModal(id){document.getElementById(id)?.classList.add('open');}
 function closeModal(id){document.getElementById(id)?.classList.remove('open');}
 function eyeToggle(inputId,btn){const inp=document.getElementById(inputId);const show=inp.type==='password';inp.type=show?'text':'password';btn.textContent=show?'\uD83D\uDE48':'\uD83D\uDC41';}
-function toast(msg,type=''){const t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3200);}
+function toast(msg,type='',dur=3200){const t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),dur);}
 const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOr','clFormOv','attachClOv','changelogOv','dpOv','rejectEinspOv','helpOv','msgFormOv','msgDetOv','gSearchOv','stLoginOv','docFormOv','docVerOv','docHistOv','docCatOv'];
 document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();openGSearch();return;}
@@ -1919,17 +1919,44 @@ ALL_MODALS.forEach(id=>{const el=document.getElementById(id);if(el)el.addEventLi
 document.addEventListener('click',e=>{if(!e.target.closest('.note-input-wrap'))document.getElementById('mentionSug')?.classList.remove('open');});
 // AUTO-REFRESH
 let _lastMsgCount=-1,_lastTkCount=-1,_refreshTimer=null;
+let _lastBreakMinute='',_breakEndMinute='';
+
+function _checkBreak(){
+  const mySess=S.stationSessions?.find(s=>s.userId===S.currentUser);
+  if(!mySess?.breakTime) { if(S._onBreak){S._onBreak=false;if(S.view==='platz')renderPlatz();} return; }
+  const now=new Date();
+  const hh=String(now.getHours()).padStart(2,'0');
+  const mm=String(now.getMinutes()).padStart(2,'0');
+  const cur=hh+':'+mm;
+  const bStart=mySess.breakTime; // "HH:MM"
+  if(!_breakEndMinute&&bStart){
+    const [bh,bm]=bStart.split(':').map(Number);
+    const endMin=(bh*60+bm+30);
+    _breakEndMinute=String(Math.floor(endMin/60)).padStart(2,'0')+':'+String(endMin%60).padStart(2,'0');
+  }
+  if(cur===bStart&&!S._onBreak){
+    S._onBreak=true;
+    toast('⏸️ Deine Pause beginnt jetzt! (30 Min.)','ok',6000);
+    if(S.view==='platz')renderPlatz();
+  } else if(S._onBreak&&_breakEndMinute&&cur>=_breakEndMinute){
+    S._onBreak=false;_breakEndMinute='';
+    toast('✅ Pause beendet – weiterhin guten Dienst!');
+    if(S.view==='platz')renderPlatz();
+  }
+}
 
 function startClock(){
   var el=document.getElementById('clockDisplay');
   if(!el)return;
   el.style.display='block';
+  var _lastMin='';
   function tick(){
     var now=new Date();
     var days=['So','Mo','Di','Mi','Do','Fr','Sa'];
     var d=days[now.getDay()]+'. '+now.getDate()+'.'+(now.getMonth()+1)+'.'+now.getFullYear();
     var t=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
     el.innerHTML=d+'<br>'+t;
+    if(t!==_lastMin){_lastMin=t;_checkBreak();}
   }
   tick();
   setInterval(tick,1000);
@@ -2785,7 +2812,7 @@ function gSearchKey(e){
 // SECTION: Platzübersicht
 const ELP_NORD = [
   [{name:'ELP 1'},{name:'ELP 2'}],
-  [{name:'ELP 7',center:true}],
+  [{name:'ELP 7'},{empty:true}],
   [{name:'ELP 4'},{name:'ELP 3'}],
   [{name:'ELP 6'},{name:'ELP 5'}],
 ];
@@ -2793,8 +2820,7 @@ const ELP_SUED = [
   [{name:'Süd ELP 1'},{name:'Süd ELP 2'}],
   [{name:'Süd ELP 3',center:true}],
   [{name:'Süd ELP 4'},{name:'Süd ELP 5'}],
-  [{name:'Süd ELP 6'}],
-  [{name:'Süd ELP 7'}],
+  [{name:'Süd ELP 6'},{name:'Süd ELP 7'}],
   [{name:'Büro Standortleiter Süd',center:true,office:true}],
 ];
 const ELP_NORD_EXT = [
@@ -2806,6 +2832,7 @@ function renderPlatz(){
   const isAlreadyIn=!!mySess;
   const canManageOutage=(S.p?.roles||[]).some(r=>['admin','leitung','technik'].includes(r));
   function card(st){
+    if(st.empty) return `<div class="elp-station" style="background:transparent;border-color:transparent;box-shadow:none"></div>`;
     const outage=S.stationOutages.find(o=>o.stationName===st.name);
     if(outage){
       return `<div class="elp-station elp-occ" style="background:rgba(239,68,68,.08);border-color:#ef4444">
@@ -2819,18 +2846,27 @@ function renderPlatz(){
     const occ=!!sess;const mine=sess?.userId===S.currentUser;
     const u=occ?getU(sess.userId):null;
     const shift=sess?.shiftId?S.stationShifts.find(sh=>sh.id===sess.shiftId):null;
-    const cls=(st.office?'elp-office ':'')+( mine?'elp-mine':occ?'elp-occ':'elp-free');
-    const enc=encodeURIComponent(st.name);
+    const onBreak=mine&&S._onBreak;
+    const cls=(st.office?'elp-office ':'')+(onBreak?'elp-break':mine?'elp-mine':occ?'elp-occ':'elp-free');
     return `<div class="elp-station ${cls}">
       <div class="elp-sname">${st.office?'🏢 ':''}<span style="font-size:${st.office?'12':'16'}px">${st.name}</span></div>
       ${occ?`
-        <div class="elp-urow">${avHtml(u?.initials||'?',u?.color||'#888',32,12,true)}<div><div class="elp-uname">${u?.name||'?'}</div>${shift?`<div class="elp-sch">${shift.label}</div>`:''}</div></div>
-        <div class="elp-badge ${mine?'elp-badge-me':'elp-badge-occ'}">${mine?'● Du bist hier':'● Besetzt'}</div>
-        ${mine?`<div style="font-size:10px;color:var(--mu);margin-top:4px">${sess.breakTime?`⏸️ Pause: ${sess.breakTime} Uhr`:''}</div><button class="btn-d" style="width:100%;margin-top:8px;font-size:11px;padding:4px 8px" onclick="logoutStation('${st.name}')">Abmelden</button>`:''}
+        ${onBreak?`
+          <div style="text-align:center;margin:8px 0">
+            <div style="font-size:28px">⏸️</div>
+            <div style="font-size:13px;font-weight:700;color:#f59e0b;margin-top:4px">PAUSE</div>
+            <div style="font-size:11px;color:var(--mu);margin-top:2px">${u?.name||'?'} · ${sess.breakTime} Uhr</div>
+          </div>
+        `:`
+          <div class="elp-urow">${avHtml(u?.initials||'?',u?.color||'#888',32,12,true)}<div><div class="elp-uname">${u?.name||'?'}</div>${shift?`<div class="elp-sch">${shift.label}</div>`:''}</div></div>
+          <div class="elp-badge ${mine?'elp-badge-me':'elp-badge-occ'}">${mine?'● Du bist hier':'● Besetzt'}</div>
+          ${mine&&sess.breakTime?`<div style="font-size:10px;color:var(--mu);margin-top:4px">⏸️ Pause: ${sess.breakTime} Uhr</div>`:''}
+        `}
+        ${mine?`<button class="btn-d" style="width:100%;margin-top:8px;font-size:11px;padding:4px 8px" onclick="logoutStation('${st.name}')">Abmelden</button>`:''}
       `:`
         <div class="elp-badge elp-badge-free">● Frei</div>
         ${!isAlreadyIn?`<button class="btn-p" style="width:100%;margin-top:8px;font-size:11px;padding:5px 8px" onclick="openStationLogin('${st.name}')">Anmelden</button>`:`<div style="font-size:10px;color:var(--di);margin-top:8px;text-align:center">Bereits an ${mySess.stationName}</div>`}
-        ${canManageOutage?`<button class="btn-d" style="font-size:10px;padding:3px 8px;margin-top:4px;width:100%" onclick="startOutage('${st.name}')">⚠️ Außer Betrieb</button>`:''}
+        ${canManageOutage?`<button onclick="startOutage('${st.name}')" style="font-size:10px;padding:2px 7px;margin-top:6px;width:100%;border:1px solid var(--border);background:transparent;border-radius:var(--r);color:var(--mu);cursor:pointer;font-family:inherit;transition:.15s" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--mu)'">⚠ Außer Betrieb</button>`:''}
       `}
     </div>`;
   }

@@ -295,6 +295,8 @@ details.dash-card > summary { list-style: none; cursor: pointer; display: flex; 
 .elp-station{flex:1;background:var(--sf2);border:2px solid var(--border);border-radius:10px;padding:12px;min-height:120px;display:flex;flex-direction:column;transition:.2s}
 .elp-mine{border-color:var(--acc);background:rgba(59,109,212,.05)}
 .elp-occ{border-color:var(--ok);background:rgba(16,185,129,.04)}
+.elp-break{border-color:#f59e0b;background:rgba(245,158,11,.08);animation:pausePulse 2s ease-in-out infinite}
+@keyframes pausePulse{0%,100%{border-color:#f59e0b}50%{border-color:#f59e0b88}}
 .elp-office{min-height:80px;background:var(--sf3)}
 .elp-sname{margin-bottom:8px}
 .elp-urow{display:flex;align-items:center;gap:8px;margin-bottom:6px}
