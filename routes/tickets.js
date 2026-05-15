@@ -245,6 +245,26 @@ router.put('/:id/checklists/:cid/items/:iid', auth, async (req,res) => {
 
 // CHECKLIST TEMPLATES
 // ── TICKET ANSEHEN ──
+router.delete('/:id', auth, async (req,res) => {
+  try {
+    const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
+    if (!tk) return bad(res,'Nicht gefunden',404);
+    if (!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
+    await pool.query('UPDATE tickets SET is_deleted=true,deleted_at=NOW(),deleted_by=$1 WHERE id=$2',[req.uid,req.params.id]);
+    await auditNote(req.params.id, req.uid, '🗑️ Ticket gelöscht');
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
+router.put('/:id/restore', auth, async (req,res) => {
+  try {
+    const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
+    if (!tk) return bad(res,'Nicht gefunden',404);
+    if (!req.tp.editAll && !req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+    await pool.query('UPDATE tickets SET is_deleted=false,deleted_at=NULL,deleted_by=NULL WHERE id=$1',[req.params.id]);
+    await auditNote(req.params.id, req.uid, '♻️ Ticket wiederhergestellt');
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
 router.put('/:id/view', auth, async (req,res) => {
   try {
     await pool.query(

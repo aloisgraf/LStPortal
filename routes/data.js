@@ -110,6 +110,7 @@ router.get('/', auth, async (req,res) => {
         id:tk.id, number:tk.number, title:tk.title, description:tk.description||'',
         department:tk.department, subcategory:tk.subcategory||'', tags:parseTags(tk.tags), priority:tk.priority,
         status:tk.status, bucket:tk.bucket||'', isPublic:tk.is_public,
+        isDeleted:!!tk.is_deleted, deletedAt:tk.deleted_at||null, deletedBy:tk.deleted_by||null,
         assigneeId:tk.assignee_id, parentTicketId:tk.parent_ticket_id,
         dueDate:tk.due_date?(typeof tk.due_date==='string'?tk.due_date.slice(0,10):tk.due_date.toISOString().slice(0,10)):null,
         snoozedUntil:tk.snoozed_until?(typeof tk.snoozed_until==='string'?tk.snoozed_until.slice(0,10):tk.snoozed_until.toISOString().slice(0,10)):null,

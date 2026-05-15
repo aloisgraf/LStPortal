@@ -223,7 +223,8 @@ function toggleSidebar(){const sb=document.getElementById('sidebar'),ov=document
 function toggleNS(id){document.getElementById(id+'Hdr').classList.toggle('open');document.getElementById(id+'Sub').classList.toggle('open');}
 function setView(v){
   S.view=v;
-  ['home','schedule','calendar','allw','diensttausch','abrechnung','dienstplaene','tickets','tickets_closed','checklists','messages','messages_sent','zahnarzt','platz'].forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
+  ['home','schedule','calendar','allw','diensttausch','abrechnung','dienstplaene','tickets','tickets_closed','tickets_deleted','checklists','messages','messages_sent','zahnarzt','platz','statistik'].forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
+  const statEl=document.getElementById('ni-statistik');if(statEl)statEl.style.display=S.p?.manageUsers?'flex':'none';
   document.getElementById('sidebar').classList.remove('open');document.getElementById('sbOv').classList.remove('open');
   renderSBF();renderMain();
 }
@@ -235,7 +236,7 @@ function renderSBF(){
     el.innerHTML='';
   }else if(S.view==='abrechnung'){
     el.innerHTML='';
-  }else if(S.view==='tickets'||S.view==='tickets_closed'){
+  }else if(S.view==='tickets'||S.view==='tickets_closed'||S.view==='tickets_deleted'){
     el.innerHTML='';
   }else el.innerHTML='';
 }
@@ -251,11 +252,12 @@ function renderMain(){
   else if(S.view==='diensttausch')renderDiensttausch();
   else if(S.view==='abrechnung')renderAbrechnung();
   else if(S.view==='dienstplaene')renderDienstplaene();
-  else if(S.view==='tickets'||S.view==='tickets_closed')renderTickets();
+  else if(S.view==='tickets'||S.view==='tickets_closed'||S.view==='tickets_deleted')renderTickets();
   else if(S.view==='checklists')renderChecklists();
   else if(S.view==='messages'||S.view==='messages_sent')renderMessages();
   else if(S.view==='zahnarzt')renderZahnarzt();
   else if(S.view==='platz')renderPlatz();
+  else if(S.view==='statistik')renderStatistik();
 }
 // HOME
 function renderHome(){
@@ -1112,9 +1114,10 @@ async function deleteDp(id){
   loading(true);try{await api('DELETE','/dienstplaene/'+id);await fetchData();renderDienstplaene();}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}finally{loading(false);}
 }
 // TICKETS
-function getVisTks(closed=false){
+function getVisTks(closed=false,deleted=false){
   return S.tickets.filter(tk=>{
-    if(closed!=(tk.status==='closed'))return false;
+    if(deleted){if(!tk.isDeleted)return false;}
+    else{if(tk.isDeleted)return false;if(closed!=(tk.status==='closed'))return false;}
     if(S.tkFiltDept&&tk.department!==S.tkFiltDept)return false;
     if(S.tkFiltPrio&&tk.priority!==S.tkFiltPrio)return false;
     if(S.tkFiltTag&&!tk.tags.includes(S.tkFiltTag))return false;
@@ -1137,7 +1140,7 @@ function getTkViewPref(){try{return localStorage.getItem('tkViewPref')||'cards';
 function saveTkViewPref(v){try{localStorage.setItem('tkViewPref',v);}catch(e){}if(S.view==='tickets'||S.view==='tickets_closed')renderTickets();}
 
 function renderTickets(){
-  const closed=S.view==='tickets_closed';const tks=getVisTks(closed);
+  const deleted=S.view==='tickets_deleted';const closed=S.view==='tickets_closed';const tks=getVisTks(closed,deleted);
   const myD=S.tp.seeAll?DEPTS:S.tp.myDepts;
   const useTable=getTkViewPref()==='table';
   // Sort: parent tickets first, then children directly below their parent
@@ -1240,17 +1243,19 @@ function renderTickets(){
   }
   const viewIcon=useTable?'\u229e':'\u2261';
   document.getElementById('main').innerHTML=`
-    <div class="ph"><div class="pt">${closed?'Abgeschlossene':'Offene'} Tickets <span style="font-size:16px;color:var(--mu)">(${tks.length})</span></div>
+    <div class="ph"><div class="pt">${deleted?'🗑️ Gelöschte':closed?'Abgeschlossene':'Offene'} Tickets <span style="font-size:16px;color:var(--mu)">(${tks.length})</span></div>
       <div style="display:flex;gap:6px">
         <button class="btn-s" title="${useTable?'Card-Ansicht':'Tabellen-Ansicht'}" onclick="saveTkViewPref('${useTable?'cards':'table'}')" style="font-size:16px;padding:4px 10px">${viewIcon}</button>
         <button class="btn-s${S.tkBatchMode?' on':''}" onclick="toggleTkBatch()" title="Mehrfachauswahl" style="font-size:13px;padding:5px 10px">&#9745; Auswahl</button>
-        <button class="btn-p" onclick="openTkForm(null)">&#65291; Ticket</button>
+        ${!deleted?`<button class="btn-p" onclick="openTkForm(null)">&#65291; Ticket</button>`:''}
       </div></div>
     ${S.tkBatchMode&&S.tkBatchSel.size?`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px;background:rgba(59,109,212,.06);border:1px solid rgba(59,109,212,.2);border-radius:var(--r);margin-bottom:10px">
       <span style="font-size:13px;font-weight:600;color:var(--acc)">${S.tkBatchSel.size} ausgewählt</span>
-      <select id="batchStatus" class="flt" style="font-size:12px"><option value="">Status ändern…</option>${STATUSES.map(s=>`<option value="${s.id}">${s.label}</option>`).join('')}</select>
+      ${!deleted?`<select id="batchStatus" class="flt" style="font-size:12px"><option value="">Status ändern…</option>${STATUSES.map(s=>`<option value="${s.id}">${s.label}</option>`).join('')}</select>
       <select id="batchAssignee" class="flt" style="font-size:12px"><option value="">Zuständig ändern…</option><option value="__none__">— niemand —</option>${S.users.filter(isAssignable).map(u=>`<option value="${u.id}">${u.name}</option>`).join('')}</select>
       <button class="btn-p" style="font-size:12px" onclick="batchApply()">&#10003; Anwenden</button>
+      <button class="btn-d" style="font-size:12px" onclick="batchDelete()">&#128465; Löschen</button>`
+      :`<button class="btn-ok" style="font-size:12px" onclick="batchRestore()">&#9851; Wiederherstellen</button>`}
       <button class="btn-s" style="font-size:12px" onclick="S.tkBatchSel.clear();renderTickets()">Auswahl aufheben</button>
     </div>`:''}
     <div class="fbar" style="flex-wrap:wrap;gap:6px">
@@ -1831,7 +1836,7 @@ function startAutoRefresh(){
       _lastMsgCount=newMsgCount;_lastTkCount=newTkCount;
       if(S.view==='home')renderHome();
       else if(S.view==='messages'||S.view==='messages_sent')renderMessages();
-      else if(S.view==='tickets'||S.view==='tickets_closed')renderTickets();
+      else if(S.view==='tickets'||S.view==='tickets_closed'||S.view==='tickets_deleted')renderTickets();
     var _rd=document.getElementById('lastRefreshDisplay');if(_rd){var _n=new Date();_rd.textContent='↻ '+_n.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit',second:'2-digit'});_rd.style.display='block';}
     }catch(e){}
   },60000);
@@ -2532,6 +2537,25 @@ async function batchApply(){
     toast('✅ '+ids.length+' Tickets aktualisiert');
   }catch(e){toast('⚠️ '+e.message,'err');}finally{loading(false);}
 }
+async function batchDelete(){
+  const ids=[...S.tkBatchSel];if(!ids.length)return;
+  if(!confirm(ids.length+' Ticket(s) in den Papierkorb verschieben?'))return;
+  loading(true);
+  try{
+    await Promise.all(ids.map(id=>api('DELETE','/tickets/'+id)));
+    await fetchData();S.tkBatchSel.clear();renderTickets();
+    toast('🗑️ '+ids.length+' Ticket(s) gelöscht');
+  }catch(e){toast('⚠️ '+e.message,'err');}finally{loading(false);}
+}
+async function batchRestore(){
+  const ids=[...S.tkBatchSel];if(!ids.length)return;
+  loading(true);
+  try{
+    await Promise.all(ids.map(id=>api('PUT','/tickets/'+id+'/restore')));
+    await fetchData();S.tkBatchSel.clear();renderTickets();
+    toast('♻️ '+ids.length+' Ticket(s) wiederhergestellt');
+  }catch(e){toast('⚠️ '+e.message,'err');}finally{loading(false);}
+}
 
 // ── Quick-Action-Button ──
 function _qaItems(){
@@ -2630,40 +2654,64 @@ function gSearchKey(e){
 }
 
 // SECTION: Platzübersicht
-const ELP_ROWS = [
+const ELP_NORD = [
   [{name:'ELP 1'},{name:'ELP 2'}],
   [{name:'ELP 7',center:true}],
   [{name:'ELP 4'},{name:'ELP 3'}],
   [{name:'ELP 6'},{name:'ELP 5'}],
+];
+const ELP_SUED = [
+  [{name:'Süd ELP 1'},{name:'Süd ELP 2'}],
+  [{name:'Süd ELP 3',center:true}],
+  [{name:'Süd ELP 4'},{name:'Süd ELP 5'}],
+  [{name:'Süd ELP 6'}],
+  [{name:'Süd ELP 7'}],
+  [{name:'Büro Standortleiter Süd',center:true,office:true}],
+];
+const ELP_NORD_EXT = [
+  [{name:'ELP 8'},{name:'ELP 9'}],
+  [{name:'Büro Standortleiter Nord',office:true},{name:'ELP 10'}],
 ];
 function renderPlatz(){
   const mySess=S.stationSessions.find(s=>s.userId===S.currentUser);
   const isAlreadyIn=!!mySess;
   function card(st){
     const sess=S.stationSessions.find(s=>s.stationName===st.name);
-    const occ=!!sess;
-    const mine=sess?.userId===S.currentUser;
+    const occ=!!sess;const mine=sess?.userId===S.currentUser;
     const u=occ?getU(sess.userId):null;
     const shift=sess?.shiftId?S.stationShifts.find(sh=>sh.id===sess.shiftId):null;
-    const cls=mine?'elp-mine':occ?'elp-occ':'elp-free';
+    const cls=(st.office?'elp-office ':'')+( mine?'elp-mine':occ?'elp-occ':'elp-free');
+    const enc=encodeURIComponent(st.name);
     return `<div class="elp-station ${cls}">
-      <div class="elp-sname">${st.name}</div>
+      <div class="elp-sname">${st.office?'🏢 ':''}<span style="font-size:${st.office?'12':'16'}px">${st.name}</span></div>
       ${occ?`
-        <div class="elp-urow">${avHtml(u?.initials||'?',u?.color||'#888',34,13,true)}<div><div class="elp-uname">${u?.name||'?'}</div>${shift?`<div class="elp-sch">${shift.label}</div>`:''}</div></div>
+        <div class="elp-urow">${avHtml(u?.initials||'?',u?.color||'#888',32,12,true)}<div><div class="elp-uname">${u?.name||'?'}</div>${shift?`<div class="elp-sch">${shift.label}</div>`:''}</div></div>
         <div class="elp-badge ${mine?'elp-badge-me':'elp-badge-occ'}">${mine?'● Du bist hier':'● Besetzt'}</div>
-        ${mine?`<button class="btn-d" style="width:100%;margin-top:10px;font-size:12px" onclick="logoutStation('${st.name}')">Abmelden</button>`:''}
+        ${mine?`<button class="btn-d" style="width:100%;margin-top:8px;font-size:11px;padding:4px 8px" onclick="logoutStation('${st.name}')">Abmelden</button>`:''}
       `:`
         <div class="elp-badge elp-badge-free">● Frei</div>
-        ${!isAlreadyIn?`<button class="btn-p" style="width:100%;margin-top:10px;font-size:12px" onclick="openStationLogin('${st.name}')">Anmelden</button>`:`<div style="font-size:11px;color:var(--di);margin-top:10px;text-align:center">Du bist bereits an ${mySess.stationName} angemeldet</div>`}
+        ${!isAlreadyIn?`<button class="btn-p" style="width:100%;margin-top:8px;font-size:11px;padding:5px 8px" onclick="openStationLogin('${st.name}')">Anmelden</button>`:`<div style="font-size:10px;color:var(--di);margin-top:8px;text-align:center">Bereits an ${mySess.stationName}</div>`}
       `}
+    </div>`;
+  }
+  function section(title,rows){
+    return `<div class="elp-section">
+      <div class="elp-section-title">${title}</div>
+      ${rows.map(row=>`<div class="elp-row${row.length===1&&!row[0].center?'':row[0].center?' elp-center':''}">${row.map(card).join('')}</div>`).join('')}
     </div>`;
   }
   document.getElementById('main').innerHTML=`
     <div class="ph"><div class="pt">&#128225; Platz&#252;bersicht</div>
       <button class="btn-s" style="font-size:12px" onclick="fetchData().then(renderPlatz)">&#8635; Aktualisieren</button>
     </div>
-    <div class="elp-wrap">
-      ${ELP_ROWS.map(row=>`<div class="elp-row${row[0].center?' elp-center':''}">${row.map(card).join('')}</div>`).join('')}
+    <div class="elp-columns">
+      <div class="elp-col">
+        ${section('🔵 Rettungsleitstelle Nord',ELP_NORD)}
+        ${section('🔵 Rettungsleitstelle Nord – Erweiterung',ELP_NORD_EXT)}
+      </div>
+      <div class="elp-col">
+        ${section('🟢 Rettungsleitstelle Süd',ELP_SUED)}
+      </div>
     </div>`;
 }
 function openStationLogin(name){
@@ -2699,4 +2747,86 @@ async function addShift(){
 async function deleteShift(id){
   if(!confirm('Schicht löschen?'))return;
   try{await api('DELETE','/station-shifts/'+id);await fetchData();renderShiftsAdmin();toast('✅ Schicht gelöscht');}catch(e){toast('⚠️ '+e.message,'err');}
+}
+
+// SECTION: Statistik
+async function renderStatistik(){
+  if(!S.p.manageUsers){document.getElementById('main').innerHTML='<div class="empty">Keine Berechtigung</div>';return;}
+  document.getElementById('main').innerHTML='<div class="ph"><div class="pt">📊 Statistik</div></div><div style="padding:20px;color:var(--mu)">Lade…</div>';
+  let data;
+  try{data=await api('GET','/statistik');}catch(e){document.getElementById('main').innerHTML=`<div class="empty">⚠️ ${e.message}</div>`;return;}
+  const {tickets,logins}=data;
+  const loginMap={};logins.forEach(l=>{loginMap[l.userId]=l.count;});
+  // Per-User stats
+  const userStats={};
+  S.users.forEach(u=>{userStats[u.id]={created:0,assigned:0,closed:0,byDept:{},closedByDept:{}};});
+  tickets.forEach(tk=>{
+    if(tk.created_by&&userStats[tk.created_by]){
+      userStats[tk.created_by].created++;
+      const d=tk.department||'—';
+      userStats[tk.created_by].byDept[d]=(userStats[tk.created_by].byDept[d]||0)+1;
+    }
+    if(tk.assignee_id&&userStats[tk.assignee_id]){
+      userStats[tk.assignee_id].assigned++;
+      if(tk.status==='closed'){
+        userStats[tk.assignee_id].closed++;
+        const d=tk.department||'—';
+        userStats[tk.assignee_id].closedByDept[d]=(userStats[tk.assignee_id].closedByDept[d]||0)+1;
+      }
+    }
+  });
+  // Dept stats
+  const deptStats={};
+  tickets.forEach(tk=>{const d=tk.department||'—';if(!deptStats[d])deptStats[d]={total:0,open:0,closed:0};deptStats[d].total++;if(tk.status==='closed')deptStats[d].closed++;else deptStats[d].open++;});
+  const maxBar=Math.max(...Object.values(deptStats).map(d=>d.total),1);
+  function bar(val,max,color='var(--acc)'){const w=Math.round(val/max*100);return`<div style="display:flex;align-items:center;gap:6px"><div style="flex:1;background:var(--sf3);border-radius:3px;height:8px"><div style="width:${w}%;background:${color};height:8px;border-radius:3px;transition:.3s"></div></div><span style="font-size:11px;font-weight:600;min-width:24px;text-align:right">${val}</span></div>`;}
+  document.getElementById('main').innerHTML=`
+  <div class="ph"><div class="pt">📊 Statistik</div></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+
+  <div class="dash-card">
+    <h3 style="margin-bottom:12px">👤 Tickets erstellt pro Mitarbeiter</h3>
+    <div style="overflow-x:auto"><table class="rm-table" style="font-size:12px">
+      <thead><tr><th style="text-align:left">Mitarbeiter</th><th>Gesamt</th>${DEPTS.map(d=>`<th>${DEPT_LABELS[d]||d}</th>`).join('')}</tr></thead>
+      <tbody>${S.users.filter(u=>userStats[u.id]?.created>0).sort((a,b)=>(userStats[b.id]?.created||0)-(userStats[a.id]?.created||0)).map(u=>`
+        <tr><td style="text-align:left;font-weight:600">${avHtml(u.initials,u.color,18,8)} ${u.name}</td>
+        <td><span class="anum" style="background:rgba(59,109,212,.1);color:var(--acc)">${userStats[u.id].created}</span></td>
+        ${DEPTS.map(d=>`<td>${userStats[u.id].byDept[d]||'—'}</td>`).join('')}</tr>`).join('')}
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="dash-card">
+    <h3 style="margin-bottom:12px">✅ Tickets bearbeitet & abgeschlossen</h3>
+    <div style="overflow-x:auto"><table class="rm-table" style="font-size:12px">
+      <thead><tr><th style="text-align:left">Mitarbeiter</th><th>Zugewiesen</th><th>Abgeschl.</th>${DEPTS.map(d=>`<th>${DEPT_LABELS[d]||d}</th>`).join('')}</tr></thead>
+      <tbody>${S.users.filter(u=>userStats[u.id]?.assigned>0).sort((a,b)=>(userStats[b.id]?.closed||0)-(userStats[a.id]?.closed||0)).map(u=>`
+        <tr><td style="text-align:left;font-weight:600">${avHtml(u.initials,u.color,18,8)} ${u.name}</td>
+        <td><span class="anum" style="background:rgba(59,109,212,.1);color:var(--acc)">${userStats[u.id].assigned}</span></td>
+        <td><span class="anum" style="background:rgba(16,185,129,.1);color:var(--ok)">${userStats[u.id].closed}</span></td>
+        ${DEPTS.map(d=>`<td>${userStats[u.id].closedByDept[d]||'—'}</td>`).join('')}</tr>`).join('')}
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="dash-card">
+    <h3 style="margin-bottom:14px">📁 Tickets nach Fachbereich</h3>
+    ${Object.entries(deptStats).sort((a,b)=>b[1].total-a[1].total).map(([d,s])=>`
+      <div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;margin-bottom:4px"><span>${DEPT_LABELS[d]||d}</span><span style="color:var(--mu)">offen: ${s.open} | geschl.: ${s.closed}</span></div>
+        ${bar(s.total,maxBar)}
+      </div>`).join('')}
+  </div>
+
+  <div class="dash-card">
+    <h3 style="margin-bottom:12px">🔑 Portal-Anmeldungen pro Mitarbeiter</h3>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${S.users.slice().sort((a,b)=>(loginMap[b.id]||0)-(loginMap[a.id]||0)).map(u=>{const cnt=loginMap[u.id]||0;const maxL=Math.max(...Object.values(loginMap),1);return`<div style="display:flex;align-items:center;gap:10px">
+        <div style="display:flex;align-items:center;gap:6px;min-width:130px">${avHtml(u.initials,u.color,20,9)}<span style="font-size:12px;font-weight:600">${u.name}</span></div>
+        ${bar(cnt,maxL,'var(--info)')}
+      </div>`;}).join('')}
+    </div>
+  </div>
+
+  </div>`;
 }

@@ -225,6 +225,9 @@ async function initDB() {
       id TEXT PRIMARY KEY, label TEXT NOT NULL, body TEXT NOT NULL,
       sort_order INTEGER DEFAULT 0, created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
     )`,
+    `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false`,
+    `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`,
+    `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS deleted_by TEXT`,
     `CREATE TABLE IF NOT EXISTS station_shifts (
       id TEXT PRIMARY KEY, label TEXT NOT NULL,
       sort_order INTEGER DEFAULT 0, created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()

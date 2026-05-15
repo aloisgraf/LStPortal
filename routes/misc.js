@@ -706,6 +706,18 @@ router.get('/ical/:userId', async (req,res) => {
   } catch(e) { res.status(500).send(e.message); }
 });
 
+// STATISTIK
+router.get('/statistik', auth, async (req,res) => {
+  try {
+    if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+    const [ticketsRaw, logins] = await Promise.all([
+      q('SELECT id,created_by,assignee_id,status,department,updated_at FROM tickets WHERE is_deleted IS NOT TRUE'),
+      q(`SELECT user_id, COUNT(*) as cnt FROM activity_log WHERE action='login' GROUP BY user_id`),
+    ]);
+    ok(res, { tickets: ticketsRaw, logins: logins.map(l=>({userId:l.user_id,count:parseInt(l.cnt)})) });
+  } catch(e) { bad(res,e.message,500); }
+});
+
 // STATION SESSIONS
 router.get('/stations', auth, async (req,res) => {
   try {
