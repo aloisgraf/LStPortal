@@ -250,6 +250,12 @@ router.delete('/:id', auth, async (req,res) => {
     const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
     if (!tk) return bad(res,'Nicht gefunden',404);
     if (!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
+    const activeChildren = await q(
+      'SELECT id FROM tickets WHERE parent_ticket_id=$1 AND (is_deleted IS NOT TRUE) AND status!=\'closed\'',
+      [req.params.id]
+    );
+    if (activeChildren.length > 0)
+      return bad(res,`Dieses Ticket hat noch ${activeChildren.length} aktives Unterticket(s). Bitte zuerst die Untertickets abschließen oder löschen.`,409);
     await pool.query('UPDATE tickets SET is_deleted=true,deleted_at=NOW(),deleted_by=$1 WHERE id=$2',[req.uid,req.params.id]);
     await auditNote(req.params.id, req.uid, '🗑️ Ticket gelöscht');
     ok(res);

@@ -189,7 +189,12 @@ function loginOK(){
   toast('\uD83D\uDC4B Willkommen, '+(u?.name||'')+'!');
 }
 async function logout(){
-  loading(true);try{await api('POST','/auth/logout');}catch(e){}finally{loading(false);}
+  loading(true);
+  try{
+    const mySess=S.stationSessions?.find(s=>s.userId===S.currentUser);
+    if(mySess)await api('DELETE','/stations/'+encodeURIComponent(mySess.stationName)).catch(()=>{});
+    await api('POST','/auth/logout');
+  }catch(e){}finally{loading(false);}
   if(_refreshTimer)clearInterval(_refreshTimer);
   S.currentUser=null;document.getElementById('hdr').style.display='none';document.getElementById('APP').style.display='none';
   await loadLoginUsers();document.getElementById('LS').classList.add('open');
@@ -223,7 +228,7 @@ function toggleSidebar(){const sb=document.getElementById('sidebar'),ov=document
 function toggleNS(id){document.getElementById(id+'Hdr').classList.toggle('open');document.getElementById(id+'Sub').classList.toggle('open');}
 function setView(v){
   S.view=v;
-  ['home','schedule','calendar','allw','diensttausch','abrechnung','dienstplaene','tickets','tickets_closed','tickets_deleted','checklists','messages','messages_sent','zahnarzt','platz','statistik'].forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
+  ['home','schedule','calendar','allw','diensttausch','abrechnung','dienstplaene','tickets','tickets_closed','tickets_deleted','checklists','messages','messages_sent','zahnarzt','platz','links','statistik'].forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
   const statEl=document.getElementById('ni-statistik');if(statEl)statEl.style.display=S.p?.manageUsers?'flex':'none';
   document.getElementById('sidebar').classList.remove('open');document.getElementById('sbOv').classList.remove('open');
   renderSBF();renderMain();
@@ -257,6 +262,7 @@ function renderMain(){
   else if(S.view==='messages'||S.view==='messages_sent')renderMessages();
   else if(S.view==='zahnarzt')renderZahnarzt();
   else if(S.view==='platz')renderPlatz();
+  else if(S.view==='links')renderLinks();
   else if(S.view==='statistik')renderStatistik();
 }
 // HOME
@@ -2829,4 +2835,29 @@ async function renderStatistik(){
   </div>
 
   </div>`;
+}
+
+// SECTION: Links
+const QUICK_LINKS = [
+  {id:'lebensretter', label:'admin.lebensretter.at', url:'https://admin.lebensretter.at/', icon:'🌐', desc:'Lebensretter Admin-Portal'},
+];
+function renderLinks(){
+  document.getElementById('main').innerHTML=`
+    <div class="ph"><div class="pt">&#128279; Links</div></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">
+      ${QUICK_LINKS.map(lk=>`
+        <div class="dash-card" style="cursor:pointer;transition:.15s" onclick="window.open('${lk.url}','_blank','noopener')" onmouseenter="this.style.borderColor='var(--acc)'" onmouseleave="this.style.borderColor=''">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="font-size:28px;line-height:1">${lk.icon}</div>
+            <div>
+              <div style="font-size:14px;font-weight:700">${lk.label}</div>
+              <div style="font-size:12px;color:var(--mu);margin-top:2px">${lk.desc}</div>
+            </div>
+            <div style="margin-left:auto;color:var(--di);font-size:14px">&#8599;</div>
+          </div>
+        </div>`).join('')}
+    </div>
+    <div style="margin-top:20px;padding:12px 16px;background:var(--sf2);border:1px solid var(--border);border-radius:var(--r);font-size:12px;color:var(--mu)">
+      &#8505;&#65039; Links öffnen sich in einem neuen Tab. Weitere Links können vom Administrator im Quellcode ergänzt werden (QUICK_LINKS Array in app.js).
+    </div>`;
 }

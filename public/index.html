@@ -91,6 +91,7 @@
       <div class="nsub open" id="dbSub">
         <div class="ni" id="ni-zahnarzt" onclick="setView('zahnarzt')">&#129464; Dienstplan Zahn&#228;rzte</div>
         <div class="ni" id="ni-platz" onclick="setView('platz')">&#128225; Platz&#252;bersicht</div>
+        <div class="ni" id="ni-links" onclick="setView('links')">&#128279; Links</div>
       </div>
       <div class="ndiv"></div>
       <div class="nsh open" id="tkHdr" onclick="toggleNS('tk')"><span>&#127931; Ticketsystem</span><span class="arr">&#9660;</span></div>
@@ -107,13 +108,13 @@
         <div class="ni" id="ni-messages_sent" onclick="setView('messages_sent')">&#128228; Gesendet</div>
       </div>
       <div class="ndiv"></div>
-      <div class="ni top ni-admin-only" id="ni-statistik" onclick="setView('statistik')">&#128202; Statistik</div>
-      <div class="ndiv"></div>
       <div class="nsh open" id="newsHdr" onclick="toggleNS('news')"><span>&#128240; News</span><span class="arr">&#9660;</span></div>
       <div class="nsub open" id="newsSub">
         <div class="ni" id="ni-news" onclick="setView('news')">&#128240; Aktuelle News<span class="bdgn" id="newsBdg" style="display:none">0</span></div>
         <div class="ni" id="ni-news_archiv" onclick="setView('news_archiv')" style="display:none">&#128450; Archiv</div>
       </div>
+      <div class="ndiv"></div>
+      <div class="ni top ni-admin-only" id="ni-statistik" onclick="setView('statistik')">&#128202; Statistik</div>
     </div>
     <div class="sbf" id="sbf"><div class="sfl">Filter</div></div>
     <div class="sbver" onclick="openModal('changelogOv')" title="Changelog">LSt Portal <span id="versionBadge"></span> &#9432;</div>
