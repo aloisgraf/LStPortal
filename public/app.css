@@ -186,15 +186,46 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
 @media(max-width:768px){
   .hbg{display:flex}.logo{width:auto}
   .app{grid-template-columns:1fr}
-  .sb{position:fixed;top:var(--hdr);left:-250px;width:250px;height:calc(100vh - var(--hdr));transition:left .25s}
+  .sb{position:fixed;top:var(--hdr);left:-250px;width:250px;height:calc(100vh - var(--hdr));transition:left .25s;z-index:50}
   .sb.open{left:0;box-shadow:var(--sh2)}.sb-overlay.open{display:block}
   .sr{grid-template-columns:1fr 1fr}.tk-body{grid-template-columns:1fr}
-  .tk-sb{border-top:1px solid var(--border);border-right:none;max-height:none}.tk-main{max-height:50vh}
+  .tk-sb{border-top:1px solid var(--border);border-right:none;max-height:none}.tk-main{max-height:none;overflow-y:visible}
   .dash-grid{grid-template-columns:1fr}.abr-grid{grid-template-columns:1fr}
-  main{padding:14px 12px}
+  main{padding:12px 10px}
+  /* Modals: fast vollbild auf Mobile */
+  .ov{align-items:flex-end;padding:0}
+  .modal,.modal.wide,.modal.xl,.modal.lg,.modal.sm{width:100%;max-width:100%;max-height:92vh;border-radius:16px 16px 0 0;margin:0}
+  .mh{position:sticky;top:0;z-index:2}
+  /* Admin-Sidebar → horizontal oben */
+  .adm-layout{flex-direction:column}
+  .atabs{flex-direction:row;width:100%;border-right:none;border-bottom:1px solid var(--border);margin:0 0 0 -0px;padding:6px 8px;overflow-x:auto;overflow-y:hidden;white-space:nowrap}
+  .tb{width:auto;flex-shrink:0;border-left:none;border-bottom:2px solid transparent;border-radius:6px 6px 0 0;padding:7px 12px}
+  .tb.on{border-left-color:transparent;border-bottom-color:var(--acc)}
+  .tp{padding:14px 16px}
+  /* Ticketdetail Tabs */
+  .tk-main{gap:10px}
+  /* Filter-Bar wrapping */
+  .fbar .srch{width:100%}
+  /* Seiten-Header */
+  .ph{flex-wrap:wrap;gap:8px}
+  .pt{font-size:17px}
+  /* Statistik Grid */
+  .stat-grid{grid-template-columns:1fr!important}
+  /* Platz */
+  .elp-columns{grid-template-columns:1fr;padding:12px}
+  /* Homeoffice-Grid */
+  .role-chks{grid-template-columns:1fr}
 }
 @media(max-width:480px){
   .sr{grid-template-columns:1fr}.fr{grid-template-columns:1fr}.aer{grid-template-columns:1fr 1fr}
+  .ov{padding:0}
+  main{padding:10px 8px}
+  .ph .btn-p,.ph .btn-s{font-size:12px;padding:6px 10px}
+  /* Batch-Aktionen besser stapeln */
+  .fbar{gap:6px}
+  .flt,.srch{font-size:12px}
+  /* Ticket-Karten */
+  .notif-card{flex-direction:column;align-items:flex-start;gap:6px}
 }
 
 
@@ -266,3 +297,10 @@ details.dash-card > summary { list-style: none; cursor: pointer; display: flex; 
 .elp-badge-occ{color:var(--ok)}
 .elp-badge-free{color:var(--di);margin-top:auto}
 @media(max-width:900px){.elp-columns{grid-template-columns:1fr}}
+/* Touch-freundliche Mindestgrößen */
+@media(hover:none),(pointer:coarse){
+  .btn-p,.btn-s,.btn-d,.btn-e,.btn-ok,.btn-warn{min-height:40px}
+  .ni{min-height:44px;padding:8px 10px 8px 24px}
+  .ni.top{padding-left:10px}
+  input[type=text],input[type=date],input[type=password],select,textarea{font-size:16px!important}
+}

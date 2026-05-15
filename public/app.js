@@ -2788,7 +2788,7 @@ async function renderStatistik(){
   function bar(val,max,color='var(--acc)'){const w=Math.round(val/max*100);return`<div style="display:flex;align-items:center;gap:6px"><div style="flex:1;background:var(--sf3);border-radius:3px;height:8px"><div style="width:${w}%;background:${color};height:8px;border-radius:3px;transition:.3s"></div></div><span style="font-size:11px;font-weight:600;min-width:24px;text-align:right">${val}</span></div>`;}
   document.getElementById('main').innerHTML=`
   <div class="ph"><div class="pt">📊 Statistik</div></div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+  <div class="stat-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
 
   <div class="dash-card">
     <h3 style="margin-bottom:12px">👤 Tickets erstellt pro Mitarbeiter</h3>
