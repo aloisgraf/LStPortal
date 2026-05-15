@@ -713,7 +713,7 @@ router.get('/stations', auth, async (req,res) => {
     ok(res, sessions.map(s=>({id:s.id,stationName:s.station_name,userId:s.user_id,shiftId:s.shift_id,loggedInAt:s.logged_in_at})));
   } catch(e) { bad(res,e.message,500); }
 });
-router.post('/stations/:name/login', auth, async (req,res) => {
+router.post('/stations/:name', auth, async (req,res) => {
   try {
     const name = decodeURIComponent(req.params.name);
     const {shiftId} = req.body;
@@ -723,7 +723,7 @@ router.post('/stations/:name/login', auth, async (req,res) => {
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
-router.delete('/stations/:name/logout', auth, async (req,res) => {
+router.delete('/stations/:name', auth, async (req,res) => {
   try {
     const name = decodeURIComponent(req.params.name);
     const sess = await q1('SELECT * FROM station_sessions WHERE station_name=$1',[name]);
