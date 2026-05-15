@@ -376,6 +376,7 @@
         <button class="tb" id="atb-notetpls" onclick="swTab('notetpls')">&#128172; Notizvorlagen</button>
         <button class="tb" id="atb-log" onclick="swTab('log');loadLog(true)">&#128221; Aktivitätslog</button>
         <button class="tb" id="atb-shifts" onclick="swTab('shifts')">&#128336; Schichten</button>
+        <button class="tb" id="atb-links" onclick="swTab('links')">&#128279; Links</button>
       </div>
       <div class="tp on" id="atp-users"><div class="al" id="usrList"></div><button class="btn-p" style="width:100%;justify-content:center" onclick="openUF(null)">&#65291; Benutzer</button></div>
       <div class="tp" id="atp-cats"><div class="al" id="catList"></div><button class="btn-p" style="width:100%;justify-content:center" onclick="openCF(null)">&#65291; Kategorie</button></div>
@@ -432,11 +433,24 @@
         <button class="btn-s" id="logMoreBtn" onclick="loadLog(false)" style="width:100%;margin-top:8px;display:none">Mehr laden …</button>
       </div>
       <div class="tp" id="atp-shifts">
-        <div style="display:flex;gap:8px;margin-bottom:12px;align-items:flex-end;flex-wrap:wrap">
-          <div class="fg" style="margin:0;flex:1;min-width:160px"><label style="font-size:11px">Bezeichnung</label><input type="text" id="shiftFLabel" placeholder="z.B. Frühschicht" style="font-size:12px;padding:5px 8px"></div>
-          <button class="btn-p" style="font-size:12px;white-space:nowrap" onclick="addShift()">&#43; Hinzufügen</button>
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:flex-end">
+          <div class="fg" style="margin:0;flex:2;min-width:140px"><label style="font-size:11px">Bezeichnung</label><input type="text" id="shiftFLabel" placeholder="z.B. Frühschicht" style="font-size:12px;padding:5px 8px"></div>
+          <div class="fg" style="margin:0;min-width:80px"><label style="font-size:11px">Von</label><input type="time" id="shiftFStart" style="font-size:12px;padding:5px 8px"></div>
+          <div class="fg" style="margin:0;min-width:80px"><label style="font-size:11px">Bis</label><input type="time" id="shiftFEnd" style="font-size:12px;padding:5px 8px"></div>
+          <div class="fg" style="margin:0;min-width:100px"><label style="font-size:11px;display:flex;align-items:center;gap:5px"><input type="checkbox" id="shiftFBreak" checked> Hat Pause</label></div>
+          <button class="btn-p" style="font-size:12px;white-space:nowrap" onclick="addShift()">&#43; Hinzuf&#252;gen</button>
         </div>
         <div id="shiftList"></div>
+      </div>
+      <div class="tp" id="atp-links">
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:flex-end">
+          <div class="fg" style="margin:0;flex:1;min-width:50px"><label style="font-size:11px">Icon</label><input type="text" id="linkFIcon" placeholder="&#128279;" style="font-size:12px;padding:5px 8px;width:50px"></div>
+          <div class="fg" style="margin:0;flex:3;min-width:160px"><label style="font-size:11px">Bezeichnung</label><input type="text" id="linkFLabel" placeholder="z.B. Admin Portal" style="font-size:12px;padding:5px 8px"></div>
+          <div class="fg" style="margin:0;flex:4;min-width:200px"><label style="font-size:11px">URL</label><input type="text" id="linkFUrl" placeholder="https://..." style="font-size:12px;padding:5px 8px"></div>
+          <div class="fg" style="margin:0;flex:3;min-width:160px"><label style="font-size:11px">Beschreibung</label><input type="text" id="linkFDesc" placeholder="Optional..." style="font-size:12px;padding:5px 8px"></div>
+          <button class="btn-p" style="font-size:12px;white-space:nowrap" onclick="addLink()">&#43; Hinzuf&#252;gen</button>
+        </div>
+        <div id="linkList"></div>
       </div>
       </div><!-- /adm-layout -->
     </div>
@@ -453,11 +467,18 @@
     <div class="mh"><h2 id="stLoginTitle">&#128225; Anmelden</h2><button class="mc" onclick="closeModal('stLoginOv')">&#10005;</button></div>
     <div class="mb2">
       <input type="hidden" id="stLoginStation">
-      <div style="font-size:13px;color:var(--mu);margin-bottom:12px">Wähle deine aktuelle Dienstschicht:</div>
       <div class="fg"><label>Dienstschicht</label>
-        <select id="stLoginShift" style="font-size:13px">
-          <option value="">— keine Angabe —</option>
+        <select id="stLoginShift" style="font-size:13px" onchange="onStLoginShiftChange()">
+          <option value="">&#8212; keine Angabe &#8212;</option>
         </select>
+      </div>
+      <div id="stLoginBreakWrap" style="display:none">
+        <div class="fg"><label>&#9208;&#65039; Meine Pause (30 Min.) um</label>
+          <select id="stLoginBreakTime" style="font-size:13px">
+            <option value="">&#8212; keine Angabe &#8212;</option>
+          </select>
+        </div>
+        <div id="stLoginOtherBreaks" style="font-size:12px;color:var(--mu);margin-top:6px;padding:8px;background:var(--sf2);border-radius:6px;display:none"></div>
       </div>
     </div>
     <div class="mf">

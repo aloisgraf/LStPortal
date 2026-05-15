@@ -1807,12 +1807,70 @@ async function loadLog(reset){
 function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 function openAdminModal(){renderUsrList();renderCatList();renderTagList();renderRightsMatrix();openModal('admOv');}
-function swTab(t){['users','cats','tags','stats','rights','subcats','notetpls','log','ho','shifts'].forEach(x=>{document.getElementById('atb-'+x)?.classList.toggle('on',x===t);document.getElementById('atp-'+x)?.classList.toggle('on',x===t);});if(t==='ho')renderHoAdmin();if(t==='subcats')renderSubcatAdmin();if(t==='notetpls')renderNoteTplAdmin();if(t==='stats')renderStatsPanel();if(t==='shifts')renderShiftsAdmin();}
+function swTab(t){['users','cats','tags','stats','rights','subcats','notetpls','log','ho','shifts','links'].forEach(x=>{document.getElementById('atb-'+x)?.classList.toggle('on',x===t);document.getElementById('atp-'+x)?.classList.toggle('on',x===t);});if(t==='ho')renderHoAdmin();if(t==='subcats')renderSubcatAdmin();if(t==='notetpls')renderNoteTplAdmin();if(t==='stats')renderStatsPanel();if(t==='shifts')renderShiftsAdmin();if(t==='links')renderLinksAdmin();if(t==='rights')renderRightsMatrix();}
 function backToAdmin(tab='users'){['ufOv','cfOv','tfOv'].forEach(closeModal);openAdminModal();swTab(tab);}
 function renderUsrList(){document.getElementById('usrList').innerHTML=S.users.map(u=>`<div class="ai">${avHtml(u.initials,u.color,34,13,u.isOnline)}<div class="aii"><div class="ain">${u.name} ${roleBadges(u.id)}${u.isOnline?'<span style="font-size:10px;color:var(--ok)">\u25cf online</span>':''}</div><div class="ais">${u.mustChangePW?'\u26A0\uFE0F PW ausstehend':'\u2713 Aktiv'}</div></div><div class="aia"><button class="btn-e" onclick="openUF('${u.id}')">\u270e</button>${S.users.length>1&&u.id!==S.currentUser?`<button class="btn-d" onclick="delUser('${u.id}')">\u2715</button>`:''}</div></div>`).join('');}
 function renderCatList(){document.getElementById('catList').innerHTML=S.categories.map(c=>`<div class="ai"><div style="width:14px;height:14px;border-radius:3px;background:${c.color};flex-shrink:0"></div><div class="aii"><div class="ain">${c.emoji} ${c.label}</div></div><div class="aia"><button class="btn-e" onclick="openCF('${c.id}')">\u270e</button>${S.categories.length>1?`<button class="btn-d" onclick="delCat('${c.id}')">\u2715</button>`:''}</div></div>`).join('');}
 function renderTagList(){document.getElementById('tagList').innerHTML=S.tags.map(t=>`<div class="ai"><div style="width:14px;height:14px;border-radius:3px;background:${t.color};flex-shrink:0"></div><div class="aii"><div class="ain"><span class="tag-chip" style="background:${t.color}1a;color:${t.color}">${t.label}</span></div></div><div class="aia"><button class="btn-e" onclick="openTF('${t.id}')">\u270e</button>${S.tags.length>1?`<button class="btn-d" onclick="delTag('${t.id}')">\u2715</button>`:''}</div></div>`).join('');}
-function renderRightsMatrix(){const rids=ROLES.map(r=>r.id);document.getElementById('rightsMatrix').innerHTML=`<table class="rm-table"><thead><tr><th style="text-align:left">Berechtigung</th>${ROLES.map(r=>`<th>${r.icon}<br>${r.label}</th>`).join('')}</tr></thead><tbody>${RM.map(([p2,v])=>`<tr><td style="text-align:left">${p2}</td>${rids.map(r=>`<td>${v[r]===1?'<span class="rm-yes">\u2713</span>':v[r]===2?'<span class="rm-part">\u3030</span>':'<span class="rm-no">\u2013</span>'}</td>`).join('')}</tr>`).join('')}</tbody></table>`;}
+function renderRightsMatrix(){
+  const el=document.getElementById('rightsMatrix');if(!el)return;
+  const ROLES_LIST=['admin','leitung','dienstplanung','schichtleiter','technik','qm','standard'];
+  const PERMS=[
+    {key:'manageUsers',label:'Benutzerverwaltung'},
+    {key:'canApproveEvents',label:'Dienste genehmigen'},
+    {key:'editAllPersonal',label:'Alle Eintr\u00e4ge bearbeiten'},
+    {key:'addForOthers',label:'F\u00fcr andere eintragen'},
+    {key:'addGeneral',label:'Allg. Eintr\u00e4ge'},
+    {key:'seeAllAllw',label:'Alle Zulagen sehen'},
+    {key:'editAllw',label:'Zulagen bearbeiten'},
+    {key:'seeAllAbrechnung',label:'Alle Abrechnungen'},
+    {key:'canSendMessages',label:'Nachrichten senden'},
+  ];
+  const defaults={
+    admin:{manageUsers:1,canApproveEvents:1,editAllPersonal:1,addForOthers:1,addGeneral:1,seeAllAllw:1,editAllw:1,seeAllAbrechnung:1,canSendMessages:1},
+    leitung:{canApproveEvents:1,editAllPersonal:1,addForOthers:1,addGeneral:1,seeAllAllw:1,editAllw:1,canSendMessages:1},
+    dienstplanung:{canApproveEvents:1,editAllPersonal:1,addForOthers:1,addGeneral:1,seeAllAllw:1,editAllw:1,seeAllAbrechnung:1,canSendMessages:1},
+    schichtleiter:{addForOthers:1,canSendMessages:1},
+    technik:{addGeneral:1,canSendMessages:1},
+    qm:{addForOthers:1,addGeneral:1,canSendMessages:1},
+    standard:{},
+  };
+  const ovMap={};
+  (S.rolePermissions||[]).forEach(o=>{if(!ovMap[o.role])ovMap[o.role]={};ovMap[o.role][o.permission]=o.granted;});
+  el.innerHTML=`<div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr>
+        <th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--border);min-width:160px">Recht</th>
+        ${ROLES_LIST.map(r=>`<th style="padding:6px 8px;border-bottom:2px solid var(--border);text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.5px">${r}</th>`).join('')}
+      </tr></thead>
+      <tbody>
+        ${PERMS.map((p2,pi)=>`<tr style="background:${pi%2===0?'var(--sf2)':'transparent'}">
+          <td style="padding:6px 8px;font-size:12px;color:var(--tx)">${p2.label}</td>
+          ${ROLES_LIST.map(r=>{
+            const defVal=!!(defaults[r]||{})[p2.key];
+            const override=ovMap[r]?.[p2.key];
+            const effective=override!==undefined?override:defVal;
+            const isOverridden=override!==undefined;
+            return`<td style="text-align:center;padding:6px 8px">
+              <label style="cursor:pointer;display:flex;align-items:center;justify-content:center;gap:2px" title="${isOverridden?'\u00dcberschrieben':'Standard'}">
+                <input type="checkbox" ${effective?'checked':''} onchange="setRightOverride('${r}','${p2.key}',this.checked)" style="cursor:pointer">
+                ${isOverridden?`<span style="font-size:9px;color:${override?'var(--ok)':'var(--danger)'}">${override?'\u2191':'\u2193'}</span>`:''}
+              </label>
+            </td>`;
+          }).join('')}
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    <div style="font-size:11px;color:var(--mu);margin-top:10px">\u2191/\u2193 = manuell \u00fcberschrieben \u00b7 \u00c4nderungen werden sofort gespeichert</div>
+  </div>`;
+}
+async function setRightOverride(role,permission,granted){
+  try{
+    await api('POST','/role-permissions',{role,permission,granted});
+    await fetchData();renderRightsMatrix();
+    toast('\u2705 Recht aktualisiert');
+  }catch(e){toast('\u26a0\ufe0f '+e.message,'err');}
+}
 function buildCP(cid,sel,fn){document.getElementById(cid).innerHTML=pal().map(col=>`<div class="cp ${col===sel?'on':''}" style="background:${col}" onclick="${fn}('${col}','${cid}')"></div>`).join('');}
 function pickU(col,cid){S.ufColor=col;document.querySelectorAll('#'+cid+' .cp').forEach(el=>el.classList.toggle('on',el.style.backgroundColor===h2r(col)));}
 function pickC(col,cid){S.cfColor=col;document.querySelectorAll('#'+cid+' .cp').forEach(el=>el.classList.toggle('on',el.style.backgroundColor===h2r(col)));}
@@ -1897,6 +1955,7 @@ function startAutoRefresh(){
       S.messages=data.messages||[];S.notifications=data.notifications||[];
       S.allowances=data.allowances||[];S.checklists=data.checklists||[];
       S.abrechnung=data.abrechnung||{einspringer:[],homeoffice:[]};S.dienstplaene=data.dienstplaene||[];S.diensttausch=data.diensttausch||[];S.homeoffice=data.homeoffice||{slots:[],config:[],boxes:[],dienste:[]};S.vacationConfig=data.vacationConfig||[];S.diensttausch=data.diensttausch||[];
+      S.stationSessions=data.stationSessions||[];S.stationShifts=data.stationShifts||[];S.stationOutages=data.stationOutages||[];S.links=data.portalLinks||[];S.docs=data.docs||[];S.docCategories=data.docCategories||[];S.rolePermissions=data.rolePermissions||[];
       updateBadges();
       if(_lastMsgCount>=0&&newMsgCount>_lastMsgCount)toast('\uD83D\uDCEC Neue Nachricht eingegangen!');
       if(_lastTkCount>=0&&newTkCount>_lastTkCount)toast('\uD83C\uDFAB Neues Ticket in deinem Bereich!');
@@ -1904,9 +1963,12 @@ function startAutoRefresh(){
       if(S.view==='home')renderHome();
       else if(S.view==='messages'||S.view==='messages_sent')renderMessages();
       else if(S.view==='tickets'||S.view==='tickets_closed'||S.view==='tickets_deleted')renderTickets();
+      else if(S.view==='platz')renderPlatz();
+      else if(S.view==='links')renderLinks();
+      else if(S.view==='docs')renderDocs();
     var _rd=document.getElementById('lastRefreshDisplay');if(_rd){var _n=new Date();_rd.textContent='↻ '+_n.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit',second:'2-digit'});_rd.style.display='block';}
     }catch(e){}
-  },60000);
+  },30000);
 }
 // ══════════════════════════════════════════
 // SECTION: Austrian Holidays
@@ -2742,7 +2804,17 @@ const ELP_NORD_EXT = [
 function renderPlatz(){
   const mySess=S.stationSessions.find(s=>s.userId===S.currentUser);
   const isAlreadyIn=!!mySess;
+  const canManageOutage=(S.p?.roles||[]).some(r=>['admin','leitung','technik'].includes(r));
   function card(st){
+    const outage=S.stationOutages.find(o=>o.stationName===st.name);
+    if(outage){
+      return `<div class="elp-station elp-occ" style="background:rgba(239,68,68,.08);border-color:#ef4444">
+        <div class="elp-sname" style="text-decoration:line-through;color:var(--danger)">${st.name}</div>
+        <div style="font-size:10px;color:var(--danger);font-weight:700">⚠️ AUSSER BETRIEB</div>
+        ${outage.reason?`<div style="font-size:10px;color:var(--mu)">${outage.reason}</div>`:''}
+        ${canManageOutage?`<button class="btn-ok" style="font-size:10px;padding:3px 8px;margin-top:4px;width:100%" onclick="endOutage('${outage.id}')">✓ Wieder aktiv</button>`:''}
+      </div>`;
+    }
     const sess=S.stationSessions.find(s=>s.stationName===st.name);
     const occ=!!sess;const mine=sess?.userId===S.currentUser;
     const u=occ?getU(sess.userId):null;
@@ -2754,10 +2826,11 @@ function renderPlatz(){
       ${occ?`
         <div class="elp-urow">${avHtml(u?.initials||'?',u?.color||'#888',32,12,true)}<div><div class="elp-uname">${u?.name||'?'}</div>${shift?`<div class="elp-sch">${shift.label}</div>`:''}</div></div>
         <div class="elp-badge ${mine?'elp-badge-me':'elp-badge-occ'}">${mine?'● Du bist hier':'● Besetzt'}</div>
-        ${mine?`<button class="btn-d" style="width:100%;margin-top:8px;font-size:11px;padding:4px 8px" onclick="logoutStation('${st.name}')">Abmelden</button>`:''}
+        ${mine?`<div style="font-size:10px;color:var(--mu);margin-top:4px">${sess.breakTime?`⏸️ Pause: ${sess.breakTime} Uhr`:''}</div><button class="btn-d" style="width:100%;margin-top:8px;font-size:11px;padding:4px 8px" onclick="logoutStation('${st.name}')">Abmelden</button>`:''}
       `:`
         <div class="elp-badge elp-badge-free">● Frei</div>
         ${!isAlreadyIn?`<button class="btn-p" style="width:100%;margin-top:8px;font-size:11px;padding:5px 8px" onclick="openStationLogin('${st.name}')">Anmelden</button>`:`<div style="font-size:10px;color:var(--di);margin-top:8px;text-align:center">Bereits an ${mySess.stationName}</div>`}
+        ${canManageOutage?`<button class="btn-d" style="font-size:10px;padding:3px 8px;margin-top:4px;width:100%" onclick="startOutage('${st.name}')">⚠️ Außer Betrieb</button>`:''}
       `}
     </div>`;
   }
@@ -2785,14 +2858,42 @@ function openStationLogin(name){
   document.getElementById('stLoginStation').value=name;
   document.getElementById('stLoginTitle').textContent='📡 Anmelden – '+name;
   const sel=document.getElementById('stLoginShift');
-  sel.innerHTML='<option value="">— keine Angabe —</option>'+S.stationShifts.map(s=>`<option value="${s.id}">${s.label}</option>`).join('');
+  sel.innerHTML='<option value="">— keine Angabe —</option>'+S.stationShifts.map(s=>`<option value="${s.id}">${s.label}${s.serviceStart?(' ('+s.serviceStart+(s.serviceEnd?'–'+s.serviceEnd:'')+')'):''}</option>`).join('');
+  document.getElementById('stLoginBreakWrap').style.display='none';
   openModal('stLoginOv');
+}
+function onStLoginShiftChange(){
+  const shiftId=document.getElementById('stLoginShift').value;
+  const shift=S.stationShifts.find(s=>s.id===shiftId);
+  const wrap=document.getElementById('stLoginBreakWrap');
+  if(!shift||!shift.hasBreak){wrap.style.display='none';return;}
+  wrap.style.display='';
+  const btSel=document.getElementById('stLoginBreakTime');
+  const slots=[];
+  const [sh,sm]=shift.serviceStart?(shift.serviceStart.split(':').map(Number)):[7,0];
+  const [eh,em]=shift.serviceEnd?(shift.serviceEnd.split(':').map(Number)):[19,0];
+  const startMins=sh*60+sm+60;
+  const endMins=eh*60+em-30;
+  for(let m=startMins;m<=endMins;m+=30){
+    const hh=String(Math.floor(m/60)).padStart(2,'0');
+    const mm=String(m%60).padStart(2,'0');
+    slots.push(`${hh}:${mm}`);
+  }
+  btSel.innerHTML='<option value="">— keine Angabe —</option>'+slots.map(t=>`<option value="${t}">${t} Uhr</option>`).join('');
+  const today=new Date().toDateString();
+  const others=S.stationSessions.filter(s=>s.userId!==S.currentUser&&s.breakTime&&new Date(s.loggedInAt).toDateString()===today);
+  const obDiv=document.getElementById('stLoginOtherBreaks');
+  if(others.length){
+    obDiv.style.display='';
+    obDiv.innerHTML='<div style="font-size:11px;font-weight:700;margin-bottom:4px;color:var(--mu)">Pausen anderer Mitarbeiter heute:</div>'+others.map(s=>`<div style="display:flex;gap:6px;align-items:center;font-size:12px"><span>⏸️ ${getU(s.userId)?.name||'?'}</span><span style="font-weight:600">${s.breakTime} Uhr</span></div>`).join('');
+  } else { obDiv.style.display='none'; }
 }
 async function confirmStationLogin(){
   const name=document.getElementById('stLoginStation').value;
   const shiftId=document.getElementById('stLoginShift').value||null;
+  const breakTime=document.getElementById('stLoginBreakTime')?.value||null;
   try{
-    await api('POST','/stations/'+encodeURIComponent(name),{shiftId});
+    await api('POST','/stations/'+encodeURIComponent(name),{shiftId,breakTime});
     await fetchData();closeModal('stLoginOv');renderPlatz();toast('✅ Angemeldet an '+name);
   }catch(e){toast('⚠️ '+e.message,'err');}
 }
@@ -2805,15 +2906,28 @@ async function logoutStation(name){
 // Shifts Admin
 function renderShiftsAdmin(){
   const el=document.getElementById('shiftList');if(!el)return;
-  el.innerHTML=S.stationShifts.length?S.stationShifts.map(s=>`<div class="ai"><div class="aii"><div class="ain">&#128336; ${s.label}</div></div><div class="aia"><button class="btn-d" onclick="deleteShift('${s.id}')">&#10005;</button></div></div>`).join(''):'<div style="color:var(--di);font-size:12px;padding:8px 0">Noch keine Schichten. Füge eine hinzu.</div>';
+  el.innerHTML=S.stationShifts.length?S.stationShifts.map(s=>`<div class="ai"><div class="aii"><div class="ain">🕐 ${s.label}${s.serviceStart?' ('+s.serviceStart+(s.serviceEnd?'–'+s.serviceEnd:'')+')':''}</div><div style="font-size:11px;color:var(--mu)">${s.hasBreak?'✅ hat Pause':'—'}</div></div><div class="aia"><button class="btn-d" onclick="deleteShift('${s.id}')">✕</button></div></div>`).join(''):'<div style="color:var(--di);font-size:12px;padding:8px 0">Noch keine Schichten.</div>';
 }
 async function addShift(){
   const lbl=document.getElementById('shiftFLabel');if(!lbl?.value.trim())return toast('Bezeichnung eingeben!','err');
-  try{await api('POST','/station-shifts',{label:lbl.value.trim()});lbl.value='';await fetchData();renderShiftsAdmin();toast('✅ Schicht hinzugefügt');}catch(e){toast('⚠️ '+e.message,'err');}
+  const serviceStart=document.getElementById('shiftFStart')?.value||'';
+  const serviceEnd=document.getElementById('shiftFEnd')?.value||'';
+  const hasBreak=document.getElementById('shiftFBreak')?.checked!==false;
+  try{await api('POST','/station-shifts',{label:lbl.value.trim(),serviceStart,serviceEnd,hasBreak});lbl.value='';await fetchData();renderShiftsAdmin();toast('✅ Schicht hinzugefügt');}catch(e){toast('⚠️ '+e.message,'err');}
 }
 async function deleteShift(id){
   if(!confirm('Schicht löschen?'))return;
   try{await api('DELETE','/station-shifts/'+id);await fetchData();renderShiftsAdmin();toast('✅ Schicht gelöscht');}catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function startOutage(name){
+  const reason=prompt('Grund (optional):','');
+  if(reason===null)return;
+  try{await api('POST','/station-outages',{stationName:name,reason});await fetchData();renderPlatz();toast('⚠️ '+name+' außer Betrieb gesetzt');}
+  catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function endOutage(id){
+  try{await api('DELETE','/station-outages/'+id);await fetchData();renderPlatz();toast('✅ Station wieder in Betrieb');}
+  catch(e){toast('⚠️ '+e.message,'err');}
 }
 
 // SECTION: Statistik
@@ -2900,27 +3014,37 @@ async function renderStatistik(){
 
 // SECTION: Links
 const QUICK_LINKS = [
-  {id:'lebensretter', label:'admin.lebensretter.at', url:'https://admin.lebensretter.at/', icon:'🌐', desc:'Lebensretter Admin-Portal'},
+  {id:'lebensretter', label:'admin.lebensretter.at', url:'https://admin.lebensretter.at/', icon:'🌐', description:'Lebensretter Admin-Portal'},
 ];
 function renderLinks(){
+  const allLinks=S.links.length?S.links:QUICK_LINKS;
   document.getElementById('main').innerHTML=`
-    <div class="ph"><div class="pt">&#128279; Links</div></div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">
-      ${QUICK_LINKS.map(lk=>`
-        <div class="dash-card" style="cursor:pointer;transition:.15s" onclick="window.open('${lk.url}','_blank','noopener')" onmouseenter="this.style.borderColor='var(--acc)'" onmouseleave="this.style.borderColor=''">
-          <div style="display:flex;align-items:center;gap:12px">
-            <div style="font-size:28px;line-height:1">${lk.icon}</div>
-            <div>
-              <div style="font-size:14px;font-weight:700">${lk.label}</div>
-              <div style="font-size:12px;color:var(--mu);margin-top:2px">${lk.desc}</div>
-            </div>
-            <div style="margin-left:auto;color:var(--di);font-size:14px">&#8599;</div>
-          </div>
-        </div>`).join('')}
-    </div>
-    <div style="margin-top:20px;padding:12px 16px;background:var(--sf2);border:1px solid var(--border);border-radius:var(--r);font-size:12px;color:var(--mu)">
-      &#8505;&#65039; Links öffnen sich in einem neuen Tab. Weitere Links können vom Administrator im Quellcode ergänzt werden (QUICK_LINKS Array in app.js).
+    <div class="ph"><div class="pt">&#128279; Links</div>${S.p?.manageUsers?`<button class="btn-s" onclick="openModal('admOv');swTab('links')">⚙️ Links verwalten</button>`:''}</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;padding:0 20px 20px">
+    ${allLinks.map(lk=>`<div style="background:var(--sf);border:1px solid var(--border);border-radius:12px;padding:16px 18px;cursor:pointer;transition:.15s" onclick="window.open('${lk.url}','_blank','noopener')" onmouseover="this.style.borderColor='var(--acc)'" onmouseout="this.style.borderColor='var(--border)'">
+      <div style="font-size:28px;margin-bottom:8px">${lk.icon||'🔗'}</div>
+      <div style="font-size:14px;font-weight:600;margin-bottom:4px">${lk.label}</div>
+      ${lk.description?`<div style="font-size:12px;color:var(--mu)">${lk.description}</div>`:''}
+      <div style="font-size:11px;color:var(--di);margin-top:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${lk.url}</div>
+    </div>`).join('')}
+    ${!allLinks.length?'<div style="color:var(--di);font-size:13px;padding:20px">Noch keine Links eingetragen.</div>':''}
     </div>`;
+}
+function renderLinksAdmin(){
+  const el=document.getElementById('linkList');if(!el)return;
+  el.innerHTML=S.links.length?S.links.map(l=>`<div class="ai"><div class="aii"><div class="ain">${l.icon} ${l.label}</div><div style="font-size:11px;color:var(--mu);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.url}</div></div><div class="aia"><a href="${l.url}" target="_blank" class="btn-s" style="font-size:11px;padding:3px 8px;text-decoration:none">↗</a><button class="btn-d" onclick="deleteLink('${l.id}')">✕</button></div></div>`).join(''):'<div style="color:var(--di);font-size:12px;padding:8px 0">Noch keine Links. Füge einen hinzu.</div>';
+}
+async function addLink(){
+  const label=document.getElementById('linkFLabel')?.value.trim();
+  const url=document.getElementById('linkFUrl')?.value.trim();
+  if(!label||!url)return toast('⚠️ Label und URL erforderlich','err');
+  const icon=document.getElementById('linkFIcon')?.value.trim()||'🔗';
+  const description=document.getElementById('linkFDesc')?.value.trim()||'';
+  try{await api('POST','/portal-links',{label,url,icon,description});await fetchData();renderLinksAdmin();toast('✅ Link hinzugefügt');}catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function deleteLink(id){
+  if(!confirm('Link löschen?'))return;
+  try{await api('DELETE','/portal-links/'+id);await fetchData();renderLinksAdmin();toast('✅ Link gelöscht');}catch(e){toast('⚠️ '+e.message,'err');}
 }
 
 // ── DOKUMENTE / DATEIABLAGE ───────────────────────────────────────────────────
