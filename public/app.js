@@ -266,7 +266,6 @@ function renderMain(){
   else if(S.view==='links')renderLinks();
   else if(S.view==='docs')renderDocs();
   else if(S.view==='statistik')renderStatistik();
-  else if(S.view==='docs')renderDocs();
 }
 // HOME
 function renderHome(){
