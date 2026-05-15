@@ -268,6 +268,28 @@ async function initDB() {
       size_bytes INTEGER NOT NULL DEFAULT 0,
       uploaded_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
     )`,
+    `ALTER TABLE station_shifts ADD COLUMN IF NOT EXISTS service_start TEXT DEFAULT ''`,
+    `ALTER TABLE station_shifts ADD COLUMN IF NOT EXISTS service_end TEXT DEFAULT ''`,
+    `ALTER TABLE station_shifts ADD COLUMN IF NOT EXISTS has_break BOOLEAN DEFAULT true`,
+    `ALTER TABLE station_sessions ADD COLUMN IF NOT EXISTS break_time TEXT DEFAULT NULL`,
+    `CREATE TABLE IF NOT EXISTS portal_links (
+      id TEXT PRIMARY KEY, label TEXT NOT NULL, url TEXT NOT NULL,
+      icon TEXT DEFAULT '🔗', description TEXT DEFAULT '',
+      sort_order INTEGER DEFAULT 0,
+      created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS station_outages (
+      id TEXT PRIMARY KEY, station_name TEXT NOT NULL,
+      reason TEXT DEFAULT '',
+      start_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      end_at TIMESTAMPTZ,
+      created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS role_permissions (
+      role TEXT NOT NULL, permission TEXT NOT NULL,
+      granted BOOLEAN NOT NULL DEFAULT true,
+      PRIMARY KEY (role, permission)
+    )`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }

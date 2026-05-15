@@ -17,20 +17,31 @@ const parseTags  = t => !t ? [] : Array.isArray(t) ? t : (()=>{ try{return JSON.
 const getUser    = id => q1('SELECT * FROM users WHERE id=$1', [id]);
 const DEPTS = ['technik','leitung','dienstplanung','ausbildung','qm','frei'];
 
-async function getP(uid, userObj=null) {
+async function getP(uid, userObj=null, overrides=[]) {
   const u = userObj || await getUser(uid);
   const roles = parseRoles(u?.roles);
   const has = (...r) => r.some(x => roles.includes(x));
   const full = has('admin','leitung','dienstplanung');
+  // Build overrideMap: for each permission, if any role grants explicitly, use that
+  const overrideMap = {};
+  (overrides||[]).forEach(o => {
+    if(roles.includes(o.role)) {
+      if(o.granted && overrideMap[o.permission] !== false) overrideMap[o.permission] = true;
+      else if(!o.granted && overrideMap[o.permission] === undefined) overrideMap[o.permission] = false;
+    }
+  });
+  const perm = (key, defaultVal) => overrideMap[key] !== undefined ? overrideMap[key] : defaultVal;
   return {
-    manageUsers: has('admin'), editAllPersonal: full,
-    addForOthers: has('admin','leitung','dienstplanung','ausbildung','qm'),
-    addGeneral: has('admin','leitung','dienstplanung','technik','ausbildung','qm'),
-    manageGeneral: has('admin','leitung','dienstplanung','technik','ausbildung','qm'),
-    seeAllAllw: full, editAllw: full,
-    canApproveEvents: has('admin','dienstplanung','leitung'),
-    canSendMessages: !has('standard'),
-    seeAllAbrechnung: has('admin','dienstplanung'),
+    manageUsers: perm('manageUsers', has('admin')),
+    editAllPersonal: perm('editAllPersonal', full),
+    addForOthers: perm('addForOthers', has('admin','leitung','dienstplanung','ausbildung','qm')),
+    addGeneral: perm('addGeneral', has('admin','leitung','dienstplanung','technik','ausbildung','qm')),
+    manageGeneral: perm('manageGeneral', has('admin','leitung','dienstplanung','technik','ausbildung','qm')),
+    seeAllAllw: perm('seeAllAllw', full),
+    editAllw: perm('editAllw', full),
+    canApproveEvents: perm('canApproveEvents', has('admin','dienstplanung','leitung')),
+    canSendMessages: perm('canSendMessages', !has('standard')),
+    seeAllAbrechnung: perm('seeAllAbrechnung', has('admin','dienstplanung')),
     roles,
   };
 }

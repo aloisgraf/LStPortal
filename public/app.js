@@ -46,6 +46,7 @@ let S={
   zahnarztWeek:null, // null = all from today, otherwise ISO Mon of week
   zahnarztData:[],
   events:[],users:[],categories:[],tags:[],allowances:[],tickets:[],ticketSubcategories:[],noteTemplates:[],stationSessions:[],stationShifts:[],
+  stationOutages:[],links:[],rolePermissions:[],
   docs:[],docCategories:[],_docFilter:'all',_docSearch:'',
   tkBatchMode:false,tkBatchSel:new Set(),_tkFeedFilter:'all',_tkTab:'details',
   checklists:[],messages:[],notifications:[],abrechnung:{einspringer:[],homeoffice:[]},dienstplaene:[],
@@ -73,6 +74,7 @@ async function fetchData(){
     S.dienstplaene=data.dienstplaene||[];S.diensttausch=data.diensttausch||[];
     S.ticketSubcategories=data.ticketSubcategories||[];
     S.noteTemplates=data.noteTemplates||[];S.stationShifts=data.stationShifts||[];S.stationSessions=data.stationSessions||[];
+    S.stationOutages=data.stationOutages||[];S.links=data.portalLinks||[];S.rolePermissions=data.rolePermissions||[];
     S.docs=data.docs||[];S.docCategories=data.docCategories||[];
     S.currentUser=data.currentUser;S.p=data.permissions||{};
     const u=getU(S.currentUser);const roles=u?.roles||['standard'];

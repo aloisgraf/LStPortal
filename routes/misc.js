@@ -728,10 +728,10 @@ router.get('/stations', auth, async (req,res) => {
 router.post('/stations/:name', auth, async (req,res) => {
   try {
     const name = decodeURIComponent(req.params.name);
-    const {shiftId} = req.body;
+    const {shiftId, breakTime} = req.body;
     await pool.query('DELETE FROM station_sessions WHERE user_id=$1 OR station_name=$2',[req.uid,name]);
-    await pool.query('INSERT INTO station_sessions (id,station_name,user_id,shift_id) VALUES ($1,$2,$3,$4)',
-      [newId(),name,req.uid,shiftId||null]);
+    await pool.query('INSERT INTO station_sessions (id,station_name,user_id,shift_id,break_time) VALUES ($1,$2,$3,$4,$5)',
+      [newId(),name,req.uid,shiftId||null,breakTime||null]);
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
@@ -749,16 +749,16 @@ router.delete('/stations/:name', auth, async (req,res) => {
 router.get('/station-shifts', auth, async (req,res) => {
   try {
     const shifts = await q('SELECT * FROM station_shifts ORDER BY sort_order,label');
-    ok(res, shifts.map(s=>({id:s.id,label:s.label,sortOrder:s.sort_order})));
+    ok(res, shifts.map(s=>({id:s.id,label:s.label,sortOrder:s.sort_order,serviceStart:s.service_start||'',serviceEnd:s.service_end||'',hasBreak:s.has_break!==false})));
   } catch(e) { bad(res,e.message,500); }
 });
 router.post('/station-shifts', auth, async (req,res) => {
   try {
     if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
-    const {label} = req.body;
+    const {label, serviceStart, serviceEnd, hasBreak} = req.body;
     if (!label?.trim()) return bad(res,'Bezeichnung erforderlich');
-    await pool.query('INSERT INTO station_shifts (id,label,sort_order,created_by) VALUES ($1,$2,$3,$4)',
-      [newId(),label.trim(),0,req.uid]);
+    await pool.query('INSERT INTO station_shifts (id,label,sort_order,created_by,service_start,service_end,has_break) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+      [newId(),label.trim(),0,req.uid,serviceStart||'',serviceEnd||'',hasBreak!==false]);
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
@@ -766,6 +766,78 @@ router.delete('/station-shifts/:id', auth, async (req,res) => {
   try {
     if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
     await pool.query('DELETE FROM station_shifts WHERE id=$1',[req.params.id]);
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
+
+// ── PORTAL LINKS ──
+router.get('/portal-links', auth, async (req,res) => {
+  try { ok(res, await q('SELECT * FROM portal_links ORDER BY sort_order,label')); }
+  catch(e) { bad(res,e.message,500); }
+});
+router.post('/portal-links', auth, async (req,res) => {
+  try {
+    if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+    const {label,url,icon,description} = req.body;
+    if (!label?.trim()||!url?.trim()) return bad(res,'Label und URL erforderlich');
+    const cnt = await q('SELECT COUNT(*) as n FROM portal_links');
+    await pool.query('INSERT INTO portal_links (id,label,url,icon,description,sort_order,created_by) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+      [newId(),label.trim(),url.trim(),icon||'🔗',description||'',parseInt(cnt[0].n)||0,req.uid]);
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
+router.delete('/portal-links/:id', auth, async (req,res) => {
+  try {
+    if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+    await pool.query('DELETE FROM portal_links WHERE id=$1',[req.params.id]);
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
+
+// ── STATION OUTAGES ──
+router.post('/station-outages', auth, async (req,res) => {
+  try {
+    const roles=req.p.roles||[];
+    if(!roles.some(r=>['admin','leitung','technik'].includes(r))) return bad(res,'Keine Berechtigung',403);
+    const {stationName,reason,endAt} = req.body;
+    if (!stationName) return bad(res,'Station erforderlich');
+    await pool.query('INSERT INTO station_outages (id,station_name,reason,start_at,end_at,created_by) VALUES ($1,$2,$3,NOW(),$4,$5)',
+      [newId(),stationName,reason||'',endAt||null,req.uid]);
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
+router.delete('/station-outages/:id', auth, async (req,res) => {
+  try {
+    const roles=req.p.roles||[];
+    if(!roles.some(r=>['admin','leitung','technik'].includes(r))) return bad(res,'Keine Berechtigung',403);
+    await pool.query('DELETE FROM station_outages WHERE id=$1',[req.params.id]);
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
+
+// ── ROLE PERMISSIONS ──
+router.get('/role-permissions', auth, async (req,res) => {
+  try {
+    if(!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+    ok(res, await q('SELECT * FROM role_permissions'));
+  } catch(e) { bad(res,e.message,500); }
+});
+router.post('/role-permissions', auth, async (req,res) => {
+  try {
+    if(!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+    const {role,permission,granted} = req.body;
+    if(!role||!permission) return bad(res,'role und permission erforderlich');
+    await pool.query(
+      'INSERT INTO role_permissions (role,permission,granted) VALUES ($1,$2,$3) ON CONFLICT (role,permission) DO UPDATE SET granted=$3',
+      [role,permission,granted!==false]
+    );
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
+router.delete('/role-permissions/:role/:permission', auth, async (req,res) => {
+  try {
+    if(!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+    await pool.query('DELETE FROM role_permissions WHERE role=$1 AND permission=$2',[req.params.role,req.params.permission]);
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });

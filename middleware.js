@@ -1,6 +1,18 @@
 'use strict';
 const { getUser, getP, getTP } = require('./db');
 
+let _rolePermsCache = null;
+let _rolePermsCacheTime = 0;
+async function getRolePerms() {
+  if(_rolePermsCache && Date.now()-_rolePermsCacheTime < 300000) return _rolePermsCache;
+  try {
+    const { q } = require('./db');
+    _rolePermsCache = await q('SELECT * FROM role_permissions');
+    _rolePermsCacheTime = Date.now();
+    return _rolePermsCache;
+  } catch(e) { return []; }
+}
+
 async function auth(req, res, next) {
   if (!req.session?.userId)
     return res.status(401).json({ success:false, error:'Nicht angemeldet' });
@@ -9,7 +21,8 @@ async function auth(req, res, next) {
     if (!user) { req.session.destroy(()=>{}); return res.status(401).json({ success:false, error:'Benutzer nicht gefunden' }); }
     req.uid  = user.id;
     req.user = user;
-    req.p    = await getP(user.id, user);
+    const overrides = await getRolePerms();
+    req.p    = await getP(user.id, user, overrides);
     req.tp   = await getTP(user.id, user);
     req.clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || '';
     require('./db').pool.query('UPDATE users SET last_seen=NOW() WHERE id=$1',[user.id]).catch(()=>{});
