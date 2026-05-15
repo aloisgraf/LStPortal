@@ -229,14 +229,14 @@ function toggleSidebar(){const sb=document.getElementById('sidebar'),ov=document
 function toggleNS(id){document.getElementById(id+'Hdr').classList.toggle('open');document.getElementById(id+'Sub').classList.toggle('open');}
 function setView(v){
   S.view=v;
-  ['home','schedule','calendar','allw','diensttausch','abrechnung','dienstplaene','tickets','tickets_closed','tickets_deleted','checklists','messages','messages_sent','zahnarzt','platz','links','statistik','docs'].forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
+  ['home','schedule','allw','diensttausch','abrechnung','dienstplaene','tickets','tickets_closed','tickets_deleted','checklists','messages','messages_sent','zahnarzt','platz','links','statistik','docs'].forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
   const statEl=document.getElementById('ni-statistik');if(statEl)statEl.style.display=S.p?.manageUsers?'flex':'none';
   document.getElementById('sidebar').classList.remove('open');document.getElementById('sbOv').classList.remove('open');
   renderSBF();renderMain();
 }
 function renderSBF(){
   const el=document.getElementById('sbf');if(!el)return;
-  if(S.view==='schedule'||S.view==='calendar'){
+  if(S.view==='schedule'){
     el.innerHTML='';
   }else if(S.view==='allw'){
     el.innerHTML='';
@@ -249,7 +249,6 @@ function renderSBF(){
 function renderMain(){
   if(S.view==='home')renderHome();
   else if(S.view==='schedule')renderSchedule();
-  else if(S.view==='calendar')renderCalendar();
   else if(S.view==='homeoffice')renderHomeoffice();
   else if(S.view==='vacation')renderVacation();
   else if(S.view==='diensttausch')renderDiensttausch();
@@ -513,15 +512,34 @@ function getVisEvts(){
   else evs=evs.filter(ev=>new Date(ev.dateFrom).getFullYear()===S.year);
   return evs.sort((a,b)=>a.dateFrom.localeCompare(b.dateFrom));
 }
+function getDpMode(){return localStorage.getItem('dpViewMode')||'both';}
+function setDpMode(m){localStorage.setItem('dpViewMode',m);renderSchedule();}
 function renderSchedule(){
+  const mode=getDpMode(); // 'calendar' | 'list' | 'both'
   const evs=getVisEvts();const ml=S.month!==null?MONTHS[S.month]:'Alle';
   const filterU=S.filterUser?getU(S.filterUser):null;
+  const modeBtns=`<div style="display:flex;gap:2px;background:var(--sf2);border:1px solid var(--border);border-radius:6px;padding:2px">
+    ${[['calendar','\ud83d\udcc5 Kalender'],['list','\ud83d\udccb Liste'],['both','Beides']].map(([m,l])=>`<button onclick="setDpMode('${m}')" style="padding:4px 11px;font-size:12px;border:none;border-radius:4px;cursor:pointer;font-family:inherit;transition:.15s;background:${mode===m?'var(--acc)':'transparent'};color:${mode===m?'var(--act)':'var(--mu)'};font-weight:${mode===m?'600':'400'}">${l}</button>`).join('')}
+  </div>`;
+  const calHtml=_buildCalHtml();
+  const listHtml=`
+    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+      <h2 style="margin:0;font-size:15px">Eintr\u00e4ge (${evs.length}) <span style="font-size:13px;font-weight:400;color:var(--mu)">${ml} ${S.year}</span></h2>
+      <input class="srch" type="text" placeholder="Suchen \u2026" oninput="filtSched(this.value)" style="margin-left:auto">
+      <select class="flt" onchange="filtSched(undefined,this.value)" id="scFlt"><option value="">Alle Kategorien</option>${S.categories.map(c=>`<option value="${c.id}">${c.emoji} ${c.label}</option>`).join('')}</select>
+      <select class="flt" onchange="_scApFilt=this.value;filtSched()"><option value="">Alle Status</option><option value="pending">\u23f3 Ausstehend</option><option value="approved">\u2713 Genehmigt</option><option value="rejected">\u2717 Abgelehnt</option></select>
+    </div>
+    <div id="scTb">${buildEvCards(evs)}</div>
+    ${!evs.length?'<div class="empty">&#128235; Keine Eintr\u00e4ge</div>':''}`;
   document.getElementById('main').innerHTML=`
-    <div class="ph"><div class="pt">Eintrags\u00fcbersicht</div>
-      <div style="display:flex;gap:6px">
-        <a href="/api/ical/${S.currentUser}" download class="btn-s" style="font-size:12px;text-decoration:none;padding:6px 10px">&#128197; iCal</a>
+    <div class="ph">
+      <div class="pt">&#128197; Dienstplan</div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        ${modeBtns}
+        <a href="/api/ical/${S.currentUser}" download class="btn-s" style="font-size:12px;text-decoration:none;padding:6px 10px">iCal</a>
         <button class="btn-p" onclick="openEvtModal()">&#65291; Eintrag</button>
-      </div></div>
+      </div>
+    </div>
     <div class="fbar" style="flex-wrap:wrap;gap:6px">
       <div class="yr-row" style="margin:0"><button class="yb" onclick="S.year--;renderSBF();renderMain()">&lsaquo;</button><span class="yv">${S.year}</span><button class="yb" onclick="S.year++;renderSBF();renderMain()">&rsaquo;</button></div>
       <div style="display:flex;gap:4px;flex-wrap:wrap">
@@ -531,18 +549,68 @@ function renderSchedule(){
       ${S.p.seeAllEntries?`<select class="flt" style="width:auto;min-width:140px" onchange="S.filterUser=this.value||null;renderMain()"><option value="">Alle Mitarbeiter</option>${S.users.filter(u=>!(u.roles||[]).includes('admin')).map(u=>`<option value="${u.id}"${S.filterUser===u.id?'selected':''}>${u.name}</option>`).join('')}</select>`:''}
       ${filterU?`<span class="filter-hint">&#128100; ${filterU.name}</span>`:''}
     </div>
-    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">
-      <h2 style="margin:0;font-size:15px">Eintr\u00e4ge (${evs.length}) <span style="font-size:13px;font-weight:400;color:var(--mu)">${ml} ${S.year}</span></h2>
-      <input class="srch" type="text" placeholder="Suchen \u2026" oninput="filtSched(this.value)" style="margin-left:auto">
-      <select class="flt" onchange="filtSched(undefined,this.value)" id="scFlt"><option value="">Alle Kategorien</option>${S.categories.map(c=>`<option value="${c.id}">${c.emoji} ${c.label}</option>`).join('')}</select>
-      <select class="flt" onchange="_scApFilt=this.value;filtSched()"><option value="">Alle Status</option><option value="pending">\u23f3 Ausstehend</option><option value="approved">\u2713 Genehmigt</option><option value="rejected">\u2717 Abgelehnt</option></select>
-    </div>
-    <div id="scTb">${buildEvCards(evs)}</div>
-    ${!evs.length?'<div class="empty">&#128235; Keine Eintr\u00e4ge</div>':''}`;
+    ${mode==='calendar'?calHtml:mode==='list'?listHtml:calHtml+'<div style="margin-top:24px">'+listHtml+'</div>'}`;
+}
+function _buildCalHtml(){
+  var yr=S.year, mo=S.month!==null?S.month:new Date().getMonth();
+  var WDAYS=['Mo','Di','Mi','Do','Fr','Sa','So'];
+  var moNames=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+  var firstDay=new Date(yr,mo,1);
+  var lastDay=new Date(yr,mo+1,0);
+  var startOffset=(firstDay.getDay()+6)%7;
+  var rows=Math.max(6,Math.ceil((startOffset+lastDay.getDate())/7));
+  var today=new Date();
+  var evByDate={};
+  var visEvs=S.events.filter(function(ev){
+    if(!ev.isGeneral && ev.approvalStatus==='rejected') return false;
+    var d=new Date(ev.dateFrom);
+    return d.getFullYear()===yr && d.getMonth()===mo || (ev.dateTo && new Date(ev.dateTo)>=firstDay && d<=lastDay);
+  });
+  visEvs.forEach(function(ev){
+    var from=new Date(ev.dateFrom), to=new Date(ev.dateTo||ev.dateFrom);
+    for(var d=new Date(from);d<=to;d.setDate(d.getDate()+1)){
+      if(d.getFullYear()===yr&&d.getMonth()===mo){
+        var k=d.getDate(); if(!evByDate[k])evByDate[k]=[]; evByDate[k].push(ev);
+      }
+    }
+  });
+  var cells='';
+  var dayNum=1;
+  for(var r=0;r<rows;r++){
+    cells+='<tr>';
+    for(var c=0;c<7;c++){
+      var ci=r*7+c;
+      if(ci<startOffset||dayNum>lastDay.getDate()){
+        cells+='<td class="cal-empty"></td>';
+      } else {
+        var devs=evByDate[dayNum]||[];
+        var isToday=today.getFullYear()===yr&&today.getMonth()===mo&&today.getDate()===dayNum;
+        var cls='cal-day'+(isToday?' cal-today':'')+(c>=5?' cal-we':'');
+        var dnHtml=isToday?'<div class="cal-daynum cal-daynum-today">'+dayNum+'</div>':'<div class="cal-daynum">'+dayNum+'</div>';
+        var evsHtml='';
+        devs.slice(0,4).forEach(function(ev){
+          if(ev._anonymized){evsHtml+='<div class="cal-ev cal-ev-anon">&#128274;</div>';return;}
+          var cat=S.categories.find(function(c2){return c2.id===ev.category;});
+          var u=ev.isGeneral?null:S.users.find(function(u2){return u2.id===ev.userId;});
+          var color=ev.isGeneral?'#10b981':cat?cat.color:'#3b6dd4';
+          var label=(ev.isGeneral?'\ud83c\udf10 ':u?u.initials+' ':'')+ev.reason.slice(0,20);
+          evsHtml+='<div class="cal-ev" style="background:'+color+'22;border-left:2px solid '+color+';color:'+color+'" title="'+ev.reason.replace(/"/g,'&quot;')+'">'+label+'</div>';
+        });
+        if(devs.length>4)evsHtml+='<div class="cal-ev-more">+'+(devs.length-4)+' weitere</div>';
+        cells+='<td class="'+cls+'">'+dnHtml+'<div class="cal-evs">'+evsHtml+'</div></td>';
+        dayNum++;
+      }
+    }
+    cells+='</tr>';
+  }
+  var html='<div style="font-size:13px;font-weight:600;color:var(--mu);margin-bottom:8px">'+moNames[mo]+' '+yr+'</div>';
+  html+='<div class="tw"><table class="cal-table"><thead><tr>';
+  WDAYS.forEach(function(d){html+='<th>'+d+'</th>';});
+  html+='</tr></thead><tbody>'+cells+'</tbody></table></div>';
+  return html;
 }
 function buildEvCards(evs){
   if(!evs.length)return'';
-  // Group by month when viewing "all", otherwise flat
   const grouped=S.month!==null?{null:evs}:(()=>{const g={};evs.forEach(ev=>{const d=new Date(ev.dateFrom);const k=d.getFullYear()+'-'+String(d.getMonth()).padStart(2,'0');if(!g[k])g[k]={month:d.getMonth(),year:d.getFullYear(),evs:[]};g[k].evs.push(ev);});return g;})();
   let html='';
   Object.values(grouped).forEach(grp=>{
@@ -576,8 +644,7 @@ function buildEvCards(evs){
         <div style="display:flex;gap:4px;flex-shrink:0">${apActions}${ev._canEdit?`<button class="btn-e" onclick="openEditEvt('${ev.id}')">\u270e</button>`:''}${canDel?`<button class="btn-d" onclick="deleteEvt('${ev.id}')">\u2715</button>`:''}</div>
       </div>`;
     }).join('');
-    if(S.month===null)html+=`</div>`;
-    else html+=`</div>`;
+    html+=`</div>`;
   });
   return html;
 }
@@ -641,72 +708,7 @@ function sumAllw(uid,year,months){return months.reduce((a,m)=>{const r=getAllw(u
 function numCell(n,color){if(!n)return`<td style="text-align:center;color:var(--di)">\u2013</td>`;return`<td style="text-align:center"><span class="anum" style="background:${color}18;color:${color}">${n}</span></td>`;}
 
 
-function renderCalendar(){
-  var yr=S.year, mo=S.month!==null?S.month:new Date().getMonth();
-  var WDAYS=['Mo','Di','Mi','Do','Fr','Sa','So'];
-  var firstDay=new Date(yr,mo,1);
-  var lastDay=new Date(yr,mo+1,0);
-  var startOffset=(firstDay.getDay()+6)%7;
-  var rows=Math.max(6,Math.ceil((startOffset+lastDay.getDate())/7));
-  var today=new Date();
-
-  // Group events by day
-  var evByDate={};
-  var visEvs=S.events.filter(function(ev){
-    // Abgelehnte Einträge im Kalender nicht anzeigen
-    if(!ev.isGeneral && ev.approvalStatus==='rejected') return false;
-    var d=new Date(ev.dateFrom);
-    return d.getFullYear()===yr && d.getMonth()===mo || (ev.dateTo && new Date(ev.dateTo)>=firstDay && d<=lastDay);
-  });
-  visEvs.forEach(function(ev){
-    var from=new Date(ev.dateFrom), to=new Date(ev.dateTo||ev.dateFrom);
-    for(var d=new Date(from);d<=to;d.setDate(d.getDate()+1)){
-      if(d.getFullYear()===yr&&d.getMonth()===mo){
-        var k=d.getDate(); if(!evByDate[k])evByDate[k]=[]; evByDate[k].push(ev);
-      }
-    }
-  });
-
-  var cells='';
-  var dayNum=1;
-  for(var r=0;r<rows;r++){
-    cells+='<tr>';
-    for(var c=0;c<7;c++){
-      var ci=r*7+c;
-      if(ci<startOffset||dayNum>lastDay.getDate()){
-        cells+='<td class="cal-empty"></td>';
-      } else {
-        var evs=evByDate[dayNum]||[];
-        var isToday=today.getFullYear()===yr&&today.getMonth()===mo&&today.getDate()===dayNum;
-        var cls='cal-day'+(isToday?' cal-today':'')+(c>=5?' cal-we':'');
-        var dnHtml=isToday?'<div class="cal-daynum cal-daynum-today">'+dayNum+'</div>':'<div class="cal-daynum">'+dayNum+'</div>';
-        var evsHtml='';
-        evs.slice(0,4).forEach(function(ev){
-          if(ev._anonymized){evsHtml+='<div class="cal-ev cal-ev-anon">&#128274;</div>';return;}
-          var cat=S.categories.find(function(c2){return c2.id===ev.category;});
-          var u=ev.isGeneral?null:S.users.find(function(u2){return u2.id===ev.userId;});
-          var color=ev.isGeneral?'#10b981':cat?cat.color:'#3b6dd4';
-          var label=(ev.isGeneral?'\uD83C\uDF10 ':u?u.initials+' ':'')+ev.reason.slice(0,20);
-          evsHtml+='<div class="cal-ev" style="background:'+color+'22;border-left:2px solid '+color+';color:'+color+'" title="'+ev.reason.replace(/"/g,'&quot;')+'">'+label+'</div>';
-        });
-        if(evs.length>4)evsHtml+='<div class="cal-ev-more">+' +(evs.length-4)+' weitere</div>';
-        cells+='<td class="'+cls+'">'+dnHtml+'<div class="cal-evs">'+evsHtml+'</div></td>';
-        dayNum++;
-      }
-    }
-    cells+='</tr>';
-  }
-
-  var moNames=['Jänner','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
-  var html='<div class="ph"><div class="pt">\uD83D\uDCC5 Kalenderansicht <span>'+moNames[mo]+' '+yr+'</span></div>';
-  html+='<button class="btn-p" onclick="openEvtModal()">&#65291; Eintrag hinzufügen</button></div>';
-
-  html+='<div class="tw"><table class="cal-table"><thead><tr>';
-  WDAYS.forEach(function(d){html+='<th>'+d+'</th>';});
-  html+='</tr></thead><tbody>'+cells+'</tbody></table></div>';
-  document.getElementById('main').innerHTML=html;
-}
-
+function renderCalendar(){renderSchedule();}
 
 // ══════════════════════════════════════════
 // SECTION: Diensttausch
@@ -2935,8 +2937,8 @@ function renderDocs(){
   const isAdmin=S.p?.manageUsers;
   const canManage=d=>d.uploadedBy===S.currentUser||isAdmin;
   document.getElementById('main').innerHTML=`
-    <div class="pg-head">
-      <h1>&#128193; Dateiablage</h1>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:24px 20px 0;gap:10px;flex-wrap:wrap">
+      <h1 style="margin:0;font-size:20px;font-weight:700">&#128193; Dateiablage</h1>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         ${isAdmin?`<button class="btn-s" onclick="openModal('docCatOv');renderDocCatAdmin()">&#128193; Kategorien</button>`:''}
         <button class="btn-p" onclick="openDocForm()">&#8679; Hochladen</button>

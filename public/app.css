@@ -313,7 +313,7 @@ details.dash-card > summary { list-style: none; cursor: pointer; display: flex; 
   input[type=text],input[type=date],input[type=password],select,textarea{font-size:16px!important}
 }
 /* ── DOKUMENTE / DATEIABLAGE ── */
-.docs-layout{display:grid;grid-template-columns:190px 1fr;gap:20px;padding:0 20px 20px;align-items:start}
+.docs-layout{display:grid;grid-template-columns:190px 1fr;gap:20px;padding:0 20px 28px;align-items:start;margin-top:20px}
 .docs-sidebar{background:var(--sf);border:1px solid var(--border);border-radius:10px;overflow:hidden;position:sticky;top:16px}
 .docs-cat-item{padding:9px 14px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:6px;transition:.15s;color:var(--tx);border-left:3px solid transparent}
 .docs-cat-item:hover{background:var(--sf2)}
