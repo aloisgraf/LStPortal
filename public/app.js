@@ -2906,7 +2906,46 @@ async function logoutStation(name){
 // Shifts Admin
 function renderShiftsAdmin(){
   const el=document.getElementById('shiftList');if(!el)return;
-  el.innerHTML=S.stationShifts.length?S.stationShifts.map(s=>`<div class="ai"><div class="aii"><div class="ain">🕐 ${s.label}${s.serviceStart?' ('+s.serviceStart+(s.serviceEnd?'–'+s.serviceEnd:'')+')':''}</div><div style="font-size:11px;color:var(--mu)">${s.hasBreak?'✅ hat Pause':'—'}</div></div><div class="aia"><button class="btn-d" onclick="deleteShift('${s.id}')">✕</button></div></div>`).join(''):'<div style="color:var(--di);font-size:12px;padding:8px 0">Noch keine Schichten.</div>';
+  if(!S.stationShifts.length){el.innerHTML='<div style="color:var(--di);font-size:12px;padding:8px 0">Noch keine Schichten.</div>';return;}
+  el.innerHTML=S.stationShifts.map(s=>`
+    <div class="ai" id="shift-row-${s.id}">
+      <div class="aii" style="flex:1;min-width:0">
+        <div id="shift-view-${s.id}" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span class="ain">🕐 ${s.label}</span>
+          ${s.serviceStart?`<span style="font-size:11px;color:var(--mu)">${s.serviceStart}${s.serviceEnd?'–'+s.serviceEnd:''}</span>`:''}
+          <span style="font-size:11px;color:var(--mu)">${s.hasBreak?'✅ Pause':'—'}</span>
+        </div>
+        <div id="shift-edit-${s.id}" style="display:none;flex-direction:column;gap:6px;margin-top:6px">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end">
+            <div class="fg" style="margin:0;flex:2;min-width:120px"><label style="font-size:11px">Bezeichnung</label><input id="seLabel-${s.id}" value="${s.label.replace(/"/g,'&quot;')}" style="font-size:12px;padding:4px 7px;border:1px solid var(--border);border-radius:var(--r);background:var(--sf);color:var(--tx);width:100%"></div>
+            <div class="fg" style="margin:0;min-width:70px"><label style="font-size:11px">Von</label><input type="time" id="seStart-${s.id}" value="${s.serviceStart||''}" style="font-size:12px;padding:4px 7px;border:1px solid var(--border);border-radius:var(--r);background:var(--sf);color:var(--tx)"></div>
+            <div class="fg" style="margin:0;min-width:70px"><label style="font-size:11px">Bis</label><input type="time" id="seEnd-${s.id}" value="${s.serviceEnd||''}" style="font-size:12px;padding:4px 7px;border:1px solid var(--border);border-radius:var(--r);background:var(--sf);color:var(--tx)"></div>
+            <label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap"><input type="checkbox" id="seBreak-${s.id}" ${s.hasBreak?'checked':''}>Hat Pause</label>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn-p" style="font-size:11px;padding:4px 10px" onclick="saveShift('${s.id}')">✓ Speichern</button>
+            <button class="btn-s" style="font-size:11px;padding:4px 10px" onclick="toggleShiftEdit('${s.id}',false)">Abbrechen</button>
+          </div>
+        </div>
+      </div>
+      <div class="aia" id="shift-btns-${s.id}">
+        <button class="btn-s" style="font-size:11px;padding:4px 9px" onclick="toggleShiftEdit('${s.id}',true)">✎</button>
+        <button class="btn-d" style="font-size:11px;padding:4px 9px" onclick="deleteShift('${s.id}')">✕</button>
+      </div>
+    </div>`).join('');
+}
+function toggleShiftEdit(id,open){
+  document.getElementById('shift-view-'+id).style.display=open?'none':'flex';
+  document.getElementById('shift-edit-'+id).style.display=open?'flex':'none';
+  document.getElementById('shift-btns-'+id).style.display=open?'none':'flex';
+}
+async function saveShift(id){
+  const label=document.getElementById('seLabel-'+id)?.value.trim();
+  if(!label)return toast('⚠️ Bezeichnung erforderlich','err');
+  const serviceStart=document.getElementById('seStart-'+id)?.value||'';
+  const serviceEnd=document.getElementById('seEnd-'+id)?.value||'';
+  const hasBreak=document.getElementById('seBreak-'+id)?.checked!==false;
+  try{await api('PUT','/station-shifts/'+id,{label,serviceStart,serviceEnd,hasBreak});await fetchData();renderShiftsAdmin();toast('✅ Schicht gespeichert');}catch(e){toast('⚠️ '+e.message,'err');}
 }
 async function addShift(){
   const lbl=document.getElementById('shiftFLabel');if(!lbl?.value.trim())return toast('Bezeichnung eingeben!','err');

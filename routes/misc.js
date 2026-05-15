@@ -769,6 +769,16 @@ router.delete('/station-shifts/:id', auth, async (req,res) => {
     ok(res);
   } catch(e) { bad(res,e.message,500); }
 });
+router.put('/station-shifts/:id', auth, async (req,res) => {
+  try {
+    if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+    const {label, serviceStart, serviceEnd, hasBreak} = req.body;
+    if (!label?.trim()) return bad(res,'Bezeichnung erforderlich');
+    await pool.query('UPDATE station_shifts SET label=$1,service_start=$2,service_end=$3,has_break=$4 WHERE id=$5',
+      [label.trim(),serviceStart||'',serviceEnd||'',hasBreak!==false,req.params.id]);
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
 
 // ── PORTAL LINKS ──
 router.get('/portal-links', auth, async (req,res) => {
