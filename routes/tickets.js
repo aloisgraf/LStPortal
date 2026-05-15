@@ -1,7 +1,12 @@
 'use strict';
+const path = require('path');
+const fs   = require('fs');
 const router = require('express').Router();
 const { q, q1, newId, pool, getUser, logAct, canSeeTk, canEditTk, nextTicketNumber, auditNote, createNotification, parseMentions } = require('../db');
 const { auth, ok, bad } = require('../middleware');
+
+const UPLOAD_DIR = path.resolve(__dirname, '..', 'uploads', 'ticket-files');
+try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch(e) {}
 
 
 router.post('/', auth, async (req,res) => {
@@ -282,5 +287,57 @@ router.put('/:id/view', auth, async (req,res) => {
   } catch(e) { bad(res,e.message,500); }
 });
 
+// ── FILE MANAGEMENT ──
+router.post('/:id/files', auth, async (req,res) => {
+  try {
+    const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
+    if (!tk) return bad(res,'Nicht gefunden',404);
+    if (!canSeeTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
+    const {name, mimeType, data} = req.body;
+    if (!name?.trim() || !data) return bad(res,'Dateiname und Daten erforderlich');
+    const buf = Buffer.from(data,'base64');
+    if (buf.length > 20*1024*1024) return bad(res,'Datei zu groß (max. 20 MB)');
+    const id = newId();
+    const ext = (name.split('.').pop()||'bin').toLowerCase().replace(/[^a-z0-9]/g,'');
+    const filename = `${id}.${ext}`;
+    fs.mkdirSync(UPLOAD_DIR,{recursive:true});
+    fs.writeFileSync(path.join(UPLOAD_DIR,filename),buf);
+    await pool.query('INSERT INTO ticket_files (id,ticket_id,filename,original_name,mime_type,size_bytes,uploaded_by) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+      [id,req.params.id,filename,name.trim(),mimeType||'application/octet-stream',buf.length,req.uid]);
+    const uname=(await getUser(req.uid))?.name||'?';
+    await auditNote(req.params.id,req.uid,`📎 Datei hochgeladen: ${name.trim()} von ${uname}`);
+    ok(res,{id});
+  } catch(e) { bad(res,e.message,500); }
+});
+
+router.get('/:id/files/:fid', auth, async (req,res) => {
+  try {
+    const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
+    if (!tk) return bad(res,'Nicht gefunden',404);
+    if (!canSeeTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
+    const file = await q1('SELECT * FROM ticket_files WHERE id=$1 AND ticket_id=$2',[req.params.fid,req.params.id]);
+    if (!file) return bad(res,'Datei nicht gefunden',404);
+    const filePath = path.join(UPLOAD_DIR,file.filename);
+    if (!fs.existsSync(filePath)) return bad(res,'Datei nicht auf Datenträger',404);
+    res.setHeader('Content-Type',file.mime_type);
+    res.setHeader('Content-Disposition',`inline; filename*=UTF-8''${encodeURIComponent(file.original_name)}`);
+    res.sendFile(filePath);
+  } catch(e) { bad(res,e.message,500); }
+});
+
+router.delete('/:id/files/:fid', auth, async (req,res) => {
+  try {
+    const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
+    if (!tk) return bad(res,'Nicht gefunden',404);
+    if (!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
+    const file = await q1('SELECT * FROM ticket_files WHERE id=$1 AND ticket_id=$2',[req.params.fid,req.params.id]);
+    if (!file) return bad(res,'Datei nicht gefunden',404);
+    try { fs.unlinkSync(path.join(UPLOAD_DIR,file.filename)); } catch(e) {}
+    await pool.query('DELETE FROM ticket_files WHERE id=$1',[req.params.fid]);
+    const uname=(await getUser(req.uid))?.name||'?';
+    await auditNote(req.params.id,req.uid,`🗑️ Datei gelöscht: ${file.original_name} von ${uname}`);
+    ok(res);
+  } catch(e) { bad(res,e.message,500); }
+});
 
 module.exports = router;

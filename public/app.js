@@ -1411,12 +1411,38 @@ function renderTkDetail(){
       ${['all','audit','note'].map(f=>`<button onclick="S._tkFeedFilter='${f}';renderTkDetail()" style="font-size:11px;padding:3px 10px;border:none;border-radius:4px;cursor:pointer;font-family:inherit;transition:.15s;background:${(S._tkFeedFilter||'all')===f?'var(--acc)':'transparent'};color:${(S._tkFeedFilter||'all')===f?'var(--act)':'var(--mu)'}">${f==='all'?'Alle':f==='audit'?'\u00c4nderungen':'Text'}</button>`).join('')}
     </div>
     <div class="nfeed">${_renderFeed(notes,tk.id,canEdit,S._tkFeedFilter||'all')}</div>`;
+  const files=tk.files||[];
+  const fmtBytes=b=>b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB';
+  const fileIcon=m=>{if(m.startsWith('image/'))return'\ud83d\uddbc\ufe0f';if(m==='application/pdf')return'\ud83d\udcc4';if(m.includes('word')||m.includes('document'))return'\ud83d\udcdd';if(m.includes('excel')||m.includes('spreadsheet')||m.includes('csv'))return'\ud83d\udcca';if(m.includes('zip')||m.includes('compressed')||m.includes('archive'))return'\ud83d\udddc\ufe0f';if(m.startsWith('video/'))return'\ud83c\udfac';if(m.startsWith('audio/'))return'\ud83c\udfb5';return'\ud83d\udcce';};
+  const filesHtml=`
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <span style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di)">${files.length} Datei${files.length!==1?'en':''}</span>
+        <label class="btn-p" style="cursor:pointer;font-size:12px;padding:6px 12px">
+          &#8679; Datei hochladen
+          <input type="file" multiple style="display:none" onchange="uploadTkFiles('${tk.id}',this)">
+        </label>
+      </div>
+      ${files.length===0?`<div style="text-align:center;padding:32px 0;color:var(--di);font-size:13px">Noch keine Dateien hochgeladen.</div>`:''}
+      <div class="tk-files-list">
+        ${files.map(f=>`<div class="tk-file-row">
+          <div class="tk-file-icon">${fileIcon(f.mimeType)}</div>
+          <div class="tk-file-info">
+            <a href="/api/tickets/${tk.id}/files/${f.id}" target="_blank" rel="noopener" class="tk-file-name">${f.originalName}</a>
+            <div class="tk-file-meta">${fmtBytes(f.sizeBytes)} &bull; ${getU(f.uploadedBy)?.name||'?'} &bull; ${fdt(f.createdAt)}</div>
+            ${f.mimeType.startsWith('image/')?`<div class="tk-file-thumb"><img src="/api/tickets/${tk.id}/files/${f.id}" alt="${f.originalName}" loading="lazy"></div>`:''}
+          </div>
+          ${canEdit?`<button class="btn-d tk-file-del" onclick="deleteTkFile('${tk.id}','${f.id}','${f.originalName.replace(/'/g,"\\'")}')">&#128465;</button>`:''}
+        </div>`).join('')}
+      </div>
+    </div>`;
   document.getElementById('tkDetMain').innerHTML=`
     <div style="border-bottom:1px solid var(--border);margin:-18px -18px 14px;padding:0 18px;display:flex;gap:0">
       ${tabBtn('details','\ud83d\udccb Details')}
       ${tabBtn('protocol','\ud83d\udd50 Protokoll'+(notes.length?` (${notes.length})`:''))}
+      ${tabBtn('files','\ud83d\udcce Dateien'+(files.length?` (${files.length})`:''))}
     </div>
-    ${tab==='details'?detailsHtml:protocolHtml}`;
+    ${tab==='details'?detailsHtml:tab==='protocol'?protocolHtml:filesHtml}`;
   document.getElementById('tkDetSB').innerHTML=`
     ${canEdit?`
     <div class="tkf"><label>Status</label><select onchange="updateTkField('${tk.id}','status',this.value)">${STATUSES.map(s=>`<option value="${s.id}"${tk.status===s.id?' selected':''}>${s.label}</option>`).join('')}</select></div>
@@ -1606,6 +1632,35 @@ async function removeCl(tkId,clId){try{await api('DELETE','/tickets/'+tkId+'/che
 async function syncCl(tkId,clId){try{await api('PUT','/tickets/'+tkId+'/checklists/'+clId+'/sync');await fetchData();renderTkDetail();toast('\u2705 Checkliste aktualisiert!');}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}}
 async function toggleClItem(tkId,clId,iId,checked){try{await api('PUT','/tickets/'+tkId+'/checklists/'+clId+'/items/'+iId,{completed:checked});await fetchData();renderTkDetail();}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}}
 async function saveClItemNote(tkId,clId,iId,note){try{await api('PUT','/tickets/'+tkId+'/checklists/'+clId+'/items/'+iId,{userNote:note});}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}}
+async function uploadTkFiles(tkId,input){
+  const files=[...input.files];if(!files.length)return;
+  const MAX=15*1024*1024;
+  let done=0,errs=[];
+  toast('\u23F3 '+files.length+' Datei(en) werden hochgeladen\u2026');
+  for(const f of files){
+    if(f.size>MAX){errs.push(f.name+': Zu gro\u00DF (max. 15 MB)');continue;}
+    try{
+      const buf=await f.arrayBuffer();
+      const bytes=new Uint8Array(buf);
+      let b64='';const chunk=8192;
+      for(let i=0;i<bytes.length;i+=chunk)b64+=String.fromCharCode(...bytes.subarray(i,i+chunk));
+      b64=btoa(b64);
+      await api('POST','/tickets/'+tkId+'/files',{name:f.name,mimeType:f.type||'application/octet-stream',data:b64});
+      done++;
+    }catch(e){errs.push(f.name+': '+e.message);}
+  }
+  await fetchData();
+  S._tkTab='files';
+  renderTkDetail();
+  if(errs.length)toast('\u26A0\uFE0F Fehler: '+errs.join(', '),'err');
+  else toast('\u2705 '+done+' Datei(en) hochgeladen');
+  input.value='';
+}
+async function deleteTkFile(tkId,fId,name){
+  if(!confirm('Datei "'+name+'" wirklich l\u00F6schen?'))return;
+  try{await api('DELETE','/tickets/'+tkId+'/files/'+fId);await fetchData();renderTkDetail();toast('\u2705 Datei gel\u00F6scht');}
+  catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
+}
 // MESSAGES
 function renderMessages(){
   const isSent=S.view==='messages_sent';

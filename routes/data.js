@@ -8,7 +8,7 @@ router.get('/', auth, async (req,res) => {
   try {
     const uid=req.uid, p=req.p, tp=req.tp, roles=p.roles;
     const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
-           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw] = await Promise.all([
+           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw] = await Promise.all([
       q('SELECT id,name,initials,roles,color,must_change_pw,last_seen FROM users ORDER BY name'),
       q('SELECT * FROM categories ORDER BY sort_order,label'),
       q('SELECT * FROM tags ORDER BY label'),
@@ -43,9 +43,12 @@ router.get('/', auth, async (req,res) => {
       q('SELECT * FROM note_templates ORDER BY sort_order,label').catch(()=>[]),
       q('SELECT * FROM station_shifts ORDER BY sort_order,label').catch(()=>[]),
       q('SELECT * FROM station_sessions ORDER BY logged_in_at').catch(()=>[]),
+      q('SELECT id,ticket_id,original_name,mime_type,size_bytes,uploaded_by,created_at FROM ticket_files ORDER BY created_at DESC').catch(()=>[]),
     ]);
 
     const tkViewMap = new Map((tkViewsRaw||[]).map(v=>[v.ticket_id, v.viewed_at]));
+    const tkFileMap = {};
+    (tkFilesRaw||[]).forEach(f=>{ if(!tkFileMap[f.ticket_id]) tkFileMap[f.ticket_id]=[]; tkFileMap[f.ticket_id].push({id:f.id,originalName:f.original_name,mimeType:f.mime_type,sizeBytes:f.size_bytes,uploadedBy:f.uploaded_by,createdAt:f.created_at}); });
     const noteMap={}, clItemMap={}, tkClItemMap={}, tkClMap={};
     notesRaw.forEach(n=>{ if(!noteMap[n.ticket_id]) noteMap[n.ticket_id]=[]; noteMap[n.ticket_id].push({id:n.id,text:n.text,authorId:n.author_id,noteType:n.note_type,createdAt:n.created_at,mentionedUsers:(()=>{try{return JSON.parse(n.mentioned_users||'[]');}catch{return [];}})()}); });
     clItems.forEach(i=>{ if(!clItemMap[i.template_id]) clItemMap[i.template_id]=[]; clItemMap[i.template_id].push({id:i.id,text:i.text,itemType:i.item_type||'check',sortOrder:i.sort_order}); });
@@ -116,7 +119,7 @@ router.get('/', auth, async (req,res) => {
         snoozedUntil:tk.snoozed_until?(typeof tk.snoozed_until==='string'?tk.snoozed_until.slice(0,10):tk.snoozed_until.toISOString().slice(0,10)):null,
         createdBy:tk.created_by, createdAt:tk.created_at, updatedAt:tk.updated_at, lastViewedAt:tkViewMap.get(tk.id)||null,
         mentionedUsers:[...new Set((noteMap[tk.id]||[]).flatMap(n=>n.mentionedUsers||[]))].filter(Boolean),
-        notes:noteMap[tk.id]||[], checklists:tkClMap[tk.id]||[],
+        notes:noteMap[tk.id]||[], checklists:tkClMap[tk.id]||[], files:tkFileMap[tk.id]||[],
         _canEdit:canEditTk(tp,tk,uid),
       })),
       allowances: allwRaw.map(a=>({id:a.id,userId:a.user_id,year:a.year,month:a.month,nd:a.nd,fd:a.fd,fw:a.fw,c10:a.c10})),

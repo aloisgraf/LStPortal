@@ -117,6 +117,14 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
 .tkf{display:flex;flex-direction:column;gap:4px}.tkf label{font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--di)}.tkf .val{font-size:13px;font-weight:500}
 .tkdiv{height:1px;background:var(--border);margin:4px 0}
 .nfeed{display:flex;flex-direction:column;gap:0}
+.tk-files-list{display:flex;flex-direction:column;gap:8px}
+.tk-file-row{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:var(--sf2);border:1px solid var(--border);border-radius:8px}
+.tk-file-icon{font-size:22px;flex-shrink:0;margin-top:2px}
+.tk-file-info{flex:1;min-width:0}
+.tk-file-name{font-size:13px;font-weight:600;color:var(--acc);text-decoration:none;word-break:break-all}.tk-file-name:hover{text-decoration:underline}
+.tk-file-meta{font-size:11px;color:var(--mu);margin-top:2px}
+.tk-file-thumb{margin-top:8px}.tk-file-thumb img{max-width:100%;max-height:180px;border-radius:6px;border:1px solid var(--border);object-fit:contain}
+.tk-file-del{margin-left:auto;flex-shrink:0;align-self:flex-start;padding:4px 8px;font-size:13px}
 .ni2{background:var(--sf2);border:1px solid var(--border);border-radius:8px;padding:9px 12px}
 .ni2.audit{background:rgba(124,58,237,0.04));border-color:rgba(124,58,237,0.18)}
 .na{font-size:11px;font-weight:600;color:var(--mu)}.na.audit{color:var(--info)}.nd{font-size:10px;color:var(--di);margin-left:6px}

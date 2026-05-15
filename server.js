@@ -238,6 +238,13 @@ async function initDB() {
       logged_in_at TIMESTAMPTZ DEFAULT NOW(),
       UNIQUE(station_name), UNIQUE(user_id)
     )`,
+    `CREATE TABLE IF NOT EXISTS ticket_files (
+      id TEXT PRIMARY KEY, ticket_id TEXT NOT NULL,
+      filename TEXT NOT NULL, original_name TEXT NOT NULL,
+      mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+      size_bytes INTEGER NOT NULL DEFAULT 0,
+      uploaded_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }
