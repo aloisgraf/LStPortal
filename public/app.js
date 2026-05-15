@@ -46,9 +46,9 @@ let S={
   zahnarztWeek:null, // null = all from today, otherwise ISO Mon of week
   zahnarztData:[],
   events:[],users:[],categories:[],tags:[],allowances:[],tickets:[],ticketSubcategories:[],noteTemplates:[],stationSessions:[],stationShifts:[],
+  docs:[],docCategories:[],_docFilter:'all',_docSearch:'',
   tkBatchMode:false,tkBatchSel:new Set(),_tkFeedFilter:'all',_tkTab:'details',
   checklists:[],messages:[],notifications:[],abrechnung:{einspringer:[],homeoffice:[]},dienstplaene:[],
-  p:{canApproveEvents:false,canSendMessages:false,seeAllEntries:true,editAllPersonal:false,addForOthers:false,addGeneral:false,manageUsers:false,seeAllAllw:false,editAllw:false,seeAllAbrechnung:false},
   p:{canApproveEvents:false,canSendMessages:false,seeAllEntries:true,editAllPersonal:false,addForOthers:false,addGeneral:false,manageUsers:false,seeAllAllw:false,editAllw:false,seeAllAbrechnung:false},
   tp:{seeAll:false,editAll:false,myDepts:[],canSetPublic:false,canAssign:false,canSeeSubcat:false,canEditSubcat:false,roles:[]},
 };
@@ -73,6 +73,7 @@ async function fetchData(){
     S.dienstplaene=data.dienstplaene||[];S.diensttausch=data.diensttausch||[];
     S.ticketSubcategories=data.ticketSubcategories||[];
     S.noteTemplates=data.noteTemplates||[];S.stationShifts=data.stationShifts||[];S.stationSessions=data.stationSessions||[];
+    S.docs=data.docs||[];S.docCategories=data.docCategories||[];
     S.currentUser=data.currentUser;S.p=data.permissions||{};
     const u=getU(S.currentUser);const roles=u?.roles||['standard'];
     const has=(...r)=>r.some(x=>roles.includes(x));
@@ -228,7 +229,7 @@ function toggleSidebar(){const sb=document.getElementById('sidebar'),ov=document
 function toggleNS(id){document.getElementById(id+'Hdr').classList.toggle('open');document.getElementById(id+'Sub').classList.toggle('open');}
 function setView(v){
   S.view=v;
-  ['home','schedule','calendar','allw','diensttausch','abrechnung','dienstplaene','tickets','tickets_closed','tickets_deleted','checklists','messages','messages_sent','zahnarzt','platz','links','statistik'].forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
+  ['home','schedule','calendar','allw','diensttausch','abrechnung','dienstplaene','tickets','tickets_closed','tickets_deleted','checklists','messages','messages_sent','zahnarzt','platz','links','statistik','docs'].forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
   const statEl=document.getElementById('ni-statistik');if(statEl)statEl.style.display=S.p?.manageUsers?'flex':'none';
   document.getElementById('sidebar').classList.remove('open');document.getElementById('sbOv').classList.remove('open');
   renderSBF();renderMain();
@@ -263,7 +264,9 @@ function renderMain(){
   else if(S.view==='zahnarzt')renderZahnarzt();
   else if(S.view==='platz')renderPlatz();
   else if(S.view==='links')renderLinks();
+  else if(S.view==='docs')renderDocs();
   else if(S.view==='statistik')renderStatistik();
+  else if(S.view==='docs')renderDocs();
 }
 // HOME
 function renderHome(){
@@ -1846,7 +1849,7 @@ function openModal(id){document.getElementById(id)?.classList.add('open');}
 function closeModal(id){document.getElementById(id)?.classList.remove('open');}
 function eyeToggle(inputId,btn){const inp=document.getElementById(inputId);const show=inp.type==='password';inp.type=show?'text':'password';btn.textContent=show?'\uD83D\uDE48':'\uD83D\uDC41';}
 function toast(msg,type=''){const t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3200);}
-const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOr','clFormOv','attachClOv','changelogOv','dpOv','rejectEinspOv','helpOv','msgFormOv','msgDetOv','gSearchOv','stLoginOv'];
+const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOr','clFormOv','attachClOv','changelogOv','dpOv','rejectEinspOv','helpOv','msgFormOv','msgDetOv','gSearchOv','stLoginOv','docFormOv','docVerOv','docHistOv','docCatOv'];
 document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();openGSearch();return;}
   if(e.key==='Escape'){ALL_MODALS.forEach(closeModal);closeGSearch();}
@@ -2915,4 +2918,174 @@ function renderLinks(){
     <div style="margin-top:20px;padding:12px 16px;background:var(--sf2);border:1px solid var(--border);border-radius:var(--r);font-size:12px;color:var(--mu)">
       &#8505;&#65039; Links öffnen sich in einem neuen Tab. Weitere Links können vom Administrator im Quellcode ergänzt werden (QUICK_LINKS Array in app.js).
     </div>`;
+}
+
+// ── DOKUMENTE / DATEIABLAGE ───────────────────────────────────────────────────
+function renderDocs(){
+  const cats=S.docCategories||[];
+  const docs=S.docs||[];
+  const search=(S._docSearch||'').toLowerCase().trim();
+  const filt=S._docFilter||'all';
+  let filtered=docs;
+  if(filt==='__none__') filtered=filtered.filter(d=>!d.categoryId);
+  else if(filt!=='all') filtered=filtered.filter(d=>d.categoryId===filt);
+  if(search) filtered=filtered.filter(d=>d.title.toLowerCase().includes(search)||(d.originalName||'').toLowerCase().includes(search)||(d.description||'').toLowerCase().includes(search));
+  const fmtBytes=b=>b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB';
+  const fileIcon=m=>{if(!m)return'📎';if(m.startsWith('image/'))return'🖼️';if(m==='application/pdf')return'📄';if(m.includes('word')||m.includes('document'))return'📝';if(m.includes('excel')||m.includes('spreadsheet')||m.includes('csv'))return'📊';if(m.includes('zip')||m.includes('compressed')||m.includes('archive'))return'🗜️';if(m.startsWith('video/'))return'🎬';if(m.startsWith('audio/'))return'🎵';return'📎';};
+  const catBadge=d=>{const c=cats.find(x=>x.id===d.categoryId);if(!c)return'';return`<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${c.color}22;color:${c.color};border:1px solid ${c.color}44;font-weight:600">${c.icon} ${c.name}</span>`;};
+  const isAdmin=S.p?.manageUsers;
+  const canManage=d=>d.uploadedBy===S.currentUser||isAdmin;
+  document.getElementById('main').innerHTML=`
+    <div class="pg-head">
+      <h1>&#128193; Dateiablage</h1>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        ${isAdmin?`<button class="btn-s" onclick="openModal('docCatOv');renderDocCatAdmin()">&#128193; Kategorien</button>`:''}
+        <button class="btn-p" onclick="openDocForm()">&#8679; Hochladen</button>
+      </div>
+    </div>
+    <div class="docs-layout">
+      <div class="docs-sidebar">
+        <div class="docs-cat-item${filt==='all'?' active':''}" onclick="S._docFilter='all';renderDocs()">&#128193; Alle <span class="docs-cat-cnt">${docs.length}</span></div>
+        ${cats.map(c=>{const n=docs.filter(d=>d.categoryId===c.id).length;return`<div class="docs-cat-item${filt===c.id?' active':''}" onclick="S._docFilter='${c.id}';renderDocs()" style="${filt===c.id?'border-left-color:'+c.color:''}">${c.icon} ${c.name} <span class="docs-cat-cnt">${n}</span></div>`;}).join('')}
+        <div class="docs-cat-item${filt==='__none__'?' active':''}" onclick="S._docFilter='__none__';renderDocs()">📎 Ohne Kat. <span class="docs-cat-cnt">${docs.filter(d=>!d.categoryId).length}</span></div>
+      </div>
+      <div class="docs-main">
+        <input type="text" placeholder="&#128269; Suchen…" value="${(S._docSearch||'').replace(/"/g,'&quot;')}" oninput="S._docSearch=this.value;renderDocs()" style="width:100%;padding:8px 12px;font-size:13px;border:1px solid var(--border);border-radius:var(--r);background:var(--sf);color:var(--tx);box-sizing:border-box;margin-bottom:14px">
+        ${filtered.length===0?`<div style="text-align:center;padding:48px 20px;color:var(--di);font-size:14px">Keine Dokumente gefunden.</div>`:`
+        <div class="docs-list">
+          ${filtered.map(d=>`<div class="doc-row">
+            <div class="doc-icon">${fileIcon(d.mimeType)}</div>
+            <div class="doc-info">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <a href="/api/docs/${d.id}" target="_blank" rel="noopener" class="doc-title">${d.title}</a>
+                ${catBadge(d)}
+                ${d.currentVersion>1?`<span class="doc-ver-badge">v${d.currentVersion}</span>`:''}
+              </div>
+              ${d.description?`<div class="doc-desc">${d.description}</div>`:''}
+              <div class="doc-meta">${d.originalName} &bull; ${fmtBytes(d.sizeBytes||0)} &bull; ${getU(d.uploadedBy)?.name||'?'} &bull; ${fdt(d.createdAt)}${d.currentVersion>1?` &bull; <a href="#" onclick="showDocHistory('${d.id}');return false" style="color:var(--acc)">${d.currentVersion} Versionen &#9660;</a>`:''}</div>
+            </div>
+            <div class="doc-actions">
+              ${canManage(d)?`
+              <button class="btn-s" style="font-size:11px;padding:4px 9px" onclick="openDocForm('${d.id}')" title="Bearbeiten">&#9998;</button>
+              <button class="btn-s" style="font-size:11px;padding:4px 9px" onclick="openDocVersion('${d.id}')" title="Neue Version">&#128260;</button>
+              <button class="btn-d" style="font-size:11px;padding:4px 9px" onclick="deleteDoc('${d.id}','${d.title.replace(/'/g,"\\'")}')" title="Löschen">&#128465;</button>`:''}
+            </div>
+          </div>`).join('')}
+        </div>`}
+      </div>
+    </div>`;
+}
+function openDocForm(docId){
+  S._editDocId=docId||null;
+  const doc=docId?S.docs.find(d=>d.id===docId):null;
+  document.getElementById('docFormTitle').textContent=doc?'✏️ Dokument bearbeiten':'📄 Dokument hochladen';
+  document.getElementById('docFTitle').value=doc?.title||'';
+  document.getElementById('docFDesc').value=doc?.description||'';
+  const fw=document.getElementById('docFFileWrap');if(fw)fw.style.display=doc?'none':'';
+  document.getElementById('docFBtn').textContent=doc?'Speichern':'Hochladen';
+  const sel=document.getElementById('docFCat');
+  sel.innerHTML=`<option value="">— Keine Kategorie —</option>${(S.docCategories||[]).map(c=>`<option value="${c.id}"${doc?.categoryId===c.id?' selected':''}>${c.icon} ${c.name}</option>`).join('')}`;
+  if(doc?.categoryId)sel.value=doc.categoryId;
+  openModal('docFormOv');
+}
+async function submitDocForm(){
+  const title=document.getElementById('docFTitle').value.trim();
+  if(!title){toast('⚠️ Titel erforderlich','err');return;}
+  const catId=document.getElementById('docFCat').value||null;
+  const desc=document.getElementById('docFDesc').value.trim();
+  if(S._editDocId){
+    try{await api('PUT','/docs/'+S._editDocId,{title,description:desc,categoryId:catId});await fetchData();renderDocs();closeModal('docFormOv');toast('✅ Gespeichert');}
+    catch(e){toast('⚠️ '+e.message,'err');}
+    return;
+  }
+  const fileInput=document.getElementById('docFFile');
+  const file=fileInput?.files[0];
+  if(!file){toast('⚠️ Bitte eine Datei auswählen','err');return;}
+  if(file.size>15*1024*1024){toast('⚠️ Datei zu groß (max. 15 MB)','err');return;}
+  toast('⏳ Wird hochgeladen…');
+  try{
+    const buf=await file.arrayBuffer();const bytes=new Uint8Array(buf);
+    let b64='';const chunk=8192;for(let i=0;i<bytes.length;i+=chunk)b64+=String.fromCharCode(...bytes.subarray(i,i+chunk));
+    b64=btoa(b64);
+    await api('POST','/docs',{title,description:desc,categoryId:catId,name:file.name,mimeType:file.type||'application/octet-stream',data:b64});
+    await fetchData();renderDocs();closeModal('docFormOv');toast('✅ Dokument hochgeladen');
+  }catch(e){toast('⚠️ '+e.message,'err');}
+}
+function openDocVersion(docId){
+  const doc=S.docs.find(d=>d.id===docId);if(!doc)return;
+  document.getElementById('docVerDocId').value=docId;
+  document.getElementById('docVerInfo').textContent='Aktuell: v'+doc.currentVersion+' — '+doc.originalName;
+  document.getElementById('docVerFile').value='';
+  openModal('docVerOv');
+}
+async function submitDocVersion(){
+  const docId=document.getElementById('docVerDocId').value;
+  const file=document.getElementById('docVerFile').files[0];
+  if(!file){toast('⚠️ Bitte eine Datei auswählen','err');return;}
+  if(file.size>15*1024*1024){toast('⚠️ Datei zu groß (max. 15 MB)','err');return;}
+  toast('⏳ Wird hochgeladen…');
+  try{
+    const buf=await file.arrayBuffer();const bytes=new Uint8Array(buf);
+    let b64='';const chunk=8192;for(let i=0;i<bytes.length;i+=chunk)b64+=String.fromCharCode(...bytes.subarray(i,i+chunk));
+    b64=btoa(b64);
+    await api('POST','/docs/'+docId+'/version',{name:file.name,mimeType:file.type||'application/octet-stream',data:b64});
+    await fetchData();renderDocs();closeModal('docVerOv');toast('✅ Neue Version hochgeladen');
+  }catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function deleteDoc(id,title){
+  if(!confirm('Dokument "'+title+'" wirklich löschen? Alle Versionen werden entfernt.'))return;
+  try{await api('DELETE','/docs/'+id);await fetchData();renderDocs();toast('✅ Dokument gelöscht');}
+  catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function showDocHistory(docId){
+  const doc=S.docs.find(d=>d.id===docId);if(!doc)return;
+  try{
+    const vers=await api('GET','/docs/'+docId+'/versions');
+    const fmtBytes=b=>b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB';
+    document.getElementById('docHistBody').innerHTML=`
+      <div style="font-size:13px;font-weight:600;margin-bottom:12px">${doc.title}</div>
+      <div style="font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;margin-bottom:6px">Aktuelle Version</div>
+      <div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--sf2);border:1px solid var(--acc);border-radius:8px;margin-bottom:12px">
+        <span style="font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:10px">v${doc.currentVersion}</span>
+        <span style="font-size:13px;flex:1">${doc.originalName}</span>
+        <a href="/api/docs/${docId}" target="_blank" class="btn-s" style="font-size:11px;padding:3px 8px;text-decoration:none">&#8595; Öffnen</a>
+      </div>
+      ${vers&&vers.length?`<div style="font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;margin-bottom:6px">Ältere Versionen</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${vers.map(v=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--sf2);border:1px solid var(--border);border-radius:8px">
+          <span style="font-size:11px;font-weight:700;color:var(--mu);border:1px solid var(--border);padding:2px 7px;border-radius:10px">v${v.version}</span>
+          <span style="font-size:12px;flex:1;color:var(--mu)">${v.original_name||v.originalName}</span>
+          <span style="font-size:11px;color:var(--di)">${fmtBytes(v.size_bytes||v.sizeBytes||0)}</span>
+          <a href="/api/docs/${docId}/versions/${v.id}" target="_blank" class="btn-s" style="font-size:11px;padding:3px 8px;text-decoration:none">&#8595;</a>
+        </div>`).join('')}
+      </div>`:'<div style="color:var(--di);font-size:12px">Keine älteren Versionen.</div>'}`;
+    openModal('docHistOv');
+  }catch(e){toast('⚠️ '+e.message,'err');}
+}
+function renderDocCatAdmin(){
+  if(!S.p?.manageUsers)return;
+  const list=document.getElementById('docCatList');if(!list)return;
+  list.innerHTML=(S.docCategories||[]).length?(S.docCategories||[]).map(c=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--sf2);border:1px solid var(--border);border-radius:7px;margin-bottom:6px">
+    <span style="font-size:18px">${c.icon}</span>
+    <span style="flex:1;font-size:13px">${c.name}</span>
+    <span style="width:18px;height:18px;border-radius:50%;background:${c.color};flex-shrink:0;display:inline-block"></span>
+    <button class="btn-d" style="padding:3px 8px;font-size:11px" onclick="deleteDocCat('${c.id}','${c.name.replace(/'/g,"\\'")}')">&#10005;</button>
+  </div>`).join(''):'<div style="color:var(--di);font-size:12px;padding:4px 0">Noch keine Kategorien.</div>';
+}
+async function addDocCat(){
+  const name=document.getElementById('docCatName').value.trim();
+  const icon=document.getElementById('docCatIcon').value.trim()||'📁';
+  if(!name){toast('⚠️ Name erforderlich','err');return;}
+  try{
+    await api('POST','/doc-categories',{name,icon});
+    document.getElementById('docCatName').value='';document.getElementById('docCatIcon').value='';
+    await fetchData();renderDocCatAdmin();
+    const sel=document.getElementById('docFCat');if(sel){sel.innerHTML=`<option value="">— Keine Kategorie —</option>${(S.docCategories||[]).map(c=>`<option value="${c.id}">${c.icon} ${c.name}</option>`).join('')}`;}
+    if(S.view==='docs')renderDocs();
+  }catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function deleteDocCat(id,name){
+  if(!confirm('Kategorie "'+name+'" löschen? Zugeordnete Dokumente verlieren nur die Kategorie.'))return;
+  try{await api('DELETE','/doc-categories/'+id);await fetchData();renderDocCatAdmin();if(S.view==='docs')renderDocs();}
+  catch(e){toast('⚠️ '+e.message,'err');}
 }

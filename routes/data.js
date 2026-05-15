@@ -8,7 +8,7 @@ router.get('/', auth, async (req,res) => {
   try {
     const uid=req.uid, p=req.p, tp=req.tp, roles=p.roles;
     const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
-           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw] = await Promise.all([
+           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw] = await Promise.all([
       q('SELECT id,name,initials,roles,color,must_change_pw,last_seen FROM users ORDER BY name'),
       q('SELECT * FROM categories ORDER BY sort_order,label'),
       q('SELECT * FROM tags ORDER BY label'),
@@ -44,6 +44,8 @@ router.get('/', auth, async (req,res) => {
       q('SELECT * FROM station_shifts ORDER BY sort_order,label').catch(()=>[]),
       q('SELECT * FROM station_sessions ORDER BY logged_in_at').catch(()=>[]),
       q('SELECT id,ticket_id,original_name,mime_type,size_bytes,uploaded_by,created_at FROM ticket_files ORDER BY created_at DESC').catch(()=>[]),
+      q('SELECT * FROM doc_categories ORDER BY sort_order,name').catch(()=>[]),
+      q('SELECT id,category_id,title,description,original_name,mime_type,size_bytes,current_version,uploaded_by,created_at,updated_at FROM documents ORDER BY created_at DESC').catch(()=>[]),
     ]);
 
     const tkViewMap = new Map((tkViewsRaw||[]).map(v=>[v.ticket_id, v.viewed_at]));
@@ -179,6 +181,8 @@ router.get('/', auth, async (req,res) => {
       noteTemplates: (noteTmplsRaw||[]).map(t=>({id:t.id,label:t.label,body:t.body})),
       stationShifts: (stShiftsRaw||[]).map(s=>({id:s.id,label:s.label,sortOrder:s.sort_order})),
       stationSessions: (stSessionsRaw||[]).map(s=>({id:s.id,stationName:s.station_name,userId:s.user_id,shiftId:s.shift_id,loggedInAt:s.logged_in_at})),
+      docCategories: (docCatsRaw||[]).map(c=>({id:c.id,name:c.name,icon:c.icon,color:c.color,sortOrder:c.sort_order})),
+      docs: (docsRaw||[]).map(d=>({id:d.id,categoryId:d.category_id,title:d.title,description:d.description||'',originalName:d.original_name,mimeType:d.mime_type,sizeBytes:d.size_bytes,currentVersion:d.current_version,uploadedBy:d.uploaded_by,createdAt:d.created_at,updatedAt:d.updated_at})),
     });
   } catch(e) { console.error('[/api/data FEHLER]', e.message, e.stack?.split('\n')[1]); bad(res,e.message,500); }
 });

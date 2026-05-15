@@ -245,6 +245,29 @@ async function initDB() {
       size_bytes INTEGER NOT NULL DEFAULT 0,
       uploaded_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
     )`,
+    `CREATE TABLE IF NOT EXISTS doc_categories (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL,
+      icon TEXT DEFAULT '📁', color TEXT DEFAULT '#3b6dd4',
+      sort_order INTEGER DEFAULT 0,
+      created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS documents (
+      id TEXT PRIMARY KEY, category_id TEXT,
+      title TEXT NOT NULL, description TEXT DEFAULT '',
+      filename TEXT NOT NULL, original_name TEXT NOT NULL,
+      mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+      size_bytes INTEGER NOT NULL DEFAULT 0,
+      current_version INTEGER DEFAULT 1,
+      uploaded_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS document_versions (
+      id TEXT PRIMARY KEY, document_id TEXT NOT NULL,
+      version INTEGER NOT NULL,
+      filename TEXT NOT NULL, original_name TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL DEFAULT 0,
+      uploaded_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }
@@ -283,6 +306,7 @@ app.use('/api/data',     require('./routes/data'));
 app.use('/api/events',   require('./routes/events'));
 app.use('/api/tickets',  require('./routes/tickets'));
 app.use('/api/zahnarzt', require('./routes/zahnarzt'));
+app.use('/api',          require('./routes/docs'));
 app.use('/api',          require('./routes/misc'));
 
 app.get('*', (req,res) => res.sendFile(path.join(__dirname,'public','index.html')));

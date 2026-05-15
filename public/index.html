@@ -105,6 +105,8 @@
         <div class="ni" id="ni-checklists" onclick="setView('checklists')">&#9745;&#65039; Checklisten</div>
       </div>
       <div class="ndiv"></div>
+      <div class="ni top" id="ni-docs" onclick="setView('docs')">&#128193; Dokumente</div>
+      <div class="ndiv"></div>
       <div class="nsh open" id="msgHdr" onclick="toggleNS('msg')"><span>&#9993;&#65039; Nachrichten <span class="nbdg" id="navMsgBdg" style="display:none">0</span></span><span class="arr">&#9660;</span></div>
       <div class="nsub open" id="msgSub">
         <div class="ni" id="ni-messages" onclick="setView('messages')">&#128235; Eingang</div>
@@ -1364,5 +1366,61 @@
 </div>
 
 <script src="/app.js"></script>
+
+<!-- DOC UPLOAD/EDIT MODAL -->
+<div class="ov" id="docFormOv">
+  <div class="modal sm">
+    <div class="mh"><h2 id="docFormTitle">&#128196; Dokument hochladen</h2><button class="mc" onclick="closeModal('docFormOv')">&#10005;</button></div>
+    <div class="mb2">
+      <div class="fg"><label>Titel *</label><input type="text" id="docFTitle" placeholder="Dokumententitel..."></div>
+      <div class="fg"><label>Kategorie</label><select id="docFCat"><option value="">&#8212; Keine Kategorie &#8212;</option></select></div>
+      <div class="fg"><label>Beschreibung</label><textarea id="docFDesc" rows="2" placeholder="Optional..."></textarea></div>
+      <div class="fg" id="docFFileWrap"><label>Datei *</label><input type="file" id="docFFile"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+        <button class="btn-s" onclick="closeModal('docFormOv')">Abbrechen</button>
+        <button class="btn-p" id="docFBtn" onclick="submitDocForm()">Hochladen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DOC VERSION MODAL -->
+<div class="ov" id="docVerOv">
+  <div class="modal sm">
+    <div class="mh"><h2>&#128260; Neue Version hochladen</h2><button class="mc" onclick="closeModal('docVerOv')">&#10005;</button></div>
+    <div class="mb2">
+      <input type="hidden" id="docVerDocId">
+      <div style="font-size:13px;color:var(--mu);margin-bottom:12px" id="docVerInfo"></div>
+      <div class="fg"><label>Neue Datei *</label><input type="file" id="docVerFile"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+        <button class="btn-s" onclick="closeModal('docVerOv')">Abbrechen</button>
+        <button class="btn-p" onclick="submitDocVersion()">Version hochladen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DOC HISTORY MODAL -->
+<div class="ov" id="docHistOv">
+  <div class="modal sm">
+    <div class="mh"><h2>&#128203; Versionshistorie</h2><button class="mc" onclick="closeModal('docHistOv')">&#10005;</button></div>
+    <div class="mb2" id="docHistBody"></div>
+  </div>
+</div>
+
+<!-- DOC CATEGORY MODAL (admin) -->
+<div class="ov" id="docCatOv">
+  <div class="modal sm">
+    <div class="mh"><h2>&#128193; Kategorien verwalten</h2><button class="mc" onclick="closeModal('docCatOv')">&#10005;</button></div>
+    <div class="mb2">
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <input type="text" id="docCatName" placeholder="Name..." style="flex:1">
+        <input type="text" id="docCatIcon" placeholder="&#128193;" style="width:50px;text-align:center">
+        <button class="btn-p" onclick="addDocCat()">+ Hinzuf&#252;gen</button>
+      </div>
+      <div id="docCatList"></div>
+    </div>
+  </div>
+</div>
 </body>
 </html>
