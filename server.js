@@ -318,19 +318,7 @@ app.set('trust proxy', 1);
 
 // ── SECURITY HEADERS ──
 app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc:  ["'self'", "'unsafe-inline'"],   // SPA inline scripts
-      styleSrc:   ["'self'", "'unsafe-inline'"],
-      imgSrc:     ["'self'", 'data:', 'blob:'],
-      connectSrc: ["'self'"],
-      fontSrc:    ["'self'", 'data:'],
-      objectSrc:  ["'none'"],
-      frameAncestors: ["'none'"],
-    },
-  },
-  crossOriginEmbedderPolicy: false, // needed for PDF inline display
+  contentSecurityPolicy: false,   // SPA mit Inline-Handlers + Google Fonts — CSP separat konfigurieren wenn nötig
 }));
 app.disable('x-powered-by');
 
