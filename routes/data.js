@@ -190,7 +190,7 @@ router.get('/', auth, async (req,res) => {
       stationOutages: (stOutagesRaw||[]).map(o=>({id:o.id,stationName:o.station_name,reason:o.reason,startAt:o.start_at,endAt:o.end_at,createdBy:o.created_by})),
       rolePermissions: (rolePermsRaw||[]).map(r=>({role:r.role,permission:r.permission,granted:r.granted})),
     });
-  } catch(e) { console.error('[/api/data FEHLER]', e.message, e.stack?.split('\n')[1]); bad(res,e.message,500); }
+  } catch(e) { console.error('[/api/data FEHLER]', e.message, e.stack?.split('\n')[1]); bad(res,'Serverfehler',500); }
 });
 
 // EVENTS

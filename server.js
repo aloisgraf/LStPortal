@@ -1,10 +1,12 @@
 'use strict';
 require('dotenv').config();
-const express   = require('express');
-const session   = require('express-session');
-const pgSession = require('connect-pg-simple')(session);
-const path      = require('path');
-const crypto    = require('crypto');
+const express      = require('express');
+const session      = require('express-session');
+const pgSession    = require('connect-pg-simple')(session);
+const path         = require('path');
+const crypto       = require('crypto');
+const helmet       = require('helmet');
+const rateLimit    = require('express-rate-limit');
 
 const PORT   = parseInt(process.env.PORT || '3000');
 const SECRET = process.env.SESSION_SECRET || 'bitte-aendern-' + crypto.randomBytes(16).toString('hex');
@@ -312,10 +314,44 @@ async function initDB() {
 }
 
 const app = express();
-app.use(express.json({ limit: '20mb' }));
-app.use(express.urlencoded({ extended: true, limit: '20mb' })); // für Mailgun Webhook
-app.use(express.static(path.join(__dirname, 'public')));
 app.set('trust proxy', 1);
+
+// ── SECURITY HEADERS ──
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc:  ["'self'", "'unsafe-inline'"],   // SPA inline scripts
+      styleSrc:   ["'self'", "'unsafe-inline'"],
+      imgSrc:     ["'self'", 'data:', 'blob:'],
+      connectSrc: ["'self'"],
+      fontSrc:    ["'self'", 'data:'],
+      objectSrc:  ["'none'"],
+      frameAncestors: ["'none'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false, // needed for PDF inline display
+}));
+app.disable('x-powered-by');
+
+// ── RATE LIMITING ──
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,   // 15 Minuten
+  max: 10,                      // max 10 Login-Versuche pro IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Zu viele Anmeldeversuche. Bitte 15 Minuten warten.' },
+});
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use(express.json({ limit: '20mb' }));
+app.use(express.urlencoded({ extended: true, limit: '20mb' }));
+app.use(express.static(path.join(__dirname, 'public')));
 app.use(session({
   store: new pgSession({ pool, tableName: 'sessions', createTableIfMissing: true }),
   secret: SECRET, resave: false, saveUninitialized: false, name: 'lst.sid',
@@ -323,6 +359,8 @@ app.use(session({
 }));
 
 // ── ROUTES ──
+app.use('/api/auth/login', loginLimiter);
+app.use('/api',            apiLimiter);
 app.use('/api/auth',     require('./routes/auth'));
 app.use('/api/data',     require('./routes/data'));
 app.use('/api/events',   require('./routes/events'));

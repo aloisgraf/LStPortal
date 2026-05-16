@@ -4,6 +4,7 @@ const fs   = require('fs');
 const router = require('express').Router();
 const { q, q1, newId, pool, getUser, logAct, canSeeTk, canEditTk, nextTicketNumber, auditNote, createNotification, parseMentions } = require('../db');
 const { auth, ok, bad } = require('../middleware');
+const { sanitizeFilename, validateMime, assertUnderDir } = require('../fileutil');
 
 const UPLOAD_DIR = path.resolve(__dirname, '..', 'uploads', 'ticket-files');
 try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch(e) {}
@@ -37,7 +38,7 @@ router.post('/', auth, async (req,res) => {
     await pool.query(`INSERT INTO ticket_views (ticket_id,user_id,viewed_at) VALUES ($1,$2,NOW()) ON CONFLICT (ticket_id,user_id) DO UPDATE SET viewed_at=NOW()`,
       [id,req.uid]).catch(()=>{});
     ok(res,{id,number});
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 router.put('/:id', auth, async (req,res) => {
   try {
@@ -110,7 +111,7 @@ router.put('/:id', auth, async (req,res) => {
       [req.params.id,req.uid]).catch(()=>{});
     await logAct(req.uid,req.user.name,'update_ticket',{id:req.params.id});
     ok(res);
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 router.delete('/:id', auth, async (req,res) => {
   try {
@@ -121,7 +122,7 @@ router.delete('/:id', auth, async (req,res) => {
     await pool.query('DELETE FROM tickets WHERE id=$1',[req.params.id]);
     await logAct(req.uid,req.user.name,'delete_ticket',{id:req.params.id});
     ok(res);
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 router.post('/:id/notes', auth, async (req,res) => {
   try {
@@ -155,7 +156,7 @@ router.post('/:id/notes', auth, async (req,res) => {
       await createNotification(u.id,'mention',`${author?.name||'?'} erwähnte dich in ${tk.number}`,tk.id,id,req.uid);
     }
     ok(res,{id,createdAt:now});
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 
 router.delete('/:id/notes/:noteId', auth, async (req,res) => {
@@ -166,7 +167,7 @@ router.delete('/:id/notes/:noteId', auth, async (req,res) => {
     if (note.note_type==='audit') return bad(res,'Protokolleinträge können nicht gelöscht werden',403);
     await pool.query('DELETE FROM ticket_notes WHERE id=$1',[req.params.noteId]);
     ok(res);
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 
 // TICKET CHECKLISTS
@@ -184,7 +185,7 @@ router.post('/:id/checklists', auth, async (req,res) => {
         [newId(),clId,item.text,item.item_type||'check',item.sort_order]);
     await auditNote(req.params.id,req.uid,`📋 Checkliste angehängt: "${tmpl.name}"`);
     ok(res,{id:clId});
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 router.delete('/:id/checklists/:cid', auth, async (req,res) => {
   try {
@@ -193,7 +194,7 @@ router.delete('/:id/checklists/:cid', auth, async (req,res) => {
     await pool.query('DELETE FROM ticket_checklist_items WHERE checklist_id=$1',[req.params.cid]);
     await pool.query('DELETE FROM ticket_checklists WHERE id=$1',[req.params.cid]);
     ok(res);
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 router.put('/:id/checklists/:cid/sync', auth, async (req,res) => {
   try {
@@ -228,7 +229,7 @@ router.put('/:id/checklists/:cid/sync', auth, async (req,res) => {
     await pool.query('UPDATE ticket_checklists SET name=$1 WHERE id=$2',[tmpl.name, req.params.cid]);
     await auditNote(req.params.id, req.uid, `🔄 Checkliste aktualisiert: "${tmpl.name}"`);
     ok(res);
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 router.put('/:id/checklists/:cid/items/:iid', auth, async (req,res) => {
   try {
@@ -245,7 +246,7 @@ router.put('/:id/checklists/:cid/items/:iid', auth, async (req,res) => {
     else if (userNote !== undefined)
       await pool.query('UPDATE ticket_checklist_items SET user_note=$1 WHERE id=$2',[userNote,req.params.iid]);
     ok(res);
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 
 // CHECKLIST TEMPLATES
@@ -264,7 +265,7 @@ router.delete('/:id', auth, async (req,res) => {
     await pool.query('UPDATE tickets SET is_deleted=true,deleted_at=NOW(),deleted_by=$1 WHERE id=$2',[req.uid,req.params.id]);
     await auditNote(req.params.id, req.uid, '🗑️ Ticket gelöscht');
     ok(res);
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 router.put('/:id/restore', auth, async (req,res) => {
   try {
@@ -274,7 +275,7 @@ router.put('/:id/restore', auth, async (req,res) => {
     await pool.query('UPDATE tickets SET is_deleted=false,deleted_at=NULL,deleted_by=NULL WHERE id=$1',[req.params.id]);
     await auditNote(req.params.id, req.uid, '♻️ Ticket wiederhergestellt');
     ok(res);
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 router.put('/:id/view', auth, async (req,res) => {
   try {
@@ -284,7 +285,7 @@ router.put('/:id/view', auth, async (req,res) => {
       [req.params.id, req.uid]
     );
     ok(res);
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 
 // ── FILE MANAGEMENT ──
@@ -295,19 +296,24 @@ router.post('/:id/files', auth, async (req,res) => {
     if (!canSeeTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
     const {name, mimeType, data} = req.body;
     if (!name?.trim() || !data) return bad(res,'Dateiname und Daten erforderlich');
+    const mime = mimeType || 'application/octet-stream';
+    if (!validateMime(mime)) return bad(res,'Dateityp nicht erlaubt',400);
     const buf = Buffer.from(data,'base64');
     if (buf.length > 20*1024*1024) return bad(res,'Datei zu groß (max. 20 MB)');
     const id = newId();
-    const ext = (name.split('.').pop()||'bin').toLowerCase().replace(/[^a-z0-9]/g,'');
+    const safeName = sanitizeFilename(name.trim());
+    const ext = (safeName.split('.').pop()||'bin').toLowerCase().replace(/[^a-z0-9]/g,'');
     const filename = `${id}.${ext}`;
+    const destPath = path.join(UPLOAD_DIR, filename);
+    assertUnderDir(UPLOAD_DIR, destPath);
     fs.mkdirSync(UPLOAD_DIR,{recursive:true});
-    fs.writeFileSync(path.join(UPLOAD_DIR,filename),buf);
+    fs.writeFileSync(destPath, buf);
     await pool.query('INSERT INTO ticket_files (id,ticket_id,filename,original_name,mime_type,size_bytes,uploaded_by) VALUES ($1,$2,$3,$4,$5,$6,$7)',
-      [id,req.params.id,filename,name.trim(),mimeType||'application/octet-stream',buf.length,req.uid]);
+      [id,req.params.id,filename,safeName,mime,buf.length,req.uid]);
     const uname=(await getUser(req.uid))?.name||'?';
-    await auditNote(req.params.id,req.uid,`📎 Datei hochgeladen: ${name.trim()} von ${uname}`);
+    await auditNote(req.params.id,req.uid,`📎 Datei hochgeladen: ${safeName} von ${uname}`);
     ok(res,{id});
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 
 router.get('/:id/files/:fid', auth, async (req,res) => {
@@ -317,12 +323,13 @@ router.get('/:id/files/:fid', auth, async (req,res) => {
     if (!canSeeTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
     const file = await q1('SELECT * FROM ticket_files WHERE id=$1 AND ticket_id=$2',[req.params.fid,req.params.id]);
     if (!file) return bad(res,'Datei nicht gefunden',404);
-    const filePath = path.join(UPLOAD_DIR,file.filename);
+    const filePath = path.join(UPLOAD_DIR, file.filename);
+    assertUnderDir(UPLOAD_DIR, filePath);
     if (!fs.existsSync(filePath)) return bad(res,'Datei nicht auf Datenträger',404);
-    res.setHeader('Content-Type',file.mime_type);
+    res.setHeader('Content-Type', file.mime_type);
     res.setHeader('Content-Disposition',`inline; filename*=UTF-8''${encodeURIComponent(file.original_name)}`);
     res.sendFile(filePath);
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 
 router.delete('/:id/files/:fid', auth, async (req,res) => {
@@ -332,12 +339,14 @@ router.delete('/:id/files/:fid', auth, async (req,res) => {
     if (!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
     const file = await q1('SELECT * FROM ticket_files WHERE id=$1 AND ticket_id=$2',[req.params.fid,req.params.id]);
     if (!file) return bad(res,'Datei nicht gefunden',404);
-    try { fs.unlinkSync(path.join(UPLOAD_DIR,file.filename)); } catch(e) {}
+    const filePath = path.join(UPLOAD_DIR, file.filename);
+    assertUnderDir(UPLOAD_DIR, filePath);
+    try { fs.unlinkSync(filePath); } catch(e) {}
     await pool.query('DELETE FROM ticket_files WHERE id=$1',[req.params.fid]);
     const uname=(await getUser(req.uid))?.name||'?';
     await auditNote(req.params.id,req.uid,`🗑️ Datei gelöscht: ${file.original_name} von ${uname}`);
     ok(res);
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 
 module.exports = router;

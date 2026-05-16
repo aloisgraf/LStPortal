@@ -12,28 +12,33 @@ async function logActivity(pool, uid, name, action, details={}, ip='') {
   ).catch(()=>{});
 }
 
+// Only exposes display data needed for the login dropdown — no roles, no hashes
 router.get('/users', async (req,res) => {
   try {
-    const users = await q('SELECT id,name,initials,color,roles FROM users ORDER BY name');
-    console.log('[auth/users] Benutzer gefunden:', users.length);
-    ok(res, users.map(u=>({id:u.id,name:u.name,initials:u.initials,color:u.color,roles:parseRoles(u.roles)})));
+    const users = await q('SELECT id,name,initials,color FROM users ORDER BY name');
+    ok(res, users);
   } catch(e) {
-    console.error('[auth/users] Fehler:', e.message);
-    bad(res,e.message,500);
+    bad(res,'Serverfehler',500);
   }
 });
 router.post('/login', async (req,res) => {
   try {
     const {userId,password} = req.body;
-    if (!userId||!password) return bad(res,'Benutzername und Passwort erforderlich');
+    if (!userId || !password || typeof userId!=='string' || typeof password!=='string')
+      return bad(res,'Benutzername und Passwort erforderlich');
+    if (userId.length > 200 || password.length > 200)
+      return bad(res,'Ungültige Eingabe',400);
     const user = await getUser(userId);
-    if (!user||!(await bcrypt.compare(password,user.pw_hash))) return bad(res,'Falsches Passwort',401);
+    // Always run bcrypt to prevent timing attacks
+    const hash = user?.pw_hash || '$2a$10$invalidhashpaddingtopreventimenumerabilityx';
+    const valid = await bcrypt.compare(password, hash);
+    if (!user || !valid) return bad(res,'Falsches Passwort',401);
     req.session.userId = user.id;
     await new Promise((resolve, reject) => req.session.save(e => e ? reject(e) : resolve()));
     const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || '';
     await logAct(user.id, user.name, 'login', {ip});
     ok(res, {userId:user.id, mustChangePW: user.must_change_pw===true});
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 router.post('/logout', (req,res) => req.session.destroy(()=>ok(res)));
 router.get('/me', auth, (req,res) => ok(res, {userId:req.uid, mustChangePW:req.user.must_change_pw===true}));
@@ -42,11 +47,11 @@ router.post('/change-password', auth, async (req,res) => {
     const {currentPassword,newPassword} = req.body;
     if (!req.user.must_change_pw && !(await bcrypt.compare(currentPassword||'',req.user.pw_hash)))
       return bad(res,'Aktuelles Passwort falsch');
-    if (!newPassword||newPassword.length<6) return bad(res,'Mindestens 6 Zeichen');
+    if (!newPassword || newPassword.length < 8) return bad(res,'Mindestens 8 Zeichen');
     await pool.query('UPDATE users SET pw_hash=$1,must_change_pw=false WHERE id=$2',
       [await bcrypt.hash(newPassword,10), req.uid]);
     ok(res);
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 
 module.exports = router;

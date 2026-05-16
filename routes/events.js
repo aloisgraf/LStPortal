@@ -21,7 +21,7 @@ router.post('/', auth, async (req,res) => {
     }
     await logAct(req.uid,req.user.name,'create_event',{dateFrom,isGeneral:!!isGeneral});
     ok(res,{id});
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 router.put('/:id', auth, async (req,res) => {
   try {
@@ -37,7 +37,7 @@ router.put('/:id', auth, async (req,res) => {
       await createNotification(ev.user_id,'event_changed',`${author?.name||'?'} hat deinen Eintrag geändert`,null,null,req.uid,ev.id);
     }
     ok(res);
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 router.put('/:id/approval', auth, async (req,res) => {
   try {
@@ -47,14 +47,14 @@ router.put('/:id/approval', auth, async (req,res) => {
     await pool.query('UPDATE events SET approval_status=$1 WHERE id=$2 AND is_general=false',[status,req.params.id]);
     await logAct(req.uid,req.user.name,'approve_event',{eventId:req.params.id,status});
     ok(res);
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 router.post('/:id/confirm', auth, async (req,res) => {
   try {
     await pool.query('INSERT INTO event_confirms (id,event_id,user_id) VALUES ($1,$2,$3) ON CONFLICT (event_id,user_id) DO NOTHING',
       [newId(),req.params.id,req.uid]);
     ok(res);
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 router.delete('/:id', auth, async (req,res) => {
   try {
@@ -65,7 +65,7 @@ router.delete('/:id', auth, async (req,res) => {
     await pool.query('DELETE FROM event_confirms WHERE event_id=$1',[req.params.id]);
     await pool.query('DELETE FROM events WHERE id=$1',[req.params.id]);
     ok(res);
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 
 // TICKETS
