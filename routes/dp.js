@@ -486,12 +486,13 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
     const daysInMonth = new Date(plan.year, plan.month, 0).getDate();
     const AT_HOLIDAYS = getAustrianHolidays(plan.year);
 
-    // Build qualification map: shiftTypeId -> Set of qualified empIds
-    // If no qualifications defined for a shift type, ALL employees can do it
-    const qualMap = {};
+    // Build qualification maps:
+    // empQualMap: empId -> Set of shiftTypeIds the employee is qualified for
+    // An employee with zero qualifications cannot be auto-scheduled at all.
+    const empQualMap = {};
     for (const q_ of qualifications) {
-      if (!qualMap[q_.shift_type_id]) qualMap[q_.shift_type_id] = new Set();
-      qualMap[q_.shift_type_id].add(q_.employee_id);
+      if (!empQualMap[q_.employee_id]) empQualMap[q_.employee_id] = new Set();
+      empQualMap[q_.employee_id].add(q_.shift_type_id);
     }
 
     // Build all required slots, sorted: nights first → weekends → date
@@ -559,8 +560,11 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
         const params = empParamMap[empId];
         if (!params) continue;
 
-        // Hard: qualification check (only if qualifications are defined for this shift type)
-        if (qualMap[slot.shiftTypeId] && !qualMap[slot.shiftTypeId].has(empId)) continue;
+        // Hard: employee must have at least one qualification defined,
+        // and must be qualified for this specific shift type
+        const empQuals = empQualMap[empId];
+        if (!empQuals || empQuals.size === 0) continue;
+        if (!empQuals.has(slot.shiftTypeId)) continue;
 
         // Hard: blocked by absence
         if (absenceSet.has(`${empId}_${slot.date}`)) continue;
