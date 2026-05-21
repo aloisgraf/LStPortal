@@ -292,6 +292,39 @@ async function initDB() {
       granted BOOLEAN NOT NULL DEFAULT true,
       PRIMARY KEY (role, permission)
     )`,
+    `CREATE TABLE IF NOT EXISTS meetings (
+  id TEXT PRIMARY KEY, title TEXT NOT NULL,
+  type TEXT NOT NULL DEFAULT 'einmalig',
+  rhythm TEXT DEFAULT NULL,
+  rhythm_day INTEGER DEFAULT NULL,
+  rhythm_time TEXT DEFAULT '',
+  description TEXT DEFAULT '',
+  created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
+)`,
+    `CREATE TABLE IF NOT EXISTS meeting_instances (
+  id TEXT PRIMARY KEY,
+  meeting_id TEXT NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+  date DATE NOT NULL, time TEXT DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'planned',
+  notes TEXT DEFAULT '',
+  created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
+)`,
+    `CREATE TABLE IF NOT EXISTS discussion_items (
+  id TEXT PRIMARY KEY,
+  instance_id TEXT NOT NULL REFERENCES meeting_instances(id) ON DELETE CASCADE,
+  title TEXT NOT NULL, description TEXT DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'open',
+  due_date DATE DEFAULT NULL, meeting_date DATE DEFAULT NULL,
+  parent_id TEXT DEFAULT NULL, delegated_to TEXT DEFAULT NULL,
+  result TEXT DEFAULT '', sort_order INTEGER DEFAULT 0,
+  created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
+)`,
+    `CREATE TABLE IF NOT EXISTS discussion_participants (
+  id TEXT PRIMARY KEY,
+  item_id TEXT NOT NULL REFERENCES discussion_items(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'required',
+  UNIQUE(item_id, user_id)
+)`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }
@@ -356,6 +389,7 @@ app.use('/api/tickets',  require('./routes/tickets'));
 app.use('/api/zahnarzt', require('./routes/zahnarzt'));
 app.use('/api',          require('./routes/docs'));
 app.use('/api',          require('./routes/misc'));
+app.use('/api',          require('./routes/meetings'));
 
 app.get('*', (req,res) => res.sendFile(path.join(__dirname,'public','index.html')));
 

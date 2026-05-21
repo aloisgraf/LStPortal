@@ -48,6 +48,7 @@ let S={
   events:[],users:[],categories:[],tags:[],allowances:[],tickets:[],ticketSubcategories:[],noteTemplates:[],stationSessions:[],stationShifts:[],
   stationOutages:[],links:[],rolePermissions:[],_onBreak:false,
   docs:[],docCategories:[],_docFilter:'all',_docSearch:'',
+  meetings:[], _selMeeting:null, _selInstance:null,
   tkBatchMode:false,tkBatchSel:new Set(),_tkFeedFilter:'all',_tkTab:'details',
   checklists:[],messages:[],notifications:[],abrechnung:{einspringer:[],homeoffice:[]},dienstplaene:[],
   p:{canApproveEvents:false,canSendMessages:false,seeAllEntries:true,editAllPersonal:false,addForOthers:false,addGeneral:false,manageUsers:false,seeAllAllw:false,editAllw:false,seeAllAbrechnung:false},
@@ -76,6 +77,7 @@ async function fetchData(){
     S.noteTemplates=data.noteTemplates||[];S.stationShifts=data.stationShifts||[];S.stationSessions=data.stationSessions||[];
     S.stationOutages=data.stationOutages||[];S.links=data.portalLinks||[];S.rolePermissions=data.rolePermissions||[];
     S.docs=data.docs||[];S.docCategories=data.docCategories||[];
+    S.meetings=data.meetings||[];
     S.currentUser=data.currentUser;S.p=data.permissions||{};
     const u=getU(S.currentUser);const roles=u?.roles||['standard'];
     const has=(...r)=>r.some(x=>roles.includes(x));
@@ -231,7 +233,7 @@ function toggleSidebar(){const sb=document.getElementById('sidebar'),ov=document
 function toggleNS(id){document.getElementById(id+'Hdr').classList.toggle('open');document.getElementById(id+'Sub').classList.toggle('open');}
 function setView(v){
   S.view=v;
-  ['home','schedule','allw','diensttausch','abrechnung','dienstplaene','tickets','tickets_closed','tickets_deleted','checklists','messages','messages_sent','zahnarzt','platz','links','statistik','docs'].forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
+  ['home','schedule','allw','diensttausch','abrechnung','dienstplaene','tickets','tickets_closed','tickets_deleted','checklists','messages','messages_sent','zahnarzt','platz','links','statistik','docs','meetings'].forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
   const statEl=document.getElementById('ni-statistik');if(statEl)statEl.style.display=S.p?.manageUsers?'flex':'none';
   document.getElementById('sidebar').classList.remove('open');document.getElementById('sbOv').classList.remove('open');
   renderSBF();renderMain();
@@ -267,6 +269,7 @@ function renderMain(){
   else if(S.view==='links')renderLinks();
   else if(S.view==='docs')renderDocs();
   else if(S.view==='statistik')renderStatistik();
+  else if(S.view==='meetings')renderMeetings();
 }
 // HOME
 function renderHome(){
@@ -1982,7 +1985,7 @@ function startAutoRefresh(){
       S.messages=data.messages||[];S.notifications=data.notifications||[];
       S.allowances=data.allowances||[];S.checklists=data.checklists||[];
       S.abrechnung=data.abrechnung||{einspringer:[],homeoffice:[]};S.dienstplaene=data.dienstplaene||[];S.diensttausch=data.diensttausch||[];S.homeoffice=data.homeoffice||{slots:[],config:[],boxes:[],dienste:[]};S.vacationConfig=data.vacationConfig||[];S.diensttausch=data.diensttausch||[];
-      S.stationSessions=data.stationSessions||[];S.stationShifts=data.stationShifts||[];S.stationOutages=data.stationOutages||[];S.links=data.portalLinks||[];S.docs=data.docs||[];S.docCategories=data.docCategories||[];S.rolePermissions=data.rolePermissions||[];
+      S.stationSessions=data.stationSessions||[];S.stationShifts=data.stationShifts||[];S.stationOutages=data.stationOutages||[];S.links=data.portalLinks||[];S.docs=data.docs||[];S.docCategories=data.docCategories||[];S.rolePermissions=data.rolePermissions||[];S.meetings=data.meetings||[];
       updateBadges();
       if(_lastMsgCount>=0&&newMsgCount>_lastMsgCount)toast('\uD83D\uDCEC Neue Nachricht eingegangen!');
       if(_lastTkCount>=0&&newTkCount>_lastTkCount)toast('\uD83C\uDFAB Neues Ticket in deinem Bereich!');
@@ -1993,6 +1996,7 @@ function startAutoRefresh(){
       else if(S.view==='platz')renderPlatz();
       else if(S.view==='links')renderLinks();
       else if(S.view==='docs')renderDocs();
+      else if(S.view==='meetings')renderMeetings();
     var _rd=document.getElementById('lastRefreshDisplay');if(_rd){var _n=new Date();_rd.textContent='↻ '+_n.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit',second:'2-digit'});_rd.style.display='block';}
     }catch(e){}
   },30000);
@@ -3290,4 +3294,309 @@ async function deleteDocCat(id,name){
   if(!confirm('Kategorie "'+name+'" löschen? Zugeordnete Dokumente verlieren nur die Kategorie.'))return;
   try{await api('DELETE','/doc-categories/'+id);await fetchData();renderDocCatAdmin();if(S.view==='docs')renderDocs();}
   catch(e){toast('⚠️ '+e.message,'err');}
+}
+
+// ── MEETINGS ─────────────────────────────────────────────────────────────────
+const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function fmtDate(d){if(!d)return'';var p=String(d).slice(0,10);return p.slice(8)+'.'+p.slice(5,7)+'.'+p.slice(0,4);}
+
+function renderMeetings() {
+  const canManage = S.p.manageUsers || (S.p.roles||[]).some(r=>['admin','leitung','technik'].includes(r));
+  const m = S._selMeeting ? S.meetings.find(x=>x.id===S._selMeeting) : null;
+  document.getElementById('main').innerHTML = `
+<div class="meetings-layout">
+  <div class="meetings-sidebar">
+    <div class="meetings-sidebar-hdr">
+      <span style="font-weight:700;font-size:15px">&#128483;&#65039; Besprechungen</span>
+      ${canManage?`<button class="btn-s" onclick="openMeetingForm()">+ Neu</button>`:''}
+    </div>
+    <div class="meetings-list">
+      ${S.meetings.length===0?`<div style="color:var(--mu);font-size:13px;padding:12px">Keine Besprechungen</div>`:''}
+      ${S.meetings.map(mt=>{
+        const open=(mt.instances||[]).reduce((s,i)=>(i.items||[]).filter(it=>it.status==='open'||it.status==='redo').length+s,0);
+        const typeBadge={einmalig:'Einmalig',jour_fixe:'Jour Fixe',ad_hoc:'Ad hoc'}[mt.type]||mt.type;
+        return`<div class="meetings-item${S._selMeeting===mt.id?' active':''}" onclick="S._selMeeting='${mt.id}';S._selInstance=null;renderMeetings()">
+          <div style="font-weight:600;font-size:13px">${esc(mt.title)}</div>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:3px">
+            <span style="font-size:11px;background:var(--bg2);padding:1px 6px;border-radius:10px;color:var(--mu)">${typeBadge}</span>
+            ${mt.type==='jour_fixe'&&mt.rhythm?`<span style="font-size:11px;color:var(--mu)">${{weekly:'wöchentlich',biweekly:'2-wöchentlich',monthly:'monatlich',daily:'täglich'}[mt.rhythm]||''} ${mt.rhythmTime||''}</span>`:''}
+            ${open>0?`<span style="font-size:11px;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:10px">${open} offen</span>`:''}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>
+  <div class="meetings-main">
+    ${m ? renderMeetingDetail(m, canManage) : `<div style="color:var(--mu);padding:32px;text-align:center;font-size:14px">← Besprechung auswählen</div>`}
+  </div>
+</div>`;
+}
+
+function renderMeetingDetail(m, canManage) {
+  const inst = S._selInstance ? m.instances.find(x=>x.id===S._selInstance) : null;
+  const rhythmLabels={weekly:'wöchentlich',biweekly:'alle 2 Wochen',monthly:'monatlich',daily:'täglich'};
+  return`<div style="padding:20px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;gap:12px">
+      <div>
+        <h2 style="margin:0 0 4px;font-size:18px">${esc(m.title)}</h2>
+        ${m.description?`<div style="font-size:13px;color:var(--mu)">${esc(m.description)}</div>`:''}
+        ${m.type==='jour_fixe'?`<div style="font-size:12px;color:var(--mu);margin-top:4px">&#128257; ${rhythmLabels[m.rhythm]||m.rhythm||''} ${m.rhythmTime?'um '+m.rhythmTime:''}</div>`:''}
+      </div>
+      <div style="display:flex;gap:8px;flex-shrink:0">
+        ${canManage?`<button class="btn-s" onclick="openMeetingForm('${m.id}')">&#10002; Bearbeiten</button>`:''}
+        ${canManage?`<button class="btn-s btn-danger" onclick="deleteMeeting('${m.id}')">&#128465;</button>`:''}
+        <button class="btn-s" onclick="openInstanceForm('${m.id}')">+ Termin</button>
+        ${m.type==='jour_fixe'?`<button class="btn-s" onclick="generateNextInstance('${m.id}')">&#128257; Nächster</button>`:''}
+      </div>
+    </div>
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;overflow-x:auto">
+      ${(m.instances||[]).length===0?`<div style="color:var(--mu);font-size:13px;padding:8px 0">Noch keine Termine</div>`:''}
+      ${[...(m.instances||[])].sort((a,b)=>new Date(b.date)-new Date(a.date)).map(i=>{
+        const open=(i.items||[]).filter(it=>it.status==='open'||it.status==='redo').length;
+        const statusColor={planned:'#3b82f6',done:'#10b981',cancelled:'#ef4444'}[i.status]||'#64748b';
+        return`<div class="meetings-inst-tab${S._selInstance===i.id?' active':''}" onclick="S._selInstance='${i.id}';renderMeetings()">
+          <div style="font-size:12px;font-weight:600">${fmtDate(i.date)}${i.time?' '+i.time:''}</div>
+          <div style="display:flex;gap:4px;margin-top:2px">
+            <span style="font-size:10px;color:${statusColor}">${{planned:'Geplant',done:'Abgeschlossen',cancelled:'Abgesagt'}[i.status]||i.status}</span>
+            ${open>0?`<span style="font-size:10px;color:#92400e;background:#fef3c7;padding:0 4px;border-radius:8px">${open}</span>`:''}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+    ${inst ? renderInstanceDetail(inst, m, canManage) : `<div style="color:var(--mu);font-size:13px">← Termin auswählen</div>`}
+  </div>`;
+}
+
+function renderInstanceDetail(inst, meeting, canManage) {
+  const statusCols={open:'Zu besprechen',done:'Besprochen',redo:'Nochmal',delegate:'Delegiert'};
+  const statusColors={open:'#3b82f6',done:'#10b981',redo:'#f59e0b',delegate:'#7c3aed'};
+  const groups={open:[],done:[],redo:[],delegate:[]};
+  (inst.items||[]).forEach(it=>{if(groups[it.status])groups[it.status].push(it);else groups.open.push(it);});
+  return`<div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-size:13px;color:var(--mu)">${inst.notes?`<span>${esc(inst.notes)}</span>`:''}</div>
+      <div style="display:flex;gap:8px">
+        ${canManage?`<button class="btn-s" onclick="openInstanceForm('${meeting.id}','${inst.id}')">&#10002; Termin</button>`:''}
+        <button class="btn" onclick="openItemForm('${inst.id}')">+ Punkt</button>
+        ${inst.status==='planned'?`<button class="btn-s" style="background:#10b981;color:#fff" onclick="setInstanceStatus('${inst.id}','done')">&#10003; Abschließen</button>`:''}
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+      ${Object.entries(groups).map(([st,items])=>`
+        <div class="meetings-col">
+          <div class="meetings-col-hdr" style="color:${statusColors[st]}">${statusCols[st]} <span style="font-size:11px;opacity:.7">(${items.length})</span></div>
+          ${items.length===0?`<div style="font-size:12px;color:var(--mu);padding:8px;text-align:center">—</div>`:''}
+          ${items.map(it=>`<div class="meetings-card" onclick="openItemForm('${inst.id}','${it.id}')">
+            <div style="font-weight:600;font-size:13px;margin-bottom:4px">${esc(it.title)}</div>
+            ${it.description?`<div style="font-size:12px;color:var(--mu);margin-bottom:4px">${esc(it.description.slice(0,80))}${it.description.length>80?'…':''}</div>`:''}
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
+              ${it.dueDate?`<span style="font-size:11px;color:${new Date(it.dueDate)<new Date()?'#ef4444':'#64748b'}">&#128197; ${fmtDate(it.dueDate)}</span>`:''}
+              ${it.delegatedTo?`<span style="font-size:11px;color:#7c3aed">→ ${esc(getU(it.delegatedTo)?.name||'?')}</span>`:''}
+              ${(it.participants||[]).slice(0,4).map(p=>{const u=getU(p.userId);return u?`<span class="av-sm" style="background:${u.color}" title="${esc(u.name)}">${esc(u.initials)}</span>`:''}).join('')}
+              ${(it.participants||[]).length>4?`<span style="font-size:11px;color:var(--mu)">+${it.participants.length-4}</span>`:''}
+            </div>
+            ${it.parentId?`<div style="font-size:11px;color:#7c3aed;margin-top:4px">&#8617; Folge</div>`:''}
+          </div>`).join('')}
+        </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+function openMeetingForm(id=null) {
+  const m = id ? S.meetings.find(x=>x.id===id) : null;
+  document.getElementById('meetingFormTitle').textContent = m ? 'Besprechung bearbeiten' : 'Neue Besprechung';
+  document.getElementById('mfId').value = m?.id||'';
+  document.getElementById('mfTitle').value = m?.title||'';
+  document.getElementById('mfType').value = m?.type||'einmalig';
+  document.getElementById('mfDesc').value = m?.description||'';
+  document.getElementById('mfRhythm').value = m?.rhythm||'weekly';
+  document.getElementById('mfRhythmTime').value = m?.rhythmTime||'';
+  document.getElementById('mfRhythmDiv').style.display = (m?.type||'einmalig')==='jour_fixe'?'':'none';
+  openModal('meetingFormOv');
+}
+
+function onMfTypeChange() {
+  document.getElementById('mfRhythmDiv').style.display = document.getElementById('mfType').value==='jour_fixe'?'':'none';
+}
+
+async function submitMeetingForm() {
+  const id = document.getElementById('mfId').value;
+  const title = document.getElementById('mfTitle').value.trim();
+  if (!title) return toast('Titel erforderlich','err');
+  const body = {
+    title, type: document.getElementById('mfType').value,
+    rhythm: document.getElementById('mfRhythm').value,
+    rhythmTime: document.getElementById('mfRhythmTime').value,
+    description: document.getElementById('mfDesc').value.trim(),
+  };
+  try {
+    if (id) await api('PUT','/meetings/'+id, body);
+    else await api('POST','/meetings', body);
+    closeModal('meetingFormOv');
+    await fetchData();
+    renderMeetings();
+    toast('Besprechung gespeichert');
+  } catch(e) { toast('Fehler beim Speichern','err'); }
+}
+
+async function deleteMeeting(id) {
+  if (!confirm('Besprechung und alle Termine löschen?')) return;
+  try {
+    await api('DELETE','/meetings/'+id);
+    S._selMeeting=null; S._selInstance=null;
+    await fetchData(); renderMeetings(); toast('Gelöscht');
+  } catch(e) { toast('Fehler','err'); }
+}
+
+function openInstanceForm(meetingId, id=null) {
+  const m = S.meetings.find(x=>x.id===meetingId);
+  const inst = id ? (m?.instances||[]).find(x=>x.id===id) : null;
+  document.getElementById('instanceFormTitle').textContent = inst ? 'Termin bearbeiten' : 'Neuer Termin';
+  document.getElementById('ifId').value = inst?.id||'';
+  document.getElementById('ifMeetingId').value = meetingId;
+  document.getElementById('ifDate').value = inst?.date?.slice?.(0,10)||new Date().toISOString().slice(0,10);
+  document.getElementById('ifTime').value = inst?.time||m?.rhythmTime||'';
+  document.getElementById('ifNotes').value = inst?.notes||'';
+  openModal('instanceFormOv');
+}
+
+async function submitInstanceForm() {
+  const id = document.getElementById('ifId').value;
+  const meetingId = document.getElementById('ifMeetingId').value;
+  const date = document.getElementById('ifDate').value;
+  if (!date) return toast('Datum erforderlich','err');
+  const body = { date, time: document.getElementById('ifTime').value, notes: document.getElementById('ifNotes').value };
+  try {
+    if (id) await api('PUT','/meeting-instances/'+id, body);
+    else await api('POST','/meetings/'+meetingId+'/instances', body);
+    closeModal('instanceFormOv');
+    await fetchData(); renderMeetings(); toast('Termin gespeichert');
+  } catch(e) { toast('Fehler','err'); }
+}
+
+async function setInstanceStatus(id, status) {
+  try {
+    await api('PUT','/meeting-instances/'+id,{status});
+    await fetchData(); renderMeetings();
+  } catch(e) { toast('Fehler','err'); }
+}
+
+async function generateNextInstance(meetingId) {
+  try {
+    await api('POST','/meetings/'+meetingId+'/next-instance');
+    await fetchData(); renderMeetings(); toast('Nächster Termin erstellt');
+  } catch(e) { toast('Fehler','err'); }
+}
+
+function openItemForm(instanceId, id=null) {
+  const allItems = S.meetings.flatMap(m=>m.instances.flatMap(i=>i.items));
+  const item = id ? allItems.find(x=>x.id===id) : null;
+  document.getElementById('itemFormTitle').textContent = item ? 'Punkt bearbeiten' : 'Neuer Besprechungspunkt';
+  document.getElementById('itId').value = item?.id||'';
+  document.getElementById('itInstanceId').value = instanceId;
+  document.getElementById('itTitle').value = item?.title||'';
+  document.getElementById('itDesc').value = item?.description||'';
+  document.getElementById('itDueDate').value = item?.dueDate?.slice?.(0,10)||'';
+  document.getElementById('itMeetingDate').value = item?.meetingDate?.slice?.(0,10)||'';
+  document.getElementById('itStatus').value = item?.status||'open';
+  document.getElementById('itResult').value = item?.result||'';
+  document.getElementById('itDelegateTo').style.display = (item?.status)==='delegate'?'':'none';
+  const delSel = document.getElementById('itDelegatedTo');
+  delSel.innerHTML = S.users.map(u=>`<option value="${u.id}"${item?.delegatedTo===u.id?' selected':''}>${esc(u.name)}</option>`).join('');
+  document.getElementById('itPartUser').innerHTML = S.users.map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('');
+  renderItemParticipants(item?.participants||[]);
+  const fbtn = document.getElementById('itFollowupBtn');
+  fbtn.style.display = (item && item.status==='done') ? '' : 'none';
+  if (item) fbtn.onclick = ()=>openFollowupForm(item.id);
+  document.getElementById('itStatus').onchange = function(){
+    document.getElementById('itDelegateTo').style.display = this.value==='delegate'?'':'none';
+  };
+  openModal('itemFormOv');
+}
+
+function renderItemParticipants(parts) {
+  const roleLabel={required:'Pflicht',invited:'Eingeladen',informed:'Info'};
+  document.getElementById('itParticipantsList').innerHTML = parts.map(p=>{
+    const u=getU(p.userId); if(!u) return '';
+    return`<span style="display:inline-flex;align-items:center;gap:4px;background:var(--bg2);border-radius:12px;padding:2px 8px;font-size:12px" data-user-id="${p.userId}" data-role="${p.role}">
+      <span class="av-sm" style="background:${u.color}">${esc(u.initials)}</span>${esc(u.name)}
+      <span style="color:var(--mu);font-size:10px">${roleLabel[p.role]||p.role}</span>
+      <button style="border:none;background:none;cursor:pointer;color:var(--mu);padding:0 2px;font-size:13px" onclick="removeItemParticipantForm('${p.userId}')">&#215;</button>
+    </span>`;
+  }).join('');
+}
+
+function addItemParticipantForm() {
+  const userId = document.getElementById('itPartUser').value;
+  const role = document.getElementById('itPartRole').value;
+  const list = document.getElementById('itParticipantsList');
+  const existing = list.querySelector(`[data-user-id="${userId}"]`);
+  if (existing) return;
+  const u = getU(userId); if (!u) return;
+  const roleLabel={required:'Pflicht',invited:'Eingeladen',informed:'Info'};
+  const span = document.createElement('span');
+  span.style.cssText='display:inline-flex;align-items:center;gap:4px;background:var(--bg2);border-radius:12px;padding:2px 8px;font-size:12px';
+  span.dataset.userId = userId;
+  span.dataset.role = role;
+  span.innerHTML=`<span class="av-sm" style="background:${u.color}">${esc(u.initials)}</span>${esc(u.name)}<span style="color:var(--mu);font-size:10px">${roleLabel[role]||role}</span><button style="border:none;background:none;cursor:pointer;color:var(--mu);padding:0 2px;font-size:13px" onclick="this.parentElement.remove()">&#215;</button>`;
+  list.appendChild(span);
+}
+
+function removeItemParticipantForm(userId) {
+  const list = document.getElementById('itParticipantsList');
+  const spans = list.querySelectorAll('[data-user-id]');
+  spans.forEach(s=>{ if(s.dataset.userId===userId) s.remove(); });
+}
+
+async function submitItemForm() {
+  const id = document.getElementById('itId').value;
+  const instanceId = document.getElementById('itInstanceId').value;
+  const title = document.getElementById('itTitle').value.trim();
+  if (!title) return toast('Thema erforderlich','err');
+  const status = document.getElementById('itStatus').value;
+  const partEls = document.getElementById('itParticipantsList').children;
+  const participants = [];
+  for (const el of partEls) {
+    if (el.dataset.userId) participants.push({userId:el.dataset.userId, role:el.dataset.role||'required'});
+  }
+  const body = {
+    title, description: document.getElementById('itDesc').value.trim(),
+    status, dueDate: document.getElementById('itDueDate').value||null,
+    meetingDate: document.getElementById('itMeetingDate').value||null,
+    delegatedTo: status==='delegate'?document.getElementById('itDelegatedTo').value:null,
+    result: document.getElementById('itResult').value.trim(),
+    participants,
+  };
+  try {
+    if (id) {
+      await api('PUT','/discussion-items/'+id, body);
+      if (participants.length > 0) {
+        const existing = S.meetings.flatMap(m=>m.instances.flatMap(i=>i.items)).find(x=>x.id===id);
+        for (const p of (existing?.participants||[])) {
+          await api('DELETE',`/discussion-items/${id}/participants/${p.userId}`).catch(()=>{});
+        }
+        for (const p of participants) {
+          await api('POST',`/discussion-items/${id}/participants`, p).catch(()=>{});
+        }
+      }
+    } else {
+      await api('POST','/meeting-instances/'+instanceId+'/items', body);
+    }
+    closeModal('itemFormOv');
+    await fetchData(); renderMeetings(); toast('Gespeichert');
+  } catch(e) { toast('Fehler','err'); }
+}
+
+async function openFollowupForm(itemId) {
+  const allItems = S.meetings.flatMap(m=>m.instances.flatMap(i=>i.items));
+  const item = allItems.find(x=>x.id===itemId);
+  if (!item) return;
+  const instId = S._selInstance;
+  if (!instId) return toast('Bitte erst Termin auswählen','err');
+  const dueDate = prompt('Fällig bis (YYYY-MM-DD, optional):');
+  try {
+    await api('POST',`/discussion-items/${itemId}/followup`, {instanceId: instId, dueDate: dueDate||null});
+    closeModal('itemFormOv');
+    await fetchData(); renderMeetings(); toast('Folgebesprechung erstellt');
+  } catch(e) { toast('Fehler','err'); }
 }

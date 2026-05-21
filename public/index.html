@@ -106,6 +106,8 @@
       <div class="ndiv"></div>
       <div class="ni top" id="ni-docs" onclick="setView('docs')">&#128193; Dokumente</div>
       <div class="ndiv"></div>
+      <div class="ni top" id="ni-meetings" onclick="setView('meetings')">&#128483;&#65039; Besprechungen</div>
+      <div class="ndiv"></div>
       <div class="nsh open" id="msgHdr" onclick="toggleNS('msg')"><span>&#9993;&#65039; Nachrichten <span class="nbdg" id="navMsgBdg" style="display:none">0</span></span><span class="arr">&#9660;</span></div>
       <div class="nsub open" id="msgSub">
         <div class="ni" id="ni-messages" onclick="setView('messages')">&#128235; Eingang</div>
@@ -1383,6 +1385,98 @@
 <div id="qaWrap" style="position:fixed;bottom:24px;right:24px;z-index:1100;display:flex;flex-direction:column;align-items:flex-end;gap:8px">
   <div id="qaMenu" style="display:none;flex-direction:column;align-items:flex-end;gap:6px"></div>
   <button id="qaFab" onclick="toggleQA()" style="width:52px;height:52px;border-radius:50%;background:var(--acc);color:#fff;font-size:26px;font-weight:300;border:none;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;transition:transform .2s,box-shadow .2s;line-height:1">+</button>
+</div>
+
+<!-- MEETING FORM MODAL -->
+<div class="ov" id="meetingFormOv">
+  <div class="modal sm">
+    <div class="mh"><h2 id="meetingFormTitle">Besprechung</h2><button class="mc" onclick="closeModal('meetingFormOv')">&#10005;</button></div>
+    <div class="mb2">
+      <input type="hidden" id="mfId">
+      <div class="fg"><label>Titel *</label><input type="text" id="mfTitle" placeholder="z.B. Technik-Weekly"></div>
+      <div class="fg"><label>Typ</label>
+        <select id="mfType" onchange="onMfTypeChange()">
+          <option value="einmalig">Einmalig</option>
+          <option value="jour_fixe">Jour Fixe (wiederkehrend)</option>
+          <option value="ad_hoc">Ad hoc</option>
+        </select>
+      </div>
+      <div id="mfRhythmDiv" style="display:none">
+        <div class="fg"><label>Rhythmus</label>
+          <select id="mfRhythm">
+            <option value="weekly">W&#246;chentlich</option>
+            <option value="biweekly">Alle 2 Wochen</option>
+            <option value="monthly">Monatlich</option>
+            <option value="daily">T&#228;glich</option>
+          </select>
+        </div>
+        <div class="fg"><label>Uhrzeit</label><input type="time" id="mfRhythmTime"></div>
+      </div>
+      <div class="fg"><label>Beschreibung</label><textarea id="mfDesc" rows="2"></textarea></div>
+    </div>
+    <div class="mf"><button class="btn" onclick="submitMeetingForm()">&#10003; Speichern</button></div>
+  </div>
+</div>
+
+<!-- INSTANCE FORM MODAL -->
+<div class="ov" id="instanceFormOv">
+  <div class="modal sm">
+    <div class="mh"><h2 id="instanceFormTitle">Termin</h2><button class="mc" onclick="closeModal('instanceFormOv')">&#10005;</button></div>
+    <div class="mb2">
+      <input type="hidden" id="ifId">
+      <input type="hidden" id="ifMeetingId">
+      <div class="fg"><label>Datum *</label><input type="date" id="ifDate"></div>
+      <div class="fg"><label>Uhrzeit</label><input type="time" id="ifTime"></div>
+      <div class="fg"><label>Notizen</label><textarea id="ifNotes" rows="2"></textarea></div>
+    </div>
+    <div class="mf"><button class="btn" onclick="submitInstanceForm()">&#10003; Speichern</button></div>
+  </div>
+</div>
+
+<!-- DISCUSSION ITEM FORM MODAL -->
+<div class="ov" id="itemFormOv">
+  <div class="modal" style="max-width:560px">
+    <div class="mh"><h2 id="itemFormTitle">Besprechungspunkt</h2><button class="mc" onclick="closeModal('itemFormOv')">&#10005;</button></div>
+    <div class="mb2">
+      <input type="hidden" id="itId">
+      <input type="hidden" id="itInstanceId">
+      <div class="fg"><label>Thema *</label><input type="text" id="itTitle"></div>
+      <div class="fg"><label>Beschreibung</label><textarea id="itDesc" rows="2"></textarea></div>
+      <div style="display:flex;gap:12px">
+        <div class="fg" style="flex:1"><label>F&#228;llig bis</label><input type="date" id="itDueDate"></div>
+        <div class="fg" style="flex:1"><label>Besprochen am</label><input type="date" id="itMeetingDate"></div>
+      </div>
+      <div class="fg"><label>Status</label>
+        <select id="itStatus">
+          <option value="open">&#128308; Zu besprechen</option>
+          <option value="done">&#9989; Besprochen</option>
+          <option value="redo">&#128260; Nochmal besprechen</option>
+          <option value="delegate">&#128101; Delegiert</option>
+        </select>
+      </div>
+      <div class="fg" id="itDelegateTo" style="display:none"><label>Delegiert an</label><select id="itDelegatedTo"></select></div>
+      <div class="fg"><label>Ergebnis / Notiz</label><textarea id="itResult" rows="2"></textarea></div>
+      <div class="fg">
+        <label>Teilnehmer</label>
+        <div id="itParticipantsList" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px"></div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="itPartUser" style="flex:1"></select>
+          <select id="itPartRole" style="width:130px">
+            <option value="required">Pflicht</option>
+            <option value="invited">Eingeladen</option>
+            <option value="informed">Informiert</option>
+          </select>
+          <button class="btn-s" onclick="addItemParticipantForm()">+</button>
+        </div>
+      </div>
+    </div>
+    <div class="mf" style="justify-content:space-between">
+      <div>
+        <button class="btn-s" id="itFollowupBtn" onclick="openFollowupForm()" style="display:none">&#128257; Folgebesprechung</button>
+      </div>
+      <button class="btn" onclick="submitItemForm()">&#10003; Speichern</button>
+    </div>
+  </div>
 </div>
 
 <script src="/app.js"></script>
