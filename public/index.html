@@ -1571,10 +1571,8 @@
     <div class="mb2">
       <input type="hidden" id="dpEpfEmpId">
       <div class="fg"><label>Mitarbeiter</label><select id="dpEpfEmp" onchange="document.getElementById('dpEpfEmpId').value=this.value"></select></div>
-      <div style="display:flex;gap:12px">
-        <div class="fg" style="flex:1"><label>Wochenstunden</label><input type="number" id="dpEpfWeekly" value="40" step="0.5" min="4" max="60"></div>
-        <div class="fg" style="flex:1"><label>Arbeitstage/Woche</label><input type="number" id="dpEpfWorkDays" value="5" min="1" max="7"></div>
-      </div>
+      <div class="fg"><label>Monatsstunden (Soll)</label><input type="number" id="dpEpfMonthly" value="160" step="1" min="10" max="300" placeholder="z.B. 160">
+        <small style="color:var(--mu);font-size:11px">Durchschnittliche Sollstunden pro Monat (Vollzeit ≈ 173h)</small></div>
       <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:4px">
         <label class="rck"><input type="checkbox" id="dpEpfNights" checked> Nachtdienste m&#246;glich</label>
         <label class="rck"><input type="checkbox" id="dpEpfDoubleNights" checked> Doppeln&#228;chte erlaubt</label>

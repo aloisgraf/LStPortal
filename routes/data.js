@@ -8,7 +8,7 @@ router.get('/', auth, async (req,res) => {
   try {
     const uid=req.uid, p=req.p, tp=req.tp, roles=p.roles;
     const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
-           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw] = await Promise.all([
+           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw,dpQualificationsRaw] = await Promise.all([
       q('SELECT id,name,initials,roles,color,must_change_pw,last_seen FROM users ORDER BY name'),
       q('SELECT * FROM categories ORDER BY sort_order,label'),
       q('SELECT * FROM tags ORDER BY label'),
@@ -56,6 +56,7 @@ router.get('/', auth, async (req,res) => {
       q('SELECT * FROM dp_shift_types ORDER BY sort_order, name').catch(()=>[]),
       q('SELECT * FROM dp_absence_types ORDER BY sort_order, label').catch(()=>[]),
       q('SELECT * FROM dp_plans ORDER BY year DESC, month DESC').catch(()=>[]),
+      q('SELECT * FROM dp_employee_qualifications').catch(()=>[]),
     ]);
 
     const tkViewMap = new Map((tkViewsRaw||[]).map(v=>[v.ticket_id, v.viewed_at]));
@@ -206,6 +207,7 @@ router.get('/', auth, async (req,res) => {
       dpShiftTypes: dpShiftTypesRaw||[],
       dpAbsenceTypes: dpAbsenceTypesRaw||[],
       dpPlans: dpPlansRaw||[],
+      dpQualifications: dpQualificationsRaw||[],
     });
   } catch(e) { console.error('[/api/data FEHLER]', e.message, e.stack?.split('\n')[1]); bad(res,'Serverfehler',500); }
 });

@@ -134,25 +134,57 @@ router.get('/employee-params', auth, async (req,res) => {
 
 router.post('/employee-params', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
-  const {employeeId,weeklyHours,workDaysPerWeek,canDoNights,maxNightsPerMonth,doubleNightsAllowed,isSpringer,springerConfig,locations} = req.body;
+  const {employeeId,monthlyHours,canDoNights,maxNightsPerMonth,doubleNightsAllowed,isSpringer} = req.body;
   if (!employeeId) return bad(res,'Mitarbeiter erforderlich',400);
+  const mh = parseFloat(monthlyHours)||160;
+  // weekly_hours stored for legacy compatibility (monthly / 4.33)
+  const wh = Math.round(mh / 4.33 * 100) / 100;
   try {
     const existing = await q1('SELECT id FROM dp_employee_params WHERE employee_id=$1',[employeeId]);
     if (existing) {
       const row = await q1(
-        `UPDATE dp_employee_params SET weekly_hours=$1,work_days_per_week=$2,can_do_nights=$3,
-         max_nights_per_month=$4,double_nights_allowed=$5,is_springer=$6,springer_config=$7,
-         locations=$8,updated_at=NOW() WHERE employee_id=$9 RETURNING *`,
-        [weeklyHours||40,workDaysPerWeek||5,canDoNights!==false,maxNightsPerMonth||null,doubleNightsAllowed!==false,!!isSpringer,JSON.stringify(springerConfig||{}),JSON.stringify(locations||[]),employeeId]
+        `UPDATE dp_employee_params SET monthly_hours=$1,weekly_hours=$2,can_do_nights=$3,
+         max_nights_per_month=$4,double_nights_allowed=$5,is_springer=$6,updated_at=NOW() WHERE employee_id=$7 RETURNING *`,
+        [mh,wh,canDoNights!==false,maxNightsPerMonth||null,doubleNightsAllowed!==false,!!isSpringer,employeeId]
       );
       return ok(res,row);
     }
     const row = await q1(
-      `INSERT INTO dp_employee_params (id,employee_id,weekly_hours,work_days_per_week,can_do_nights,max_nights_per_month,double_nights_allowed,is_springer,springer_config,locations,created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-      [newId(),employeeId,weeklyHours||40,workDaysPerWeek||5,canDoNights!==false,maxNightsPerMonth||null,doubleNightsAllowed!==false,!!isSpringer,JSON.stringify(springerConfig||{}),JSON.stringify(locations||[]),req.uid]
+      `INSERT INTO dp_employee_params (id,employee_id,monthly_hours,weekly_hours,work_days_per_week,can_do_nights,max_nights_per_month,double_nights_allowed,is_springer,springer_config,locations,created_by)
+       VALUES ($1,$2,$3,$4,5,$5,$6,$7,$8,'{}','[]',$9) RETURNING *`,
+      [newId(),employeeId,mh,wh,canDoNights!==false,maxNightsPerMonth||null,doubleNightsAllowed!==false,!!isSpringer,req.uid]
+      /* Note: work_days_per_week literal 5 kept for schema compat, no longer user-input */
     );
     ok(res,row);
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+// ── EMPLOYEE QUALIFICATIONS ───────────────────────────────────────────────────
+
+router.get('/employee-qualifications', auth, async (req,res) => {
+  try { ok(res, await q('SELECT * FROM dp_employee_qualifications ORDER BY employee_id, shift_type_id')); }
+  catch(e) { bad(res,'Serverfehler',500); }
+});
+
+router.post('/employee-qualifications', auth, async (req,res) => {
+  if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+  const {employeeId, shiftTypeId} = req.body;
+  if (!employeeId||!shiftTypeId) return bad(res,'Pflichtfelder fehlen',400);
+  try {
+    const row = await q1(
+      `INSERT INTO dp_employee_qualifications (id,employee_id,shift_type_id,created_by) VALUES ($1,$2,$3,$4)
+       ON CONFLICT (employee_id,shift_type_id) DO NOTHING RETURNING *`,
+      [newId(),employeeId,shiftTypeId,req.uid]
+    );
+    ok(res, row||{employeeId,shiftTypeId});
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+router.delete('/employee-qualifications/:empId/:stId', auth, async (req,res) => {
+  if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+  try {
+    await q('DELETE FROM dp_employee_qualifications WHERE employee_id=$1 AND shift_type_id=$2',[req.params.empId,req.params.stId]);
+    ok(res);
   } catch(e) { bad(res,'Serverfehler',500); }
 });
 
@@ -438,177 +470,178 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
     const plan = await q1('SELECT * FROM dp_plans WHERE id=$1',[req.params.id]);
     if (!plan) return bad(res,'Plan nicht gefunden',404);
 
-    const [shiftTypes,requirements,empParams,users,existingAssignments,wishDays,absenceTypes] = await Promise.all([
+    const [shiftTypes,requirements,empParams,existingAssignments,wishDays,absenceTypes,qualifications] = await Promise.all([
       q('SELECT * FROM dp_shift_types ORDER BY sort_order'),
       q('SELECT * FROM dp_shift_requirements'),
       q('SELECT * FROM dp_employee_params'),
-      q('SELECT id,name FROM users WHERE id IN (SELECT employee_id FROM dp_employee_params)'),
       q('SELECT * FROM dp_assignments WHERE plan_id=$1',[req.params.id]),
       q('SELECT * FROM dp_wish_days WHERE month=$1 AND year=$2',[plan.month,plan.year]),
       q('SELECT * FROM dp_absence_types'),
+      q('SELECT * FROM dp_employee_qualifications'),
     ]);
 
     const daysInMonth = new Date(plan.year, plan.month, 0).getDate();
     const AT_HOLIDAYS = getAustrianHolidays(plan.year);
 
-    // Build all required slots
+    // Build qualification map: shiftTypeId -> Set of qualified empIds
+    // If no qualifications defined for a shift type, ALL employees can do it
+    const qualMap = {};
+    for (const q_ of qualifications) {
+      if (!qualMap[q_.shift_type_id]) qualMap[q_.shift_type_id] = new Set();
+      qualMap[q_.shift_type_id].add(q_.employee_id);
+    }
+
+    // Build all required slots, sorted: nights first → weekends → date
     const slots = [];
     for (let d = 1; d <= daysInMonth; d++) {
       const date = new Date(plan.year, plan.month-1, d);
       const dateStr = date.toISOString().slice(0,10);
       const wd = date.getDay();
-      const isWeekend = wd===0||wd===6;
-      const isHoliday = !!AT_HOLIDAYS[dateStr];
-      const dayInfo = {date:dateStr, weekday:wd, isWeekend, isHoliday};
-
+      const dayInfo = {date:dateStr, weekday:wd, isWeekend:wd===0||wd===6, isHoliday:!!AT_HOLIDAYS[dateStr]};
       for (const st of shiftTypes) {
         const needed = getRequiredCount(requirements, st.id, dayInfo);
-        // Count already assigned (non-absence) for this date+shift
         const alreadyFilled = existingAssignments.filter(a=>
           a.date?.toString().slice(0,10)===dateStr && a.shift_type_id===st.id && !a.absence_type_id
         ).length;
-        const toFill = needed - alreadyFilled;
-        for (let slot = 0; slot < toFill; slot++) {
+        for (let i = 0; i < needed - alreadyFilled; i++) {
           slots.push({...dayInfo, shiftTypeId:st.id, shiftType:st});
         }
       }
     }
-
-    // Sort: nights first, then weekends, then by date
     slots.sort((a,b) => {
       if (a.shiftType.is_night !== b.shiftType.is_night) return a.shiftType.is_night ? -1 : 1;
-      if (a.isWeekend !== b.isWeekend) return a.isWeekend ? -1 : 1;
+      if ((a.isWeekend||a.isHoliday) !== (b.isWeekend||b.isHoliday)) return (a.isWeekend||a.isHoliday) ? -1 : 1;
       return a.date.localeCompare(b.date);
     });
 
     // Build employee state
-    const empState = {};
     const empParamMap = {};
+    const empState = {};
     for (const p of empParams) {
       empParamMap[p.employee_id] = p;
+      const monthlyTarget = parseFloat(p.monthly_hours)||160;
       empState[p.employee_id] = {
+        monthlyTarget,
         hoursAssigned: 0,
         nightsAssigned: 0,
         weekendsAssigned: 0,
+        // weekly hours tracking: weekKey (YYYY-Www) -> hours
+        weeklyHours: {},
         assignments: existingAssignments.filter(a=>a.employee_id===p.employee_id).map(a=>({
-          ...a, date: a.date?.toString().slice(0,10)
+          ...a, date: a.date?.toString().slice(0,10),
+          shiftType: shiftTypes.find(s=>s.id===a.shift_type_id)||null,
         })),
       };
+      // Seed with existing assignment hours
+      for (const a of empState[p.employee_id].assignments) {
+        if (!a.absence_type_id) {
+          empState[p.employee_id].hoursAssigned += parseFloat(a.hours_credited)||0;
+          const wk = getISOWeek(a.date);
+          empState[p.employee_id].weeklyHours[wk] = (empState[p.employee_id].weeklyHours[wk]||0) + (parseFloat(a.hours_credited)||0);
+        }
+      }
     }
 
-    // Wish days as a set for quick lookup: employeeId+date
     const wishSet = new Set(wishDays.map(w=>`${w.employee_id}_${w.date?.toString().slice(0,10)||w.date}`));
-    // Blocked by absence
     const absenceSet = new Set(existingAssignments.filter(a=>a.absence_type_id).map(a=>`${a.employee_id}_${a.date?.toString().slice(0,10)}`));
 
     const newAssignments = [];
 
     for (const slot of slots) {
+      const slotHours = parseFloat(slot.shiftType.duration_hours)||0;
+      const slotEndH = getShiftEndHour(slot.shiftType);
       const candidates = [];
 
       for (const [empId, state] of Object.entries(empState)) {
         const params = empParamMap[empId];
         if (!params) continue;
 
+        // Hard: qualification check (only if qualifications are defined for this shift type)
+        if (qualMap[slot.shiftTypeId] && !qualMap[slot.shiftTypeId].has(empId)) continue;
+
         // Hard: blocked by absence
         if (absenceSet.has(`${empId}_${slot.date}`)) continue;
-        // Hard: already assigned this day
-        if (state.assignments.some(a=>a.date===slot.date && !a.absence_type_id)) continue;
+
+        // Hard: already has a shift on this day
+        if (state.assignments.some(a=>a.date===slot.date && a.shift_type_id && !a.absence_type_id)) continue;
+
+        // Hard: monthly hours cap — don't exceed target (allow up to +shift for last slot)
+        if (state.hoursAssigned >= state.monthlyTarget) continue;
+
+        // Hard: Austrian law — 48h/week cap
+        const wk = getISOWeek(slot.date);
+        if ((state.weeklyHours[wk]||0) + slotHours > 48) continue;
+
         // Hard: night restriction
         if (slot.shiftType.is_night && !params.can_do_nights) continue;
-        // Hard: max nights
-        if (slot.shiftType.is_night && params.max_nights_per_month!==null && state.nightsAssigned >= params.max_nights_per_month) continue;
-        // Hard: wish day (respect if possible — will score poorly, not excluded)
+
+        // Hard: max nights/month
+        if (slot.shiftType.is_night && params.max_nights_per_month!==null &&
+            state.nightsAssigned >= params.max_nights_per_month) continue;
+
+        // Hard: Austrian Arbeitszeitgesetz — 11h minimum rest between shifts
+        // Check previous shift end + 11h <= this shift start
+        // Check this shift end + 11h <= next already-assigned shift start
+        if (!checkRestPeriod(state.assignments, slot, shiftTypes)) continue;
+
+        // Hard: max 6 consecutive days
+        if (getConsecutiveDays(state.assignments, slot.date) >= 6) continue;
+
         const isWishDay = wishSet.has(`${empId}_${slot.date}`);
-
-        // Hard: rest period check (simplified: check previous and next day)
-        const slotDate = new Date(slot.date);
-        let restViolation = false;
-        for (const prev of state.assignments) {
-          if (!prev.date || prev.absence_type_id) continue;
-          const prevDate = new Date(prev.date);
-          const diffDays = Math.abs((slotDate - prevDate) / 86400000);
-          if (diffDays < 0.01) { restViolation = true; break; } // same day
-          // After night: 1 day off
-          const prevSt = shiftTypes.find(s=>s.id===prev.shift_type_id);
-          if (prevSt?.is_night && diffDays < 1.5) { restViolation = true; break; }
-          // Before night: check last assignment is not too close
-          if (slot.shiftType.is_night && diffDays < 0.5) { restViolation = true; break; }
-        }
-        if (restViolation) continue;
-
-        // Score (lower = preferred)
-        const workDays = getWorkDaysInMonth(plan.year, plan.month, AT_HOLIDAYS);
-        const dailyTarget = parseFloat(params.weekly_hours) / parseInt(params.work_days_per_week);
-        const monthTarget = workDays * dailyTarget;
-        const hoursDeficit = monthTarget - state.hoursAssigned;
-        let score = -hoursDeficit; // prefer employees who need more hours
+        const hoursDeficit = state.monthlyTarget - state.hoursAssigned;
+        let score = -hoursDeficit;
         if (slot.shiftType.is_night) score += state.nightsAssigned * 50;
-        if (slot.isWeekend) score += state.weekendsAssigned * 30;
-        if (isWishDay) score += 10000; // heavy penalty for wish day
+        if (slot.isWeekend || slot.isHoliday) score += state.weekendsAssigned * 30;
+        if (isWishDay) score += 10000;
 
         candidates.push({empId, score});
       }
 
-      if (candidates.length === 0) continue; // slot stays open
+      if (candidates.length === 0) continue;
 
       candidates.sort((a,b)=>a.score-b.score);
       const winnerId = candidates[0].empId;
       const st = slot.shiftType;
-
       const assignment = {
-        id: newId(),
-        plan_id: plan.id,
-        employee_id: winnerId,
-        date: slot.date,
-        shift_type_id: slot.shiftTypeId,
-        absence_type_id: null,
-        hours_credited: parseFloat(st.duration_hours)||0,
-        hours_source: 'shift',
-        is_overtime: false,
-        is_locked: false,
-        source: 'generated',
-        notes: '',
-        created_by: req.uid,
+        id: newId(), plan_id: plan.id, employee_id: winnerId,
+        date: slot.date, shift_type_id: slot.shiftTypeId, absence_type_id: null,
+        hours_credited: slotHours, hours_source: 'shift',
+        is_overtime: false, is_locked: false, source: 'generated', notes: '',
+        created_by: req.uid, shiftType: st,
       };
-
       newAssignments.push(assignment);
 
-      // Update state
       const state = empState[winnerId];
-      state.hoursAssigned += parseFloat(st.duration_hours)||0;
+      state.hoursAssigned += slotHours;
+      const wk = getISOWeek(slot.date);
+      state.weeklyHours[wk] = (state.weeklyHours[wk]||0) + slotHours;
       if (st.is_night) state.nightsAssigned++;
-      if (slot.isWeekend) state.weekendsAssigned++;
+      if (slot.isWeekend||slot.isHoliday) state.weekendsAssigned++;
       state.assignments.push(assignment);
     }
 
-    // Insert all new assignments
     if (newAssignments.length > 0) {
       for (const a of newAssignments) {
         await pool.query(
           `INSERT INTO dp_assignments (id,plan_id,employee_id,date,shift_type_id,absence_type_id,hours_credited,hours_source,is_overtime,is_locked,source,notes,created_by)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-          [a.id,a.plan_id,a.employee_id,a.date,a.shift_type_id,a.absence_type_id,a.hours_credited,a.hours_source,false,false,'generated',a.notes,a.created_by]
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,false,false,'generated',$9,$10)`,
+          [a.id,a.plan_id,a.employee_id,a.date,a.shift_type_id,null,a.hours_credited,'shift',a.notes,a.created_by]
         ).catch(()=>{});
       }
     }
 
-    // Update plan
     await pool.query(`UPDATE dp_plans SET generated_at=NOW(),generated_by=$1,status='reviewed' WHERE id=$2`,[req.uid,plan.id]);
 
-    // Check wish day violations
     const violatedWishDays = [];
     for (const wd of wishDays) {
       const wdDate = wd.date?.toString().slice(0,10)||wd.date;
-      const assigned = [...newAssignments, ...existingAssignments].find(a=>
+      const assigned = [...newAssignments,...existingAssignments].find(a=>
         a.employee_id===wd.employee_id && a.date?.toString().slice(0,10)===wdDate && a.shift_type_id && !a.absence_type_id
       );
       if (assigned) violatedWishDays.push(wd.id);
     }
-    if (violatedWishDays.length > 0) {
-      for (const id of violatedWishDays) {
-        await pool.query(`UPDATE dp_wish_days SET status='violated' WHERE id=$1`,[id]).catch(()=>{});
-      }
+    for (const id of violatedWishDays) {
+      await pool.query(`UPDATE dp_wish_days SET status='violated' WHERE id=$1`,[id]).catch(()=>{});
     }
 
     ok(res, {generated: newAssignments.length, total: slots.length, violations: violatedWishDays.length});
@@ -718,6 +751,84 @@ function getAustrianHolidays(year) {
 function getEasterDate(year) {
   const a=year%19,b=Math.floor(year/100),c=year%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),month=Math.floor((h+l-7*m+114)/31),day=((h+l-7*m+114)%31)+1;
   return new Date(year,month-1,day);
+}
+
+// Returns ISO week string YYYY-Www for a date string
+function getISOWeek(dateStr) {
+  const d = new Date(dateStr);
+  const day = d.getDay()||7;
+  d.setDate(d.getDate() + 4 - day);
+  const yearStart = new Date(d.getFullYear(), 0, 1);
+  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return `${d.getFullYear()}-W${String(weekNo).padStart(2,'0')}`;
+}
+
+// Returns decimal hour when shift ends (handles overnight: end_time < start_time adds 24)
+function getShiftEndHour(st) {
+  const [sh, sm] = (st.start_time||'08:00').split(':').map(Number);
+  const [eh, em] = (st.end_time||'20:00').split(':').map(Number);
+  const startH = sh + sm/60;
+  let endH = eh + em/60;
+  if (endH <= startH) endH += 24;
+  return endH;
+}
+
+function getShiftStartHour(st) {
+  const [h, m] = (st.start_time||'08:00').split(':').map(Number);
+  return h + m/60;
+}
+
+// Check 11h rest period (Austrian AZG §12)
+function checkRestPeriod(assignments, slot, shiftTypes) {
+  const slotStartH = getShiftStartHour(slot.shiftType);
+  const slotEndH   = getShiftEndHour(slot.shiftType);
+
+  for (const a of assignments) {
+    if (!a.date || a.absence_type_id || !a.shift_type_id) continue;
+    const prevSt = a.shiftType || shiftTypes.find(s=>s.id===a.shift_type_id);
+    if (!prevSt) continue;
+
+    const diffDays = (new Date(slot.date) - new Date(a.date)) / 86400000;
+    if (Math.abs(diffDays) > 2) continue; // far enough apart, skip
+
+    if (diffDays === 0) return false; // same day
+
+    const prevStartH = getShiftStartHour(prevSt);
+    const prevEndH   = getShiftEndHour(prevSt);
+
+    if (diffDays > 0) {
+      // prev is before slot: prev shift ends at (prevEndH + diffDays*24) before slot
+      // slot starts at slotStartH on slot.date
+      // rest = slotStartH - (prevEndH - diffDays*24 relative to slot date)
+      // Simplified: absolute hours
+      const prevEndAbs = prevEndH; // hours from midnight of prev.date
+      const slotStartAbs = slotStartH + diffDays * 24; // hours from midnight of prev.date
+      if (slotStartAbs - prevEndAbs < 11) return false;
+    } else {
+      // prev is after slot (diffDays < 0): slot ends, then prev starts
+      const slotEndAbs = slotEndH; // hours from midnight of slot.date
+      const prevStartAbs = prevStartH + Math.abs(diffDays) * 24;
+      if (prevStartAbs - slotEndAbs < 11) return false;
+    }
+  }
+  return true;
+}
+
+// Count consecutive days worked up to (not including) targetDate
+function getConsecutiveDays(assignments, targetDate) {
+  const worked = new Set(assignments
+    .filter(a=>!a.absence_type_id && a.shift_type_id)
+    .map(a=>a.date)
+  );
+  let count = 0;
+  let d = new Date(targetDate);
+  d.setDate(d.getDate() - 1);
+  while (worked.has(d.toISOString().slice(0,10))) {
+    count++;
+    d.setDate(d.getDate() - 1);
+    if (count > 7) break;
+  }
+  return count;
 }
 
 module.exports = router;

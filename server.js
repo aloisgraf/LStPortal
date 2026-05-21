@@ -421,6 +421,14 @@ async function initDB() {
   reason TEXT DEFAULT '',
   performed_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
 )`,
+    `CREATE TABLE IF NOT EXISTS dp_employee_qualifications (
+  id TEXT PRIMARY KEY,
+  employee_id TEXT NOT NULL,
+  shift_type_id TEXT NOT NULL,
+  created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(employee_id, shift_type_id)
+)`,
+    `ALTER TABLE dp_employee_params ADD COLUMN IF NOT EXISTS monthly_hours NUMERIC(6,2) NOT NULL DEFAULT 160`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }

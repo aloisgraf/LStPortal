@@ -53,7 +53,7 @@ let S={
   checklists:[],messages:[],notifications:[],abrechnung:{einspringer:[],homeoffice:[]},dienstplaene:[],
   p:{canApproveEvents:false,canSendMessages:false,seeAllEntries:true,editAllPersonal:false,addForOthers:false,addGeneral:false,manageUsers:false,seeAllAllw:false,editAllw:false,seeAllAbrechnung:false},
   tp:{seeAll:false,editAll:false,myDepts:[],canSetPublic:false,canAssign:false,canSeeSubcat:false,canEditSubcat:false,roles:[]},
-  dpPlans:[], dpShiftTypes:[], dpAbsenceTypes:[], dpEmpParams:[],
+  dpPlans:[], dpShiftTypes:[], dpAbsenceTypes:[], dpEmpParams:[], dpQualifications:[],
   _dpPlanId:null, _dpMatrix:null, _dpStatsExpanded:false, _dpConfigTab:'shift-types',
 };
 async function api(method,path2,body){
@@ -83,6 +83,7 @@ async function fetchData(){
     S.dpShiftTypes=data.dpShiftTypes||[];
     S.dpAbsenceTypes=data.dpAbsenceTypes||[];
     S.dpPlans=data.dpPlans||[];
+    S.dpQualifications=data.dpQualifications||[];
     S.currentUser=data.currentUser;S.p=data.permissions||{};
     const u=getU(S.currentUser);const roles=u?.roles||['standard'];
     const has=(...r)=>r.some(x=>roles.includes(x));
@@ -3954,6 +3955,7 @@ async function renderDPConfig() {
     {id:'shift-types',label:'Schichttypen'},
     {id:'absence-types',label:'Abwesenheiten'},
     {id:'emp-params',label:'Mitarbeiter-Param.'},
+    {id:'qualifications',label:'Qualifikationen'},
     {id:'requirements',label:'Schichtbedarf'},
   ];
 
@@ -3963,6 +3965,7 @@ async function renderDPConfig() {
   if (tab === 'shift-types') content = await renderDPConfigShiftTypes();
   else if (tab === 'absence-types') content = await renderDPConfigAbsenceTypes();
   else if (tab === 'emp-params') content = await renderDPConfigEmpParams();
+  else if (tab === 'qualifications') content = await renderDPConfigQualifications();
   else if (tab === 'requirements') content = await renderDPConfigRequirements();
 
   el.innerHTML = `<div style="display:flex;flex-direction:column;height:calc(100vh - 56px)">
@@ -4029,7 +4032,7 @@ async function renderDPConfigEmpParams() {
     return `<div class="dp-cfg-row">
       <span class="av-sm" style="background:${u.color}">${esc(u.initials)}</span>
       <span class="dp-cfg-label">${esc(u.name)}</span>
-      <span style="font-size:11px;color:var(--mu)">${p.weekly_hours}h/Wo · ${p.work_days_per_week}d${p.can_do_nights?' 🌙':''}${p.is_springer?' 🔄':''}</span>
+      <span style="font-size:11px;color:var(--mu)">${p.monthly_hours||Math.round(p.weekly_hours*4.33)}h/Mo${p.can_do_nights?' 🌙':''}${p.is_springer?' 🔄':''}</span>
       <button class="btn-s" onclick="openDpEmpParamForm('${u.id}')">✏️</button>
     </div>`;
   }).join('');
@@ -4059,6 +4062,60 @@ async function renderDPConfigRequirements() {
     <h3>Schichtbedarf <button class="btn-p" style="float:right;font-size:11px" onclick="openDpReqForm()">+ Hinzufügen</button></h3>
     ${rows||'<div style="color:var(--mu);font-size:13px">Noch kein Bedarf definiert.</div>'}
   </div>`;
+}
+
+async function renderDPConfigQualifications() {
+  let qualifications = [];
+  try { qualifications = await api('GET', '/dp/employee-qualifications'); } catch(e) {}
+  S.dpQualifications = qualifications;
+
+  const shiftTypes = S.dpShiftTypes;
+  if (!shiftTypes.length) return '<div style="color:var(--mu)">Zuerst Schichttypen anlegen.</div>';
+
+  // Build map: empId -> Set of shiftTypeIds
+  const qualMap = {};
+  for (const q of qualifications) {
+    if (!qualMap[q.employee_id]) qualMap[q.employee_id] = new Set();
+    qualMap[q.employee_id].add(q.shift_type_id);
+  }
+
+  const rows = S.users.map(u => {
+    const empQuals = qualMap[u.id] || new Set();
+    const chips = shiftTypes.map(st => {
+      const has = empQuals.has(st.id);
+      return `<span style="display:inline-flex;align-items:center;gap:4px;background:${has?st.color+'20':'var(--bg)'};color:${has?st.color:'var(--mu)'};border:1px solid ${has?st.color:'var(--border)'};border-radius:20px;padding:2px 10px;font-size:12px;cursor:pointer;font-weight:${has?'700':'400'}" onclick="toggleDpQualification('${u.id}','${st.id}',${has})" title="${has?'Entfernen':'Hinzufügen'}">
+        ${esc(st.code)}
+      </span>`;
+    }).join(' ');
+    return `<div class="dp-cfg-row">
+      <span class="av-sm" style="background:${u.color}">${esc(u.initials)}</span>
+      <span class="dp-cfg-label" style="min-width:120px">${esc(u.name)}</span>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;flex:1">${chips}</div>
+    </div>`;
+  }).join('');
+
+  const anyDefined = qualifications.length > 0;
+  const infoText = anyDefined
+    ? `<div style="color:var(--mu);font-size:12px;margin-bottom:10px">Nur markierte Schichttypen werden beim Auto-Generieren für den jeweiligen Mitarbeiter berücksichtigt. Schichttypen ohne <em>jegliche</em> Qualifikation können von allen vergeben werden.</div>`
+    : `<div style="color:#f59e0b;font-size:12px;margin-bottom:10px">⚠️ Noch keine Qualifikationen definiert — der Scheduler kann jeden Mitarbeiter für jeden Dienst einteilen.</div>`;
+
+  return `<div class="dp-cfg-card">
+    <h3>Schicht-Qualifikationen</h3>
+    ${infoText}
+    ${rows}
+  </div>`;
+}
+
+async function toggleDpQualification(empId, shiftTypeId, currentlyHas) {
+  try {
+    if (currentlyHas) {
+      await api('DELETE', `/dp/employee-qualifications/${empId}/${shiftTypeId}`);
+    } else {
+      await api('POST', '/dp/employee-qualifications', {employeeId:empId, shiftTypeId});
+    }
+    S._dpConfigTab = 'qualifications';
+    renderDPConfig();
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
 }
 
 function openDpShiftTypeForm(jsonStr) {
@@ -4175,8 +4232,7 @@ function openDpEmpParamForm(empId) {
   const empSel = document.getElementById('dpEpfEmp');
   empSel.innerHTML = S.users.map(u=>`<option value="${u.id}"${u.id===empId?' selected':''}>${esc(u.name)}</option>`).join('');
   document.getElementById('dpEpfEmpId').value = empId||'';
-  document.getElementById('dpEpfWeekly').value = p?.weekly_hours||40;
-  document.getElementById('dpEpfWorkDays').value = p?.work_days_per_week||5;
+  document.getElementById('dpEpfMonthly').value = p?.monthly_hours || (p?.weekly_hours ? Math.round(p.weekly_hours*4.33) : 160);
   document.getElementById('dpEpfNights').checked = p ? !!p.can_do_nights : true;
   document.getElementById('dpEpfDoubleNights').checked = p ? !!p.double_nights_allowed : true;
   document.getElementById('dpEpfSpringer').checked = !!p?.is_springer;
@@ -4189,8 +4245,7 @@ async function submitDpEmpParamForm() {
   if (!empId) return toast('Mitarbeiter auswählen','err');
   const body = {
     employeeId: empId,
-    weeklyHours: parseFloat(document.getElementById('dpEpfWeekly').value)||40,
-    workDaysPerWeek: parseInt(document.getElementById('dpEpfWorkDays').value)||5,
+    monthlyHours: parseFloat(document.getElementById('dpEpfMonthly').value)||160,
     canDoNights: document.getElementById('dpEpfNights').checked,
     doubleNightsAllowed: document.getElementById('dpEpfDoubleNights').checked,
     isSpringer: document.getElementById('dpEpfSpringer').checked,
