@@ -3610,9 +3610,20 @@ async function openFollowupForm(itemId) {
   } catch(e) { toast('Fehler','err'); }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// DIENSTPLAN (DP) — PLANERSTELLUNG
-// ═══════════════════════════════════════════════════════════════════════════
+// Returns a readable text color for a given hex background color
+function dpTextColor(hex) {
+  if (!hex || hex.length < 7) return '#333';
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  // Perceived luminance (0–1)
+  const lum = (0.299*r + 0.587*g + 0.114*b) / 255;
+  if (lum > 0.55) {
+    // Light color → darken significantly for readable text
+    return `#${[r,g,b].map(c=>Math.max(0,Math.floor(c*0.40)).toString(16).padStart(2,'0')).join('')}`;
+  }
+  return hex;
+}
 
 const MONTH_NAMES=['Jänner','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const WD_SHORT=['So','Mo','Di','Mi','Do','Fr','Sa'];
@@ -3739,7 +3750,7 @@ function renderDPMatrix(data) {
       const label = at ? at.code : (st ? st.code : '?');
       const color = at ? at.color : (st ? st.color : '#ccc');
       const title = [at?.label, st?.name].filter(Boolean).join(' + ');
-      const style = `background:${color}20;color:${color};font-weight:700`;
+      const style = `background:${color}22;color:${dpTextColor(color)};font-weight:700`;
       if (canEdit) {
         return `<td class="dp-cell" style="${style}" onclick="openDpCellMenu('${emp.id}','${d.date}',event)" title="${esc(title)}">${esc(label)}</td>`;
       }
@@ -4386,7 +4397,7 @@ async function renderDPMine() {
       if (a) {
         const color = at ? at.color : (st ? st.color : '#ccc');
         const label = at ? at.code : (st ? st.code : '');
-        content = `<span style="background:${color}20;color:${color};border-radius:4px;padding:2px 6px;font-weight:700;font-size:12px">${esc(label)}</span>`;
+        content = `<span style="background:${color}22;color:${dpTextColor(color)};border-radius:4px;padding:2px 6px;font-weight:700;font-size:12px">${esc(label)}</span>`;
         if (at && st) content += `<br><span style="font-size:10px;color:var(--mu)">${esc(st.code)}</span>`;
       }
       const wishBadge = wd ? `<span title="Wunschtag${wd.status==='violated'?' (verletzt)':''}" style="font-size:12px">${wd.status==='violated'?'❌':'⭐'}</span>` : '';
