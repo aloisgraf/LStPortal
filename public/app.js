@@ -3642,8 +3642,9 @@ function renderDP() {
       ${activePlan?`<span style="color:${statusColor[st]};font-weight:600;font-size:12px">${statusLabel[st]}</span>`:''}
       <div style="flex:1"></div>
       ${canEdit?`<button class="btn-s" onclick="openDpPlanForm()">+ Neuer Plan</button>`:''}
-      ${canEdit&&activePlan&&st==='draft'?`<button class="btn-s" onclick="generateDpPlan('${activePlan.id}')">⚡ Auto-Generieren</button>`:''}
+      ${canEdit&&activePlan&&st!=='published'?`<button class="btn-s" onclick="generateDpPlan('${activePlan.id}')">⚡ Auto-Generieren</button>`:''}
       ${canEdit&&activePlan&&st!=='published'?`<button class="btn-p" onclick="publishDpPlan('${activePlan.id}')">✓ Freigeben</button>`:''}
+      ${canEdit&&activePlan&&st!=='published'?`<button class="btn-s" style="color:#ef4444" onclick="deleteDpPlan('${activePlan.id}')">🗑 Plan löschen</button>`:''}
     </div>
     <div id="dpMatrixContainer" style="flex:1;overflow:auto">
       ${activePlan ? '<div style="padding:20px;color:var(--mu)">Lade Matrix…</div>' : '<div style="padding:20px;color:var(--mu)">Kein Plan vorhanden. Erstelle zuerst einen Plan.</div>'}
@@ -3939,6 +3940,18 @@ async function publishDpPlan(planId) {
   } catch(e) { toast('Fehler: '+e.message,'err'); }
 }
 
+async function deleteDpPlan(planId) {
+  if (!confirm('Plan und alle Einträge unwiderruflich löschen?')) return;
+  try {
+    await api('DELETE', '/dp/plans/'+planId);
+    S._dpPlanId = null;
+    S._dpMatrix = null;
+    await fetchData();
+    renderDP();
+    toast('Plan gelöscht');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // DIENSTPLAN — KONFIGURATION
 // ═══════════════════════════════════════════════════════════════════════════
@@ -3985,7 +3998,7 @@ async function renderDPConfigShiftTypes() {
     <span class="dp-color-dot" style="background:${st.color}"></span>
     <span class="dp-cfg-label"><strong>${esc(st.code)}</strong> – ${esc(st.name)}</span>
     <span style="font-size:11px;color:var(--mu)">${st.start_time}–${st.end_time} (${st.duration_hours}h)${st.is_night?' 🌙':''}${st.is_zulage?' ⭐':''}</span>
-    <button class="btn-s" onclick="openDpShiftTypeForm(${JSON.stringify(JSON.stringify(st))})">✏️</button>
+    <button class="btn-s" onclick="openDpShiftTypeForm('${st.id}')">✏️</button>
     <button class="btn-s" style="color:#ef4444" onclick="deleteDpShiftType('${st.id}')">✕</button>
   </div>`).join('');
 
@@ -4004,7 +4017,7 @@ async function renderDPConfigAbsenceTypes() {
     <span class="dp-color-dot" style="background:${at.color}"></span>
     <span class="dp-cfg-label"><strong>${esc(at.code)}</strong> – ${esc(at.label)}</span>
     <span style="font-size:11px;color:var(--mu)">${hcLabel[at.hours_calculation]||at.hours_calculation}${at.adjusts_monthly_target?' 📉':''}</span>
-    <button class="btn-s" onclick="openDpAbsenceTypeForm(${JSON.stringify(JSON.stringify(at))})">✏️</button>
+    <button class="btn-s" onclick="openDpAbsenceTypeForm('${at.id}')">✏️</button>
     <button class="btn-s" style="color:#ef4444" onclick="deleteDpAbsenceType('${at.id}')">✕</button>
   </div>`).join('');
 
@@ -4118,8 +4131,8 @@ async function toggleDpQualification(empId, shiftTypeId, currentlyHas) {
   } catch(e) { toast('Fehler: '+e.message,'err'); }
 }
 
-function openDpShiftTypeForm(jsonStr) {
-  const st = jsonStr ? JSON.parse(jsonStr) : null;
+function openDpShiftTypeForm(id) {
+  const st = id ? S.dpShiftTypes.find(x=>x.id===id)||null : null;
   document.getElementById('dpStfTitle').textContent = st ? 'Schichttyp bearbeiten' : 'Neuer Schichttyp';
   document.getElementById('dpStfId').value = st?.id||'';
   document.getElementById('dpStfName').value = st?.name||'';
@@ -4170,8 +4183,8 @@ async function deleteDpShiftType(id) {
   } catch(e) { toast('Fehler: '+e.message,'err'); }
 }
 
-function openDpAbsenceTypeForm(jsonStr) {
-  const at = jsonStr ? JSON.parse(jsonStr) : null;
+function openDpAbsenceTypeForm(id) {
+  const at = id ? S.dpAbsenceTypes.find(x=>x.id===id)||null : null;
   document.getElementById('dpAtfTitle').textContent = at ? 'Abwesenheitstyp bearbeiten' : 'Neuer Abwesenheitstyp';
   document.getElementById('dpAtfId').value = at?.id||'';
   document.getElementById('dpAtfCode').value = at?.code||'';

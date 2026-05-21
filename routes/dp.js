@@ -470,11 +470,14 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
     const plan = await q1('SELECT * FROM dp_plans WHERE id=$1',[req.params.id]);
     if (!plan) return bad(res,'Plan nicht gefunden',404);
 
+    // Delete previously auto-generated assignments (keep manual + locked ones)
+    await q(`DELETE FROM dp_assignments WHERE plan_id=$1 AND source='generated' AND is_locked=false`,[req.params.id]);
+
     const [shiftTypes,requirements,empParams,existingAssignments,wishDays,absenceTypes,qualifications] = await Promise.all([
       q('SELECT * FROM dp_shift_types ORDER BY sort_order'),
       q('SELECT * FROM dp_shift_requirements'),
       q('SELECT * FROM dp_employee_params'),
-      q('SELECT * FROM dp_assignments WHERE plan_id=$1',[req.params.id]),
+      q(`SELECT * FROM dp_assignments WHERE plan_id=$1`,[req.params.id]),
       q('SELECT * FROM dp_wish_days WHERE month=$1 AND year=$2',[plan.month,plan.year]),
       q('SELECT * FROM dp_absence_types'),
       q('SELECT * FROM dp_employee_qualifications'),
