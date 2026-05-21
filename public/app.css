@@ -427,3 +427,7 @@ details.dash-card > summary { list-style: none; cursor: pointer; display: flex; 
 .todo-ci-meta{font-size:10px;color:var(--di);margin-top:4px}
 .todo-ci-actions{display:flex;gap:4px;flex-shrink:0;opacity:0;transition:.15s}
 .todo-ci:hover .todo-ci-actions{opacity:1}
+.todo-ci-textarea{width:100%;margin-top:4px;padding:4px 6px;font-size:12px;font-family:inherit;color:var(--mu);background:transparent;border:1px solid transparent;border-radius:5px;resize:vertical;min-height:28px;transition:border-color .15s;line-height:1.4}
+.todo-ci-textarea:focus{outline:none;border-color:var(--border);background:var(--bg);color:var(--tx)}
+.todo-ci-textarea::placeholder{color:var(--di)}
+.todo-ci.done-item .todo-ci-textarea{text-decoration:none;color:var(--di)}

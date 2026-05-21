@@ -4535,15 +4535,14 @@ function renderTodoDetail(t) {
 
   const itemsHtml = t.items.map(item => {
     const doneUser = item.done_by ? getU(item.done_by) : null;
-    return `<div class="todo-ci${item.is_done?' done-item':''}">
+    return `<div class="todo-ci${item.is_done?' done-item':''}" id="todo-ci-${item.id}">
       <input type="checkbox" ${item.is_done?'checked':''} onchange="toggleTodoItem('${t.id}','${item.id}',this.checked)">
       <div class="todo-ci-body">
         <div class="todo-ci-title">${esc(item.title)}</div>
-        ${item.comment ? `<div class="todo-ci-comment">${esc(item.comment)}</div>` : ''}
+        <textarea id="todo-comment-${item.id}" class="todo-ci-textarea" rows="1" placeholder="Kommentar…" onblur="saveTodoItemComment('${t.id}','${item.id}')">${esc(item.comment||'')}</textarea>
         ${item.is_done && doneUser ? `<div class="todo-ci-meta">Erledigt von ${esc(doneUser.name)} · ${item.done_at?String(item.done_at).slice(0,16).replace('T',' '):''}</div>` : ''}
       </div>
       <div class="todo-ci-actions">
-        <button class="btn-e" style="padding:3px 7px" onclick="openTodoItemForm('${t.id}','${item.id}')">✏️</button>
         <button class="btn-d" style="padding:3px 7px" onclick="deleteTodoItem('${t.id}','${item.id}')">✕</button>
       </div>
     </div>`;
@@ -4671,14 +4670,16 @@ async function submitTodoItemForm() {
 }
 
 async function toggleTodoItem(todoId, itemId, isDone) {
+  const commentEl = document.getElementById('todo-comment-'+itemId);
+  const comment = commentEl ? commentEl.value : undefined;
   try {
-    await api('PUT', `/todos/${todoId}/items/${itemId}`, {isDone});
-    // Optimistic local update to avoid full reload lag
+    await api('PUT', `/todos/${todoId}/items/${itemId}`, {isDone, ...(comment!==undefined ? {comment} : {})});
     const todo = S.todos.find(t => t.id === todoId);
     if (todo) {
       const item = todo.items.find(i => i.id === itemId);
       if (item) {
         item.is_done = isDone;
+        item.comment = comment !== undefined ? comment : item.comment;
         item.done_by = isDone ? S.currentUser : null;
         item.done_at = isDone ? new Date().toISOString() : null;
       }
@@ -4687,6 +4688,19 @@ async function toggleTodoItem(todoId, itemId, isDone) {
     const todo2  = S.todos.find(t => t.id === todoId);
     if (detail && todo2) detail.innerHTML = renderTodoDetail(todo2);
   } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+async function saveTodoItemComment(todoId, itemId) {
+  const el = document.getElementById('todo-comment-'+itemId);
+  if (!el) return;
+  const comment = el.value;
+  const todo = S.todos.find(t => t.id === todoId);
+  const item = todo?.items.find(i => i.id === itemId);
+  if (item && item.comment === comment) return; // no change
+  try {
+    await api('PUT', `/todos/${todoId}/items/${itemId}`, {comment});
+    if (item) item.comment = comment;
+  } catch(e) { toast('Fehler beim Speichern','err'); }
 }
 
 async function deleteTodoItem(todoId, itemId) {
