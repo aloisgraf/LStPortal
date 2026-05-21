@@ -114,6 +114,7 @@
       </div>
       <div class="ndiv"></div>
       <div class="ni top" id="ni-meetings" onclick="setView('meetings')">&#128483;&#65039; Besprechungen</div>
+      <div class="ni top" id="ni-todos" onclick="setView('todos')">&#9989; Todos</div>
       <div class="ndiv"></div>
       <div class="nsh open" id="msgHdr" onclick="toggleNS('msg')"><span>&#9993;&#65039; Nachrichten <span class="nbdg" id="navMsgBdg" style="display:none">0</span></span><span class="arr">&#9660;</span></div>
       <div class="nsub open" id="msgSub">
@@ -1615,6 +1616,44 @@
 
 <!-- DP: Zell-Menü (dynamisch positioniert) -->
 <div id="dpCellMenu" class="dp-menu" style="display:none"></div>
+
+<!-- TODOS: Todo-Formular -->
+<div class="ov" id="todoFormOv">
+  <div class="modal sm">
+    <div class="mh"><h2 id="todoFormTitle">Neues Todo</h2><button class="mc" onclick="closeModal('todoFormOv')">&#10005;</button></div>
+    <div class="mb2">
+      <input type="hidden" id="tfId">
+      <div class="fg"><label>Titel *</label><input type="text" id="tfTitle" placeholder="Todo-Titel…"></div>
+      <div class="fg"><label>Beschreibung</label><textarea id="tfDesc" rows="2" placeholder="Optional…"></textarea></div>
+      <div style="display:flex;gap:12px">
+        <div class="fg" style="flex:1"><label>Priorität</label>
+          <select id="tfPriority">
+            <option value="low">🟢 Niedrig</option>
+            <option value="medium" selected>🟡 Mittel</option>
+            <option value="high">🔴 Hoch</option>
+          </select>
+        </div>
+        <div class="fg" style="flex:1"><label>Fällig bis</label><input type="date" id="tfDue"></div>
+      </div>
+      <div class="fg"><label>Zugewiesen an</label><select id="tfAssignee"><option value="">— niemand —</option></select></div>
+    </div>
+    <div class="mf"><button class="btn-s" onclick="closeModal('todoFormOv')">Abbrechen</button><button class="btn-p" onclick="submitTodoForm()">&#10003; Speichern</button></div>
+  </div>
+</div>
+
+<!-- TODOS: Todo-Item Formular -->
+<div class="ov" id="todoItemFormOv">
+  <div class="modal sm">
+    <div class="mh"><h2 id="todoItemFormTitle">Punkt hinzufügen</h2><button class="mc" onclick="closeModal('todoItemFormOv')">&#10005;</button></div>
+    <div class="mb2">
+      <input type="hidden" id="tifId">
+      <input type="hidden" id="tifTodoId">
+      <div class="fg"><label>Bezeichnung *</label><input type="text" id="tifTitle" placeholder="Was muss erledigt werden?"></div>
+      <div class="fg"><label>Kommentar</label><textarea id="tifComment" rows="3" placeholder="Notiz, Details, Hinweise…"></textarea></div>
+    </div>
+    <div class="mf"><button class="btn-s" onclick="closeModal('todoItemFormOv')">Abbrechen</button><button class="btn-p" onclick="submitTodoItemForm()">&#10003; Speichern</button></div>
+  </div>
+</div>
 
 <script src="/app.js"></script>
 

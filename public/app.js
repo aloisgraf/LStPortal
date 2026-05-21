@@ -54,6 +54,7 @@ let S={
   p:{canApproveEvents:false,canSendMessages:false,seeAllEntries:true,editAllPersonal:false,addForOthers:false,addGeneral:false,manageUsers:false,seeAllAllw:false,editAllw:false,seeAllAbrechnung:false},
   tp:{seeAll:false,editAll:false,myDepts:[],canSetPublic:false,canAssign:false,canSeeSubcat:false,canEditSubcat:false,roles:[]},
   dpPlans:[], dpShiftTypes:[], dpAbsenceTypes:[], dpEmpParams:[], dpQualifications:[],
+  todos:[], _selTodo:null,
   _dpPlanId:null, _dpMatrix:null, _dpStatsExpanded:false, _dpConfigTab:'shift-types',
 };
 async function api(method,path2,body){
@@ -84,6 +85,7 @@ async function fetchData(){
     S.dpAbsenceTypes=data.dpAbsenceTypes||[];
     S.dpPlans=data.dpPlans||[];
     S.dpQualifications=data.dpQualifications||[];
+    S.todos=data.todos||[];
     S.currentUser=data.currentUser;S.p=data.permissions||{};
     const u=getU(S.currentUser);const roles=u?.roles||['standard'];
     const has=(...r)=>r.some(x=>roles.includes(x));
@@ -239,7 +241,7 @@ function toggleSidebar(){const sb=document.getElementById('sidebar'),ov=document
 function toggleNS(id){document.getElementById(id+'Hdr').classList.toggle('open');document.getElementById(id+'Sub').classList.toggle('open');}
 function setView(v){
   S.view=v;
-  ['home','schedule','allw','diensttausch','abrechnung','dienstplaene','tickets','tickets_closed','tickets_deleted','checklists','messages','messages_sent','zahnarzt','platz','links','statistik','docs','meetings','dp','dp-config','dp-mine'].forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
+  ['home','schedule','allw','diensttausch','abrechnung','dienstplaene','tickets','tickets_closed','tickets_deleted','checklists','messages','messages_sent','zahnarzt','platz','links','statistik','docs','meetings','dp','dp-config','dp-mine','todos'].forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
   const statEl=document.getElementById('ni-statistik');if(statEl)statEl.style.display=S.p?.manageUsers?'flex':'none';
   document.getElementById('sidebar').classList.remove('open');document.getElementById('sbOv').classList.remove('open');
   renderSBF();renderMain();
@@ -279,6 +281,7 @@ function renderMain(){
   else if(S.view==='dp')renderDP();
   else if(S.view==='dp-config')renderDPConfig();
   else if(S.view==='dp-mine')renderDPMine();
+  else if(S.view==='todos')renderTodos();
 }
 // HOME
 function renderHome(){
@@ -4460,5 +4463,227 @@ async function deleteDpWishDay(id) {
     await api('DELETE', '/dp/wish-days/'+id);
     renderDPMine();
     toast('Wunschtag gelöscht');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TODOS
+// ═══════════════════════════════════════════════════════════════════════════
+
+const TODO_PRIO = {
+  low:    {label:'Niedrig', color:'#10b981', dot:'🟢'},
+  medium: {label:'Mittel',  color:'#f59e0b', dot:'🟡'},
+  high:   {label:'Hoch',    color:'#ef4444', dot:'🔴'},
+};
+
+function renderTodos() {
+  const el = document.getElementById('main');
+  if (!el) return;
+
+  const todos = S.todos;
+  const selId = S._selTodo;
+  const sel   = todos.find(t => t.id === selId) || todos[0] || null;
+  if (sel && !S._selTodo) S._selTodo = sel.id;
+
+  const sideItems = todos.map(t => {
+    const done    = t.items.filter(i => i.is_done).length;
+    const total   = t.items.length;
+    const allDone = total > 0 && done === total;
+    const prio    = TODO_PRIO[t.priority] || TODO_PRIO.medium;
+    const active  = t.id === (sel?.id);
+    return `<div class="todo-item${active?' active':''}${allDone?' done':''}" onclick="S._selTodo='${t.id}';renderTodos()">
+      <div class="todo-item-title">${esc(t.title)}</div>
+      <div class="todo-item-meta">
+        <span class="todo-prio" style="background:${prio.color}"></span>
+        <span>${prio.label}</span>
+        ${total > 0 ? `<span style="margin-left:auto">${done}/${total}</span>` : ''}
+        ${t.due_date ? `<span>📅 ${String(t.due_date).slice(0,10)}</span>` : ''}
+      </div>
+    </div>`;
+  }).join('') || '<div style="padding:16px;color:var(--mu);font-size:13px">Noch keine Todos</div>';
+
+  el.innerHTML = `<div class="todos-layout">
+    <div class="todos-sidebar">
+      <div class="todos-sidebar-hdr">
+        <h3>✅ Todos</h3>
+        <button class="btn-p" style="padding:5px 10px;font-size:12px" onclick="openTodoForm()">+</button>
+      </div>
+      <div class="todos-list">${sideItems}</div>
+    </div>
+    <div class="todos-detail" id="todosDetail">
+      ${sel ? renderTodoDetail(sel) : '<div style="color:var(--mu);padding:40px 0;text-align:center">Kein Todo ausgewählt</div>'}
+    </div>
+  </div>`;
+}
+
+function renderTodoDetail(t) {
+  const done  = t.items.filter(i => i.is_done).length;
+  const total = t.items.length;
+  const pct   = total > 0 ? Math.round(done / total * 100) : 0;
+  const prio  = TODO_PRIO[t.priority] || TODO_PRIO.medium;
+  const assignee = t.assigned_to ? getU(t.assigned_to) : null;
+  const creator  = getU(t.created_by);
+
+  const itemsHtml = t.items.map(item => {
+    const doneUser = item.done_by ? getU(item.done_by) : null;
+    return `<div class="todo-ci${item.is_done?' done-item':''}">
+      <input type="checkbox" ${item.is_done?'checked':''} onchange="toggleTodoItem('${t.id}','${item.id}',this.checked)">
+      <div class="todo-ci-body">
+        <div class="todo-ci-title">${esc(item.title)}</div>
+        ${item.comment ? `<div class="todo-ci-comment">${esc(item.comment)}</div>` : ''}
+        ${item.is_done && doneUser ? `<div class="todo-ci-meta">Erledigt von ${esc(doneUser.name)} · ${item.done_at?String(item.done_at).slice(0,16).replace('T',' '):''}</div>` : ''}
+      </div>
+      <div class="todo-ci-actions">
+        <button class="btn-e" style="padding:3px 7px" onclick="openTodoItemForm('${t.id}','${item.id}')">✏️</button>
+        <button class="btn-d" style="padding:3px 7px" onclick="deleteTodoItem('${t.id}','${item.id}')">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  const statusColor = t.status === 'done' ? '#10b981' : t.status === 'cancelled' ? '#94a3b8' : '#f59e0b';
+  const statusLabel = {open:'Offen', done:'Erledigt', cancelled:'Abgebrochen'}[t.status] || t.status;
+
+  return `<div>
+    <div class="todos-detail-hdr">
+      <div style="flex:1">
+        <h2>${esc(t.title)}</h2>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap">
+          <span style="font-size:12px">${prio.dot} ${prio.label}</span>
+          <span style="font-size:12px;color:${statusColor};font-weight:600">${statusLabel}</span>
+          ${t.due_date ? `<span style="font-size:12px;color:var(--mu)">📅 ${String(t.due_date).slice(0,10)}</span>` : ''}
+          ${assignee ? `<span style="font-size:12px;color:var(--mu)">👤 ${esc(assignee.name)}</span>` : ''}
+          ${creator ? `<span style="font-size:12px;color:var(--di)">erstellt von ${esc(creator.name)}</span>` : ''}
+        </div>
+        ${t.description ? `<div style="margin-top:8px;font-size:13px;color:var(--mu)">${esc(t.description)}</div>` : ''}
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button class="btn-s" onclick="openTodoForm('${t.id}')">✏️ Bearbeiten</button>
+        ${t.status !== 'done' ? `<button class="btn-ok" onclick="setTodoStatus('${t.id}','done')">✓ Abschließen</button>` : `<button class="btn-warn" onclick="setTodoStatus('${t.id}','open')">↩ Wiederöffnen</button>`}
+        <button class="btn-d" onclick="deleteTodo('${t.id}')">🗑</button>
+      </div>
+    </div>
+
+    ${total > 0 ? `<div class="todo-progress" title="${pct}% erledigt">
+      <div class="todo-progress-bar" style="width:${pct}%"></div>
+    </div>
+    <div style="font-size:12px;color:var(--mu);margin-bottom:12px">${done} von ${total} Punkten erledigt (${pct}%)</div>` : ''}
+
+    <div class="todo-checklist">${itemsHtml}</div>
+
+    <button class="btn-p" style="margin-top:14px" onclick="openTodoItemForm('${t.id}')">+ Punkt hinzufügen</button>
+  </div>`;
+}
+
+function openTodoForm(id) {
+  const t = id ? S.todos.find(x => x.id === id) : null;
+  document.getElementById('todoFormTitle').textContent = t ? 'Todo bearbeiten' : 'Neues Todo';
+  document.getElementById('tfId').value = t?.id || '';
+  document.getElementById('tfTitle').value = t?.title || '';
+  document.getElementById('tfDesc').value = t?.description || '';
+  document.getElementById('tfPriority').value = t?.priority || 'medium';
+  document.getElementById('tfDue').value = t?.due_date ? String(t.due_date).slice(0,10) : '';
+  const asel = document.getElementById('tfAssignee');
+  asel.innerHTML = '<option value="">— niemand —</option>' +
+    S.users.map(u => `<option value="${u.id}"${t?.assigned_to===u.id?' selected':''}>${esc(u.name)}</option>`).join('');
+  openModal('todoFormOv');
+}
+
+async function submitTodoForm() {
+  const id    = document.getElementById('tfId').value;
+  const title = document.getElementById('tfTitle').value.trim();
+  if (!title) return toast('Titel erforderlich','err');
+  const body = {
+    title,
+    description: document.getElementById('tfDesc').value.trim(),
+    priority:    document.getElementById('tfPriority').value,
+    dueDate:     document.getElementById('tfDue').value || null,
+    assignedTo:  document.getElementById('tfAssignee').value || null,
+  };
+  try {
+    if (id) await api('PUT', '/todos/'+id, body);
+    else {
+      const t = await api('POST', '/todos', body);
+      S._selTodo = t.id;
+    }
+    closeModal('todoFormOv');
+    await fetchData();
+    renderTodos();
+    toast('Gespeichert');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+async function deleteTodo(id) {
+  if (!confirm('Todo und alle Punkte löschen?')) return;
+  try {
+    await api('DELETE', '/todos/'+id);
+    if (S._selTodo === id) S._selTodo = null;
+    await fetchData();
+    renderTodos();
+    toast('Gelöscht');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+async function setTodoStatus(id, status) {
+  try {
+    await api('PUT', '/todos/'+id, {status});
+    await fetchData();
+    renderTodos();
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+function openTodoItemForm(todoId, itemId) {
+  const t    = S.todos.find(x => x.id === todoId);
+  const item = itemId ? t?.items.find(x => x.id === itemId) : null;
+  document.getElementById('todoItemFormTitle').textContent = item ? 'Punkt bearbeiten' : 'Punkt hinzufügen';
+  document.getElementById('tifId').value     = item?.id || '';
+  document.getElementById('tifTodoId').value = todoId;
+  document.getElementById('tifTitle').value   = item?.title || '';
+  document.getElementById('tifComment').value = item?.comment || '';
+  openModal('todoItemFormOv');
+}
+
+async function submitTodoItemForm() {
+  const id     = document.getElementById('tifId').value;
+  const todoId = document.getElementById('tifTodoId').value;
+  const title  = document.getElementById('tifTitle').value.trim();
+  if (!title) return toast('Bezeichnung erforderlich','err');
+  const body = {
+    title,
+    comment: document.getElementById('tifComment').value.trim(),
+  };
+  try {
+    if (id) await api('PUT', `/todos/${todoId}/items/${id}`, body);
+    else    await api('POST', `/todos/${todoId}/items`, body);
+    closeModal('todoItemFormOv');
+    await fetchData();
+    renderTodos();
+    toast('Gespeichert');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+async function toggleTodoItem(todoId, itemId, isDone) {
+  try {
+    await api('PUT', `/todos/${todoId}/items/${itemId}`, {isDone});
+    // Optimistic local update to avoid full reload lag
+    const todo = S.todos.find(t => t.id === todoId);
+    if (todo) {
+      const item = todo.items.find(i => i.id === itemId);
+      if (item) {
+        item.is_done = isDone;
+        item.done_by = isDone ? S.currentUser : null;
+        item.done_at = isDone ? new Date().toISOString() : null;
+      }
+    }
+    const detail = document.getElementById('todosDetail');
+    const todo2  = S.todos.find(t => t.id === todoId);
+    if (detail && todo2) detail.innerHTML = renderTodoDetail(todo2);
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+async function deleteTodoItem(todoId, itemId) {
+  try {
+    await api('DELETE', `/todos/${todoId}/items/${itemId}`);
+    await fetchData();
+    renderTodos();
   } catch(e) { toast('Fehler: '+e.message,'err'); }
 }

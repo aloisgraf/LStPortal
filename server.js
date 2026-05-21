@@ -429,6 +429,30 @@ async function initDB() {
   UNIQUE(employee_id, shift_type_id)
 )`,
     `ALTER TABLE dp_employee_params ADD COLUMN IF NOT EXISTS monthly_hours NUMERIC(6,2) NOT NULL DEFAULT 160`,
+    `CREATE TABLE IF NOT EXISTS todos (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'open',
+  priority TEXT NOT NULL DEFAULT 'medium',
+  due_date DATE DEFAULT NULL,
+  assigned_to TEXT DEFAULT NULL,
+  created_by TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+)`,
+    `CREATE TABLE IF NOT EXISTS todo_items (
+  id TEXT PRIMARY KEY,
+  todo_id TEXT NOT NULL REFERENCES todos(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  is_done BOOLEAN NOT NULL DEFAULT false,
+  comment TEXT DEFAULT '',
+  sort_order INTEGER DEFAULT 0,
+  done_by TEXT DEFAULT NULL,
+  done_at TIMESTAMPTZ DEFAULT NULL,
+  created_by TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+)`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }
@@ -495,6 +519,7 @@ app.use('/api',          require('./routes/docs'));
 app.use('/api',          require('./routes/misc'));
 app.use('/api',          require('./routes/meetings'));
 app.use('/api/dp', require('./routes/dp'));
+app.use('/api',   require('./routes/todos'));
 
 app.get('*', (req,res) => res.sendFile(path.join(__dirname,'public','index.html')));
 
