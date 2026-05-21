@@ -3721,14 +3721,23 @@ function renderDPMatrix(data) {
   </th>
   ${expanded ? statsExtra.map(s=>`<th style="background:var(--bg2);padding:4px 6px;font-size:11px">${s}</th>`).join('') : ''}`;
 
-  // Build open slots rows per shift type
-  let openRows = shiftTypes.map(st => {
+  // Only show shift types that have at least one requirement defined in this month
+  const stWithRequirements = shiftTypes.filter(st =>
+    days.some(d => (requirements[d.date]?.[st.id] || 0) > 0)
+  );
+
+  let openRows = stWithRequirements.map(st => {
     let cells = days.map(d => {
-      const open = openSlots[d.date]?.[st.id];
-      if (open && open > 0) {
+      const required = requirements[d.date]?.[st.id] || 0;
+      if (required === 0) {
+        // No requirement for this shift on this day — show neutral empty cell
+        return `<td style="background:var(--bg2)"></td>`;
+      }
+      const open = openSlots[d.date]?.[st.id] || 0;
+      if (open > 0) {
         return `<td class="dp-cell-open" title="${esc(st.name)}: ${open} offen">-${open}</td>`;
       }
-      return `<td class="dp-cell-ok" title="Besetzt">✓</td>`;
+      return `<td class="dp-cell-ok" title="Besetzt (${required}/${required})">✓</td>`;
     }).join('');
     return `<tr class="dp-open-row">
       <td class="dp-row-label"><span class="dp-color-dot" style="background:${st.color}"></span> ${esc(st.code)}</td>
