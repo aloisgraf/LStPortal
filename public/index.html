@@ -106,6 +106,13 @@
       <div class="ndiv"></div>
       <div class="ni top" id="ni-docs" onclick="setView('docs')">&#128193; Dokumente</div>
       <div class="ndiv"></div>
+      <div class="nsh open" id="dpHdr" onclick="toggleNS('dp')"><span>&#128197; Dienstplanung</span><span class="arr">&#9660;</span></div>
+      <div class="nsub open" id="dpSub">
+        <div class="ni" id="ni-dp" onclick="setView('dp')">&#128203; Planerstellung</div>
+        <div class="ni ni-admin-only" id="ni-dp-config" onclick="setView('dp-config')">&#9881;&#65039; Konfiguration</div>
+        <div class="ni" id="ni-dp-mine" onclick="setView('dp-mine')">&#128100; Mein Dienstplan</div>
+      </div>
+      <div class="ndiv"></div>
       <div class="ni top" id="ni-meetings" onclick="setView('meetings')">&#128483;&#65039; Besprechungen</div>
       <div class="ndiv"></div>
       <div class="nsh open" id="msgHdr" onclick="toggleNS('msg')"><span>&#9993;&#65039; Nachrichten <span class="nbdg" id="navMsgBdg" style="display:none">0</span></span><span class="arr">&#9660;</span></div>
@@ -1478,6 +1485,138 @@
     </div>
   </div>
 </div>
+
+<!-- DP: Neuer Plan -->
+<div class="ov" id="dpPlanFormOv">
+  <div class="modal sm">
+    <div class="mh"><h2 id="dpPlanFormTitle">Neuer Plan</h2><button class="mc" onclick="closeModal('dpPlanFormOv')">&#10005;</button></div>
+    <div class="mb2">
+      <input type="hidden" id="dpPfId">
+      <div style="display:flex;gap:12px">
+        <div class="fg" style="flex:1"><label>Monat *</label><select id="dpPfMonth"><option value="1">Januar</option><option value="2">Februar</option><option value="3">März</option><option value="4">April</option><option value="5">Mai</option><option value="6">Juni</option><option value="7">Juli</option><option value="8">August</option><option value="9">September</option><option value="10">Oktober</option><option value="11">November</option><option value="12">Dezember</option></select></div>
+        <div class="fg" style="flex:1"><label>Jahr *</label><input type="number" id="dpPfYear" min="2024" max="2030" value="2025"></div>
+      </div>
+      <div class="fg"><label>Titel</label><input type="text" id="dpPfTitle" placeholder="z.B. Mai 2025"></div>
+      <div class="fg"><label>Notizen</label><textarea id="dpPfNotes" rows="2"></textarea></div>
+    </div>
+    <div class="mf"><button class="btn" onclick="submitDpPlanForm()">&#10003; Erstellen</button></div>
+  </div>
+</div>
+
+<!-- DP: Schichttyp Form -->
+<div class="ov" id="dpShiftTypeFormOv">
+  <div class="modal sm">
+    <div class="mh"><h2 id="dpStfTitle">Schichttyp</h2><button class="mc" onclick="closeModal('dpShiftTypeFormOv')">&#10005;</button></div>
+    <div class="mb2">
+      <input type="hidden" id="dpStfId">
+      <div style="display:flex;gap:12px">
+        <div class="fg" style="flex:2"><label>Name *</label><input type="text" id="dpStfName" placeholder="z.B. Tagdienst C1"></div>
+        <div class="fg" style="flex:1"><label>Code *</label><input type="text" id="dpStfCode" placeholder="C1" maxlength="5" style="text-transform:uppercase"></div>
+      </div>
+      <div style="display:flex;gap:12px">
+        <div class="fg" style="flex:1"><label>Von</label><input type="time" id="dpStfStart" value="08:00"></div>
+        <div class="fg" style="flex:1"><label>Bis</label><input type="time" id="dpStfEnd" value="20:00"></div>
+        <div class="fg" style="flex:1"><label>Stunden</label><input type="number" id="dpStfHours" value="12" step="0.5" min="1" max="24"></div>
+      </div>
+      <div style="display:flex;gap:12px">
+        <div class="fg" style="flex:1"><label>Standort</label><input type="text" id="dpStfLocation" placeholder="optional"></div>
+        <div class="fg" style="flex:1"><label>Rolle</label><input type="text" id="dpStfRole" placeholder="optional"></div>
+      </div>
+      <div style="display:flex;gap:16px;margin-top:4px">
+        <label class="rck"><input type="checkbox" id="dpStfNight"> Nachtdienst</label>
+        <label class="rck"><input type="checkbox" id="dpStfZulage"> Zulagendienst</label>
+      </div>
+      <div class="fg" style="margin-top:8px"><label>Farbe</label><input type="color" id="dpStfColor" value="#3b6dd4"></div>
+    </div>
+    <div class="mf"><button class="btn" onclick="submitDpShiftTypeForm()">&#10003; Speichern</button></div>
+  </div>
+</div>
+
+<!-- DP: Abwesenheitstyp Form -->
+<div class="ov" id="dpAbsenceTypeFormOv">
+  <div class="modal sm">
+    <div class="mh"><h2 id="dpAtfTitle">Abwesenheitstyp</h2><button class="mc" onclick="closeModal('dpAbsenceTypeFormOv')">&#10005;</button></div>
+    <div class="mb2">
+      <input type="hidden" id="dpAtfId">
+      <div style="display:flex;gap:12px">
+        <div class="fg" style="flex:1"><label>Code *</label><input type="text" id="dpAtfCode" placeholder="U" maxlength="5" style="text-transform:uppercase"></div>
+        <div class="fg" style="flex:3"><label>Bezeichnung *</label><input type="text" id="dpAtfLabel" placeholder="z.B. Urlaub"></div>
+        <div class="fg" style="flex:1"><label>Farbe</label><input type="color" id="dpAtfColor" value="#f59e0b"></div>
+      </div>
+      <div class="fg"><label>Stundenberechnung</label>
+        <select id="dpAtfHoursCalc">
+          <option value="daily_target">Tagessoll des Mitarbeiters</option>
+          <option value="shift_hours">Stunden des überschriebenen Dienstes</option>
+          <option value="zero">0 Stunden (kein Anspruch)</option>
+          <option value="fixed">Fixer Wert</option>
+        </select>
+      </div>
+      <div class="fg" id="dpAtfFixedWrap" style="display:none"><label>Fixe Stunden</label><input type="number" id="dpAtfFixed" value="8" step="0.5"></div>
+      <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:6px">
+        <label class="rck"><input type="checkbox" id="dpAtfAdjTarget"> Monatssoll anpassen (Freistellung)</label>
+        <label class="rck"><input type="checkbox" id="dpAtfBlocks" checked> Dienst-Planung sperren</label>
+        <label class="rck"><input type="checkbox" id="dpAtfReopens" checked> Dienst wieder &#246;ffnen</label>
+        <label class="rck"><input type="checkbox" id="dpAtfCounts" checked> Z&#228;hlt als Arbeitszeit</label>
+        <label class="rck"><input type="checkbox" id="dpAtfApproval"> Genehmigung erforderlich</label>
+      </div>
+    </div>
+    <div class="mf"><button class="btn" onclick="submitDpAbsenceTypeForm()">&#10003; Speichern</button></div>
+  </div>
+</div>
+
+<!-- DP: Mitarbeiter-Parameter Form -->
+<div class="ov" id="dpEmpParamFormOv">
+  <div class="modal sm">
+    <div class="mh"><h2>Mitarbeiter-Parameter</h2><button class="mc" onclick="closeModal('dpEmpParamFormOv')">&#10005;</button></div>
+    <div class="mb2">
+      <input type="hidden" id="dpEpfEmpId">
+      <div class="fg"><label>Mitarbeiter</label><select id="dpEpfEmp" onchange="document.getElementById('dpEpfEmpId').value=this.value"></select></div>
+      <div style="display:flex;gap:12px">
+        <div class="fg" style="flex:1"><label>Wochenstunden</label><input type="number" id="dpEpfWeekly" value="40" step="0.5" min="4" max="60"></div>
+        <div class="fg" style="flex:1"><label>Arbeitstage/Woche</label><input type="number" id="dpEpfWorkDays" value="5" min="1" max="7"></div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:4px">
+        <label class="rck"><input type="checkbox" id="dpEpfNights" checked> Nachtdienste m&#246;glich</label>
+        <label class="rck"><input type="checkbox" id="dpEpfDoubleNights" checked> Doppeln&#228;chte erlaubt</label>
+        <label class="rck"><input type="checkbox" id="dpEpfSpringer"> Springer</label>
+      </div>
+      <div class="fg" style="margin-top:8px"><label>Max. N&#228;chte/Monat (leer = kein Limit)</label><input type="number" id="dpEpfMaxNights" placeholder="z.B. 4" min="0" max="31"></div>
+    </div>
+    <div class="mf"><button class="btn" onclick="submitDpEmpParamForm()">&#10003; Speichern</button></div>
+  </div>
+</div>
+
+<!-- DP: Schicht-Anforderung Form -->
+<div class="ov" id="dpReqFormOv">
+  <div class="modal sm">
+    <div class="mh"><h2 id="dpRfTitle">Schichtbedarf</h2><button class="mc" onclick="closeModal('dpReqFormOv')">&#10005;</button></div>
+    <div class="mb2">
+      <input type="hidden" id="dpRfId">
+      <div class="fg"><label>Schichttyp *</label><select id="dpRfShiftType"></select></div>
+      <div class="fg"><label>Gilt f&#252;r</label>
+        <select id="dpRfAppliesTo" onchange="onDpRfTypeChange()">
+          <option value="weekday">Bestimmter Wochentag</option>
+          <option value="weekend">Wochenende (Sa+So)</option>
+          <option value="holiday">Feiertag</option>
+          <option value="date">Bestimmtes Datum</option>
+        </select>
+      </div>
+      <div class="fg" id="dpRfWeekdayWrap"><label>Wochentag</label>
+        <select id="dpRfWeekday">
+          <option value="">Alle Werktage (Mo-Fr)</option>
+          <option value="1">Montag</option><option value="2">Dienstag</option><option value="3">Mittwoch</option>
+          <option value="4">Donnerstag</option><option value="5">Freitag</option>
+        </select>
+      </div>
+      <div class="fg" id="dpRfDateWrap" style="display:none"><label>Datum</label><input type="date" id="dpRfDate"></div>
+      <div class="fg"><label>Anzahl Slots</label><input type="number" id="dpRfSlots" value="1" min="0" max="20"></div>
+    </div>
+    <div class="mf"><button class="btn" onclick="submitDpReqForm()">&#10003; Speichern</button></div>
+  </div>
+</div>
+
+<!-- DP: Zell-Menü (dynamisch positioniert) -->
+<div id="dpCellMenu" class="dp-menu" style="display:none"></div>
 
 <script src="/app.js"></script>
 

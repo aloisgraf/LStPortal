@@ -325,6 +325,102 @@ async function initDB() {
   user_id TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'required',
   UNIQUE(item_id, user_id)
 )`,
+    `CREATE TABLE IF NOT EXISTS dp_shift_types (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, code TEXT NOT NULL,
+  location TEXT DEFAULT '', role TEXT DEFAULT '',
+  start_time TEXT NOT NULL DEFAULT '08:00', end_time TEXT NOT NULL DEFAULT '20:00',
+  duration_hours NUMERIC(4,2) NOT NULL DEFAULT 12,
+  is_night BOOLEAN NOT NULL DEFAULT false,
+  is_zulage BOOLEAN NOT NULL DEFAULT false,
+  color TEXT NOT NULL DEFAULT '#3b6dd4',
+  sort_order INTEGER DEFAULT 0,
+  created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
+)`,
+    `CREATE TABLE IF NOT EXISTS dp_shift_requirements (
+  id TEXT PRIMARY KEY, shift_type_id TEXT NOT NULL,
+  applies_to TEXT NOT NULL DEFAULT 'weekday',
+  weekday INTEGER DEFAULT NULL,
+  specific_date DATE DEFAULT NULL,
+  slot_count INTEGER NOT NULL DEFAULT 1,
+  created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
+)`,
+    `CREATE TABLE IF NOT EXISTS dp_absence_types (
+  id TEXT PRIMARY KEY, code TEXT NOT NULL, label TEXT NOT NULL,
+  color TEXT NOT NULL DEFAULT '#f59e0b',
+  hours_calculation TEXT NOT NULL DEFAULT 'daily_target',
+  fixed_hours NUMERIC(4,2) DEFAULT NULL,
+  adjusts_monthly_target BOOLEAN NOT NULL DEFAULT false,
+  blocks_scheduling BOOLEAN NOT NULL DEFAULT true,
+  reopens_shift BOOLEAN NOT NULL DEFAULT true,
+  counts_as_worked BOOLEAN NOT NULL DEFAULT true,
+  requires_approval BOOLEAN NOT NULL DEFAULT false,
+  sort_order INTEGER DEFAULT 0,
+  created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
+)`,
+    `CREATE TABLE IF NOT EXISTS dp_employee_params (
+  id TEXT PRIMARY KEY, employee_id TEXT NOT NULL UNIQUE,
+  weekly_hours NUMERIC(5,2) NOT NULL DEFAULT 40,
+  work_days_per_week INTEGER NOT NULL DEFAULT 5,
+  can_do_nights BOOLEAN NOT NULL DEFAULT true,
+  max_nights_per_month INTEGER DEFAULT NULL,
+  double_nights_allowed BOOLEAN NOT NULL DEFAULT true,
+  is_springer BOOLEAN NOT NULL DEFAULT false,
+  springer_config JSONB DEFAULT '{}',
+  locations JSONB DEFAULT '[]',
+  created_by TEXT NOT NULL, updated_at TIMESTAMPTZ DEFAULT NOW()
+)`,
+    `CREATE TABLE IF NOT EXISTS dp_plans (
+  id TEXT PRIMARY KEY, month INTEGER NOT NULL, year INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'draft',
+  published_at TIMESTAMPTZ, published_by TEXT,
+  generated_at TIMESTAMPTZ, generated_by TEXT,
+  notes TEXT DEFAULT '',
+  created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(month, year)
+)`,
+    `CREATE TABLE IF NOT EXISTS dp_assignments (
+  id TEXT PRIMARY KEY, plan_id TEXT NOT NULL,
+  employee_id TEXT NOT NULL, date DATE NOT NULL,
+  shift_type_id TEXT DEFAULT NULL,
+  absence_type_id TEXT DEFAULT NULL,
+  hours_credited NUMERIC(5,2) NOT NULL DEFAULT 0,
+  hours_source TEXT NOT NULL DEFAULT 'shift',
+  is_overtime BOOLEAN NOT NULL DEFAULT false,
+  is_locked BOOLEAN NOT NULL DEFAULT false,
+  source TEXT NOT NULL DEFAULT 'manual',
+  notes TEXT DEFAULT '',
+  created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+)`,
+    `CREATE TABLE IF NOT EXISTS dp_wish_days (
+  id TEXT PRIMARY KEY, employee_id TEXT NOT NULL,
+  month INTEGER NOT NULL, year INTEGER NOT NULL,
+  date DATE NOT NULL,
+  reason TEXT DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending',
+  violated_reason TEXT DEFAULT '',
+  notified_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+)`,
+    `CREATE TABLE IF NOT EXISTS dp_swap_requests (
+  id TEXT PRIMARY KEY, plan_id TEXT NOT NULL,
+  requester_id TEXT NOT NULL, requester_assignment_id TEXT NOT NULL,
+  target_employee_id TEXT, target_assignment_id TEXT,
+  message TEXT DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending_target',
+  constraint_warning TEXT DEFAULT '',
+  decided_by TEXT, decided_at TIMESTAMPTZ, reject_reason TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+)`,
+    `CREATE TABLE IF NOT EXISTS dp_audit_log (
+  id TEXT PRIMARY KEY, plan_id TEXT NOT NULL,
+  date DATE, employee_id TEXT,
+  action TEXT NOT NULL,
+  old_value JSONB DEFAULT '{}', new_value JSONB DEFAULT '{}',
+  reason TEXT DEFAULT '',
+  performed_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
+)`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }
@@ -390,6 +486,7 @@ app.use('/api/zahnarzt', require('./routes/zahnarzt'));
 app.use('/api',          require('./routes/docs'));
 app.use('/api',          require('./routes/misc'));
 app.use('/api',          require('./routes/meetings'));
+app.use('/api/dp', require('./routes/dp'));
 
 app.get('*', (req,res) => res.sendFile(path.join(__dirname,'public','index.html')));
 

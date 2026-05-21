@@ -349,3 +349,50 @@ details.dash-card > summary { list-style: none; cursor: pointer; display: flex; 
 .meetings-card{background:var(--sf);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer;transition:box-shadow .15s}
 .meetings-card:hover{box-shadow:0 2px 8px rgba(0,0,0,.08)}
 .av-sm{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;color:#fff;font-size:10px;font-weight:700}
+
+/* ── DIENSTPLAN MATRIX ───────────────────────────────────────── */
+.dp-wrap{display:flex;flex-direction:column;height:calc(100vh - 56px);overflow:hidden}
+.dp-toolbar{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap;flex-shrink:0}
+.dp-toolbar h2{margin:0;font-size:16px;font-weight:700}
+.dp-matrix-outer{flex:1;overflow:auto;position:relative}
+.dp-matrix{border-collapse:collapse;table-layout:fixed;min-width:100%}
+.dp-matrix th,.dp-matrix td{border:1px solid var(--border);padding:0;white-space:nowrap;font-size:12px}
+.dp-matrix thead th{background:var(--bg2);font-weight:600;text-align:center;padding:4px 6px;position:sticky;top:0;z-index:10}
+.dp-matrix thead th.dp-th-today{background:#dbeafe;color:#1d4ed8}
+.dp-matrix thead th.dp-th-weekend{background:#fef3c7}
+.dp-matrix thead th.dp-th-holiday{background:#fce7f3;color:#9d174d}
+.dp-row-label{position:sticky;left:0;z-index:5;background:var(--bg);min-width:130px;max-width:130px;font-weight:600;padding:4px 8px !important;text-align:left !important}
+.dp-matrix thead .dp-row-label{z-index:15;background:var(--bg2)}
+.dp-section-hdr td{background:var(--bg2);font-weight:700;font-size:11px;color:var(--mu);padding:3px 8px !important;letter-spacing:.5px}
+.dp-open-row td.dp-cell-open{background:#fef9c3;color:#854d0e;font-size:11px;text-align:center;padding:3px 4px;cursor:default}
+.dp-open-row td.dp-cell-ok{color:#16a34a;text-align:center;padding:3px 4px;font-size:13px}
+.dp-cell{text-align:center;padding:3px 2px;cursor:pointer;min-width:42px;max-width:60px;transition:background .1s}
+.dp-cell:hover{filter:brightness(.93)}
+.dp-cell-empty{color:var(--mu);font-size:11px}
+.dp-cell-shift{border-radius:4px;padding:2px 4px;font-weight:600;font-size:11px;display:inline-block}
+.dp-cell-absence{border-radius:4px;padding:2px 4px;font-weight:700;font-size:11px;display:inline-block;opacity:.9}
+.dp-stat-sep{border-left:2px solid var(--accent) !important}
+.dp-stat-cell{text-align:right;padding:3px 8px !important;min-width:52px;white-space:nowrap}
+.dp-diff-pos{color:#16a34a;font-weight:700}
+.dp-diff-neg{color:#ef4444;font-weight:700}
+.dp-diff-zero{color:var(--mu)}
+.dp-stat-extra{transition:all .2s}
+.dp-stat-hidden{display:none !important}
+.dp-summary-row td{background:var(--bg2);font-weight:600;font-size:11px}
+/* Cell quick-menu */
+.dp-menu{position:fixed;background:var(--bg);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);z-index:1000;min-width:200px;padding:6px;max-height:70vh;overflow-y:auto}
+.dp-menu-hdr{font-size:11px;font-weight:700;color:var(--mu);padding:4px 8px;text-transform:uppercase;letter-spacing:.5px}
+.dp-menu-item{padding:7px 12px;border-radius:6px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px}
+.dp-menu-item:hover{background:var(--bg2)}
+.dp-menu-sep{height:1px;background:var(--border);margin:4px 0}
+/* Config panels */
+.dp-cfg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;padding:16px}
+.dp-cfg-card{background:var(--bg2);border-radius:10px;padding:14px}
+.dp-cfg-card h3{margin:0 0 10px;font-size:14px}
+.dp-cfg-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}
+.dp-cfg-row:last-child{border-bottom:none}
+.dp-cfg-row .dp-cfg-label{flex:1;font-weight:500}
+.dp-color-dot{width:14px;height:14px;border-radius:50%;flex-shrink:0;display:inline-block}
+/* Stat toggle button */
+.dp-stat-toggle-btn{background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;padding:1px 5px;font-size:11px;color:var(--mu)}
+.dp-stat-toggle-btn:hover{background:var(--bg2)}

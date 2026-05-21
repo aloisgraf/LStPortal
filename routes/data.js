@@ -8,7 +8,7 @@ router.get('/', auth, async (req,res) => {
   try {
     const uid=req.uid, p=req.p, tp=req.tp, roles=p.roles;
     const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
-           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw] = await Promise.all([
+           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw] = await Promise.all([
       q('SELECT id,name,initials,roles,color,must_change_pw,last_seen FROM users ORDER BY name'),
       q('SELECT * FROM categories ORDER BY sort_order,label'),
       q('SELECT * FROM tags ORDER BY label'),
@@ -53,6 +53,9 @@ router.get('/', auth, async (req,res) => {
       q('SELECT * FROM meeting_instances ORDER BY date DESC').catch(()=>[]),
       q('SELECT * FROM discussion_items ORDER BY sort_order,created_at').catch(()=>[]),
       q('SELECT * FROM discussion_participants').catch(()=>[]),
+      q('SELECT * FROM dp_shift_types ORDER BY sort_order, name').catch(()=>[]),
+      q('SELECT * FROM dp_absence_types ORDER BY sort_order, label').catch(()=>[]),
+      q('SELECT * FROM dp_plans ORDER BY year DESC, month DESC').catch(()=>[]),
     ]);
 
     const tkViewMap = new Map((tkViewsRaw||[]).map(v=>[v.ticket_id, v.viewed_at]));
@@ -200,6 +203,9 @@ router.get('/', auth, async (req,res) => {
       stationOutages: (stOutagesRaw||[]).map(o=>({id:o.id,stationName:o.station_name,reason:o.reason,startAt:o.start_at,endAt:o.end_at,createdBy:o.created_by})),
       rolePermissions: (rolePermsRaw||[]).map(r=>({role:r.role,permission:r.permission,granted:r.granted})),
       meetings: (meetingsRaw||[]).map(m=>({id:m.id,title:m.title,type:m.type,rhythm:m.rhythm,rhythmDay:m.rhythm_day,rhythmTime:m.rhythm_time||'',description:m.description||'',createdBy:m.created_by,createdAt:m.created_at,instances:instMap[m.id]||[]})),
+      dpShiftTypes: dpShiftTypesRaw||[],
+      dpAbsenceTypes: dpAbsenceTypesRaw||[],
+      dpPlans: dpPlansRaw||[],
     });
   } catch(e) { console.error('[/api/data FEHLER]', e.message, e.stack?.split('\n')[1]); bad(res,'Serverfehler',500); }
 });

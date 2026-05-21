@@ -53,6 +53,8 @@ let S={
   checklists:[],messages:[],notifications:[],abrechnung:{einspringer:[],homeoffice:[]},dienstplaene:[],
   p:{canApproveEvents:false,canSendMessages:false,seeAllEntries:true,editAllPersonal:false,addForOthers:false,addGeneral:false,manageUsers:false,seeAllAllw:false,editAllw:false,seeAllAbrechnung:false},
   tp:{seeAll:false,editAll:false,myDepts:[],canSetPublic:false,canAssign:false,canSeeSubcat:false,canEditSubcat:false,roles:[]},
+  dpPlans:[], dpShiftTypes:[], dpAbsenceTypes:[], dpEmpParams:[],
+  _dpPlanId:null, _dpMatrix:null, _dpStatsExpanded:false, _dpConfigTab:'shift-types',
 };
 async function api(method,path2,body){
   const opts={method,credentials:'include',headers:{}};
@@ -78,6 +80,9 @@ async function fetchData(){
     S.stationOutages=data.stationOutages||[];S.links=data.portalLinks||[];S.rolePermissions=data.rolePermissions||[];
     S.docs=data.docs||[];S.docCategories=data.docCategories||[];
     S.meetings=data.meetings||[];
+    S.dpShiftTypes=data.dpShiftTypes||[];
+    S.dpAbsenceTypes=data.dpAbsenceTypes||[];
+    S.dpPlans=data.dpPlans||[];
     S.currentUser=data.currentUser;S.p=data.permissions||{};
     const u=getU(S.currentUser);const roles=u?.roles||['standard'];
     const has=(...r)=>r.some(x=>roles.includes(x));
@@ -233,7 +238,7 @@ function toggleSidebar(){const sb=document.getElementById('sidebar'),ov=document
 function toggleNS(id){document.getElementById(id+'Hdr').classList.toggle('open');document.getElementById(id+'Sub').classList.toggle('open');}
 function setView(v){
   S.view=v;
-  ['home','schedule','allw','diensttausch','abrechnung','dienstplaene','tickets','tickets_closed','tickets_deleted','checklists','messages','messages_sent','zahnarzt','platz','links','statistik','docs','meetings'].forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
+  ['home','schedule','allw','diensttausch','abrechnung','dienstplaene','tickets','tickets_closed','tickets_deleted','checklists','messages','messages_sent','zahnarzt','platz','links','statistik','docs','meetings','dp','dp-config','dp-mine'].forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
   const statEl=document.getElementById('ni-statistik');if(statEl)statEl.style.display=S.p?.manageUsers?'flex':'none';
   document.getElementById('sidebar').classList.remove('open');document.getElementById('sbOv').classList.remove('open');
   renderSBF();renderMain();
@@ -270,6 +275,9 @@ function renderMain(){
   else if(S.view==='docs')renderDocs();
   else if(S.view==='statistik')renderStatistik();
   else if(S.view==='meetings')renderMeetings();
+  else if(S.view==='dp')renderDP();
+  else if(S.view==='dp-config')renderDPConfig();
+  else if(S.view==='dp-mine')renderDPMine();
 }
 // HOME
 function renderHome(){
@@ -3599,4 +3607,779 @@ async function openFollowupForm(itemId) {
     closeModal('itemFormOv');
     await fetchData(); renderMeetings(); toast('Folgebesprechung erstellt');
   } catch(e) { toast('Fehler','err'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DIENSTPLAN (DP) — PLANERSTELLUNG
+// ═══════════════════════════════════════════════════════════════════════════
+
+const MONTH_NAMES=['Jänner','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+const WD_SHORT=['So','Mo','Di','Mi','Do','Fr','Sa'];
+
+function renderDP() {
+  const el = document.getElementById('main');
+  if (!el) return;
+
+  const plans = S.dpPlans;
+  const activePlan = plans.find(p => p.id === S._dpPlanId) || plans[0] || null;
+  if (activePlan && !S._dpPlanId) S._dpPlanId = activePlan.id;
+
+  const canEdit = S.p.manageUsers;
+
+  let planOpts = plans.map(p =>
+    `<option value="${p.id}"${p.id===S._dpPlanId?' selected':''}>${esc(p.title||p.month+'/'+p.year)} (${p.status})</option>`
+  ).join('');
+
+  const statusLabel = {draft:'Entwurf',reviewed:'Reviewed',published:'Freigegeben'};
+  const statusColor = {draft:'var(--mu)',reviewed:'#f59e0b',published:'#10b981'};
+  const st = activePlan?.status||'draft';
+
+  el.innerHTML = `<div class="dp-wrap">
+    <div class="dp-toolbar">
+      <h2>📅 Dienstplanung</h2>
+      <select style="max-width:260px" onchange="S._dpPlanId=this.value;S._dpMatrix=null;renderDP()">${planOpts}${plans.length===0?'<option value="">-- Kein Plan --</option>':''}</select>
+      ${activePlan?`<span style="color:${statusColor[st]};font-weight:600;font-size:12px">${statusLabel[st]}</span>`:''}
+      <div style="flex:1"></div>
+      ${canEdit?`<button class="btn-s" onclick="openDpPlanForm()">+ Neuer Plan</button>`:''}
+      ${canEdit&&activePlan&&st==='draft'?`<button class="btn-s" onclick="generateDpPlan('${activePlan.id}')">⚡ Auto-Generieren</button>`:''}
+      ${canEdit&&activePlan&&st!=='published'?`<button class="btn-p" onclick="publishDpPlan('${activePlan.id}')">✓ Freigeben</button>`:''}
+    </div>
+    <div id="dpMatrixContainer" style="flex:1;overflow:auto">
+      ${activePlan ? '<div style="padding:20px;color:var(--mu)">Lade Matrix…</div>' : '<div style="padding:20px;color:var(--mu)">Kein Plan vorhanden. Erstelle zuerst einen Plan.</div>'}
+    </div>
+  </div>`;
+
+  if (activePlan) {
+    loadDpMatrix(activePlan.id);
+  }
+}
+
+async function loadDpMatrix(planId) {
+  try {
+    const data = await api('GET', '/dp/plans/'+planId+'/matrix');
+    S._dpMatrix = data;
+    renderDPMatrix(data);
+  } catch(e) {
+    const c = document.getElementById('dpMatrixContainer');
+    if (c) c.innerHTML = `<div style="padding:20px;color:#ef4444">Fehler beim Laden: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderDPMatrix(data) {
+  const c = document.getElementById('dpMatrixContainer');
+  if (!c) return;
+
+  const {plan, days, shiftTypes, absenceTypes, requirements, openSlots, empAssignMap, summary} = data;
+  const users = S.users;
+  const canEdit = S.p.manageUsers;
+
+  const today = new Date().toISOString().slice(0,10);
+
+  // Build employees list (only those with assignments or params)
+  const empIds = new Set(Object.keys(empAssignMap));
+  // Add all users who have any assignment
+  data.assignments?.forEach(a => empIds.add(a.employee_id));
+  const emps = [...empIds].map(id => users.find(u => u.id === id)).filter(Boolean);
+  emps.sort((a,b) => a.name.localeCompare(b.name));
+
+  // Stats columns: Soll, Ist, Diff, Zulage, WE, FWE, K, U
+  const statsBasic = ['Soll','Ist','Diff'];
+  const statsExtra = ['Zulage','WE','FWE','K','U'];
+
+  const expanded = S._dpStatsExpanded;
+
+  // Build header
+  let thDays = days.map(d => {
+    let cls = 'dp-cell';
+    if (d.date === today) cls += ' dp-th-today';
+    else if (d.isHoliday) cls += ' dp-th-holiday';
+    else if (d.isWeekend) cls += ' dp-th-weekend';
+    return `<th class="${cls}" title="${d.isHoliday?d.holidayName:''}">${d.date.slice(8)}<br><span style="font-size:10px;font-weight:400">${WD_SHORT[d.weekday]}</span></th>`;
+  }).join('');
+
+  const statsToggle = `<th colspan="${statsBasic.length}" style="background:var(--bg2);padding:2px">
+    <div style="display:flex;align-items:center;justify-content:center;gap:4px">
+      <span>Stats</span>
+      <button class="dp-stat-toggle-btn" onclick="S._dpStatsExpanded=!S._dpStatsExpanded;renderDPMatrix(S._dpMatrix)">${expanded?'◀':'▶'}</button>
+    </div>
+  </th>
+  ${expanded ? statsExtra.map(s=>`<th style="background:var(--bg2);padding:4px 6px;font-size:11px">${s}</th>`).join('') : ''}`;
+
+  // Build open slots rows per shift type
+  let openRows = shiftTypes.map(st => {
+    let cells = days.map(d => {
+      const open = openSlots[d.date]?.[st.id];
+      if (open && open > 0) {
+        return `<td class="dp-cell-open" title="${esc(st.name)}: ${open} offen">-${open}</td>`;
+      }
+      return `<td class="dp-cell-ok" title="Besetzt">✓</td>`;
+    }).join('');
+    return `<tr class="dp-open-row">
+      <td class="dp-row-label"><span class="dp-color-dot" style="background:${st.color}"></span> ${esc(st.code)}</td>
+      ${cells}
+      <td colspan="${statsBasic.length + (expanded?statsExtra.length:0)}" style="background:var(--bg2)"></td>
+    </tr>`;
+  }).join('');
+
+  // Build employee rows
+  let empRows = emps.map(emp => {
+    const s = summary[emp.id] || {};
+    const assign = empAssignMap[emp.id] || {};
+
+    let cells = days.map(d => {
+      const a = assign[d.date];
+      if (!a) {
+        if (canEdit) return `<td class="dp-cell" onclick="openDpCellMenu('${emp.id}','${d.date}',event)" title="Klicken zum Zuweisen"></td>`;
+        return `<td class="dp-cell"></td>`;
+      }
+      const st = shiftTypes.find(x=>x.id===a.shift_type_id);
+      const at = absenceTypes.find(x=>x.id===a.absence_type_id);
+      const label = at ? at.code : (st ? st.code : '?');
+      const color = at ? at.color : (st ? st.color : '#ccc');
+      const title = [at?.label, st?.name].filter(Boolean).join(' + ');
+      const style = `background:${color}20;color:${color};font-weight:700`;
+      if (canEdit) {
+        return `<td class="dp-cell" style="${style}" onclick="openDpCellMenu('${emp.id}','${d.date}',event)" title="${esc(title)}">${esc(label)}</td>`;
+      }
+      return `<td class="dp-cell" style="${style}" title="${esc(title)}">${esc(label)}</td>`;
+    }).join('');
+
+    const diff = (s.actualHours||0) - (s.targetHours||0);
+    const diffStr = (diff>=0?'+':'')+Math.round(diff*10)/10;
+    const diffColor = diff>=0?'#10b981':'#ef4444';
+
+    const basicStats = `
+      <td style="text-align:center;padding:3px 6px;font-size:12px">${s.targetHours||0}</td>
+      <td style="text-align:center;padding:3px 6px;font-size:12px">${Math.round((s.actualHours||0)*10)/10}</td>
+      <td style="text-align:center;padding:3px 6px;font-size:12px;color:${diffColor};font-weight:600">${diffStr}</td>`;
+
+    const extraStats = expanded ? `
+      <td style="text-align:center;padding:3px 6px;font-size:12px">${s.zulageDays||0}</td>
+      <td style="text-align:center;padding:3px 6px;font-size:12px">${s.weekendDays||0}</td>
+      <td style="text-align:center;padding:3px 6px;font-size:12px">${s.freeWeekends||0}</td>
+      <td style="text-align:center;padding:3px 6px;font-size:12px">${s.sickDays||0}</td>
+      <td style="text-align:center;padding:3px 6px;font-size:12px">${s.vacationDays||0}</td>` : '';
+
+    return `<tr>
+      <td class="dp-row-label">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span class="av-sm" style="background:${emp.color}">${esc(emp.initials)}</span>
+          <span>${esc(emp.name)}</span>
+        </div>
+      </td>
+      ${cells}${basicStats}${extraStats}
+    </tr>`;
+  }).join('');
+
+  // Stats header row
+  const statsHeader = statsBasic.map(s=>`<th style="background:var(--bg2);padding:4px 6px;font-size:11px">${s}</th>`).join('')
+    + (expanded ? statsExtra.map(s=>`<th style="background:var(--bg2);padding:4px 6px;font-size:11px">${s}</th>`).join('') : '');
+
+  c.innerHTML = `<table class="dp-matrix">
+    <thead>
+      <tr>
+        <th class="dp-row-label">${esc(plan.title||plan.month+'/'+plan.year)}</th>
+        ${thDays}
+        ${statsToggle}
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="dp-section-hdr"><td colspan="${days.length + 1 + statsBasic.length + (expanded?statsExtra.length:0)}">📋 Offene Stellen</td></tr>
+      ${openRows}
+      <tr class="dp-section-hdr"><td colspan="${days.length + 1 + statsBasic.length + (expanded?statsExtra.length:0)}">👤 Mitarbeiter</td></tr>
+      ${empRows}
+    </tbody>
+  </table>`;
+}
+
+function openDpCellMenu(empId, date, evt) {
+  if (!S._dpMatrix) return;
+  evt.stopPropagation();
+
+  const {shiftTypes, absenceTypes, empAssignMap} = S._dpMatrix;
+  const assign = empAssignMap[empId]?.[date];
+  const u = getU(empId);
+
+  const dayWD = new Date(date).getDay();
+  const isWE = dayWD===0||dayWD===6;
+  const dateDisplay = date.slice(8)+'.'+date.slice(5,7)+'. ('+WD_SHORT[dayWD]+')';
+
+  let html = `<div class="dp-menu-hdr">${esc(u?.name||empId)} · ${dateDisplay}</div>`;
+
+  if (assign) {
+    const st = shiftTypes.find(x=>x.id===assign.shift_type_id);
+    const at = absenceTypes.find(x=>x.id===assign.absence_type_id);
+    html += `<div style="padding:4px 12px;font-size:12px;color:var(--mu)">Aktuell: ${at?esc(at.label):''}${at&&st?' + ':''}${st?esc(st.name):''}</div>`;
+    html += `<div class="dp-menu-sep"></div>`;
+  }
+
+  html += `<div class="dp-menu-hdr">Dienst zuweisen</div>`;
+  shiftTypes.forEach(st => {
+    html += `<div class="dp-menu-item" onclick="dpAssign('${empId}','${date}','${st.id}',null)" style="color:${st.color}">
+      <span class="dp-color-dot" style="background:${st.color}"></span>${esc(st.code)} – ${esc(st.name)}
+    </div>`;
+  });
+
+  if (assign && assign.shift_type_id) {
+    html += `<div class="dp-menu-sep"></div><div class="dp-menu-hdr">Abwesenheit hinzufügen</div>`;
+    absenceTypes.forEach(at => {
+      html += `<div class="dp-menu-item" onclick="dpAssign('${empId}','${date}','${assign.shift_type_id}','${at.id}')" style="color:${at.color}">
+        <span class="dp-color-dot" style="background:${at.color}"></span>${esc(at.code)} – ${esc(at.label)}
+      </div>`;
+    });
+  }
+
+  if (assign) {
+    html += `<div class="dp-menu-sep"></div>`;
+    html += `<div class="dp-menu-item" style="color:#ef4444" onclick="dpClearAssign('${assign.id}','${date}')">✕ Eintrag löschen</div>`;
+  }
+
+  const menu = document.getElementById('dpCellMenu');
+  menu.innerHTML = html;
+  menu.style.display = 'block';
+
+  const rect = evt.target.getBoundingClientRect();
+  let left = rect.left + window.scrollX;
+  let top = rect.bottom + window.scrollY + 4;
+  if (left + 220 > window.innerWidth) left = window.innerWidth - 224;
+  if (top + 300 > window.innerHeight) top = rect.top + window.scrollY - 310;
+  menu.style.left = left + 'px';
+  menu.style.top = top + 'px';
+
+  setTimeout(() => {
+    const close = (e) => {
+      if (!menu.contains(e.target)) {
+        menu.style.display = 'none';
+        document.removeEventListener('click', close);
+      }
+    };
+    document.addEventListener('click', close);
+  }, 10);
+}
+
+async function dpAssign(empId, date, shiftTypeId, absenceTypeId) {
+  document.getElementById('dpCellMenu').style.display = 'none';
+  if (!S._dpPlanId) return;
+  try {
+    await api('POST', '/dp/plans/'+S._dpPlanId+'/assign', {
+      employeeId: empId, date, shiftTypeId: shiftTypeId||null, absenceTypeId: absenceTypeId||null
+    });
+    const data = await api('GET', '/dp/plans/'+S._dpPlanId+'/matrix');
+    S._dpMatrix = data;
+    renderDPMatrix(data);
+    toast('Gespeichert');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+async function dpClearAssign(assignId, date) {
+  document.getElementById('dpCellMenu').style.display = 'none';
+  if (!S._dpPlanId) return;
+  try {
+    await api('DELETE', '/dp/plans/'+S._dpPlanId+'/assign/'+assignId);
+    const data = await api('GET', '/dp/plans/'+S._dpPlanId+'/matrix');
+    S._dpMatrix = data;
+    renderDPMatrix(data);
+    toast('Gelöscht');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+function openDpPlanForm(plan) {
+  const now = new Date();
+  document.getElementById('dpPlanFormTitle').textContent = plan ? 'Plan bearbeiten' : 'Neuer Plan';
+  document.getElementById('dpPfId').value = plan?.id||'';
+  document.getElementById('dpPfMonth').value = plan?.month||String(now.getMonth()+2>12?1:now.getMonth()+2);
+  document.getElementById('dpPfYear').value = plan?.year||now.getFullYear();
+  document.getElementById('dpPfTitle').value = plan?.title||'';
+  document.getElementById('dpPfNotes').value = plan?.notes||'';
+  openModal('dpPlanFormOv');
+}
+
+async function submitDpPlanForm() {
+  const id = document.getElementById('dpPfId').value;
+  const month = parseInt(document.getElementById('dpPfMonth').value);
+  const year = parseInt(document.getElementById('dpPfYear').value);
+  const title = document.getElementById('dpPfTitle').value.trim();
+  const notes = document.getElementById('dpPfNotes').value.trim();
+  if (!month||!year) return toast('Monat und Jahr erforderlich','err');
+  try {
+    if (id) {
+      await api('PUT', '/dp/plans/'+id, {title: title||null, notes: notes||null});
+    } else {
+      const plan = await api('POST', '/dp/plans', {month, year, title: title||`Plan ${month}/${year}`, notes});
+      S._dpPlanId = plan.id;
+    }
+    closeModal('dpPlanFormOv');
+    await fetchData();
+    renderDP();
+    toast('Gespeichert');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+async function generateDpPlan(planId) {
+  if (!confirm('Auto-Generierung starten? Bestehende nicht-gesperrte Einträge werden überschrieben.')) return;
+  try {
+    loading(true);
+    const res = await api('POST', '/dp/plans/'+planId+'/generate');
+    loading(false);
+    toast(`Generiert: ${res.generated} Dienste (${res.violations} Wunschtag-Konflikte)`);
+    const data = await api('GET', '/dp/plans/'+planId+'/matrix');
+    S._dpMatrix = data;
+    renderDPMatrix(data);
+  } catch(e) { loading(false); toast('Fehler: '+e.message,'err'); }
+}
+
+async function publishDpPlan(planId) {
+  if (!confirm('Plan freigeben? Mitarbeiter können ihn danach sehen.')) return;
+  try {
+    await api('POST', '/dp/plans/'+planId+'/publish');
+    await fetchData();
+    renderDP();
+    toast('Plan freigegeben');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DIENSTPLAN — KONFIGURATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function renderDPConfig() {
+  const el = document.getElementById('main');
+  if (!el) return;
+  if (!S.p.manageUsers) {
+    el.innerHTML = '<div style="padding:20px;color:var(--mu)">Kein Zugriff</div>';
+    return;
+  }
+
+  const tabs = [
+    {id:'shift-types',label:'Schichttypen'},
+    {id:'absence-types',label:'Abwesenheiten'},
+    {id:'emp-params',label:'Mitarbeiter-Param.'},
+    {id:'requirements',label:'Schichtbedarf'},
+  ];
+
+  const tab = S._dpConfigTab;
+
+  let content = '';
+  if (tab === 'shift-types') content = await renderDPConfigShiftTypes();
+  else if (tab === 'absence-types') content = await renderDPConfigAbsenceTypes();
+  else if (tab === 'emp-params') content = await renderDPConfigEmpParams();
+  else if (tab === 'requirements') content = await renderDPConfigRequirements();
+
+  el.innerHTML = `<div style="display:flex;flex-direction:column;height:calc(100vh - 56px)">
+    <div style="display:flex;align-items:center;gap:0;padding:12px 16px 0;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg)">
+      <h2 style="margin:0 16px 0 0;font-size:16px;font-weight:700">⚙️ DP-Konfiguration</h2>
+      ${tabs.map(t=>{const on=t.id===tab;return`<button style="padding:8px 14px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:${on?'700':'400'};border-bottom:2px solid ${on?'var(--acc)':'transparent'};color:${on?'var(--acc)':'var(--mu)'}" onclick="S._dpConfigTab='${t.id}';renderDPConfig()">${t.label}</button>`;}).join('')}
+    </div>
+    <div style="flex:1;overflow:auto;padding:16px">${content}</div>
+  </div>`;
+}
+
+async function renderDPConfigShiftTypes() {
+  const types = S.dpShiftTypes;
+  if (!types.length) return `<div style="color:var(--mu);margin-bottom:12px">Noch keine Schichttypen.</div><button class="btn-p" onclick="openDpShiftTypeForm()">+ Schichttyp hinzufügen</button>`;
+
+  const rows = types.map(st => `<div class="dp-cfg-row">
+    <span class="dp-color-dot" style="background:${st.color}"></span>
+    <span class="dp-cfg-label"><strong>${esc(st.code)}</strong> – ${esc(st.name)}</span>
+    <span style="font-size:11px;color:var(--mu)">${st.start_time}–${st.end_time} (${st.duration_hours}h)${st.is_night?' 🌙':''}${st.is_zulage?' ⭐':''}</span>
+    <button class="btn-s" onclick="openDpShiftTypeForm(${JSON.stringify(JSON.stringify(st))})">✏️</button>
+    <button class="btn-s" style="color:#ef4444" onclick="deleteDpShiftType('${st.id}')">✕</button>
+  </div>`).join('');
+
+  return `<div class="dp-cfg-card">
+    <h3>Schichttypen <button class="btn-p" style="float:right;font-size:11px" onclick="openDpShiftTypeForm()">+ Hinzufügen</button></h3>
+    ${rows}
+  </div>`;
+}
+
+async function renderDPConfigAbsenceTypes() {
+  const types = S.dpAbsenceTypes;
+  if (!types.length) return `<div style="color:var(--mu);margin-bottom:12px">Noch keine Abwesenheitstypen.</div><button class="btn-p" onclick="openDpAbsenceTypeForm()">+ Hinzufügen</button>`;
+
+  const hcLabel = {daily_target:'Tagessoll',shift_hours:'Dienstst.',zero:'0h',fixed:'Fix'};
+  const rows = types.map(at => `<div class="dp-cfg-row">
+    <span class="dp-color-dot" style="background:${at.color}"></span>
+    <span class="dp-cfg-label"><strong>${esc(at.code)}</strong> – ${esc(at.label)}</span>
+    <span style="font-size:11px;color:var(--mu)">${hcLabel[at.hours_calculation]||at.hours_calculation}${at.adjusts_monthly_target?' 📉':''}</span>
+    <button class="btn-s" onclick="openDpAbsenceTypeForm(${JSON.stringify(JSON.stringify(at))})">✏️</button>
+    <button class="btn-s" style="color:#ef4444" onclick="deleteDpAbsenceType('${at.id}')">✕</button>
+  </div>`).join('');
+
+  return `<div class="dp-cfg-card">
+    <h3>Abwesenheitstypen <button class="btn-p" style="float:right;font-size:11px" onclick="openDpAbsenceTypeForm()">+ Hinzufügen</button></h3>
+    ${rows}
+  </div>`;
+}
+
+async function renderDPConfigEmpParams() {
+  let empParams = [];
+  try { empParams = await api('GET', '/dp/employee-params'); } catch(e) {}
+  S.dpEmpParams = empParams;
+
+  const rows = S.users.map(u => {
+    const p = empParams.find(x=>x.employee_id===u.id);
+    if (!p) {
+      return `<div class="dp-cfg-row">
+        <span class="av-sm" style="background:${u.color}">${esc(u.initials)}</span>
+        <span class="dp-cfg-label">${esc(u.name)}</span>
+        <span style="font-size:11px;color:var(--mu)">Nicht konfiguriert</span>
+        <button class="btn-s" onclick="openDpEmpParamForm('${u.id}')">+ Einrichten</button>
+      </div>`;
+    }
+    return `<div class="dp-cfg-row">
+      <span class="av-sm" style="background:${u.color}">${esc(u.initials)}</span>
+      <span class="dp-cfg-label">${esc(u.name)}</span>
+      <span style="font-size:11px;color:var(--mu)">${p.weekly_hours}h/Wo · ${p.work_days_per_week}d${p.can_do_nights?' 🌙':''}${p.is_springer?' 🔄':''}</span>
+      <button class="btn-s" onclick="openDpEmpParamForm('${u.id}')">✏️</button>
+    </div>`;
+  }).join('');
+
+  return `<div class="dp-cfg-card"><h3>Mitarbeiter-Parameter</h3>${rows}</div>`;
+}
+
+async function renderDPConfigRequirements() {
+  let reqs = [];
+  try { reqs = await api('GET', '/dp/shift-requirements'); } catch(e) {}
+
+  const appliesLabel = {weekday:'Werktag',weekend:'Wochenende',holiday:'Feiertag',date:'Datum'};
+  const wdLabel = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+
+  const rows = reqs.map(r => {
+    const st = S.dpShiftTypes.find(x=>x.id===r.shift_type_id);
+    const wd = r.weekday!==null ? ' ('+wdLabel[r.weekday]+')' : '';
+    return `<div class="dp-cfg-row">
+      <span class="dp-color-dot" style="background:${st?.color||'#ccc'}"></span>
+      <span class="dp-cfg-label">${esc(st?.name||r.shift_type_id)}</span>
+      <span style="font-size:11px;color:var(--mu)">${appliesLabel[r.applies_to]||r.applies_to}${wd}${r.specific_date?' '+String(r.specific_date).slice(0,10):''}: ${r.slot_count} Slot(s)</span>
+      <button class="btn-s" style="color:#ef4444" onclick="deleteDpRequirement('${r.id}')">✕</button>
+    </div>`;
+  }).join('');
+
+  return `<div class="dp-cfg-card">
+    <h3>Schichtbedarf <button class="btn-p" style="float:right;font-size:11px" onclick="openDpReqForm()">+ Hinzufügen</button></h3>
+    ${rows||'<div style="color:var(--mu);font-size:13px">Noch kein Bedarf definiert.</div>'}
+  </div>`;
+}
+
+function openDpShiftTypeForm(jsonStr) {
+  const st = jsonStr ? JSON.parse(jsonStr) : null;
+  document.getElementById('dpStfTitle').textContent = st ? 'Schichttyp bearbeiten' : 'Neuer Schichttyp';
+  document.getElementById('dpStfId').value = st?.id||'';
+  document.getElementById('dpStfName').value = st?.name||'';
+  document.getElementById('dpStfCode').value = st?.code||'';
+  document.getElementById('dpStfStart').value = st?.start_time||'08:00';
+  document.getElementById('dpStfEnd').value = st?.end_time||'20:00';
+  document.getElementById('dpStfHours').value = st?.duration_hours||12;
+  document.getElementById('dpStfLocation').value = st?.location||'';
+  document.getElementById('dpStfRole').value = st?.role||'';
+  document.getElementById('dpStfNight').checked = !!st?.is_night;
+  document.getElementById('dpStfZulage').checked = !!st?.is_zulage;
+  document.getElementById('dpStfColor').value = st?.color||'#3b6dd4';
+  openModal('dpShiftTypeFormOv');
+}
+
+async function submitDpShiftTypeForm() {
+  const id = document.getElementById('dpStfId').value;
+  const body = {
+    name: document.getElementById('dpStfName').value.trim(),
+    code: document.getElementById('dpStfCode').value.trim().toUpperCase(),
+    startTime: document.getElementById('dpStfStart').value,
+    endTime: document.getElementById('dpStfEnd').value,
+    durationHours: parseFloat(document.getElementById('dpStfHours').value)||12,
+    location: document.getElementById('dpStfLocation').value.trim(),
+    role: document.getElementById('dpStfRole').value.trim(),
+    isNight: document.getElementById('dpStfNight').checked,
+    isZulage: document.getElementById('dpStfZulage').checked,
+    color: document.getElementById('dpStfColor').value,
+  };
+  if (!body.name||!body.code) return toast('Name und Code erforderlich','err');
+  try {
+    if (id) await api('PUT', '/dp/shift-types/'+id, body);
+    else await api('POST', '/dp/shift-types', body);
+    closeModal('dpShiftTypeFormOv');
+    await fetchData();
+    renderDPConfig();
+    toast('Gespeichert');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+async function deleteDpShiftType(id) {
+  if (!confirm('Schichttyp löschen?')) return;
+  try {
+    await api('DELETE', '/dp/shift-types/'+id);
+    await fetchData();
+    renderDPConfig();
+    toast('Gelöscht');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+function openDpAbsenceTypeForm(jsonStr) {
+  const at = jsonStr ? JSON.parse(jsonStr) : null;
+  document.getElementById('dpAtfTitle').textContent = at ? 'Abwesenheitstyp bearbeiten' : 'Neuer Abwesenheitstyp';
+  document.getElementById('dpAtfId').value = at?.id||'';
+  document.getElementById('dpAtfCode').value = at?.code||'';
+  document.getElementById('dpAtfLabel').value = at?.label||'';
+  document.getElementById('dpAtfColor').value = at?.color||'#f59e0b';
+  document.getElementById('dpAtfHoursCalc').value = at?.hours_calculation||'daily_target';
+  document.getElementById('dpAtfFixed').value = at?.fixed_hours||8;
+  document.getElementById('dpAtfFixedWrap').style.display = at?.hours_calculation==='fixed' ? '' : 'none';
+  document.getElementById('dpAtfAdjTarget').checked = !!at?.adjusts_monthly_target;
+  document.getElementById('dpAtfBlocks').checked = at?.blocks_scheduling!==false;
+  document.getElementById('dpAtfReopens').checked = at?.reopens_shift!==false;
+  document.getElementById('dpAtfCounts').checked = at?.counts_as_worked!==false;
+  document.getElementById('dpAtfApproval').checked = !!at?.requires_approval;
+  document.getElementById('dpAtfHoursCalc').onchange = function() {
+    document.getElementById('dpAtfFixedWrap').style.display = this.value==='fixed' ? '' : 'none';
+  };
+  openModal('dpAbsenceTypeFormOv');
+}
+
+async function submitDpAbsenceTypeForm() {
+  const id = document.getElementById('dpAtfId').value;
+  const hc = document.getElementById('dpAtfHoursCalc').value;
+  const body = {
+    code: document.getElementById('dpAtfCode').value.trim().toUpperCase(),
+    label: document.getElementById('dpAtfLabel').value.trim(),
+    color: document.getElementById('dpAtfColor').value,
+    hoursCalculation: hc,
+    fixedHours: hc==='fixed' ? parseFloat(document.getElementById('dpAtfFixed').value)||8 : null,
+    adjustsMonthlyTarget: document.getElementById('dpAtfAdjTarget').checked,
+    blocksScheduling: document.getElementById('dpAtfBlocks').checked,
+    reopensShift: document.getElementById('dpAtfReopens').checked,
+    countsAsWorked: document.getElementById('dpAtfCounts').checked,
+    requiresApproval: document.getElementById('dpAtfApproval').checked,
+  };
+  if (!body.code||!body.label) return toast('Code und Bezeichnung erforderlich','err');
+  try {
+    if (id) await api('PUT', '/dp/absence-types/'+id, body);
+    else await api('POST', '/dp/absence-types', body);
+    closeModal('dpAbsenceTypeFormOv');
+    await fetchData();
+    renderDPConfig();
+    toast('Gespeichert');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+async function deleteDpAbsenceType(id) {
+  if (!confirm('Abwesenheitstyp löschen?')) return;
+  try {
+    await api('DELETE', '/dp/absence-types/'+id);
+    await fetchData();
+    renderDPConfig();
+    toast('Gelöscht');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+function openDpEmpParamForm(empId) {
+  const p = S.dpEmpParams?.find(x=>x.employee_id===empId);
+  const empSel = document.getElementById('dpEpfEmp');
+  empSel.innerHTML = S.users.map(u=>`<option value="${u.id}"${u.id===empId?' selected':''}>${esc(u.name)}</option>`).join('');
+  document.getElementById('dpEpfEmpId').value = empId||'';
+  document.getElementById('dpEpfWeekly').value = p?.weekly_hours||40;
+  document.getElementById('dpEpfWorkDays').value = p?.work_days_per_week||5;
+  document.getElementById('dpEpfNights').checked = p ? !!p.can_do_nights : true;
+  document.getElementById('dpEpfDoubleNights').checked = p ? !!p.double_nights_allowed : true;
+  document.getElementById('dpEpfSpringer').checked = !!p?.is_springer;
+  document.getElementById('dpEpfMaxNights').value = p?.max_nights_per_month||'';
+  openModal('dpEmpParamFormOv');
+}
+
+async function submitDpEmpParamForm() {
+  const empId = document.getElementById('dpEpfEmpId').value || document.getElementById('dpEpfEmp').value;
+  if (!empId) return toast('Mitarbeiter auswählen','err');
+  const body = {
+    employeeId: empId,
+    weeklyHours: parseFloat(document.getElementById('dpEpfWeekly').value)||40,
+    workDaysPerWeek: parseInt(document.getElementById('dpEpfWorkDays').value)||5,
+    canDoNights: document.getElementById('dpEpfNights').checked,
+    doubleNightsAllowed: document.getElementById('dpEpfDoubleNights').checked,
+    isSpringer: document.getElementById('dpEpfSpringer').checked,
+    maxNightsPerMonth: document.getElementById('dpEpfMaxNights').value ? parseInt(document.getElementById('dpEpfMaxNights').value) : null,
+  };
+  try {
+    await api('POST', '/dp/employee-params', body);
+    closeModal('dpEmpParamFormOv');
+    renderDPConfig();
+    toast('Gespeichert');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+function openDpReqForm(req) {
+  document.getElementById('dpRfTitle').textContent = req ? 'Bedarf bearbeiten' : 'Schichtbedarf';
+  document.getElementById('dpRfId').value = req?.id||'';
+  const stSel = document.getElementById('dpRfShiftType');
+  stSel.innerHTML = S.dpShiftTypes.map(st=>`<option value="${st.id}"${req?.shift_type_id===st.id?' selected':''}>${esc(st.code)} – ${esc(st.name)}</option>`).join('');
+  document.getElementById('dpRfAppliesTo').value = req?.applies_to||'weekday';
+  document.getElementById('dpRfWeekday').value = req?.weekday||'';
+  document.getElementById('dpRfDate').value = req?.specific_date||'';
+  document.getElementById('dpRfSlots').value = req?.slot_count||1;
+  onDpRfTypeChange();
+  openModal('dpReqFormOv');
+}
+
+function onDpRfTypeChange() {
+  const v = document.getElementById('dpRfAppliesTo').value;
+  document.getElementById('dpRfWeekdayWrap').style.display = v==='weekday' ? '' : 'none';
+  document.getElementById('dpRfDateWrap').style.display = v==='date' ? '' : 'none';
+}
+
+async function submitDpReqForm() {
+  const id = document.getElementById('dpRfId').value;
+  const appliesTo = document.getElementById('dpRfAppliesTo').value;
+  const body = {
+    shiftTypeId: document.getElementById('dpRfShiftType').value,
+    appliesTo,
+    weekday: appliesTo==='weekday' ? (document.getElementById('dpRfWeekday').value ? parseInt(document.getElementById('dpRfWeekday').value) : null) : null,
+    specificDate: appliesTo==='date' ? document.getElementById('dpRfDate').value : null,
+    slotCount: parseInt(document.getElementById('dpRfSlots').value)||1,
+  };
+  if (!body.shiftTypeId) return toast('Schichttyp erforderlich','err');
+  try {
+    if (id) await api('PUT', '/dp/shift-requirements/'+id, body);
+    else await api('POST', '/dp/shift-requirements', body);
+    closeModal('dpReqFormOv');
+    renderDPConfig();
+    toast('Gespeichert');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+async function deleteDpRequirement(id) {
+  if (!confirm('Schichtbedarf löschen?')) return;
+  try {
+    await api('DELETE', '/dp/shift-requirements/'+id);
+    renderDPConfig();
+    toast('Gelöscht');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DIENSTPLAN — MEIN DIENSTPLAN
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function renderDPMine() {
+  const el = document.getElementById('main');
+  if (!el) return;
+
+  const now = new Date();
+  const selMonth = S._dpMineMonth || (now.getMonth()+1);
+  const selYear = S._dpMineYear || now.getFullYear();
+  S._dpMineMonth = selMonth;
+  S._dpMineYear = selYear;
+
+  // Find published plan for this month
+  const plan = S.dpPlans.find(p=>p.month===selMonth&&p.year===selYear&&p.status==='published');
+
+  let wishDays = [];
+  try {
+    wishDays = await api('GET', `/dp/wish-days?month=${selMonth}&year=${selYear}`);
+  } catch(e) {}
+
+  const myWishDays = wishDays.filter(w=>w.employee_id===S.currentUser);
+
+  let matrixData = null;
+  if (plan) {
+    try { matrixData = await api('GET', '/dp/plans/'+plan.id+'/matrix'); } catch(e) {}
+  }
+
+  const myAssignments = matrixData ? (matrixData.empAssignMap[S.currentUser]||{}) : {};
+  const shiftTypes = matrixData?.shiftTypes||S.dpShiftTypes;
+  const absenceTypes = matrixData?.absenceTypes||S.dpAbsenceTypes;
+
+  const daysInMonth = new Date(selYear, selMonth, 0).getDate();
+  const days = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(selYear, selMonth-1, d);
+    const dateStr = date.toISOString().slice(0,10);
+    days.push({date:dateStr, weekday:date.getDay()});
+  }
+
+  let calRows = '';
+  const weeks = [];
+  let week = new Array(7).fill(null);
+  for (const d of days) {
+    const wd = d.weekday;
+    week[wd] = d;
+    if (wd===6||d===days[days.length-1]) {
+      weeks.push([...week]);
+      week = new Array(7).fill(null);
+    }
+  }
+
+  for (const w of weeks) {
+    let tds = w.map((d,i) => {
+      if (!d) return '<td style="background:var(--bg2)"></td>';
+      const a = myAssignments[d.date];
+      const st = shiftTypes.find(x=>x.id===a?.shift_type_id);
+      const at = absenceTypes.find(x=>x.id===a?.absence_type_id);
+      const isWE = i===0||i===6;
+      const wd = myWishDays.find(w=>String(w.date).slice(0,10)===d.date);
+      let bg = isWE ? 'var(--bg2)' : '';
+      let content = '';
+      if (a) {
+        const color = at ? at.color : (st ? st.color : '#ccc');
+        const label = at ? at.code : (st ? st.code : '');
+        content = `<span style="background:${color}20;color:${color};border-radius:4px;padding:2px 6px;font-weight:700;font-size:12px">${esc(label)}</span>`;
+        if (at && st) content += `<br><span style="font-size:10px;color:var(--mu)">${esc(st.code)}</span>`;
+      }
+      const wishBadge = wd ? `<span title="Wunschtag${wd.status==='violated'?' (verletzt)':''}" style="font-size:12px">${wd.status==='violated'?'❌':'⭐'}</span>` : '';
+      return `<td style="padding:6px;vertical-align:top;min-height:60px;background:${bg};border:1px solid var(--border)">
+        <div style="font-size:11px;color:var(--mu)">${d.date.slice(8)}.</div>
+        <div style="margin-top:2px">${content}</div>
+        <div style="margin-top:2px">${wishBadge}</div>
+      </td>`;
+    }).join('');
+    calRows += `<tr>${tds}</tr>`;
+  }
+
+  const canAddWish = myWishDays.length < 3;
+
+  el.innerHTML = `<div style="padding:16px;max-width:900px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <h2 style="margin:0;font-size:16px;font-weight:700">👤 Mein Dienstplan</h2>
+      <button class="btn-s" onclick="S._dpMineMonth=${selMonth===1?12:selMonth-1};S._dpMineYear=${selMonth===1?selYear-1:selYear};renderDPMine()">◀</button>
+      <span style="font-weight:600">${MONTH_NAMES[selMonth-1]} ${selYear}</span>
+      <button class="btn-s" onclick="S._dpMineMonth=${selMonth===12?1:selMonth+1};S._dpMineYear=${selMonth===12?selYear+1:selYear};renderDPMine()">▶</button>
+      ${!plan?'<span style="color:var(--mu);font-size:12px">Kein freigegebener Plan für diesen Monat</span>':''}
+    </div>
+
+    <table style="width:100%;border-collapse:collapse;margin-bottom:20px">
+      <thead><tr>${['So','Mo','Di','Mi','Do','Fr','Sa'].map(d=>`<th style="padding:6px;text-align:center;background:var(--bg2);border:1px solid var(--border);font-size:13px">${d}</th>`).join('')}</tr></thead>
+      <tbody>${calRows}</tbody>
+    </table>
+
+    <div style="background:var(--bg2);border-radius:10px;padding:14px">
+      <h3 style="margin:0 0 10px;font-size:14px">⭐ Wunschtage (${myWishDays.length}/3)</h3>
+      ${myWishDays.length ? myWishDays.map(w=>`
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px">
+          <span style="font-size:14px">${w.status==='violated'?'❌':'⭐'}</span>
+          <span>${String(w.date).slice(0,10)}</span>
+          <span style="color:var(--mu)">${esc(w.reason||'')}</span>
+          <button class="btn-s" style="color:#ef4444;margin-left:auto" onclick="deleteDpWishDay('${w.id}')">✕</button>
+        </div>`).join('') : '<div style="color:var(--mu);font-size:13px">Keine Wunschtage</div>'}
+      ${canAddWish ? `<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="date" id="dpWishDate" style="font-size:13px" min="${selYear}-${String(selMonth).padStart(2,'0')}-01" max="${selYear}-${String(selMonth).padStart(2,'0')}-${String(daysInMonth).padStart(2,'0')}">
+        <input type="text" id="dpWishReason" placeholder="Grund (optional)" style="font-size:13px;flex:1">
+        <button class="btn-p" onclick="addDpWishDay(${selMonth},${selYear})">+ Wunschtag</button>
+      </div>` : '<div style="color:var(--mu);font-size:12px;margin-top:8px">Maximum von 3 Wunschtagen erreicht</div>'}
+    </div>
+  </div>`;
+}
+
+async function addDpWishDay(month, year) {
+  const date = document.getElementById('dpWishDate').value;
+  const reason = document.getElementById('dpWishReason').value.trim();
+  if (!date) return toast('Datum erforderlich','err');
+  try {
+    await api('POST', '/dp/wish-days', {date, month, year, reason});
+    renderDPMine();
+    toast('Wunschtag gespeichert');
+  } catch(e) { toast(e.message,'err'); }
+}
+
+async function deleteDpWishDay(id) {
+  try {
+    await api('DELETE', '/dp/wish-days/'+id);
+    renderDPMine();
+    toast('Wunschtag gelöscht');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
 }
