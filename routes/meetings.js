@@ -57,12 +57,11 @@ router.delete('/meetings/:id', auth, async (req, res) => {
 router.post('/meetings/:id/instances', auth, async (req, res) => {
   try {
     const { date, time, notes } = req.body;
-    if (!date) return bad(res, 'Datum erforderlich', 400);
     const id = newId();
     await pool.query(
       `INSERT INTO meeting_instances (id, meeting_id, date, time, notes, created_by)
        VALUES ($1,$2,$3,$4,$5,$6)`,
-      [id, req.params.id, date, time || '', notes || '', req.uid]
+      [id, req.params.id, date||null, time || '', notes || '', req.uid]
     );
     const row = await q1('SELECT * FROM meeting_instances WHERE id=$1', [id]);
     ok(res, row);
@@ -135,9 +134,11 @@ router.put('/meeting-instances/:id', auth, async (req, res) => {
     const { date, time, status, notes } = req.body;
     const inst = await q1('SELECT * FROM meeting_instances WHERE id=$1', [req.params.id]);
     if (!inst) return bad(res, 'Termin nicht gefunden', 404);
+    // date can be explicitly set to null ("Datum noch offen")
+    const newDate = Object.prototype.hasOwnProperty.call(req.body,'date') ? (date||null) : inst.date;
     await pool.query(
-      `UPDATE meeting_instances SET date=COALESCE($1,date), time=COALESCE($2,time), status=COALESCE($3,status), notes=COALESCE($4,notes) WHERE id=$5`,
-      [date || null, time !== undefined ? time : null, status || null, notes !== undefined ? notes : null, req.params.id]
+      `UPDATE meeting_instances SET date=$1, time=COALESCE($2,time), status=COALESCE($3,status), notes=COALESCE($4,notes) WHERE id=$5`,
+      [newDate, time !== undefined ? time : null, status || null, notes !== undefined ? notes : null, req.params.id]
     );
     const row = await q1('SELECT * FROM meeting_instances WHERE id=$1', [req.params.id]);
     ok(res, row);

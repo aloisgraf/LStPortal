@@ -3438,7 +3438,7 @@ function renderMeetingDetail(m, canManage) {
         const open=(i.items||[]).filter(it=>it.status==='open'||it.status==='redo').length;
         const statusColor={planned:'#3b82f6',done:'#10b981',cancelled:'#ef4444'}[i.status]||'#64748b';
         return`<div class="meetings-inst-tab${S._selInstance===i.id?' active':''}" onclick="S._selInstance='${i.id}';renderMeetings()">
-          <div style="font-size:12px;font-weight:600">${fmtDate(i.date)}${i.time?' '+i.time:''}</div>
+          <div style="font-size:12px;font-weight:600">${i.date?fmtDate(i.date):'📅 Datum offen'}${i.time?' '+i.time:''}</div>
           <div style="display:flex;gap:4px;margin-top:2px">
             <span style="font-size:10px;color:${statusColor}">${{planned:'Geplant',done:'Abgeschlossen',cancelled:'Abgesagt'}[i.status]||i.status}</span>
             ${open>0?`<span style="font-size:10px;color:#92400e;background:#fef3c7;padding:0 4px;border-radius:8px">${open}</span>`:''}
@@ -3537,7 +3537,11 @@ function openInstanceForm(meetingId, id=null) {
   document.getElementById('instanceFormTitle').textContent = inst ? 'Termin bearbeiten' : 'Neuer Termin';
   document.getElementById('ifId').value = inst?.id||'';
   document.getElementById('ifMeetingId').value = meetingId;
-  document.getElementById('ifDate').value = inst?.date?.slice?.(0,10)||new Date().toISOString().slice(0,10);
+  const dateOpen = inst && !inst.date;
+  const cb = document.getElementById('ifDateOpen');
+  cb.checked = dateOpen;
+  document.getElementById('ifDate').disabled = dateOpen;
+  document.getElementById('ifDate').value = dateOpen ? '' : (inst?.date?.slice?.(0,10)||'');
   document.getElementById('ifTime').value = inst?.time||m?.rhythmTime||'';
   document.getElementById('ifNotes').value = inst?.notes||'';
   openModal('instanceFormOv');
@@ -3546,9 +3550,10 @@ function openInstanceForm(meetingId, id=null) {
 async function submitInstanceForm() {
   const id = document.getElementById('ifId').value;
   const meetingId = document.getElementById('ifMeetingId').value;
+  const dateOpen = document.getElementById('ifDateOpen').checked;
   const date = document.getElementById('ifDate').value;
-  if (!date) return toast('Datum erforderlich','err');
-  const body = { date, time: document.getElementById('ifTime').value, notes: document.getElementById('ifNotes').value };
+  if (!dateOpen && !date) return toast('Datum erforderlich oder "Datum noch offen" aktivieren','err');
+  const body = { date: dateOpen ? null : date, time: document.getElementById('ifTime').value, notes: document.getElementById('ifNotes').value };
   try {
     if (id) await api('PUT','/meeting-instances/'+id, body);
     else await api('POST','/meetings/'+meetingId+'/instances', body);

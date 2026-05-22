@@ -1432,7 +1432,16 @@
     <div class="mb2">
       <input type="hidden" id="ifId">
       <input type="hidden" id="ifMeetingId">
-      <div class="fg"><label>Datum *</label><input type="date" id="ifDate"></div>
+      <div class="fg">
+        <label>Datum</label>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <input type="date" id="ifDate" style="flex:1">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:400;cursor:pointer;white-space:nowrap">
+            <input type="checkbox" id="ifDateOpen" onchange="document.getElementById('ifDate').disabled=this.checked;if(this.checked)document.getElementById('ifDate').value=''">
+            Datum noch offen
+          </label>
+        </div>
+      </div>
       <div class="fg"><label>Uhrzeit</label><input type="time" id="ifTime"></div>
       <div class="fg"><label>Notizen</label><textarea id="ifNotes" rows="2"></textarea></div>
     </div>
