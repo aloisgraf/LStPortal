@@ -4858,17 +4858,20 @@ function renderTodoDetail(t) {
     return `<div class="todo-ci${item.is_done?' done-item':''}" id="todo-ci-${item.id}"${itemDeadlineColor?` style="border-left:4px solid ${itemDeadlineColor}"`:''}>
       <input type="checkbox" ${item.is_done?'checked':''} ${canEditItem?'':'disabled'} onchange="toggleTodoItem('${t.id}','${item.id}',this.checked)">
       <div class="todo-ci-body">
-        <div class="todo-ci-title">${esc(item.title)}</div>
+        <div class="todo-ci-title"${canEditItem?` style="cursor:pointer" onclick="openTodoItemForm('${t.id}','${item.id}')" title="Bearbeiten"`:''}>
+          ${esc(item.title)}
+          ${item.due_date ? `<span style="font-size:11px;color:${itemDeadlineColor||'#64748b'};font-weight:${itemDeadlineColor?'600':'400'};margin-left:8px">📅 ${String(item.due_date).slice(0,10)}</span>` : ''}
+        </div>
         <textarea id="todo-comment-${item.id}" class="todo-ci-textarea" rows="1" placeholder="Kommentar…" ${canEditItem?`onblur="saveTodoItemComment('${t.id}','${item.id}')"`:''} ${canEditItem?'':'readonly'}>${esc(item.comment||'')}</textarea>
         ${assigneeNames ? `<div class="todo-ci-meta">👤 ${assigneeNames}</div>` : ''}
         ${item.is_done && doneUser ? `<div class="todo-ci-meta">Erledigt von ${esc(doneUser.name)} · ${item.done_at?String(item.done_at).slice(0,16).replace('T',' '):''}</div>` : ''}
       </div>
       <div class="todo-ci-actions">
-        ${canManageTodo&&t.items.indexOf(item)>0 ? `<button class="btn-s" style="padding:3px 7px;font-size:11px" title="Nach oben" onclick="moveTodoItem('${t.id}','${item.id}','up')">⬆</button>` : ''}
-        ${canManageTodo&&t.items.indexOf(item)<t.items.length-1 ? `<button class="btn-s" style="padding:3px 7px;font-size:11px" title="Nach unten" onclick="moveTodoItem('${t.id}','${item.id}','down')">⬇</button>` : ''}
-        ${canEditItem ? `<button class="btn-s" style="padding:3px 7px;font-size:11px" title="Bearbeiten" onclick="openTodoItemForm('${t.id}','${item.id}')">✏️</button>` : ''}
-        ${canEditItem ? `<button class="btn-s" style="padding:3px 7px;font-size:11px" onclick="openTodoItemAssignees('${t.id}','${item.id}')">👥</button>` : ''}
-        ${canEditItem ? `<button class="btn-d" style="padding:3px 7px" onclick="deleteTodoItem('${t.id}','${item.id}')">✕</button>` : ''}
+        ${canManageTodo&&t.items.indexOf(item)>0 ? `<button class="btn-s" style="padding:5px 9px;font-size:14px" title="Nach oben" onclick="moveTodoItem('${t.id}','${item.id}','up')">⬆</button>` : ''}
+        ${canManageTodo&&t.items.indexOf(item)<t.items.length-1 ? `<button class="btn-s" style="padding:5px 9px;font-size:14px" title="Nach unten" onclick="moveTodoItem('${t.id}','${item.id}','down')">⬇</button>` : ''}
+        ${canEditItem ? `<button class="btn-s" style="padding:5px 9px;font-size:14px" title="Bearbeiten" onclick="openTodoItemForm('${t.id}','${item.id}')">✏️</button>` : ''}
+        ${canEditItem ? `<button class="btn-s" style="padding:5px 9px;font-size:14px" title="Zuweisungen" onclick="openTodoItemAssignees('${t.id}','${item.id}')">👥</button>` : ''}
+        ${canEditItem ? `<button class="btn-d" style="padding:5px 9px;font-size:14px" title="Löschen" onclick="deleteTodoItem('${t.id}','${item.id}')">✕</button>` : ''}
       </div>
     </div>`;
   }).join('');
