@@ -3430,8 +3430,8 @@ function renderMeetingDetail(m, canManage) {
       <div style="display:flex;gap:8px;flex-shrink:0">
         ${canManage?`<button class="btn-s" onclick="openMeetingForm('${m.id}')">&#10002; Bearbeiten</button>`:''}
         ${canManage?`<button class="btn-s btn-danger" onclick="deleteMeeting('${m.id}')">&#128465;</button>`:''}
-        <button class="btn-s" onclick="openInstanceForm('${m.id}')">+ Termin</button>
-        ${m.type==='jour_fixe'?`<button class="btn-s" onclick="generateNextInstance('${m.id}')">&#128257; Nächster</button>`:''}
+        ${canManage?`<button class="btn-s" onclick="openInstanceForm('${m.id}')">+ Termin</button>`:''}
+        ${canManage&&m.type==='jour_fixe'?`<button class="btn-s" onclick="generateNextInstance('${m.id}')">&#128257; Nächster</button>`:''}
       </div>
     </div>
     <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;overflow-x:auto">
