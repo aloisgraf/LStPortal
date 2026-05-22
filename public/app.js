@@ -4847,7 +4847,7 @@ function renderTodoDetail(t) {
     }).join(', ');
     const canEditItem = item._canEdit || false;
     const itemDeadlineColor = getDeadlineColor(item.due_date);
-    return `<div class="todo-ci${item.is_done?' done-item':''}" id="todo-ci-${item.id}"${itemDeadlineColor?` style="border-left:4px solid ${itemDeadlineColor}"`:''}>`
+    return `<div class="todo-ci${item.is_done?' done-item':''}" id="todo-ci-${item.id}"${itemDeadlineColor?` style="border-left:4px solid ${itemDeadlineColor}"`:''}>
       <input type="checkbox" ${item.is_done?'checked':''} ${canEditItem?'':'disabled'} onchange="toggleTodoItem('${t.id}','${item.id}',this.checked)">
       <div class="todo-ci-body">
         <div class="todo-ci-title">${esc(item.title)}</div>
