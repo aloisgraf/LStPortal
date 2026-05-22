@@ -467,6 +467,7 @@ async function initDB() {
     `ALTER TABLE discussion_items ADD COLUMN IF NOT EXISTS group_id TEXT DEFAULT NULL`,
     `ALTER TABLE meeting_instances ADD COLUMN IF NOT EXISTS title TEXT DEFAULT NULL`,
     `ALTER TABLE todos ADD COLUMN IF NOT EXISTS protokoll JSONB DEFAULT '[]'`,
+    `ALTER TABLE todo_items ADD COLUMN IF NOT EXISTS due_date DATE DEFAULT NULL`,
     `ALTER TABLE discussion_items ADD COLUMN IF NOT EXISTS link TEXT DEFAULT NULL`,
     `CREATE TABLE IF NOT EXISTS todo_item_notifications (
   id TEXT PRIMARY KEY,

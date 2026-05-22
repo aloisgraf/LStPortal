@@ -4334,72 +4334,83 @@ function renderDPConfigRules() {
   return `<div class="dp-cfg-card">
     <h3>📋 Österreichische Arbeitszeitgesetz-Regelungen</h3>
     <div style="font-size:13px;line-height:1.6;color:var(--tx)">
-      <div style="margin-bottom:16px;padding:12px;background:var(--sf2);border-left:3px solid var(--acc);border-radius:4px">
-        <strong style="color:var(--acc)">Auto-Generierung berücksichtigt folgende Constraints:</strong>
+
+      <div style="margin-bottom:20px;padding:12px 14px;background:#ef444412;border-left:4px solid #ef4444;border-radius:6px">
+        <div style="font-weight:700;color:#ef4444;font-size:14px;margin-bottom:4px">🔴 Harte Regeln — werden IMMER eingehalten</div>
+        <div style="color:var(--mu);font-size:12px">Diese Regeln werden vom Auto-Generieren niemals verletzt. Ist kein geeigneter Mitarbeiter verfügbar, bleibt der Slot unbesetzt und wird im Protokoll dokumentiert.</div>
       </div>
 
-      <div style="margin-bottom:14px">
-        <h4 style="margin:0 0 6px;font-weight:600;color:var(--tx)">1️⃣ Maximale Wochenarbeitszeit: 48 Stunden</h4>
+      <div style="margin-bottom:14px;margin-left:4px">
+        <div style="font-weight:600;margin-bottom:3px">1. Qualifikationen</div>
         <div style="color:var(--mu);font-size:12px;margin-left:12px">
-          Die durchschnittliche Arbeitszeit pro Woche über 17 Wochen darf 48 Stunden nicht überschreiten (AZG §9).<br>
-          <strong>Beispiel:</strong> 5 Tage × 10h = 50h → ❌ Nicht erlaubt!
+          Ein Mitarbeiter muss für den jeweiligen Schichttyp qualifiziert sein. Ohne Qualifikation keine Einteilung.
         </div>
       </div>
 
-      <div style="margin-bottom:14px">
-        <h4 style="margin:0 0 6px;font-weight:600;color:var(--tx)">2️⃣ Maximale Tagesarbeitszeit: 10 Stunden</h4>
+      <div style="margin-bottom:14px;margin-left:4px">
+        <div style="font-weight:600;margin-bottom:3px">2. Abwesenheiten & Doppelbesetzung</div>
         <div style="color:var(--mu);font-size:12px;margin-left:12px">
-          Mit Betriebsvereinbarung max. 10h/Tag. Absolute Höchstgrenze: 12 Stunden (AZG §9).<br>
-          Wird pro Schicht über die Schichttyp-Definition festgelegt.
+          Kein Dienst an Tagen mit Abwesenheit (Urlaub, Krankenstand, …). Kein zweiter Dienst am selben Tag.
         </div>
       </div>
 
-      <div style="margin-bottom:14px">
-        <h4 style="margin:0 0 6px;font-weight:600;color:var(--tx)">3️⃣ Mindestruhezeit: 11 Stunden zwischen Schichten</h4>
+      <div style="margin-bottom:14px;margin-left:4px">
+        <div style="font-weight:600;margin-bottom:3px">3. Mindestruhezeit: 11 Stunden (AZG §12)</div>
         <div style="color:var(--mu);font-size:12px;margin-left:12px">
-          Nach Schichtende muss mind. 11 Stunden Ruhezeit vor der nächsten Schicht liegen (AZG §12).<br>
-          <strong>Beispiel:</strong> Schicht endet 20:00 → Nächste Schicht frühestens 07:00+1 Tag<br>
-          <em>Ausnahme:</em> Verkürzt auf 8h mit Ausgleich im Kollektivvertrag.
+          Zwischen Schichtende und nächster Schicht müssen mindestens 11 Stunden liegen.<br>
+          Beispiel: Dienst endet 20:00 → nächster Dienst frühestens 07:00 des Folgetags.
         </div>
       </div>
 
-      <div style="margin-bottom:14px">
-        <h4 style="margin:0 0 6px;font-weight:600;color:var(--tx)">4️⃣ Wöchentliche Ruhezeit: 36 Stunden</h4>
+      <div style="margin-bottom:14px;margin-left:4px">
+        <div style="font-weight:600;margin-bottom:3px">4. Maximale Wochenarbeitszeit: 48 Stunden (AZG §9)</div>
         <div style="color:var(--mu);font-size:12px;margin-left:12px">
-          Minimum 36 Stunden ununterbrochene Ruhezeit pro Woche (AZG §12).<br>
-          Bei Schichtarbeit minimal 24h, Durchschnitt muss aber 36h sein.
+          Pro Kalenderwoche dürfen maximal 48 Stunden eingeteilt werden.<br>
+          Beispiel: 5 × 10h = 50h → ❌ Nicht erlaubt. Maximal 4 × 10h = 40h oder 5 × 9h = 45h pro Woche.
         </div>
       </div>
 
-      <div style="margin-bottom:14px">
-        <h4 style="margin:0 0 6px;font-weight:600;color:var(--tx)">5️⃣ Maximale aufeinanderfolgende Arbeitstage: 6 Tage</h4>
+      <div style="margin-bottom:14px;margin-left:4px">
+        <div style="font-weight:600;margin-bottom:3px">5. Nachtdienst-Berechtigung</div>
         <div style="color:var(--mu);font-size:12px;margin-left:12px">
-          Nach 6 aufeinanderfolgenden Arbeitstagen muss 1 Ruhetag folgen (AZG §12).<br>
-          Der Scheduler verhindert, dass ein MA mehr als 6 Tage hintereinander eingeteilt wird.
+          Mitarbeiter ohne Nachtdienst-Erlaubnis (Parameter: Nachtdienst) werden für Nachtschichten nicht eingeteilt.
         </div>
       </div>
 
-      <div style="margin-bottom:14px">
-        <h4 style="margin:0 0 6px;font-weight:600;color:var(--tx)">6️⃣ Qualifikationen: Erforderlich für Einteilung</h4>
+      <div style="margin:24px 0 20px;padding:12px 14px;background:#f59e0b12;border-left:4px solid #f59e0b;border-radius:6px">
+        <div style="font-weight:700;color:#f59e0b;font-size:14px;margin-bottom:4px">🟡 Weiche Regeln — werden im Normalfall eingehalten</div>
+        <div style="color:var(--mu);font-size:12px">Diese Regeln werden zunächst strikt angewendet. Wenn kein Mitarbeiter verfügbar ist, darf die weiche Regel im Ausnahmefall verletzt werden. Der Vorgang wird im Protokoll als Regelverstoß dokumentiert.</div>
+      </div>
+
+      <div style="margin-bottom:14px;margin-left:4px">
+        <div style="font-weight:600;margin-bottom:3px">6. Monatliches Stundenziel</div>
         <div style="color:var(--mu);font-size:12px;margin-left:12px">
-          Ein Mitarbeiter muss mindestens 1 Qualifikation haben, um eingeteilt zu werden.<br>
-          Wird die Schicht nicht als qualifiziert markiert → Mitarbeiter wird übersprungen.
+          Mitarbeiter werden nicht über ihr monatliches Stundensoll hinaus eingeteilt.<br>
+          Im Ausnahmefall (kein anderer Mitarbeiter verfügbar) kann das Stundenziel überschritten werden.
         </div>
       </div>
 
-      <div style="margin-bottom:14px">
-        <h4 style="margin:0 0 6px;font-weight:600;color:var(--tx)">7️⃣ Monatliches Stundenziel</h4>
+      <div style="margin-bottom:14px;margin-left:4px">
+        <div style="font-weight:600;margin-bottom:3px">7. Maximale aufeinanderfolgende Arbeitstage: 6 Tage</div>
         <div style="color:var(--mu);font-size:12px;margin-left:12px">
-          Mitarbeiter-Parameter: Monthly Hours (Standard: 160h/Monat).<br>
-          Der Scheduler stoppt, wenn das Ziel erreicht ist.
+          Nach 6 aufeinanderfolgenden Arbeitstagen muss ein Ruhetag folgen (AZG §12).<br>
+          Im Ausnahmefall kann auf 7 aufeinanderfolgende Tage ausgeweitet werden.
+        </div>
+      </div>
+
+      <div style="margin-bottom:14px;margin-left:4px">
+        <div style="font-weight:600;margin-bottom:3px">8. Maximale Nachtdienste pro Monat</div>
+        <div style="color:var(--mu);font-size:12px;margin-left:12px">
+          Mitarbeiter werden bis zum konfigurierten Limit für Nachtdienste eingeteilt.<br>
+          Im Ausnahmefall kann dieses Limit überschritten werden.
         </div>
       </div>
 
       <div style="padding:12px;background:#ef444410;border-left:3px solid #ef4444;border-radius:4px;margin-top:16px">
-        <strong style="color:#ef4444">⚠️ Wenn Slots nicht gefüllt werden können:</strong><br>
+        <strong style="color:#ef4444">⚠️ Unbesetzte Slots & Regelverstöße:</strong><br>
         <div style="color:var(--tx);font-size:12px;margin-top:6px">
-          Diese werden im Generierungs-<strong>Protokoll</strong> geloggt mit dem Grund (z.B. weekly_cap_exceeded, rest_period_violated).<br>
-          Sie können im DP-Plan weiterhin manuell besetzt werden.
+          Alle unbesetzten Slots und Regelverstöße werden im Generierungs-<strong>Protokoll</strong> dokumentiert (Grund z.B. weekly_cap_exceeded, rest_period_violated, soft_rule_relaxed).<br>
+          Unbesetzte Slots können manuell nachbesetzt werden.
         </div>
       </div>
     </div>

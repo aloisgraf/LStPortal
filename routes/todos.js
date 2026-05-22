@@ -125,10 +125,12 @@ router.put('/todos/:todoId/items/:id', auth, async (req,res) => {
         is_done=COALESCE($3,is_done),
         done_by=CASE WHEN $3 IS NOT NULL THEN $4 ELSE done_by END,
         done_at=CASE WHEN $3=true THEN NOW() WHEN $3=false THEN NULL ELSE done_at END,
-        due_date=$5,
-        sort_order=COALESCE($6,sort_order)
-       WHERE id=$7 AND todo_id=$8 RETURNING *`,
-      [title||null, comment!==undefined?comment:null, isDone!==undefined?isDone:null, doneBy, dueDate||null, sortOrder||null, req.params.id, req.params.todoId]
+        due_date=CASE WHEN $5 THEN $6::DATE ELSE due_date END,
+        sort_order=COALESCE($7,sort_order)
+       WHERE id=$8 AND todo_id=$9 RETURNING *`,
+      [title||null, comment!==undefined?comment:null, isDone!==undefined?isDone:null, doneBy,
+       dueDate!==undefined, dueDate!==undefined?(dueDate||null):null,
+       sortOrder||null, req.params.id, req.params.todoId]
     );
     if (!row) return bad(res,'Nicht gefunden',404);
     // Update parent todo updated_at

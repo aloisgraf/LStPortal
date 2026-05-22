@@ -561,100 +561,75 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
 
     for (const slot of slots) {
       const slotHours = parseFloat(slot.shiftType.duration_hours)||0;
-      const slotEndH = getShiftEndHour(slot.shiftType);
-      const candidates = [];
-      const skipReasons = {}; // empId -> reason
 
-      for (const [empId, state] of Object.entries(empState)) {
-        const params = empParamMap[empId];
-        if (!params) continue;
+      // Build candidate list. Pass enforceSoftRules=true first; if no candidates, retry with false.
+      const buildCandidates = (enforceSoftRules) => {
+        const cands = [];
+        const reasons = {};
+        for (const [empId, state] of Object.entries(empState)) {
+          const params = empParamMap[empId];
+          if (!params) continue;
 
-        // Hard: employee must have at least one qualification defined,
-        // and must be qualified for this specific shift type
-        const empQuals = empQualMap[empId];
-        if (!empQuals || empQuals.size === 0) {
-          if (!skipReasons[empId]) skipReasons[empId] = 'no_qualifications';
-          continue;
+          // ── HARD RULES ──────────────────────────────────────────────────
+          const empQuals = empQualMap[empId];
+          if (!empQuals || empQuals.size === 0) { reasons[empId]='no_qualifications'; continue; }
+          if (!empQuals.has(slot.shiftTypeId))   { reasons[empId]='not_qualified';    continue; }
+          if (absenceSet.has(`${empId}_${slot.date}`)) { reasons[empId]='has_absence'; continue; }
+          if (state.assignments.some(a=>a.date===slot.date&&a.shift_type_id&&!a.absence_type_id))
+            { reasons[empId]='already_assigned'; continue; }
+
+          // Hard: 48h/week cap (AZG §9)
+          const wk = getISOWeek(slot.date);
+          const projectedWeekHours = (state.weeklyHours[wk]||0) + slotHours;
+          if (projectedWeekHours > 48) {
+            reasons[empId]='weekly_cap_exceeded';
+            protocolEntries.push({plan_id:plan.id,date:slot.date,shift_type_id:slot.shiftTypeId,
+              reason:'weekly_cap_exceeded',employee_id:empId,
+              details:{week:wk,projected:projectedWeekHours.toFixed(2)}});
+            continue;
+          }
+
+          // Hard: 11h rest period (AZG §12)
+          if (!checkRestPeriod(state.assignments, slot, shiftTypes))
+            { reasons[empId]='rest_period_violated'; continue; }
+
+          // Hard: night restriction
+          if (slot.shiftType.is_night && !params.can_do_nights)
+            { reasons[empId]='cannot_do_nights'; continue; }
+
+          // ── SOFT RULES (only enforced on first pass) ───────────────────
+          if (enforceSoftRules) {
+            if (state.hoursAssigned >= state.monthlyTarget)
+              { reasons[empId]='monthly_cap_exceeded'; continue; }
+            if (getConsecutiveDays(state.assignments, slot.date) >= 6)
+              { reasons[empId]='consecutive_days_limit'; continue; }
+            if (slot.shiftType.is_night && params.max_nights_per_month!==null &&
+                state.nightsAssigned >= params.max_nights_per_month)
+              { reasons[empId]='nights_max_exceeded'; continue; }
+          }
+
+          const isWishDay = wishSet.has(`${empId}_${slot.date}`);
+          let score = -(state.monthlyTarget - state.hoursAssigned);
+          if (slot.shiftType.is_night) score += state.nightsAssigned * 50;
+          if (slot.isWeekend || slot.isHoliday) score += state.weekendsAssigned * 30;
+          if (isWishDay) score += 10000;
+          cands.push({empId, score});
         }
-        if (!empQuals.has(slot.shiftTypeId)) {
-          if (!skipReasons[empId]) skipReasons[empId] = 'not_qualified';
-          continue;
+        return {cands, reasons};
+      };
+
+      let {cands: candidates, reasons: skipReasons} = buildCandidates(true);
+      let softViolated = false;
+      if (candidates.length === 0) {
+        const retry = buildCandidates(false);
+        if (retry.cands.length > 0) {
+          candidates = retry.cands;
+          skipReasons = retry.reasons;
+          softViolated = true;
         }
-
-        // Hard: blocked by absence
-        if (absenceSet.has(`${empId}_${slot.date}`)) {
-          if (!skipReasons[empId]) skipReasons[empId] = 'has_absence';
-          continue;
-        }
-
-        // Hard: already has a shift on this day
-        if (state.assignments.some(a=>a.date===slot.date && a.shift_type_id && !a.absence_type_id)) {
-          if (!skipReasons[empId]) skipReasons[empId] = 'already_assigned';
-          continue;
-        }
-
-        // Hard: monthly hours cap — don't exceed target (allow up to +shift for last slot)
-        if (state.hoursAssigned >= state.monthlyTarget) {
-          if (!skipReasons[empId]) skipReasons[empId] = 'monthly_cap_exceeded';
-          continue;
-        }
-
-        // Hard: Austrian law — 48h/week cap (AZG §9)
-        const wk = getISOWeek(slot.date);
-        const currentWeekHours = state.weeklyHours[wk]||0;
-        const projectedWeekHours = currentWeekHours + slotHours;
-        if (projectedWeekHours > 48) {
-          if (!skipReasons[empId]) skipReasons[empId] = 'weekly_cap_exceeded';
-          protocolEntries.push({
-            plan_id: plan.id,
-            date: slot.date,
-            shift_type_id: slot.shiftTypeId,
-            reason: 'weekly_cap_exceeded',
-            employee_id: empId,
-            details: {current_week: wk, current_hours: currentWeekHours.toFixed(2), add_shift: slotHours.toFixed(2), projected: projectedWeekHours.toFixed(2)}
-          });
-          continue;
-        }
-
-        // Hard: night restriction
-        if (slot.shiftType.is_night && !params.can_do_nights) {
-          if (!skipReasons[empId]) skipReasons[empId] = 'cannot_do_nights';
-          continue;
-        }
-
-        // Hard: max nights/month
-        if (slot.shiftType.is_night && params.max_nights_per_month!==null &&
-            state.nightsAssigned >= params.max_nights_per_month) {
-          if (!skipReasons[empId]) skipReasons[empId] = 'nights_max_exceeded';
-          continue;
-        }
-
-        // Hard: Austrian Arbeitszeitgesetz — 11h minimum rest between shifts
-        // Check previous shift end + 11h <= this shift start
-        // Check this shift end + 11h <= next already-assigned shift start
-        if (!checkRestPeriod(state.assignments, slot, shiftTypes)) {
-          if (!skipReasons[empId]) skipReasons[empId] = 'rest_period_violated';
-          continue;
-        }
-
-        // Hard: max 6 consecutive days
-        if (getConsecutiveDays(state.assignments, slot.date) >= 6) {
-          if (!skipReasons[empId]) skipReasons[empId] = 'consecutive_days_limit';
-          continue;
-        }
-
-        const isWishDay = wishSet.has(`${empId}_${slot.date}`);
-        const hoursDeficit = state.monthlyTarget - state.hoursAssigned;
-        let score = -hoursDeficit;
-        if (slot.shiftType.is_night) score += state.nightsAssigned * 50;
-        if (slot.isWeekend || slot.isHoliday) score += state.weekendsAssigned * 30;
-        if (isWishDay) score += 10000;
-
-        candidates.push({empId, score});
       }
 
       if (candidates.length === 0) {
-        // Log unfilled slot with most common reason
         const reasons = Object.values(skipReasons);
         const mainReason = reasons.length > 0 ? reasons[0] : 'no_candidates';
         protocolEntries.push({
@@ -678,6 +653,11 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
         is_overtime: false, is_locked: false, source: 'generated', notes: '',
         created_by: req.uid, shiftType: st,
       };
+      if (softViolated) {
+        protocolEntries.push({plan_id:plan.id,date:slot.date,shift_type_id:slot.shiftTypeId,
+          reason:'soft_rule_relaxed',employee_id:winnerId,
+          details:{violated_rule:skipReasons[winnerId]||'unknown'}});
+      }
       newAssignments.push(assignment);
 
       const state = empState[winnerId];
