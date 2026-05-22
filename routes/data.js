@@ -7,8 +7,9 @@ const { auth, ok, bad } = require('../middleware');
 router.get('/', auth, async (req,res) => {
   try {
     const uid=req.uid, p=req.p, tp=req.tp, roles=p.roles;
+    const canManageDp = roles.some(r=>['admin','leitung','dienstplanung'].includes(r));
     const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
-           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw,dpQualificationsRaw,dpProtocolRaw,todosRaw,todoItemsRaw,todoAssigneesRaw] = await Promise.all([
+           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw,dpQualificationsRaw,dpProtocolRaw,todosRaw,todoItemsRaw,todoAssigneesRaw,myDpPlanIdsRaw] = await Promise.all([
       q('SELECT id,name,initials,roles,color,must_change_pw,last_seen FROM users ORDER BY name'),
       q('SELECT * FROM categories ORDER BY sort_order,label'),
       q('SELECT * FROM tags ORDER BY label'),
@@ -61,6 +62,7 @@ router.get('/', auth, async (req,res) => {
       q('SELECT * FROM todos ORDER BY created_at DESC').catch(()=>[]),
       q('SELECT * FROM todo_items ORDER BY sort_order, created_at').catch(()=>[]),
       q('SELECT * FROM todo_item_assignees').catch(()=>[]),
+      canManageDp ? Promise.resolve([]) : q('SELECT DISTINCT plan_id FROM dp_assignments WHERE employee_id=$1',[uid]).catch(()=>[]),
     ]);
 
     const tkViewMap = new Map((tkViewsRaw||[]).map(v=>[v.ticket_id, v.viewed_at]));
@@ -78,6 +80,28 @@ router.get('/', auth, async (req,res) => {
     (itemsRaw||[]).forEach(it=>{if(!itemMap[it.instance_id])itemMap[it.instance_id]=[];itemMap[it.instance_id].push({id:it.id,instanceId:it.instance_id,title:it.title,description:it.description,status:it.status,dueDate:it.due_date,meetingDate:it.meeting_date,parentId:it.parent_id,delegatedTo:it.delegated_to,result:it.result,sortOrder:it.sort_order,createdBy:it.created_by,createdAt:it.created_at,participants:partMap[it.id]||[]});});
     const instMap={};
     (instancesRaw||[]).forEach(inst=>{if(!instMap[inst.meeting_id])instMap[inst.meeting_id]=[];instMap[inst.meeting_id].push({id:inst.id,meetingId:inst.meeting_id,date:inst.date,time:inst.time||'',status:inst.status,notes:inst.notes||'',createdBy:inst.created_by,createdAt:inst.created_at,items:itemMap[inst.id]||[]});});
+    // Meetings: find which meetings the user has assigned items in
+    const assignedMeetingIds = new Set();
+    const itemIsAssignedToMe = new Set(); // item ids where user is participant
+    (partRaw||[]).forEach(pp=>{
+      if(pp.user_id===uid){
+        itemIsAssignedToMe.add(pp.item_id);
+        const it=(itemsRaw||[]).find(x=>x.id===pp.item_id);
+        if(it){const inst=(instancesRaw||[]).find(x=>x.id===it.instance_id);if(inst)assignedMeetingIds.add(inst.meeting_id);}
+      }
+    });
+    // Todos: find which todos the user has assigned items in
+    const assignedTodoIds = new Set();
+    const todoItemIsAssignedToMe = new Set(); // item ids where user is assignee
+    (todoAssigneesRaw||[]).forEach(a=>{
+      if(a.user_id===uid){
+        todoItemIsAssignedToMe.add(a.item_id);
+        const it=(todoItemsRaw||[]).find(x=>x.id===a.item_id);
+        if(it) assignedTodoIds.add(it.todo_id);
+      }
+    });
+    // Dienstplan: set of plan IDs current user has assignments in
+    const myDpPlanIdSet = new Set((myDpPlanIdsRaw||[]).map(r=>r.plan_id));
     const fiveMinAgo = new Date(Date.now() - 5*60*1000);
     const readIds  = new Set(readsRaw.map(r=>r.message_id));
     const readSet   = new Set(readsRaw.filter(r=>r.read_at).map(r=>r.message_id));  // nur wirklich bestätigt
@@ -97,6 +121,7 @@ router.get('/', auth, async (req,res) => {
         myDepts:tp.myDepts, seeAllTickets:tp.seeAll,
         canSetPublic:tp.canSetPublic, canAssign:tp.canAssign,
         roles: p.roles,
+        canManageDp,
       },
       users: usersRaw.map(u=>({
         id:u.id, name:u.name, initials:u.initials, roles:parseRoles(u.roles),
@@ -207,13 +232,20 @@ router.get('/', auth, async (req,res) => {
       portalLinks: (linksRaw||[]).map(l=>({id:l.id,label:l.label,url:l.url,icon:l.icon,description:l.description,sortOrder:l.sort_order})),
       stationOutages: (stOutagesRaw||[]).map(o=>({id:o.id,stationName:o.station_name,reason:o.reason,startAt:o.start_at,endAt:o.end_at,createdBy:o.created_by})),
       rolePermissions: (rolePermsRaw||[]).map(r=>({role:r.role,permission:r.permission,granted:r.granted})),
-      meetings: (meetingsRaw||[]).map(m=>({id:m.id,title:m.title,type:m.type,rhythm:m.rhythm,rhythmDay:m.rhythm_day,rhythmTime:m.rhythm_time||'',description:m.description||'',createdBy:m.created_by,createdAt:m.created_at,instances:instMap[m.id]||[]})),
+      meetings: (meetingsRaw||[]).filter(m=>p.manageUsers||m.created_by===uid||assignedMeetingIds.has(m.id)).map(m=>{
+        const canMng=p.manageUsers||m.created_by===uid;
+        return {id:m.id,title:m.title,type:m.type,rhythm:m.rhythm,rhythmDay:m.rhythm_day,rhythmTime:m.rhythm_time||'',description:m.description||'',createdBy:m.created_by,createdAt:m.created_at,_canManage:canMng,
+          instances:(instMap[m.id]||[]).map(inst=>({...inst,items:(inst.items||[]).map(it=>({...it,_canEdit:canMng||it.createdBy===uid||it.delegatedTo===uid||itemIsAssignedToMe.has(it.id)}))}))};
+      }),
       dpShiftTypes: dpShiftTypesRaw||[],
       dpAbsenceTypes: dpAbsenceTypesRaw||[],
-      dpPlans: dpPlansRaw||[],
+      dpPlans: canManageDp ? (dpPlansRaw||[]) : (dpPlansRaw||[]).filter(p=>p.status==='published'&&myDpPlanIdSet.has(p.id)),
       dpQualifications: dpQualificationsRaw||[],
       dpProtocol: (dpProtocolRaw||[]).map(p=>({id:p.id,planId:p.plan_id,date:p.date,shiftTypeId:p.shift_type_id,reason:p.reason,employeeId:p.employee_id,details:p.details||{}})),
-      todos: (todosRaw||[]).map(t => ({...t, items: (todoItemsRaw||[]).filter(i=>i.todo_id===t.id).map(i=>({...i, assignees:(todoAssigneesRaw||[]).filter(a=>a.item_id===i.id)}))})),
+      todos: (todosRaw||[]).filter(t=>p.manageUsers||t.created_by===uid||assignedTodoIds.has(t.id)).map(t=>{
+        const canMng=p.manageUsers||t.created_by===uid;
+        return {...t,_canManage:canMng,items:(todoItemsRaw||[]).filter(i=>i.todo_id===t.id).map(i=>({...i,_canEdit:canMng||todoItemIsAssignedToMe.has(i.id),assignees:(todoAssigneesRaw||[]).filter(a=>a.item_id===i.id)}))};
+      }),
     });
   } catch(e) { console.error('[/api/data FEHLER]', e.message, e.stack?.split('\n')[1]); bad(res,'Serverfehler',500); }
 });

@@ -246,6 +246,13 @@ router.get('/plans/:id/matrix', auth, async (req,res) => {
   try {
     const plan = await q1('SELECT * FROM dp_plans WHERE id=$1',[req.params.id]);
     if (!plan) return bad(res,'Nicht gefunden',404);
+    const dpRoles = req.p.roles||[];
+    const canManageDpRoute = req.p.manageUsers||dpRoles.some(r=>['leitung','dienstplanung'].includes(r));
+    if(!canManageDpRoute){
+      if(plan.status!=='published') return bad(res,'Keine Berechtigung',403);
+      const hasAssignment = await q1('SELECT id FROM dp_assignments WHERE plan_id=$1 AND employee_id=$2',[req.params.id,req.uid]);
+      if(!hasAssignment) return bad(res,'Keine Berechtigung',403);
+    }
 
     const [shiftTypes, requirements, assignments, empParams, absenceTypes] = await Promise.all([
       q('SELECT * FROM dp_shift_types ORDER BY sort_order, name'),

@@ -73,6 +73,10 @@ router.post('/todos/:id/items', auth, async (req,res) => {
 router.put('/todos/:todoId/items/:id', auth, async (req,res) => {
   const {title, comment, isDone, sortOrder} = req.body;
   try {
+    const todo = await q1('SELECT * FROM todos WHERE id=$1',[req.params.todoId]);
+    if(!todo) return bad(res,'Todo nicht gefunden',404);
+    const isAssignee = await q1('SELECT id FROM todo_item_assignees WHERE item_id=$1 AND user_id=$2',[req.params.id,req.uid]);
+    if(!req.p.manageUsers && todo.created_by!==req.uid && !isAssignee) return bad(res,'Keine Berechtigung',403);
     const doneAt = isDone === true ? 'NOW()' : 'NULL';
     const doneBy = isDone === true ? req.uid : null;
     const row = await q1(
@@ -95,6 +99,8 @@ router.put('/todos/:todoId/items/:id', auth, async (req,res) => {
 
 router.delete('/todos/:todoId/items/:id', auth, async (req,res) => {
   try {
+    const todo2 = await q1('SELECT * FROM todos WHERE id=$1',[req.params.todoId]);
+    if(todo2 && !req.p.manageUsers && todo2.created_by!==req.uid) return bad(res,'Keine Berechtigung',403);
     await q('DELETE FROM todo_items WHERE id=$1 AND todo_id=$2', [req.params.id, req.params.todoId]);
     ok(res);
   } catch(e) { bad(res,'Serverfehler',500); }

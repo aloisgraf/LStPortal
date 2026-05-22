@@ -3384,14 +3384,14 @@ const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>
 function fmtDate(d){if(!d)return'';var p=String(d).slice(0,10);return p.slice(8)+'.'+p.slice(5,7)+'.'+p.slice(0,4);}
 
 function renderMeetings() {
-  const canManage = S.p.manageUsers || (S.p.roles||[]).some(r=>['admin','leitung','technik'].includes(r));
+  const canCreateMeeting = S.p.addGeneral || S.p.manageUsers;
   const m = S._selMeeting ? S.meetings.find(x=>x.id===S._selMeeting) : null;
   document.getElementById('main').innerHTML = `
 <div class="meetings-layout">
   <div class="meetings-sidebar">
     <div class="meetings-sidebar-hdr">
       <span style="font-weight:700;font-size:15px">&#128483;&#65039; Besprechungen</span>
-      ${canManage?`<button class="btn-s" onclick="openMeetingForm()">+ Neu</button>`:''}
+      ${canCreateMeeting?`<button class="btn-s" onclick="openMeetingForm()">+ Neu</button>`:''}
     </div>
     <div class="meetings-list">
       ${S.meetings.length===0?`<div style="color:var(--mu);font-size:13px;padding:12px">Keine Besprechungen</div>`:''}
@@ -3410,7 +3410,7 @@ function renderMeetings() {
     </div>
   </div>
   <div class="meetings-main">
-    ${m ? renderMeetingDetail(m, canManage) : `<div style="color:var(--mu);padding:32px;text-align:center;font-size:14px">← Besprechung auswählen</div>`}
+    ${m ? renderMeetingDetail(m, m._canManage||false) : `<div style="color:var(--mu);padding:32px;text-align:center;font-size:14px">← Besprechung auswählen</div>`}
   </div>
 </div>`;
 }

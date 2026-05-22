@@ -185,6 +185,11 @@ router.post('/meeting-instances/:id/items', auth, async (req, res) => {
 // PUT update discussion item
 router.put('/discussion-items/:id', auth, async (req, res) => {
   try {
+    const existingItem = await q1('SELECT di.*, mi.meeting_id FROM discussion_items di JOIN meeting_instances mi ON mi.id=di.instance_id WHERE di.id=$1',[req.params.id]);
+    if(!existingItem) return bad(res,'Nicht gefunden',404);
+    const meetingOwner = await q1('SELECT created_by FROM meetings WHERE id=$1',[existingItem.meeting_id]);
+    const isParticipant = await q1('SELECT id FROM discussion_participants WHERE item_id=$1 AND user_id=$2',[req.params.id,req.uid]);
+    if(!req.p.manageUsers && existingItem.created_by!==req.uid && !isParticipant && meetingOwner?.created_by!==req.uid) return bad(res,'Keine Berechtigung',403);
     const { title, description, status, dueDate, meetingDate, delegatedTo, result } = req.body;
     await pool.query(
       `UPDATE discussion_items SET
@@ -204,6 +209,11 @@ router.put('/discussion-items/:id', auth, async (req, res) => {
 // DELETE discussion item
 router.delete('/discussion-items/:id', auth, async (req, res) => {
   try {
+    const existingItem2 = await q1('SELECT di.*, mi.meeting_id FROM discussion_items di JOIN meeting_instances mi ON mi.id=di.instance_id WHERE di.id=$1',[req.params.id]);
+    if(existingItem2){
+      const meetingOwner2 = await q1('SELECT created_by FROM meetings WHERE id=$1',[existingItem2.meeting_id]);
+      if(!req.p.manageUsers && existingItem2.created_by!==req.uid && meetingOwner2?.created_by!==req.uid) return bad(res,'Keine Berechtigung',403);
+    }
     await pool.query('DELETE FROM discussion_items WHERE id=$1', [req.params.id]);
     ok(res, { deleted: true });
   } catch (e) { bad(res, 'Serverfehler', 500); }
