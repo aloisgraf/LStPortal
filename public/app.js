@@ -4064,6 +4064,7 @@ async function renderDPConfig() {
     {id:'emp-params',label:'Mitarbeiter-Param.'},
     {id:'qualifications',label:'Qualifikationen'},
     {id:'requirements',label:'Schichtbedarf'},
+    {id:'rules',label:'📋 Gesetzliche Regeln'},
   ];
 
   const tab = S._dpConfigTab;
@@ -4074,6 +4075,7 @@ async function renderDPConfig() {
   else if (tab === 'emp-params') content = await renderDPConfigEmpParams();
   else if (tab === 'qualifications') content = await renderDPConfigQualifications();
   else if (tab === 'requirements') content = await renderDPConfigRequirements();
+  else if (tab === 'rules') content = renderDPConfigRules();
 
   el.innerHTML = `<div style="display:flex;flex-direction:column;height:calc(100vh - 56px)">
     <div style="display:flex;align-items:center;gap:0;padding:12px 16px 0;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg)">
@@ -4168,6 +4170,82 @@ async function renderDPConfigRequirements() {
   return `<div class="dp-cfg-card">
     <h3>Schichtbedarf <button class="btn-p" style="float:right;font-size:11px" onclick="openDpReqForm()">+ Hinzufügen</button></h3>
     ${rows||'<div style="color:var(--mu);font-size:13px">Noch kein Bedarf definiert.</div>'}
+  </div>`;
+}
+
+function renderDPConfigRules() {
+  return `<div class="dp-cfg-card">
+    <h3>📋 Österreichische Arbeitszeitgesetz-Regelungen</h3>
+    <div style="font-size:13px;line-height:1.6;color:var(--tx)">
+      <div style="margin-bottom:16px;padding:12px;background:var(--sf2);border-left:3px solid var(--acc);border-radius:4px">
+        <strong style="color:var(--acc)">Auto-Generierung berücksichtigt folgende Constraints:</strong>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <h4 style="margin:0 0 6px;font-weight:600;color:var(--tx)">1️⃣ Maximale Wochenarbeitszeit: 48 Stunden</h4>
+        <div style="color:var(--mu);font-size:12px;margin-left:12px">
+          Die durchschnittliche Arbeitszeit pro Woche über 17 Wochen darf 48 Stunden nicht überschreiten (AZG §9).<br>
+          <strong>Beispiel:</strong> 5 Tage × 10h = 50h → ❌ Nicht erlaubt!
+        </div>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <h4 style="margin:0 0 6px;font-weight:600;color:var(--tx)">2️⃣ Maximale Tagesarbeitszeit: 10 Stunden</h4>
+        <div style="color:var(--mu);font-size:12px;margin-left:12px">
+          Mit Betriebsvereinbarung max. 10h/Tag. Absolute Höchstgrenze: 12 Stunden (AZG §9).<br>
+          Wird pro Schicht über die Schichttyp-Definition festgelegt.
+        </div>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <h4 style="margin:0 0 6px;font-weight:600;color:var(--tx)">3️⃣ Mindestruhezeit: 11 Stunden zwischen Schichten</h4>
+        <div style="color:var(--mu);font-size:12px;margin-left:12px">
+          Nach Schichtende muss mind. 11 Stunden Ruhezeit vor der nächsten Schicht liegen (AZG §12).<br>
+          <strong>Beispiel:</strong> Schicht endet 20:00 → Nächste Schicht frühestens 07:00+1 Tag<br>
+          <em>Ausnahme:</em> Verkürzt auf 8h mit Ausgleich im Kollektivvertrag.
+        </div>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <h4 style="margin:0 0 6px;font-weight:600;color:var(--tx)">4️⃣ Wöchentliche Ruhezeit: 36 Stunden</h4>
+        <div style="color:var(--mu);font-size:12px;margin-left:12px">
+          Minimum 36 Stunden ununterbrochene Ruhezeit pro Woche (AZG §12).<br>
+          Bei Schichtarbeit minimal 24h, Durchschnitt muss aber 36h sein.
+        </div>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <h4 style="margin:0 0 6px;font-weight:600;color:var(--tx)">5️⃣ Maximale aufeinanderfolgende Arbeitstage: 6 Tage</h4>
+        <div style="color:var(--mu);font-size:12px;margin-left:12px">
+          Nach 6 aufeinanderfolgenden Arbeitstagen muss 1 Ruhetag folgen (AZG §12).<br>
+          Der Scheduler verhindert, dass ein MA mehr als 6 Tage hintereinander eingeteilt wird.
+        </div>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <h4 style="margin:0 0 6px;font-weight:600;color:var(--tx)">6️⃣ Qualifikationen: Erforderlich für Einteilung</h4>
+        <div style="color:var(--mu);font-size:12px;margin-left:12px">
+          Ein Mitarbeiter muss mindestens 1 Qualifikation haben, um eingeteilt zu werden.<br>
+          Wird die Schicht nicht als qualifiziert markiert → Mitarbeiter wird übersprungen.
+        </div>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <h4 style="margin:0 0 6px;font-weight:600;color:var(--tx)">7️⃣ Monatliches Stundenziel</h4>
+        <div style="color:var(--mu);font-size:12px;margin-left:12px">
+          Mitarbeiter-Parameter: Monthly Hours (Standard: 160h/Monat).<br>
+          Der Scheduler stoppt, wenn das Ziel erreicht ist.
+        </div>
+      </div>
+
+      <div style="padding:12px;background:#ef444410;border-left:3px solid #ef4444;border-radius:4px;margin-top:16px">
+        <strong style="color:#ef4444">⚠️ Wenn Slots nicht gefüllt werden können:</strong><br>
+        <div style="color:var(--tx);font-size:12px;margin-top:6px">
+          Diese werden im Generierungs-<strong>Protokoll</strong> geloggt mit dem Grund (z.B. weekly_cap_exceeded, rest_period_violated).<br>
+          Sie können im DP-Plan weiterhin manuell besetzt werden.
+        </div>
+      </div>
+    </div>
   </div>`;
 }
 
