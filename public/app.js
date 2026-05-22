@@ -4855,10 +4855,12 @@ function renderTodoDetail(t) {
         ${assigneeNames ? `<div class="todo-ci-meta">👤 ${assigneeNames}</div>` : ''}
         ${item.is_done && doneUser ? `<div class="todo-ci-meta">Erledigt von ${esc(doneUser.name)} · ${item.done_at?String(item.done_at).slice(0,16).replace('T',' '):''}</div>` : ''}
       </div>
-      ${canEditItem ? `<div class="todo-ci-actions">
-        <button class="btn-s" style="padding:3px 7px;font-size:11px" onclick="openTodoItemAssignees('${t.id}','${item.id}')">👥</button>
-        <button class="btn-d" style="padding:3px 7px" onclick="deleteTodoItem('${t.id}','${item.id}')">✕</button>
-      </div>` : ''}
+      <div class="todo-ci-actions">
+        ${canManageTodo&&t.items.indexOf(item)>0 ? `<button class="btn-s" style="padding:3px 7px;font-size:11px" title="Nach oben" onclick="moveTodoItem('${t.id}','${item.id}','up')">⬆</button>` : ''}
+        ${canManageTodo&&t.items.indexOf(item)<t.items.length-1 ? `<button class="btn-s" style="padding:3px 7px;font-size:11px" title="Nach unten" onclick="moveTodoItem('${t.id}','${item.id}','down')">⬇</button>` : ''}
+        ${canEditItem ? `<button class="btn-s" style="padding:3px 7px;font-size:11px" onclick="openTodoItemAssignees('${t.id}','${item.id}')">👥</button>` : ''}
+        ${canEditItem ? `<button class="btn-d" style="padding:3px 7px" onclick="deleteTodoItem('${t.id}','${item.id}')">✕</button>` : ''}
+      </div>
     </div>`;
   }).join('');
 
@@ -5043,6 +5045,14 @@ async function saveTodoItemComment(todoId, itemId) {
     await api('PUT', `/todos/${todoId}/items/${itemId}`, {comment});
     if (item) item.comment = comment;
   } catch(e) { toast('Fehler beim Speichern','err'); }
+}
+
+async function moveTodoItem(todoId, itemId, direction) {
+  try {
+    await api('POST',`/todos/${todoId}/items/${itemId}/move`,{direction});
+    await fetchData();
+    renderTodos();
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
 }
 
 async function deleteTodoItem(todoId, itemId) {

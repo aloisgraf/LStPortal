@@ -180,6 +180,30 @@ router.delete('/todos/:todoId/items/:itemId/assignees/:userId', auth, async (req
   } catch(e) { bad(res,'Serverfehler',500); }
 });
 
+// POST reorder todo items
+router.post('/todos/:todoId/items/:id/move', auth, async (req,res) => {
+  const {direction} = req.body; // 'up' or 'down'
+  if(!direction||!['up','down'].includes(direction)) return bad(res,'direction erforderlich',400);
+  try {
+    const todo = await q1('SELECT * FROM todos WHERE id=$1',[req.params.todoId]);
+    if(!todo) return bad(res,'Todo nicht gefunden',404);
+    if(!req.p.manageUsers && todo.created_by!==req.uid) return bad(res,'Keine Berechtigung',403);
+    const item = await q1('SELECT * FROM todo_items WHERE id=$1 AND todo_id=$2',[req.params.id,req.params.todoId]);
+    if(!item) return bad(res,'Punkt nicht gefunden',404);
+    const allItems = await q('SELECT id,sort_order FROM todo_items WHERE todo_id=$1 ORDER BY sort_order,created_at',[req.params.todoId]);
+    const idx = allItems.findIndex(i=>i.id===req.params.id);
+    if(idx===-1) return bad(res,'Nicht gefunden',404);
+    if(direction==='up'&&idx===0) return bad(res,'Bereits oben',400);
+    if(direction==='down'&&idx===allItems.length-1) return bad(res,'Bereits unten',400);
+    const swapIdx = direction==='up'?idx-1:idx+1;
+    const currentOrder = item.sort_order||0;
+    const swapOrder = allItems[swapIdx].sort_order||0;
+    await q('UPDATE todo_items SET sort_order=$1 WHERE id=$2',[swapOrder,req.params.id]);
+    await q('UPDATE todo_items SET sort_order=$1 WHERE id=$2',[currentOrder,allItems[swapIdx].id]);
+    ok(res);
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
 // POST mark todo item notifications as read
 router.post('/todos/:todoId/mark-read', auth, async (req,res) => {
   try {
