@@ -4827,3 +4827,10 @@ async function toggleTodoItemAssignee(todoId, itemId, userId, assign) {
     openTodoItemAssignees(todoId, itemId);
   } catch(e) { toast('Fehler: '+e.message,'err'); }
 }
+
+// Initialize login users on page load
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', loadLoginUsers);
+} else {
+  loadLoginUsers();
+}
