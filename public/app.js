@@ -196,6 +196,7 @@ function loginOK(){
   document.getElementById('pillNm').textContent=u?.name||'?';
   const pa=document.getElementById('pillAv');pa.textContent=u?.initials||'?';pa.style.background=(u?.color||'#888')+'22';pa.style.color=u?.color||'#888';
   const ab=document.getElementById('adminBtn');if(ab)ab.style.display=S.p.manageUsers?'flex':'none';
+  const dpNavEl=document.getElementById('ni-dp');if(dpNavEl)dpNavEl.style.display=S.p.canManageDp?'flex':'none';
   restoreNavSectionState();
   loadNews().then(function(){setView('home');});startAutoRefresh();
   // archivNav for all users
@@ -271,6 +272,7 @@ function setView(v){
   S.view=v;
   ['home','schedule','allw','diensttausch','abrechnung','dienstplaene','tickets','tickets_closed','tickets_deleted','checklists','messages','messages_sent','zahnarzt','platz','links','statistik','docs','meetings','dp','dp-config','dp-mine','todos'].forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
   const statEl=document.getElementById('ni-statistik');if(statEl)statEl.style.display=S.p?.manageUsers?'flex':'none';
+  const dpEl=document.getElementById('ni-dp');if(dpEl)dpEl.style.display=S.p?.canManageDp?'flex':'none';
   document.getElementById('sidebar').classList.remove('open');document.getElementById('sbOv').classList.remove('open');
   renderSBF();renderMain();
 }
@@ -3460,9 +3462,9 @@ function renderInstanceDetail(inst, meeting, canManage) {
       <div style="font-size:13px;color:var(--mu)">${inst.notes?`<span>${esc(inst.notes)}</span>`:''}</div>
       <div style="display:flex;gap:8px">
         ${canManage?`<button class="btn-s" onclick="openInstanceForm('${meeting.id}','${inst.id}')">&#10002; Termin</button>`:''}
-        <button class="btn-add" onclick="openItemForm('${inst.id}')">+ Punkt</button>
-        ${inst.status==='planned'?`<button class="btn-s" style="background:#10b981;color:#fff" onclick="setInstanceStatus('${inst.id}','done')">&#10003; Abschließen</button>`:''}
-        ${inst.status==='done'?`<button class="btn-s" style="background:#f59e0b;color:#fff" onclick="setInstanceStatus('${inst.id}','planned')">↩ Wiederöffnen</button>`:''}
+        ${canManage?`<button class="btn-add" onclick="openItemForm('${inst.id}')">+ Punkt</button>`:''}
+        ${canManage&&inst.status==='planned'?`<button class="btn-s" style="background:#10b981;color:#fff" onclick="setInstanceStatus('${inst.id}','done')">&#10003; Abschließen</button>`:''}
+        ${canManage&&inst.status==='done'?`<button class="btn-s" style="background:#f59e0b;color:#fff" onclick="setInstanceStatus('${inst.id}','planned')">↩ Wiederöffnen</button>`:''}
       </div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
@@ -3470,7 +3472,7 @@ function renderInstanceDetail(inst, meeting, canManage) {
         <div class="meetings-col">
           <div class="meetings-col-hdr" style="color:${statusColors[st]}">${statusCols[st]} <span style="font-size:11px;opacity:.7">(${items.length})</span></div>
           ${items.length===0?`<div style="font-size:12px;color:var(--mu);padding:8px;text-align:center">—</div>`:''}
-          ${items.map(it=>`<div class="meetings-card" onclick="openItemForm('${inst.id}','${it.id}')">
+          ${items.map(it=>`<div class="meetings-card"${it._canEdit?` onclick="openItemForm('${inst.id}','${it.id}')"`:''} style="${it._canEdit?'':'cursor:default'}">
             <div style="font-weight:600;font-size:13px;margin-bottom:4px">${esc(it.title)}</div>
             ${it.description?`<div style="font-size:12px;color:var(--mu);margin-bottom:4px">${esc(it.description.slice(0,80))}${it.description.length>80?'…':''}</div>`:''}
             <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
@@ -3717,7 +3719,7 @@ function renderDP() {
   const activePlan = plans.find(p => p.id === S._dpPlanId) || plans[0] || null;
   if (activePlan && !S._dpPlanId) S._dpPlanId = activePlan.id;
 
-  const canEdit = S.p.manageUsers;
+  const canEdit = S.p.canManageDp;
 
   let planOpts = plans.map(p =>
     `<option value="${p.id}"${p.id===S._dpPlanId?' selected':''}>${esc(p.title||p.month+'/'+p.year)} (${p.status})</option>`
@@ -3765,7 +3767,7 @@ function renderDPMatrix(data) {
 
   const {plan, days, shiftTypes, absenceTypes, requirements, openSlots, empAssignMap, summary} = data;
   const users = S.users;
-  const canEdit = S.p.manageUsers;
+  const canEdit = S.p.canManageDp;
 
   const today = new Date().toISOString().slice(0,10);
 
@@ -4689,6 +4691,7 @@ function renderTodoDetail(t) {
   const assignee = t.assigned_to ? getU(t.assigned_to) : null;
   const creator  = getU(t.created_by);
 
+  const canManageTodo = t._canManage || false;
   const itemsHtml = t.items.map(item => {
     const doneUser = item.done_by ? getU(item.done_by) : null;
     const assignees = item.assignees || [];
@@ -4696,18 +4699,19 @@ function renderTodoDetail(t) {
       const u = getU(a.user_id);
       return u ? u.name : '?';
     }).join(', ');
+    const canEditItem = item._canEdit || false;
     return `<div class="todo-ci${item.is_done?' done-item':''}" id="todo-ci-${item.id}">
-      <input type="checkbox" ${item.is_done?'checked':''} onchange="toggleTodoItem('${t.id}','${item.id}',this.checked)">
+      <input type="checkbox" ${item.is_done?'checked':''} ${canEditItem?'':'disabled'} onchange="toggleTodoItem('${t.id}','${item.id}',this.checked)">
       <div class="todo-ci-body">
         <div class="todo-ci-title">${esc(item.title)}</div>
-        <textarea id="todo-comment-${item.id}" class="todo-ci-textarea" rows="1" placeholder="Kommentar…" onblur="saveTodoItemComment('${t.id}','${item.id}')">${esc(item.comment||'')}</textarea>
+        <textarea id="todo-comment-${item.id}" class="todo-ci-textarea" rows="1" placeholder="Kommentar…" ${canEditItem?`onblur="saveTodoItemComment('${t.id}','${item.id}')"`:''} ${canEditItem?'':'readonly'}>${esc(item.comment||'')}</textarea>
         ${assigneeNames ? `<div class="todo-ci-meta">👤 ${assigneeNames}</div>` : ''}
         ${item.is_done && doneUser ? `<div class="todo-ci-meta">Erledigt von ${esc(doneUser.name)} · ${item.done_at?String(item.done_at).slice(0,16).replace('T',' '):''}</div>` : ''}
       </div>
-      <div class="todo-ci-actions">
+      ${canEditItem ? `<div class="todo-ci-actions">
         <button class="btn-s" style="padding:3px 7px;font-size:11px" onclick="openTodoItemAssignees('${t.id}','${item.id}')">👥</button>
         <button class="btn-d" style="padding:3px 7px" onclick="deleteTodoItem('${t.id}','${item.id}')">✕</button>
-      </div>
+      </div>` : ''}
     </div>`;
   }).join('');
 
@@ -4727,11 +4731,11 @@ function renderTodoDetail(t) {
         </div>
         ${t.description ? `<div style="margin-top:8px;font-size:13px;color:var(--mu)">${esc(t.description)}</div>` : ''}
       </div>
-      <div style="display:flex;gap:6px;flex-shrink:0">
+      ${canManageTodo ? `<div style="display:flex;gap:6px;flex-shrink:0">
         <button class="btn-s" onclick="openTodoForm('${t.id}')">✏️ Bearbeiten</button>
         ${t.status !== 'done' ? `<button class="btn-ok" onclick="setTodoStatus('${t.id}','done')">✓ Abschließen</button>` : `<button class="btn-warn" onclick="setTodoStatus('${t.id}','open')">↩ Wiederöffnen</button>`}
         <button class="btn-d" onclick="deleteTodo('${t.id}')">🗑</button>
-      </div>
+      </div>` : ''}
     </div>
 
     ${total > 0 ? `<div class="todo-progress" title="${pct}% erledigt">
@@ -4741,7 +4745,7 @@ function renderTodoDetail(t) {
 
     <div class="todo-checklist">${itemsHtml}</div>
 
-    <button class="btn-p" style="margin-top:14px" onclick="openTodoItemForm('${t.id}')">+ Punkt hinzufügen</button>
+    ${canManageTodo ? `<button class="btn-p" style="margin-top:14px" onclick="openTodoItemForm('${t.id}')">+ Punkt hinzufügen</button>` : ''}
   </div>`;
 }
 
