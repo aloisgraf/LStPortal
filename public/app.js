@@ -4866,6 +4866,7 @@ function renderTodoDetail(t) {
       <div class="todo-ci-actions">
         ${canManageTodo&&t.items.indexOf(item)>0 ? `<button class="btn-s" style="padding:3px 7px;font-size:11px" title="Nach oben" onclick="moveTodoItem('${t.id}','${item.id}','up')">⬆</button>` : ''}
         ${canManageTodo&&t.items.indexOf(item)<t.items.length-1 ? `<button class="btn-s" style="padding:3px 7px;font-size:11px" title="Nach unten" onclick="moveTodoItem('${t.id}','${item.id}','down')">⬇</button>` : ''}
+        ${canEditItem ? `<button class="btn-s" style="padding:3px 7px;font-size:11px" title="Bearbeiten" onclick="openTodoItemForm('${t.id}','${item.id}')">✏️</button>` : ''}
         ${canEditItem ? `<button class="btn-s" style="padding:3px 7px;font-size:11px" onclick="openTodoItemAssignees('${t.id}','${item.id}')">👥</button>` : ''}
         ${canEditItem ? `<button class="btn-d" style="padding:3px 7px" onclick="deleteTodoItem('${t.id}','${item.id}')">✕</button>` : ''}
       </div>
@@ -4995,6 +4996,7 @@ function openTodoItemForm(todoId, itemId) {
   document.getElementById('tifId').value     = item?.id || '';
   document.getElementById('tifTodoId').value = todoId;
   document.getElementById('tifTitle').value   = item?.title || '';
+  document.getElementById('tifDue').value    = item?.due_date ? String(item.due_date).slice(0,10) : '';
   document.getElementById('tifComment').value = item?.comment || '';
   openModal('todoItemFormOv');
 }
@@ -5006,6 +5008,7 @@ async function submitTodoItemForm() {
   if (!title) return toast('Bezeichnung erforderlich','err');
   const body = {
     title,
+    dueDate: document.getElementById('tifDue').value || null,
     comment: document.getElementById('tifComment').value.trim(),
   };
   try {

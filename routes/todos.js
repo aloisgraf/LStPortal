@@ -72,14 +72,14 @@ router.delete('/todos/:id', auth, async (req,res) => {
 // ── TODO ITEMS ────────────────────────────────────────────────────────────────
 
 router.post('/todos/:id/items', auth, async (req,res) => {
-  const {title, comment, sortOrder} = req.body;
+  const {title, comment, sortOrder, dueDate} = req.body;
   if (!title?.trim()) return bad(res,'Titel erforderlich',400);
   try {
     const itemId = newId();
     const row = await q1(
-      `INSERT INTO todo_items (id,todo_id,title,comment,sort_order,created_by)
-       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [itemId, req.params.id, title.trim(), comment||'', sortOrder||0, req.uid]
+      `INSERT INTO todo_items (id,todo_id,title,comment,sort_order,due_date,created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [itemId, req.params.id, title.trim(), comment||'', sortOrder||0, dueDate||null, req.uid]
     );
     // Auto-assign creator as default assignee
     await q1(
@@ -91,7 +91,7 @@ router.post('/todos/:id/items', auth, async (req,res) => {
 });
 
 router.put('/todos/:todoId/items/:id', auth, async (req,res) => {
-  const {title, comment, isDone, sortOrder} = req.body;
+  const {title, comment, isDone, sortOrder, dueDate} = req.body;
   try {
     const todo = await q1('SELECT * FROM todos WHERE id=$1',[req.params.todoId]);
     if(!todo) return bad(res,'Todo nicht gefunden',404);
@@ -104,6 +104,7 @@ router.put('/todos/:todoId/items/:id', auth, async (req,res) => {
     if(title!==undefined&&title!==old.title)entry.changes.title={from:old.title,to:title};
     if(comment!==undefined&&comment!==old.comment)entry.changes.comment={from:old.comment,to:comment};
     if(isDone!==undefined&&isDone!==old.is_done)entry.changes.isDone={from:old.is_done,to:isDone};
+    if(dueDate!==undefined&&dueDate!==old.due_date)entry.changes.dueDate={from:old.due_date,to:dueDate};
     if(sortOrder!==undefined&&sortOrder!==old.sort_order)entry.changes.sortOrder={from:old.sort_order,to:sortOrder};
     if(Object.keys(entry.changes).length>0){
       const protokoll = (()=>{try{return JSON.parse(todo.protokoll||'[]');}catch{return [];}})();
@@ -124,9 +125,10 @@ router.put('/todos/:todoId/items/:id', auth, async (req,res) => {
         is_done=COALESCE($3,is_done),
         done_by=CASE WHEN $3 IS NOT NULL THEN $4 ELSE done_by END,
         done_at=CASE WHEN $3=true THEN NOW() WHEN $3=false THEN NULL ELSE done_at END,
-        sort_order=COALESCE($5,sort_order)
-       WHERE id=$6 AND todo_id=$7 RETURNING *`,
-      [title||null, comment!==undefined?comment:null, isDone!==undefined?isDone:null, doneBy, sortOrder||null, req.params.id, req.params.todoId]
+        due_date=$5,
+        sort_order=COALESCE($6,sort_order)
+       WHERE id=$7 AND todo_id=$8 RETURNING *`,
+      [title||null, comment!==undefined?comment:null, isDone!==undefined?isDone:null, doneBy, dueDate||null, sortOrder||null, req.params.id, req.params.todoId]
     );
     if (!row) return bad(res,'Nicht gefunden',404);
     // Update parent todo updated_at
