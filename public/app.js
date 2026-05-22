@@ -1518,6 +1518,12 @@ function renderTkDetail(){
           <input type="file" multiple style="display:none" onchange="uploadTkFiles('${tk.id}',this)">
         </label>
       </div>
+      <div id="tk-dropzone-${tk.id}" style="border:2px dashed var(--border);border-radius:8px;padding:32px 20px;text-align:center;margin-bottom:16px;background:var(--sf);cursor:pointer;transition:all 0.2s" ondragover="event.preventDefault();this.style.background='var(--acc)';this.style.borderColor='var(--acc)';this.style.color='#fff'" ondragleave="this.style.background='var(--sf)';this.style.borderColor='var(--border)';this.style.color='var(--mu)'" ondrop="event.preventDefault();this.style.background='var(--sf)';this.style.borderColor='var(--border)';uploadTkFiles('${tk.id}',{files:event.dataTransfer.files})">
+        <div style="font-size:14px;font-weight:600;color:var(--tx);margin-bottom:6px">📁 Dateien hier ablegen</div>
+        <div style="font-size:12px;color:var(--mu)">oder klicken zum Durchsuchen</div>
+        <input type="file" multiple id="tk-dropinput-${tk.id}" style="display:none" onchange="uploadTkFiles('${tk.id}',this)">
+      </div>
+      <script>document.getElementById('tk-dropzone-${tk.id}').addEventListener('click', () => document.getElementById('tk-dropinput-${tk.id}').click(), false);</script>
       ${files.length===0?`<div style="text-align:center;padding:32px 0;color:var(--di);font-size:13px">Noch keine Dateien hochgeladen.</div>`:''}
       <div class="tk-files-list">
         ${files.map(f=>`<div class="tk-file-row">
@@ -1752,7 +1758,7 @@ async function uploadTkFiles(tkId,input){
   renderTkDetail();
   if(errs.length)toast('\u26A0\uFE0F Fehler: '+errs.join(', '),'err');
   else toast('\u2705 '+done+' Datei(en) hochgeladen');
-  input.value='';
+  if(input.value!==undefined)input.value='';
 }
 async function deleteTkFile(tkId,fId,name){
   if(!confirm('Datei "'+name+'" wirklich l\u00F6schen?'))return;
