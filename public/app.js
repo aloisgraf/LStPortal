@@ -4793,13 +4793,18 @@ function renderTodos() {
     const allDone = total > 0 && done === total;
     const prio    = TODO_PRIO[t.priority] || TODO_PRIO.medium;
     const active  = t.id === (sel?.id);
-    return `<div class="todo-item${active?' active':''}${allDone?' done':''}" onclick="S._selTodo='${t.id}';renderTodos()">
-      <div class="todo-item-title">${esc(t.title)}</div>
+    const deadlineColor = getDeadlineColor(t.due_date);
+    const hasUnread = t._hasUnreadNotifications;
+    return `<div class="todo-item${active?' active':''}${allDone?' done':''}" onclick="S._selTodo='${t.id}';renderTodos()" style="${deadlineColor?'border-left:4px solid '+deadlineColor+'!important':''}">
+      <div class="todo-item-title" style="display:flex;align-items:center;gap:6px">
+        ${hasUnread?'<span style="width:8px;height:8px;background:#ef4444;border-radius:50%;flex-shrink:0"></span>':''}
+        <span style="flex:1">${esc(t.title)}</span>
+      </div>
       <div class="todo-item-meta">
         <span class="todo-prio" style="background:${prio.color}"></span>
         <span>${prio.label}</span>
         ${total > 0 ? `<span style="margin-left:auto">${done}/${total}</span>` : ''}
-        ${t.due_date ? `<span>📅 ${String(t.due_date).slice(0,10)}</span>` : ''}
+        ${t.due_date ? `<span style="color:${deadlineColor||'inherit'};font-weight:${deadlineColor?'600':'400'}">📅 ${String(t.due_date).slice(0,10)}</span>` : ''}
       </div>
     </div>`;
   }).join('') || '<div style="padding:16px;color:var(--mu);font-size:13px">Noch keine Todos</div>';
@@ -4819,12 +4824,18 @@ function renderTodos() {
 }
 
 function renderTodoDetail(t) {
+  // Mark notifications as read when opening todo
+  if(t._hasUnreadNotifications){
+    api('POST',`/todos/${t.id}/mark-read`).catch(()=>{});
+  }
+
   const done  = t.items.filter(i => i.is_done).length;
   const total = t.items.length;
   const pct   = total > 0 ? Math.round(done / total * 100) : 0;
   const prio  = TODO_PRIO[t.priority] || TODO_PRIO.medium;
   const assignee = t.assigned_to ? getU(t.assigned_to) : null;
   const creator  = getU(t.created_by);
+  const deadlineColor = getDeadlineColor(t.due_date);
 
   const canManageTodo = t._canManage || false;
   const itemsHtml = t.items.map(item => {
@@ -4835,7 +4846,8 @@ function renderTodoDetail(t) {
       return u ? u.name : '?';
     }).join(', ');
     const canEditItem = item._canEdit || false;
-    return `<div class="todo-ci${item.is_done?' done-item':''}" id="todo-ci-${item.id}">
+    const itemDeadlineColor = getDeadlineColor(item.due_date);
+    return `<div class="todo-ci${item.is_done?' done-item':''}" id="todo-ci-${item.id}"${itemDeadlineColor?` style="border-left:4px solid ${itemDeadlineColor}"`:''}>`
       <input type="checkbox" ${item.is_done?'checked':''} ${canEditItem?'':'disabled'} onchange="toggleTodoItem('${t.id}','${item.id}',this.checked)">
       <div class="todo-ci-body">
         <div class="todo-ci-title">${esc(item.title)}</div>
@@ -4873,13 +4885,13 @@ function renderTodoDetail(t) {
   const statusLabel = {open:'Offen', done:'Erledigt', cancelled:'Abgebrochen'}[t.status] || t.status;
 
   return `<div>
-    <div class="todos-detail-hdr">
+    <div class="todos-detail-hdr"${deadlineColor?` style="border-left:4px solid ${deadlineColor}"`:''}>
       <div style="flex:1">
         <h2>${esc(t.title)}</h2>
         <div style="display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap">
           <span style="font-size:12px">${prio.dot} ${prio.label}</span>
           <span style="font-size:12px;color:${statusColor};font-weight:600">${statusLabel}</span>
-          ${t.due_date ? `<span style="font-size:12px;color:var(--mu)">📅 ${String(t.due_date).slice(0,10)}</span>` : ''}
+          ${t.due_date ? `<span style="font-size:12px;color:${deadlineColor||'var(--mu)'};font-weight:${deadlineColor?'600':'400'}">📅 ${String(t.due_date).slice(0,10)}</span>` : ''}
           ${assignee ? `<span style="font-size:12px;color:var(--mu)">👤 ${esc(assignee.name)}</span>` : ''}
           ${creator ? `<span style="font-size:12px;color:var(--di)">erstellt von ${esc(creator.name)}</span>` : ''}
         </div>
