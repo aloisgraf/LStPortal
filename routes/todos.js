@@ -61,12 +61,18 @@ router.post('/todos/:id/items', auth, async (req,res) => {
   const {title, comment, sortOrder} = req.body;
   if (!title?.trim()) return bad(res,'Titel erforderlich',400);
   try {
+    const itemId = newId();
     const row = await q1(
       `INSERT INTO todo_items (id,todo_id,title,comment,sort_order,created_by)
        VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [newId(), req.params.id, title.trim(), comment||'', sortOrder||0, req.uid]
+      [itemId, req.params.id, title.trim(), comment||'', sortOrder||0, req.uid]
     );
-    ok(res, row);
+    // Auto-assign creator as default assignee
+    await q1(
+      `INSERT INTO todo_item_assignees (id,item_id,user_id,assigned_by) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+      [newId(), itemId, req.uid, req.uid]
+    ).catch(()=>{});
+    ok(res, {...row, assignees:[{item_id:itemId,user_id:req.uid,assigned_by:req.uid}]});
   } catch(e) { bad(res,'Serverfehler',500); }
 });
 

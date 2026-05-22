@@ -3466,6 +3466,7 @@ function renderInstanceDetail(inst, meeting, canManage) {
         ${canManage?`<button class="btn-add" onclick="openItemForm('${inst.id}')">+ Punkt</button>`:''}
         ${canManage&&inst.status==='planned'?`<button class="btn-s" style="background:#10b981;color:#fff" onclick="setInstanceStatus('${inst.id}','done')">&#10003; Abschließen</button>`:''}
         ${canManage&&inst.status==='done'?`<button class="btn-s" style="background:#f59e0b;color:#fff" onclick="setInstanceStatus('${inst.id}','planned')">↩ Wiederöffnen</button>`:''}
+        ${canManage?`<button class="btn-d" style="padding:4px 8px" onclick="deleteInstance('${inst.id}')">&#128465;</button>`:''}
       </div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
@@ -3483,6 +3484,7 @@ function renderInstanceDetail(inst, meeting, canManage) {
               ${(it.participants||[]).length>4?`<span style="font-size:11px;color:var(--mu)">+${it.participants.length-4}</span>`:''}
             </div>
             ${it.parentId?`<div style="font-size:11px;color:#7c3aed;margin-top:4px">&#8617; Folge</div>`:''}
+            ${it.groupId?`<div style="font-size:11px;color:#0ea5e9;margin-top:4px">🔗 Verknüpft</div>`:''}
           </div>`).join('')}
         </div>`).join('')}
     </div>
@@ -3583,6 +3585,8 @@ async function generateNextInstance(meetingId) {
   } catch(e) { toast('Fehler','err'); }
 }
 
+const ITEM_STATUS_LABEL = {open:'Zu besprechen',done:'Besprochen',redo:'Nochmal besprechen',delegate:'Delegiert'};
+
 function openItemForm(instanceId, id=null) {
   const allItems = S.meetings.flatMap(m=>m.instances.flatMap(i=>i.items));
   const item = id ? allItems.find(x=>x.id===id) : null;
@@ -3598,6 +3602,27 @@ function openItemForm(instanceId, id=null) {
   document.getElementById('itDelegateTo').style.display = (item?.status)==='delegate'?'':'none';
   const delSel = document.getElementById('itDelegatedTo');
   delSel.innerHTML = S.users.map(u=>`<option value="${u.id}"${item?.delegatedTo===u.id?' selected':''}>${esc(u.name)}</option>`).join('');
+  // Protokoll
+  const protoSection = document.getElementById('itProtokollSection');
+  const protoEl = document.getElementById('itProtokoll');
+  if (item && (item.protokoll||[]).length>0) {
+    protoSection.style.display='';
+    protoEl.innerHTML = [...(item.protokoll||[])].reverse().map(e=>{
+      const u=getU(e.by); const uName=u?.name||'?'; const ts=String(e.ts||'').slice(0,16).replace('T',' ');
+      if(e.type==='status') return `<div style="margin-bottom:2px">📝 ${ts} · <b>${uName}</b>: Status geändert → <b>${ITEM_STATUS_LABEL[e.to]||e.to}</b></div>`;
+      if(e.type==='linked_status') return `<div style="margin-bottom:2px">🔗 ${ts} · <b>${uName}</b>: In <i>${esc(e.fromMeeting)}</i> Status → <b>${ITEM_STATUS_LABEL[e.to]||e.to}</b></div>`;
+      if(e.type==='moved') return `<div style="margin-bottom:2px">➡️ ${ts} · <b>${uName}</b>: Verschoben von <i>${e.fromDate}</i> auf <i>${e.toDate}</i></div>`;
+      if(e.type==='copied_to') return `<div style="margin-bottom:2px">📋 ${ts} · <b>${uName}</b>: Kopiert nach <i>${esc(e.toMeeting)}</i></div>`;
+      if(e.type==='copied_from') return `<div style="margin-bottom:2px">📋 ${ts} · <b>${uName}</b>: Kopiert aus anderer Besprechung</div>`;
+      if(e.type==='content_synced') return `<div style="margin-bottom:2px">🔄 ${ts} · Inhalt aktualisiert aus <i>${esc(e.fromMeeting)}</i></div>`;
+      return '';
+    }).join('');
+  } else { protoSection.style.display='none'; }
+  // Move/Copy buttons (only when editing, only for meeting creators/managers)
+  const meeting = S.meetings.find(m=>m.instances.some(i=>i.id===instanceId));
+  const canMng = meeting?._canManage||false;
+  document.getElementById('itMoveBtn').style.display = (item && canMng) ? '' : 'none';
+  document.getElementById('itCopyBtn').style.display = (item && canMng) ? '' : 'none';
   document.getElementById('itPartUser').innerHTML = S.users.map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('');
   renderItemParticipants(item?.participants||[]);
   const fbtn = document.getElementById('itFollowupBtn');
@@ -3694,6 +3719,80 @@ async function openFollowupForm(itemId) {
     closeModal('itemFormOv');
     await fetchData(); renderMeetings(); toast('Folgebesprechung erstellt');
   } catch(e) { toast('Fehler','err'); }
+}
+
+async function deleteInstance(instanceId) {
+  if (!confirm('Termin und alle Punkte löschen?')) return;
+  try {
+    await api('DELETE','/meeting-instances/'+instanceId);
+    S._selInstance = null;
+    await fetchData(); renderMeetings(); toast('Termin gelöscht');
+  } catch(e) { toast('Fehler','err'); }
+}
+
+function openMoveItemModal() {
+  const itemId = document.getElementById('itId').value;
+  if (!itemId) return;
+  const allItems = S.meetings.flatMap(m=>m.instances.flatMap(i=>i.items));
+  const item = allItems.find(x=>x.id===itemId);
+  if (!item) return;
+  // Find meeting and its instances (excluding current)
+  const meeting = S.meetings.find(m=>m.instances.some(i=>i.id===item.instanceId));
+  if (!meeting) return;
+  const otherInsts = (meeting.instances||[]).filter(i=>i.id!==item.instanceId);
+  if (!otherInsts.length) return toast('Keine anderen Termine in dieser Besprechung','err');
+  document.getElementById('moveItemId').value = itemId;
+  const sel = document.getElementById('moveItemInstance');
+  sel.innerHTML = otherInsts.map(i=>`<option value="${i.id}">${i.date?fmtDate(i.date):'Datum offen'} ${i.time||''} (${{planned:'Geplant',done:'Abgeschlossen',cancelled:'Abgesagt'}[i.status]||i.status})</option>`).join('');
+  openModal('moveItemOv');
+}
+
+async function submitMoveItem() {
+  const itemId = document.getElementById('moveItemId').value;
+  const targetInstanceId = document.getElementById('moveItemInstance').value;
+  if (!itemId || !targetInstanceId) return;
+  try {
+    await api('POST',`/discussion-items/${itemId}/move`,{targetInstanceId});
+    closeModal('moveItemOv'); closeModal('itemFormOv');
+    await fetchData(); renderMeetings(); toast('Punkt verschoben');
+  } catch(e) { toast('Fehler beim Verschieben','err'); }
+}
+
+function openCopyItemModal() {
+  const itemId = document.getElementById('itId').value;
+  if (!itemId) return;
+  const allItems = S.meetings.flatMap(m=>m.instances.flatMap(i=>i.items));
+  const item = allItems.find(x=>x.id===itemId);
+  if (!item) return;
+  const currentMeeting = S.meetings.find(m=>m.instances.some(i=>i.id===item.instanceId));
+  document.getElementById('copyItemId').value = itemId;
+  const mSel = document.getElementById('copyItemMeeting');
+  mSel.innerHTML = S.meetings.filter(m=>m.id!==currentMeeting?.id).map(m=>`<option value="${m.id}">${esc(m.title)}</option>`).join('');
+  onCopyMeetingChange();
+  openModal('copyItemOv');
+}
+
+function onCopyMeetingChange() {
+  const mId = document.getElementById('copyItemMeeting').value;
+  const meeting = S.meetings.find(m=>m.id===mId);
+  const iSel = document.getElementById('copyItemInstance');
+  const insts = (meeting?.instances||[]).filter(i=>i.status==='planned');
+  if (!insts.length) {
+    iSel.innerHTML = '<option value="">— Kein geplanter Termin —</option>';
+  } else {
+    iSel.innerHTML = insts.map(i=>`<option value="${i.id}">${i.date?fmtDate(i.date):'Datum offen'} ${i.time||''}</option>`).join('');
+  }
+}
+
+async function submitCopyItem() {
+  const itemId = document.getElementById('copyItemId').value;
+  const targetInstanceId = document.getElementById('copyItemInstance').value;
+  if (!itemId || !targetInstanceId) return toast('Bitte einen Termin auswählen','err');
+  try {
+    await api('POST',`/discussion-items/${itemId}/copy-to-meeting`,{targetInstanceId});
+    closeModal('copyItemOv'); closeModal('itemFormOv');
+    await fetchData(); renderMeetings(); toast('Punkt kopiert und verknüpft');
+  } catch(e) { toast('Fehler beim Kopieren','err'); }
 }
 
 // Returns a readable text color for a given hex background color

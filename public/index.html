@@ -1487,11 +1487,56 @@
         </div>
       </div>
     </div>
-    <div class="mf" style="justify-content:space-between">
-      <div>
+      <!-- Protokoll (read-only, shown when editing) -->
+      <div id="itProtokollSection" style="display:none">
+        <div style="font-size:12px;font-weight:600;color:var(--mu);margin-bottom:4px">Protokoll</div>
+        <div id="itProtokoll" style="font-size:11px;color:var(--mu);background:var(--bg2);border-radius:6px;padding:8px;max-height:120px;overflow-y:auto"></div>
+      </div>
+    </div>
+    <div class="mf" style="justify-content:space-between;flex-wrap:wrap;gap:6px">
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn-s" id="itFollowupBtn" onclick="openFollowupForm()" style="display:none">&#128257; Folgebesprechung</button>
+        <button class="btn-s" id="itMoveBtn" onclick="openMoveItemModal()" style="display:none">&#10145; Verschieben</button>
+        <button class="btn-s" id="itCopyBtn" onclick="openCopyItemModal()" style="display:none">&#128203; In andere Besprechung</button>
       </div>
       <button class="btn" onclick="submitItemForm()">&#10003; Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- Move item to instance modal -->
+<div class="ov" id="moveItemOv">
+  <div class="modal sm">
+    <div class="mh"><h2>Auf anderen Termin verschieben</h2><button class="mc" onclick="closeModal('moveItemOv')">&#10005;</button></div>
+    <div class="mb2">
+      <input type="hidden" id="moveItemId">
+      <div class="fg"><label>Ziel-Termin (gleiche Besprechung)</label>
+        <select id="moveItemInstance"></select>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn-s" onclick="closeModal('moveItemOv')">Abbrechen</button>
+      <button class="btn" onclick="submitMoveItem()">&#10145; Verschieben</button>
+    </div>
+  </div>
+</div>
+
+<!-- Copy item to meeting modal -->
+<div class="ov" id="copyItemOv">
+  <div class="modal sm">
+    <div class="mh"><h2>In andere Besprechung kopieren</h2><button class="mc" onclick="closeModal('copyItemOv')">&#10005;</button></div>
+    <div class="mb2">
+      <input type="hidden" id="copyItemId">
+      <div class="fg"><label>Besprechung</label>
+        <select id="copyItemMeeting" onchange="onCopyMeetingChange()"></select>
+      </div>
+      <div class="fg"><label>Termin</label>
+        <select id="copyItemInstance"></select>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn-s" onclick="closeModal('copyItemOv')">Abbrechen</button>
+      <button class="btn" onclick="submitCopyItem()">&#128203; Kopieren</button>
     </div>
   </div>
 </div>

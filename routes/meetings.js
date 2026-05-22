@@ -182,6 +182,16 @@ router.post('/meeting-instances/:id/items', auth, async (req, res) => {
   } catch (e) { bad(res, 'Serverfehler', 500); }
 });
 
+// Helper: append a protokoll entry to an item
+async function addProtokoll(itemId, entry) {
+  await pool.query(
+    `UPDATE discussion_items SET protokoll = COALESCE(protokoll,'[]'::jsonb) || $1::jsonb WHERE id=$2`,
+    [JSON.stringify([entry]), itemId]
+  );
+}
+
+const STATUS_LABEL = {open:'Zu besprechen',done:'Besprochen',redo:'Nochmal besprechen',delegate:'Delegiert'};
+
 // PUT update discussion item
 router.put('/discussion-items/:id', auth, async (req, res) => {
   try {
@@ -191,6 +201,23 @@ router.put('/discussion-items/:id', auth, async (req, res) => {
     const isParticipant = await q1('SELECT id FROM discussion_participants WHERE item_id=$1 AND user_id=$2',[req.params.id,req.uid]);
     if(!req.p.manageUsers && existingItem.created_by!==req.uid && !isParticipant && meetingOwner?.created_by!==req.uid) return bad(res,'Keine Berechtigung',403);
     const { title, description, status, dueDate, meetingDate, delegatedTo, result } = req.body;
+    const now = new Date().toISOString();
+
+    // Detect status change → add protokoll entry
+    const oldStatus = existingItem.status;
+    const newStatus = status || oldStatus;
+    if (newStatus !== oldStatus) {
+      const entry = {ts:now,by:req.uid,type:'status',from:oldStatus,to:newStatus};
+      await addProtokoll(req.params.id, entry);
+      // Also notify all linked siblings
+      if (existingItem.group_id) {
+        const meeting = await q1('SELECT title FROM meetings WHERE id=$1',[existingItem.meeting_id]);
+        const siblings = await q('SELECT id FROM discussion_items WHERE group_id=$1 AND id!=$2',[existingItem.group_id,req.params.id]);
+        const sibEntry = {ts:now,by:req.uid,type:'linked_status',fromMeeting:meeting?.title||'',from:oldStatus,to:newStatus};
+        for (const s of siblings) await addProtokoll(s.id, sibEntry);
+      }
+    }
+
     await pool.query(
       `UPDATE discussion_items SET
         title=COALESCE($1,title), description=COALESCE($2,description),
@@ -201,9 +228,85 @@ router.put('/discussion-items/:id', auth, async (req, res) => {
        dueDate || null, meetingDate || null, delegatedTo || null, result !== undefined ? result : null,
        req.params.id]
     );
+
+    // Sync content to linked items (title/description/dueDate/delegatedTo — but NOT status/result)
+    if (existingItem.group_id && (title || description !== undefined || dueDate !== undefined || delegatedTo !== undefined)) {
+      const meeting = await q1('SELECT title FROM meetings WHERE id=$1',[existingItem.meeting_id]);
+      const siblings = await q('SELECT id FROM discussion_items WHERE group_id=$1 AND id!=$2',[existingItem.group_id,req.params.id]);
+      for (const s of siblings) {
+        await pool.query(
+          `UPDATE discussion_items SET title=COALESCE($1,title), description=COALESCE($2,description), due_date=$3, delegated_to=$4 WHERE id=$5`,
+          [title||null, description!==undefined?description:null, dueDate||null, delegatedTo||null, s.id]
+        );
+        await addProtokoll(s.id, {ts:now,by:req.uid,type:'content_synced',fromMeeting:meeting?.title||''});
+      }
+    }
+
     const row = await q1('SELECT * FROM discussion_items WHERE id=$1', [req.params.id]);
     ok(res, row);
   } catch (e) { bad(res, 'Serverfehler', 500); }
+});
+
+// POST move item to another instance of the same meeting
+router.post('/discussion-items/:id/move', auth, async (req, res) => {
+  try {
+    const { targetInstanceId } = req.body;
+    if (!targetInstanceId) return bad(res,'targetInstanceId erforderlich',400);
+    const item = await q1('SELECT di.*, mi.meeting_id FROM discussion_items di JOIN meeting_instances mi ON mi.id=di.instance_id WHERE di.id=$1',[req.params.id]);
+    if (!item) return bad(res,'Nicht gefunden',404);
+    const targetInst = await q1('SELECT * FROM meeting_instances WHERE id=$1',[targetInstanceId]);
+    if (!targetInst) return bad(res,'Ziel-Termin nicht gefunden',404);
+    const meetingOwner = await q1('SELECT created_by FROM meetings WHERE id=$1',[item.meeting_id]);
+    if (!req.p.manageUsers && meetingOwner?.created_by!==req.uid) return bad(res,'Keine Berechtigung',403);
+    const fromInst = await q1('SELECT * FROM meeting_instances WHERE id=$1',[item.instance_id]);
+    const now = new Date().toISOString();
+    await pool.query('UPDATE discussion_items SET instance_id=$1 WHERE id=$2',[targetInstanceId,req.params.id]);
+    const fromDate = fromInst?.date ? String(fromInst.date).slice(0,10) : 'offen';
+    const toDate = targetInst.date ? String(targetInst.date).slice(0,10) : 'offen';
+    await addProtokoll(req.params.id,{ts:now,by:req.uid,type:'moved',fromInstanceId:item.instance_id,toInstanceId:targetInstanceId,fromDate,toDate});
+    const row = await q1('SELECT * FROM discussion_items WHERE id=$1',[req.params.id]);
+    ok(res, row);
+  } catch(e) { console.error(e); bad(res,'Serverfehler',500); }
+});
+
+// POST copy item to another meeting (linked)
+router.post('/discussion-items/:id/copy-to-meeting', auth, async (req, res) => {
+  try {
+    const { targetInstanceId } = req.body;
+    if (!targetInstanceId) return bad(res,'targetInstanceId erforderlich',400);
+    const item = await q1('SELECT di.*, mi.meeting_id FROM discussion_items di JOIN meeting_instances mi ON mi.id=di.instance_id WHERE di.id=$1',[req.params.id]);
+    if (!item) return bad(res,'Nicht gefunden',404);
+    const targetInst = await q1('SELECT mi.*, m.title as meeting_title FROM meeting_instances mi JOIN meetings m ON m.id=mi.meeting_id WHERE mi.id=$1',[targetInstanceId]);
+    if (!targetInst) return bad(res,'Ziel-Termin nicht gefunden',404);
+    const now = new Date().toISOString();
+
+    // Assign group_id if not already set
+    const groupId = item.group_id || newId();
+    if (!item.group_id) {
+      await pool.query('UPDATE discussion_items SET group_id=$1 WHERE id=$2',[groupId,req.params.id]);
+    }
+
+    // Create linked copy
+    const newItemId = newId();
+    await pool.query(
+      `INSERT INTO discussion_items (id,instance_id,title,description,status,due_date,delegated_to,group_id,protokoll,created_by)
+       VALUES ($1,$2,$3,$4,'open',$5,$6,$7,$8::jsonb,$9)`,
+      [newItemId,targetInstanceId,item.title,item.description||'',item.due_date||null,item.delegated_to||null,groupId,
+       JSON.stringify([{ts:now,by:req.uid,type:'copied_from',fromMeeting:item.meeting_id}]),req.uid]
+    );
+    // Copy participants
+    const parts = await q('SELECT * FROM discussion_participants WHERE item_id=$1',[req.params.id]);
+    for (const p of parts) {
+      await pool.query(
+        `INSERT INTO discussion_participants (id,item_id,user_id,role) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+        [newId(),newItemId,p.user_id,p.role]
+      );
+    }
+    const srcMeeting = await q1('SELECT title FROM meetings WHERE id=$1',[item.meeting_id]);
+    await addProtokoll(req.params.id,{ts:now,by:req.uid,type:'copied_to',toMeeting:targetInst.meeting_title||'',toInstanceId:targetInstanceId});
+    const row = await q1('SELECT * FROM discussion_items WHERE id=$1',[newItemId]);
+    ok(res, row);
+  } catch(e) { console.error(e); bad(res,'Serverfehler',500); }
 });
 
 // DELETE discussion item
