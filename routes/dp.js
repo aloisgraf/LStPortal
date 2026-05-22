@@ -592,10 +592,20 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
           continue;
         }
 
-        // Hard: Austrian law — 48h/week cap
+        // Hard: Austrian law — 48h/week cap (AZG §9)
         const wk = getISOWeek(slot.date);
-        if ((state.weeklyHours[wk]||0) + slotHours > 48) {
+        const currentWeekHours = state.weeklyHours[wk]||0;
+        const projectedWeekHours = currentWeekHours + slotHours;
+        if (projectedWeekHours > 48) {
           if (!skipReasons[empId]) skipReasons[empId] = 'weekly_cap_exceeded';
+          protocolEntries.push({
+            plan_id: plan.id,
+            date: slot.date,
+            shift_type_id: slot.shiftTypeId,
+            reason: 'weekly_cap_exceeded',
+            employee_id: empId,
+            details: {current_week: wk, current_hours: currentWeekHours.toFixed(2), add_shift: slotHours.toFixed(2), projected: projectedWeekHours.toFixed(2)}
+          });
           continue;
         }
 
