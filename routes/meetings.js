@@ -158,13 +158,13 @@ router.delete('/meeting-instances/:id', auth, async (req, res) => {
 // POST create item in instance
 router.post('/meeting-instances/:id/items', auth, async (req, res) => {
   try {
-    const { title, description, dueDate, delegatedTo, participants } = req.body;
+    const { title, description, dueDate, delegatedTo, participants, link } = req.body;
     if (!title) return bad(res, 'Titel erforderlich', 400);
     const id = newId();
     await pool.query(
-      `INSERT INTO discussion_items (id, instance_id, title, description, status, due_date, delegated_to, created_by)
-       VALUES ($1,$2,$3,$4,'open',$5,$6,$7)`,
-      [id, req.params.id, title, description || '', dueDate || null, delegatedTo || null, req.uid]
+      `INSERT INTO discussion_items (id, instance_id, title, description, status, due_date, delegated_to, link, created_by)
+       VALUES ($1,$2,$3,$4,'open',$5,$6,$7,$8)`,
+      [id, req.params.id, title, description || '', dueDate || null, delegatedTo || null, link || null, req.uid]
     );
     // Add participants
     if (Array.isArray(participants)) {
@@ -200,7 +200,7 @@ router.put('/discussion-items/:id', auth, async (req, res) => {
     const meetingOwner = await q1('SELECT created_by FROM meetings WHERE id=$1',[existingItem.meeting_id]);
     const isParticipant = await q1('SELECT id FROM discussion_participants WHERE item_id=$1 AND user_id=$2',[req.params.id,req.uid]);
     if(!req.p.manageUsers && existingItem.created_by!==req.uid && !isParticipant && meetingOwner?.created_by!==req.uid) return bad(res,'Keine Berechtigung',403);
-    const { title, description, status, dueDate, meetingDate, delegatedTo, result } = req.body;
+    const { title, description, status, dueDate, meetingDate, delegatedTo, result, link } = req.body;
     const now = new Date().toISOString();
 
     // Detect status change → add protokoll entry
@@ -222,11 +222,11 @@ router.put('/discussion-items/:id', auth, async (req, res) => {
       `UPDATE discussion_items SET
         title=COALESCE($1,title), description=COALESCE($2,description),
         status=COALESCE($3,status), due_date=$4, meeting_date=$5,
-        delegated_to=$6, result=COALESCE($7,result)
-       WHERE id=$8`,
+        delegated_to=$6, result=COALESCE($7,result), link=COALESCE($8,link)
+       WHERE id=$9`,
       [title || null, description !== undefined ? description : null, status || null,
        dueDate || null, meetingDate || null, delegatedTo || null, result !== undefined ? result : null,
-       req.params.id]
+       link || null, req.params.id]
     );
 
     // Sync content to linked items (title/description/dueDate/delegatedTo — but NOT status/result)

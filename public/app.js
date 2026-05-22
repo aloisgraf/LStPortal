@@ -3479,18 +3479,19 @@ function renderInstanceDetail(inst, meeting, canManage) {
         <div class="meetings-col">
           <div class="meetings-col-hdr" style="color:${statusColors[st]}">${statusCols[st]} <span style="font-size:11px;opacity:.7">(${items.length})</span></div>
           ${items.length===0?`<div style="font-size:12px;color:var(--mu);padding:8px;text-align:center">—</div>`:''}
-          ${items.map(it=>`<div class="meetings-card"${it._canEdit?` onclick="openItemForm('${inst.id}','${it.id}')"`:''} style="${it._canEdit?'':'cursor:default'}">
+          ${items.map(it=>{const deadlineColor=getDeadlineColor(it.dueDate);return`<div class="meetings-card"${it._canEdit?` onclick="openItemForm('${inst.id}','${it.id}')"`:''} style="${it._canEdit?'':'cursor:default'}${deadlineColor?';border-left:4px solid '+deadlineColor:''}">
             <div style="font-weight:600;font-size:13px;margin-bottom:4px">${esc(it.title)}</div>
             ${it.description?`<div style="font-size:12px;color:var(--mu);margin-bottom:4px">${esc(it.description.slice(0,80))}${it.description.length>80?'…':''}</div>`:''}
             <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
-              ${it.dueDate?`<span style="font-size:11px;color:${new Date(it.dueDate)<new Date()?'#ef4444':'#64748b'}">&#128197; ${fmtDate(it.dueDate)}</span>`:''}
+              ${it.dueDate?`<span style="font-size:11px;color:${deadlineColor||'#64748b'};font-weight:${deadlineColor?'600':'400'}">&#128197; ${fmtDate(it.dueDate)}</span>`:''}
               ${it.delegatedTo?`<span style="font-size:11px;color:#7c3aed">→ ${esc(getU(it.delegatedTo)?.name||'?')}</span>`:''}
               ${(it.participants||[]).slice(0,4).map(p=>{const u=getU(p.userId);return u?`<span class="av-sm" style="background:${u.color}" title="${esc(u.name)}">${esc(u.initials)}</span>`:''}).join('')}
               ${(it.participants||[]).length>4?`<span style="font-size:11px;color:var(--mu)">+${it.participants.length-4}</span>`:''}
             </div>
+            ${it.link?`<div style="margin-top:4px;font-size:11px"><a href="${esc(it.link)}" target="_blank" rel="noopener noreferrer" style="color:#3b6dd4;text-decoration:none;display:inline-flex;align-items:center;gap:3px"><span>🔗</span><span>${esc(it.link.slice(0,30))}${it.link.length>30?'…':''}</span></a></div>`:''}
             ${it.parentId?`<div style="font-size:11px;color:#7c3aed;margin-top:4px">&#8617; Folge</div>`:''}
             ${it.groupId?`<div style="font-size:11px;color:#0ea5e9;margin-top:4px">🔗 Verknüpft</div>`:''}
-          </div>`).join('')}
+          </div>`;}).join('')}
         </div>`).join('')}
     </div>
   </div>`;
@@ -3593,6 +3594,17 @@ async function generateNextInstance(meetingId) {
 
 const ITEM_STATUS_LABEL = {open:'Zu besprechen',done:'Besprochen',redo:'Nochmal besprechen',delegate:'Delegiert'};
 
+function getDeadlineColor(dueDate) {
+  if(!dueDate) return null;
+  const due = new Date(dueDate);
+  const now = new Date();
+  const daysLeft = Math.ceil((due - now) / (1000*60*60*24));
+  if(daysLeft<=1) return '#ef4444'; // red
+  if(daysLeft<3) return '#f97316'; // orange
+  if(daysLeft<5) return '#eab308'; // yellow
+  return null;
+}
+
 function openItemForm(instanceId, id=null) {
   const allItems = S.meetings.flatMap(m=>m.instances.flatMap(i=>i.items));
   const item = id ? allItems.find(x=>x.id===id) : null;
@@ -3605,6 +3617,7 @@ function openItemForm(instanceId, id=null) {
   document.getElementById('itMeetingDate').value = item?.meetingDate?.slice?.(0,10)||'';
   document.getElementById('itStatus').value = item?.status||'open';
   document.getElementById('itResult').value = item?.result||'';
+  document.getElementById('itLink').value = item?.link||'';
   document.getElementById('itDelegateTo').style.display = (item?.status)==='delegate'?'':'none';
   const delSel = document.getElementById('itDelegatedTo');
   delSel.innerHTML = S.users.map(u=>`<option value="${u.id}"${item?.delegatedTo===u.id?' selected':''}>${esc(u.name)}</option>`).join('');
@@ -3693,6 +3706,7 @@ async function submitItemForm() {
     meetingDate: document.getElementById('itMeetingDate').value||null,
     delegatedTo: status==='delegate'?document.getElementById('itDelegatedTo').value:null,
     result: document.getElementById('itResult').value.trim(),
+    link: document.getElementById('itLink').value||null,
     participants,
   };
   try {

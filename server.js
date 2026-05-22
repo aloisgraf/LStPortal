@@ -467,6 +467,17 @@ async function initDB() {
     `ALTER TABLE discussion_items ADD COLUMN IF NOT EXISTS group_id TEXT DEFAULT NULL`,
     `ALTER TABLE meeting_instances ADD COLUMN IF NOT EXISTS title TEXT DEFAULT NULL`,
     `ALTER TABLE todos ADD COLUMN IF NOT EXISTS protokoll JSONB DEFAULT '[]'`,
+    `ALTER TABLE discussion_items ADD COLUMN IF NOT EXISTS link TEXT DEFAULT NULL`,
+    `CREATE TABLE IF NOT EXISTS todo_item_notifications (
+  id TEXT PRIMARY KEY,
+  item_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  notified_by TEXT NOT NULL,
+  type TEXT NOT NULL DEFAULT 'comment',
+  read_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(item_id, user_id, type)
+)`,
     `CREATE TABLE IF NOT EXISTS dp_generation_protocol (
   id TEXT PRIMARY KEY,
   plan_id TEXT NOT NULL REFERENCES dp_plans(id) ON DELETE CASCADE,

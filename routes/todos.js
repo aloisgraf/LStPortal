@@ -109,6 +109,11 @@ router.put('/todos/:todoId/items/:id', auth, async (req,res) => {
       const protokoll = (()=>{try{return JSON.parse(todo.protokoll||'[]');}catch{return [];}})();
       protokoll.push(entry);
       await q('UPDATE todos SET protokoll=$1 WHERE id=$2',[JSON.stringify(protokoll),req.params.todoId]);
+      // Notify todo creator if comment was added or item marked done
+      if((comment!==undefined||isDone===true) && todo.created_by!==req.uid){
+        const notifType = comment!==undefined?'comment':'completed';
+        await q1(`INSERT INTO todo_item_notifications (id,item_id,user_id,notified_by,type) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING`,[newId(),req.params.id,todo.created_by,req.uid,notifType]).catch(()=>{});
+      }
     }
     const doneAt = isDone === true ? 'NOW()' : 'NULL';
     const doneBy = isDone === true ? req.uid : null;
@@ -171,6 +176,19 @@ router.delete('/todos/:todoId/items/:itemId/assignees/:userId', auth, async (req
     protokoll.push(entry);
     await q('UPDATE todos SET protokoll=$1 WHERE id=$2',[JSON.stringify(protokoll),req.params.todoId]);
     await q('DELETE FROM todo_item_assignees WHERE item_id=$1 AND user_id=$2', [req.params.itemId, req.params.userId]);
+    ok(res);
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+// POST mark todo item notifications as read
+router.post('/todos/:todoId/mark-read', auth, async (req,res) => {
+  try {
+    const todo = await q1('SELECT * FROM todos WHERE id=$1',[req.params.todoId]);
+    if(!todo) return bad(res,'Todo nicht gefunden',404);
+    const items = await q('SELECT id FROM todo_items WHERE todo_id=$1',[req.params.todoId]);
+    for(const item of items){
+      await q('UPDATE todo_item_notifications SET read_at=NOW() WHERE item_id=$1 AND user_id=$2 AND read_at IS NULL',[item.id,req.uid]);
+    }
     ok(res);
   } catch(e) { bad(res,'Serverfehler',500); }
 });
