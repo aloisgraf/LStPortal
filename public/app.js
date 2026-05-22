@@ -4907,8 +4907,8 @@ function renderTodoDetail(t) {
     </div>
 
     <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin:12px 0">
-      <button style="flex:1;padding:8px 12px;border:none;background:${(S._todoTab||'punkte')!=='protokoll'?'var(--acc)':'transparent'};color:${(S._todoTab||'punkte')!=='protokoll'?'#fff':'var(--tx)'};cursor:pointer;font-weight:600;font-size:13px" onclick="S._todoTab='punkte';renderTodos()">Punkte</button>
-      <button style="flex:1;padding:8px 12px;border:none;background:${(S._todoTab||'punkte')==='protokoll'?'var(--acc)':'transparent'};color:${(S._todoTab||'punkte')==='protokoll'?'#fff':'var(--tx)'};cursor:pointer;font-weight:600;font-size:13px" onclick="S._todoTab='protokoll';renderTodos()">Protokoll</button>
+      <button style="padding:4px 8px;border:none;background:${(S._todoTab||'punkte')!=='protokoll'?'var(--acc)':'transparent'};color:${(S._todoTab||'punkte')!=='protokoll'?'#fff':'var(--tx)'};cursor:pointer;font-weight:500;font-size:12px;border-radius:4px 0 0 0" onclick="S._todoTab='punkte';renderTodos()">Punkte</button>
+      <button style="padding:4px 8px;border:none;background:${(S._todoTab||'punkte')==='protokoll'?'var(--acc)':'transparent'};color:${(S._todoTab||'punkte')==='protokoll'?'#fff':'var(--tx)'};cursor:pointer;font-weight:500;font-size:12px;border-radius:0 4px 0 0" onclick="S._todoTab='protokoll';renderTodos()">Protokoll</button>
     </div>
 
     ${(S._todoTab||'punkte')!=='protokoll' ? `
