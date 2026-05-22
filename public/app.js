@@ -3400,8 +3400,15 @@ function renderMeetings() {
       ${S.meetings.map(mt=>{
         const open=(mt.instances||[]).reduce((s,i)=>(i.items||[]).filter(it=>it.status==='open'||it.status==='redo').length+s,0);
         const typeBadge={einmalig:'Einmalig',jour_fixe:'Jour Fixe',ad_hoc:'Ad hoc',ungeplant:'Ungeplant'}[mt.type]||mt.type;
+        const canMng=mt._canManage||false;
         return`<div class="meetings-item${S._selMeeting===mt.id?' active':''}" onclick="S._selMeeting='${mt.id}';S._selInstance=null;renderMeetings()">
-          <div style="font-weight:600;font-size:13px">${esc(mt.title)}</div>
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px">
+            <div style="font-weight:600;font-size:13px;flex:1">${esc(mt.title)}</div>
+            ${canMng?`<div style="display:flex;gap:3px;flex-shrink:0" onclick="event.stopPropagation()">
+              <button class="btn-s" style="padding:2px 6px;font-size:11px" onclick="openMeetingForm('${mt.id}')">&#10002;</button>
+              <button class="btn-s btn-danger" style="padding:2px 6px;font-size:11px" onclick="deleteMeeting('${mt.id}')">&#128465;</button>
+            </div>`:''}
+          </div>
           <div style="display:flex;gap:6px;align-items:center;margin-top:3px">
             <span style="font-size:11px;background:var(--bg2);padding:1px 6px;border-radius:10px;color:var(--mu)">${typeBadge}</span>
             ${mt.type==='jour_fixe'&&mt.rhythm?`<span style="font-size:11px;color:var(--mu)">${{weekly:'wöchentlich',biweekly:'2-wöchentlich',monthly:'monatlich',daily:'täglich'}[mt.rhythm]||''} ${mt.rhythmTime||''}</span>`:''}
@@ -3429,8 +3436,6 @@ function renderMeetingDetail(m, canManage) {
         ${m.link?`<div style="margin-top:6px"><a href="${esc(m.link)}" target="_blank" rel="noopener noreferrer" style="font-size:12px;color:#3b6dd4;text-decoration:none;display:inline-flex;align-items:center;gap:4px"><span>🔗</span><span>${esc(m.link.slice(0,50))}${m.link.length>50?'…':''}</span></a></div>`:''}
       </div>
       <div style="display:flex;gap:8px;flex-shrink:0">
-        ${canManage?`<button class="btn-s" onclick="openMeetingForm('${m.id}')">&#10002; Bearbeiten</button>`:''}
-        ${canManage?`<button class="btn-s btn-danger" onclick="deleteMeeting('${m.id}')">&#128465;</button>`:''}
         ${canManage?`<button class="btn-s" onclick="openInstanceForm('${m.id}')">+ Termin</button>`:''}
         ${canManage&&m.type==='jour_fixe'?`<button class="btn-s" onclick="generateNextInstance('${m.id}')">&#128257; Nächster</button>`:''}
       </div>
