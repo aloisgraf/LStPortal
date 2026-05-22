@@ -59,6 +59,7 @@ main{padding:20px 22px;overflow-y:auto;max-height:calc(100vh - var(--hdr))}
 .btn-e{padding:4px 8px;background:rgba(124,58,237,.08);color:var(--info);border:1px solid rgba(124,58,237,.20);border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;transition:.15s;font-family:inherit}
 .btn-ok{padding:4px 8px;background:rgba(16,185,129,.08);color:var(--ok);border:1px solid rgba(16,185,129,.25);border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s}
 .btn-warn{padding:4px 8px;background:rgba(245,158,11,.08);color:var(--warn);border:1px solid rgba(245,158,11,.25);border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s}
+.btn-add{padding:8px 14px;background:var(--acc);color:var(--act);border:none;border-radius:var(--r);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:.15s}.btn-add:hover{background:var(--ach)}
 .sr{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
 .sc{background:var(--sf);border:1px solid var(--border);border-radius:var(--r);padding:14px;box-shadow:var(--sh)}
 .sv{font-size:26px;font-weight:800;line-height:1;margin-bottom:3px}.sl{font-size:11px;font-weight:500;color:var(--mu)}

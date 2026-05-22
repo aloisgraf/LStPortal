@@ -3460,8 +3460,9 @@ function renderInstanceDetail(inst, meeting, canManage) {
       <div style="font-size:13px;color:var(--mu)">${inst.notes?`<span>${esc(inst.notes)}</span>`:''}</div>
       <div style="display:flex;gap:8px">
         ${canManage?`<button class="btn-s" onclick="openInstanceForm('${meeting.id}','${inst.id}')">&#10002; Termin</button>`:''}
-        <button class="btn" onclick="openItemForm('${inst.id}')">+ Punkt</button>
+        <button class="btn-add" onclick="openItemForm('${inst.id}')">+ Punkt</button>
         ${inst.status==='planned'?`<button class="btn-s" style="background:#10b981;color:#fff" onclick="setInstanceStatus('${inst.id}','done')">&#10003; Abschließen</button>`:''}
+        ${inst.status==='done'?`<button class="btn-s" style="background:#f59e0b;color:#fff" onclick="setInstanceStatus('${inst.id}','planned')">↩ Wiederöffnen</button>`:''}
       </div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
@@ -3563,6 +3564,7 @@ async function submitInstanceForm() {
 }
 
 async function setInstanceStatus(id, status) {
+  if (status === 'done' && !confirm('Besprechung abschließen? Dies kann später rückgängig gemacht werden.')) return;
   try {
     await api('PUT','/meeting-instances/'+id,{status});
     await fetchData(); renderMeetings();
