@@ -561,9 +561,9 @@ function renderHome(){
         const nextInst = meeting.instances ? meeting.instances.find(inst => new Date(inst.scheduledFor) >= now) : null;
         if (!nextInst) return;
         const instDate = new Date(nextInst.scheduledFor);
-        meetingsHtml += '<div style="padding:8px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="setView(\'meetings\')">';
-        meetingsHtml += '<div style="font-size:12px;font-weight:600">'+escHtml(meeting.title)+'</div>';
-        meetingsHtml += '<div style="font-size:11px;color:var(--mu)">'+instDate.toLocaleDateString('de-AT')+' um '+instDate.toLocaleTimeString('de-AT',{hour:\'2-digit\',minute:\'2-digit\'})+'</div>';
+        meetingsHtml += `<div style="padding:8px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="setView('meetings')">`;
+        meetingsHtml += `<div style="font-size:12px;font-weight:600">${escHtml(meeting.title)}</div>`;
+        meetingsHtml += `<div style="font-size:11px;color:var(--mu)">${instDate.toLocaleDateString('de-AT')} um ${instDate.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'})}</div>`;
         meetingsHtml += '</div>';
       });
       if (upcomingMeetings.length > 5) meetingsHtml += '<div style="padding:8px 14px;border-top:1px solid var(--border)"><button class="btn-s" style="font-size:11px;width:100%" onclick="setView(\'meetings\')">Alle Besprechungen &#8594;</button></div>';
