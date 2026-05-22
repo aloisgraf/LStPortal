@@ -3605,6 +3605,15 @@ function getDeadlineColor(dueDate) {
   return null;
 }
 
+function getDeadlineColorFromItems(items) {
+  // Returns the most urgent deadline color from all open items
+  const colors = (items||[]).filter(i=>!i.is_done&&i.due_date).map(i=>getDeadlineColor(i.due_date)).filter(Boolean);
+  if(colors.includes('#ef4444')) return '#ef4444';
+  if(colors.includes('#f97316')) return '#f97316';
+  if(colors.includes('#eab308')) return '#eab308';
+  return null;
+}
+
 function openItemForm(instanceId, id=null) {
   const allItems = S.meetings.flatMap(m=>m.instances.flatMap(i=>i.items));
   const item = id ? allItems.find(x=>x.id===id) : null;
@@ -4793,7 +4802,7 @@ function renderTodos() {
     const allDone = total > 0 && done === total;
     const prio    = TODO_PRIO[t.priority] || TODO_PRIO.medium;
     const active  = t.id === (sel?.id);
-    const deadlineColor = getDeadlineColor(t.due_date);
+    const deadlineColor = getDeadlineColorFromItems(t.items);
     const hasUnread = t._hasUnreadNotifications;
     return `<div class="todo-item${active?' active':''}${allDone?' done':''}" onclick="S._selTodo='${t.id}';renderTodos()" style="${deadlineColor?'border-left:4px solid '+deadlineColor+'!important':''}">
       <div class="todo-item-title" style="display:flex;align-items:center;gap:6px">
@@ -4804,7 +4813,6 @@ function renderTodos() {
         <span class="todo-prio" style="background:${prio.color}"></span>
         <span>${prio.label}</span>
         ${total > 0 ? `<span style="margin-left:auto">${done}/${total}</span>` : ''}
-        ${t.due_date ? `<span style="color:${deadlineColor||'inherit'};font-weight:${deadlineColor?'600':'400'}">📅 ${String(t.due_date).slice(0,10)}</span>` : ''}
       </div>
     </div>`;
   }).join('') || '<div style="padding:16px;color:var(--mu);font-size:13px">Noch keine Todos</div>';
@@ -4835,7 +4843,7 @@ function renderTodoDetail(t) {
   const prio  = TODO_PRIO[t.priority] || TODO_PRIO.medium;
   const assignee = t.assigned_to ? getU(t.assigned_to) : null;
   const creator  = getU(t.created_by);
-  const deadlineColor = getDeadlineColor(t.due_date);
+  const deadlineColor = getDeadlineColorFromItems(t.items);
 
   const canManageTodo = t._canManage || false;
   const itemsHtml = t.items.map(item => {
@@ -4893,7 +4901,6 @@ function renderTodoDetail(t) {
         <div style="display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap">
           <span style="font-size:12px">${prio.dot} ${prio.label}</span>
           <span style="font-size:12px;color:${statusColor};font-weight:600">${statusLabel}</span>
-          ${t.due_date ? `<span style="font-size:12px;color:${deadlineColor||'var(--mu)'};font-weight:${deadlineColor?'600':'400'}">📅 ${String(t.due_date).slice(0,10)}</span>` : ''}
           ${assignee ? `<span style="font-size:12px;color:var(--mu)">👤 ${esc(assignee.name)}</span>` : ''}
           ${creator ? `<span style="font-size:12px;color:var(--di)">erstellt von ${esc(creator.name)}</span>` : ''}
         </div>
@@ -4933,7 +4940,6 @@ function openTodoForm(id) {
   document.getElementById('tfTitle').value = t?.title || '';
   document.getElementById('tfDesc').value = t?.description || '';
   document.getElementById('tfPriority').value = t?.priority || 'medium';
-  document.getElementById('tfDue').value = t?.due_date ? String(t.due_date).slice(0,10) : '';
   const asel = document.getElementById('tfAssignee');
   asel.innerHTML = '<option value="">— niemand —</option>' +
     S.users.map(u => `<option value="${u.id}"${t?.assigned_to===u.id?' selected':''}>${esc(u.name)}</option>`).join('');
@@ -4948,7 +4954,6 @@ async function submitTodoForm() {
     title,
     description: document.getElementById('tfDesc').value.trim(),
     priority:    document.getElementById('tfPriority').value,
-    dueDate:     document.getElementById('tfDue').value || null,
     assignedTo:  document.getElementById('tfAssignee').value || null,
   };
   try {

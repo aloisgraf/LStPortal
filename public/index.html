@@ -1681,15 +1681,12 @@
       <input type="hidden" id="tfId">
       <div class="fg"><label>Titel *</label><input type="text" id="tfTitle" placeholder="Todo-Titel…"></div>
       <div class="fg"><label>Beschreibung</label><textarea id="tfDesc" rows="2" placeholder="Optional…"></textarea></div>
-      <div style="display:flex;gap:12px">
-        <div class="fg" style="flex:1"><label>Priorität</label>
-          <select id="tfPriority">
-            <option value="low">🟢 Niedrig</option>
-            <option value="medium" selected>🟡 Mittel</option>
-            <option value="high">🔴 Hoch</option>
-          </select>
-        </div>
-        <div class="fg" style="flex:1"><label>Fällig bis</label><input type="date" id="tfDue"></div>
+      <div class="fg"><label>Priorität</label>
+        <select id="tfPriority">
+          <option value="low">🟢 Niedrig</option>
+          <option value="medium" selected>🟡 Mittel</option>
+          <option value="high">🔴 Hoch</option>
+        </select>
       </div>
       <div class="fg"><label>Zugewiesen an</label><select id="tfAssignee"><option value="">— niemand —</option></select></div>
     </div>
