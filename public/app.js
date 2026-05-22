@@ -53,7 +53,7 @@ let S={
   checklists:[],messages:[],notifications:[],abrechnung:{einspringer:[],homeoffice:[]},dienstplaene:[],
   p:{canApproveEvents:false,canSendMessages:false,seeAllEntries:true,editAllPersonal:false,addForOthers:false,addGeneral:false,manageUsers:false,seeAllAllw:false,editAllw:false,seeAllAbrechnung:false},
   tp:{seeAll:false,editAll:false,myDepts:[],canSetPublic:false,canAssign:false,canSeeSubcat:false,canEditSubcat:false,roles:[]},
-  dpPlans:[], dpShiftTypes:[], dpAbsenceTypes:[], dpEmpParams:[], dpQualifications:[],
+  dpPlans:[], dpShiftTypes:[], dpAbsenceTypes:[], dpEmpParams:[], dpQualifications:[], dpProtocol:[],
   todos:[], _selTodo:null,
   _dpPlanId:null, _dpMatrix:null, _dpStatsExpanded:false, _dpConfigTab:'shift-types',
 };
@@ -85,6 +85,7 @@ async function fetchData(){
     S.dpAbsenceTypes=data.dpAbsenceTypes||[];
     S.dpPlans=data.dpPlans||[];
     S.dpQualifications=data.dpQualifications||[];
+    S.dpProtocol=data.dpProtocol||[];
     S.todos=data.todos||[];
     S.currentUser=data.currentUser;S.p=data.permissions||{};
     const u=getU(S.currentUser);const roles=u?.roles||['standard'];
@@ -195,6 +196,7 @@ function loginOK(){
   document.getElementById('pillNm').textContent=u?.name||'?';
   const pa=document.getElementById('pillAv');pa.textContent=u?.initials||'?';pa.style.background=(u?.color||'#888')+'22';pa.style.color=u?.color||'#888';
   const ab=document.getElementById('adminBtn');if(ab)ab.style.display=S.p.manageUsers?'flex':'none';
+  restoreNavSectionState();
   loadNews().then(function(){setView('home');});startAutoRefresh();
   // archivNav for all users
   const archivNav=document.getElementById('ni-news_archiv');
@@ -238,7 +240,33 @@ async function doChangePW(){
 }
 // NAVIGATION
 function toggleSidebar(){const sb=document.getElementById('sidebar'),ov=document.getElementById('sbOv');sb.classList.toggle('open');ov.classList.toggle('open');}
-function toggleNS(id){document.getElementById(id+'Hdr').classList.toggle('open');document.getElementById(id+'Sub').classList.toggle('open');}
+function toggleNS(id){
+  const hdr = document.getElementById(id+'Hdr');
+  const sub = document.getElementById(id+'Sub');
+  const isOpen = hdr.classList.toggle('open');
+  sub.classList.toggle('open');
+  // Persistiere den Zustand
+  const nsState = JSON.parse(localStorage.getItem('navSectionState')||'{}');
+  nsState[id] = isOpen;
+  localStorage.setItem('navSectionState', JSON.stringify(nsState));
+}
+
+function restoreNavSectionState() {
+  const nsState = JSON.parse(localStorage.getItem('navSectionState')||'{}');
+  for (const [id, isOpen] of Object.entries(nsState)) {
+    const hdr = document.getElementById(id+'Hdr');
+    const sub = document.getElementById(id+'Sub');
+    if (hdr && sub) {
+      if (isOpen) {
+        hdr.classList.add('open');
+        sub.classList.add('open');
+      } else {
+        hdr.classList.remove('open');
+        sub.classList.remove('open');
+      }
+    }
+  }
+}
 function setView(v){
   S.view=v;
   ['home','schedule','allw','diensttausch','abrechnung','dienstplaene','tickets','tickets_closed','tickets_deleted','checklists','messages','messages_sent','zahnarzt','platz','links','statistik','docs','meetings','dp','dp-config','dp-mine','todos'].forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
@@ -503,6 +531,44 @@ function renderHome(){
     ${importantNewsHtml}${(hoHtml||vacHtml)?('<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">'+hoHtml+vacHtml+'</div>'):''}
     ${_dueFaelligHtml?_ccWrap('due_week','&#128197; Diese Woche fällig','<div class="card-rows">'+_dueFaelligHtml+'</div>'):''}
     ${_beschwerdenHtml?_ccWrap('beschwerden','&#128680; Zu erledigen &ndash; Beschwerden','<div class="card-rows">'+_beschwerdenHtml+'</div>'):''}
+    ${(() => {
+      const openTodos = S.todos.filter(t => t.items && t.items.some(i => !i.is_done));
+      if (!openTodos.length) return '';
+      let todosHtml = '';
+      openTodos.slice(0, 5).forEach(todo => {
+        const openItems = todo.items.filter(i => !i.is_done);
+        todosHtml += '<div style="padding:8px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="setView(\'todos\')">';
+        todosHtml += '<div style="font-size:12px;font-weight:600">'+escHtml(todo.title)+'</div>';
+        todosHtml += '<div style="font-size:11px;color:var(--mu)">'+openItems.length+' offen</div>';
+        todosHtml += '</div>';
+      });
+      if (openTodos.length > 5) todosHtml += '<div style="padding:8px 14px;border-top:1px solid var(--border)"><button class="btn-s" style="font-size:11px;width:100%" onclick="setView(\'todos\')">Alle Todos anzeigen &#8594;</button></div>';
+      return _ccWrap('todos_home', '&#9989; Offene Todos (' + openTodos.length + ')', '<div class="card-rows">' + todosHtml + '</div>');
+    })()}
+    ${(() => {
+      const now = new Date();
+      const in7days = new Date(now.getTime() + 7*24*60*60*1000);
+      const upcomingMeetings = S.meetings.filter(m => {
+        const hasUpcoming = m.instances && m.instances.some(inst => {
+          const instDate = new Date(inst.scheduledFor);
+          return instDate >= now && instDate <= in7days;
+        });
+        return hasUpcoming;
+      });
+      if (!upcomingMeetings.length) return '';
+      let meetingsHtml = '';
+      upcomingMeetings.slice(0, 5).forEach(meeting => {
+        const nextInst = meeting.instances ? meeting.instances.find(inst => new Date(inst.scheduledFor) >= now) : null;
+        if (!nextInst) return;
+        const instDate = new Date(nextInst.scheduledFor);
+        meetingsHtml += '<div style="padding:8px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="setView(\'meetings\')">';
+        meetingsHtml += '<div style="font-size:12px;font-weight:600">'+escHtml(meeting.title)+'</div>';
+        meetingsHtml += '<div style="font-size:11px;color:var(--mu)">'+instDate.toLocaleDateString('de-AT')+' um '+instDate.toLocaleTimeString('de-AT',{hour:\'2-digit\',minute:\'2-digit\'})+'</div>';
+        meetingsHtml += '</div>';
+      });
+      if (upcomingMeetings.length > 5) meetingsHtml += '<div style="padding:8px 14px;border-top:1px solid var(--border)"><button class="btn-s" style="font-size:11px;width:100%" onclick="setView(\'meetings\')">Alle Besprechungen &#8594;</button></div>';
+      return _ccWrap('meetings_home', '&#128483;&#65039; Kommende Besprechungen (' + upcomingMeetings.length + ')', '<div class="card-rows">' + meetingsHtml + '</div>');
+    })()}
     ${_ccWrap('online','&#128101; Online ('+(online.length+1)+')',_onlineHtml)}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
       ${_ccWrap('myentries','&#128197; Meine Einträge',_myEntriesHtml)}
@@ -3326,7 +3392,7 @@ function renderMeetings() {
       ${S.meetings.length===0?`<div style="color:var(--mu);font-size:13px;padding:12px">Keine Besprechungen</div>`:''}
       ${S.meetings.map(mt=>{
         const open=(mt.instances||[]).reduce((s,i)=>(i.items||[]).filter(it=>it.status==='open'||it.status==='redo').length+s,0);
-        const typeBadge={einmalig:'Einmalig',jour_fixe:'Jour Fixe',ad_hoc:'Ad hoc'}[mt.type]||mt.type;
+        const typeBadge={einmalig:'Einmalig',jour_fixe:'Jour Fixe',ad_hoc:'Ad hoc',ungeplant:'Ungeplant'}[mt.type]||mt.type;
         return`<div class="meetings-item${S._selMeeting===mt.id?' active':''}" onclick="S._selMeeting='${mt.id}';S._selInstance=null;renderMeetings()">
           <div style="font-weight:600;font-size:13px">${esc(mt.title)}</div>
           <div style="display:flex;gap:6px;align-items:center;margin-top:3px">
@@ -4535,14 +4601,21 @@ function renderTodoDetail(t) {
 
   const itemsHtml = t.items.map(item => {
     const doneUser = item.done_by ? getU(item.done_by) : null;
+    const assignees = item.assignees || [];
+    const assigneeNames = assignees.map(a => {
+      const u = getU(a.user_id);
+      return u ? u.name : '?';
+    }).join(', ');
     return `<div class="todo-ci${item.is_done?' done-item':''}" id="todo-ci-${item.id}">
       <input type="checkbox" ${item.is_done?'checked':''} onchange="toggleTodoItem('${t.id}','${item.id}',this.checked)">
       <div class="todo-ci-body">
         <div class="todo-ci-title">${esc(item.title)}</div>
         <textarea id="todo-comment-${item.id}" class="todo-ci-textarea" rows="1" placeholder="Kommentar…" onblur="saveTodoItemComment('${t.id}','${item.id}')">${esc(item.comment||'')}</textarea>
+        ${assigneeNames ? `<div class="todo-ci-meta">👤 ${assigneeNames}</div>` : ''}
         ${item.is_done && doneUser ? `<div class="todo-ci-meta">Erledigt von ${esc(doneUser.name)} · ${item.done_at?String(item.done_at).slice(0,16).replace('T',' '):''}</div>` : ''}
       </div>
       <div class="todo-ci-actions">
+        <button class="btn-s" style="padding:3px 7px;font-size:11px" onclick="openTodoItemAssignees('${t.id}','${item.id}')">👥</button>
         <button class="btn-d" style="padding:3px 7px" onclick="deleteTodoItem('${t.id}','${item.id}')">✕</button>
       </div>
     </div>`;
@@ -4708,5 +4781,44 @@ async function deleteTodoItem(todoId, itemId) {
     await api('DELETE', `/todos/${todoId}/items/${itemId}`);
     await fetchData();
     renderTodos();
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+function openTodoItemAssignees(todoId, itemId) {
+  const todo = S.todos.find(t => t.id === todoId);
+  const item = todo?.items.find(i => i.id === itemId);
+  if (!item) return;
+  const assignees = item.assignees || [];
+  const assignedIds = new Set(assignees.map(a => a.user_id));
+  let html = '<div style="max-height:300px;overflow-y:auto">';
+  S.users.forEach(u => {
+    const isAssigned = assignedIds.has(u.id);
+    html += `<div style="padding:8px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);cursor:pointer" onclick="toggleTodoItemAssignee('${todoId}','${itemId}','${u.id}',${!isAssigned})">
+      <input type="checkbox" ${isAssigned?'checked':''}>
+      <span>${esc(u.name)}</span>
+    </div>`;
+  });
+  html += '</div>';
+  const popup = document.createElement('div');
+  popup.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--sf);border:1px solid var(--border);border-radius:8px;padding:14px;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:1000;width:280px';
+  popup.innerHTML = `<div style="font-size:13px;font-weight:600;margin-bottom:10px">Zugewiesen an</div>${html}<button class="btn-p" style="width:100%;margin-top:10px" onclick="this.parentElement.remove()">Schließen</button>`;
+  document.body.appendChild(popup);
+}
+
+async function toggleTodoItemAssignee(todoId, itemId, userId, assign) {
+  try {
+    if (assign) {
+      await api('POST', `/todos/${todoId}/items/${itemId}/assignees`, {userId});
+    } else {
+      await api('DELETE', `/todos/${todoId}/items/${itemId}/assignees/${userId}`);
+    }
+    await fetchData();
+    const todo = S.todos.find(t => t.id === todoId);
+    if (todo) {
+      const detail = document.getElementById('todosDetail');
+      if (detail) detail.innerHTML = renderTodoDetail(todo);
+    }
+    document.querySelector('[style*="position:fixed"][style*="z-index:1000"]')?.remove();
+    openTodoItemAssignees(todoId, itemId);
   } catch(e) { toast('Fehler: '+e.message,'err'); }
 }

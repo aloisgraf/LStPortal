@@ -9,9 +9,13 @@ router.get('/todos', auth, async (req,res) => {
   try {
     const todos = await q('SELECT * FROM todos ORDER BY created_at DESC');
     const items = await q('SELECT * FROM todo_items ORDER BY sort_order, created_at');
+    const assignees = await q('SELECT * FROM todo_item_assignees');
     const result = todos.map(t => ({
       ...t,
-      items: items.filter(i => i.todo_id === t.id),
+      items: items.filter(i => i.todo_id === t.id).map(i => ({
+        ...i,
+        assignees: assignees.filter(a => a.item_id === i.id),
+      })),
     }));
     ok(res, result);
   } catch(e) { bad(res,'Serverfehler',500); }
@@ -92,6 +96,28 @@ router.put('/todos/:todoId/items/:id', auth, async (req,res) => {
 router.delete('/todos/:todoId/items/:id', auth, async (req,res) => {
   try {
     await q('DELETE FROM todo_items WHERE id=$1 AND todo_id=$2', [req.params.id, req.params.todoId]);
+    ok(res);
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+// ── TODO ITEM ASSIGNEES ───────────────────────────────────────────────────────
+
+router.post('/todos/:todoId/items/:itemId/assignees', auth, async (req,res) => {
+  const {userId} = req.body;
+  if (!userId) return bad(res,'Benutzer erforderlich',400);
+  try {
+    const row = await q1(
+      `INSERT INTO todo_item_assignees (id,item_id,user_id,assigned_by)
+       VALUES ($1,$2,$3,$4) ON CONFLICT (item_id, user_id) DO UPDATE SET assigned_at=NOW() RETURNING *`,
+      [newId(), req.params.itemId, userId, req.uid]
+    );
+    ok(res, row);
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+router.delete('/todos/:todoId/items/:itemId/assignees/:userId', auth, async (req,res) => {
+  try {
+    await q('DELETE FROM todo_item_assignees WHERE item_id=$1 AND user_id=$2', [req.params.itemId, req.params.userId]);
     ok(res);
   } catch(e) { bad(res,'Serverfehler',500); }
 });

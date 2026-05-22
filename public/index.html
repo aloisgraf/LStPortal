@@ -77,6 +77,9 @@
   <aside class="sb" id="sidebar">
     <div class="nav-area">
       <div class="ni top active" id="ni-home" onclick="setView('home')">&#127968; &#220;bersicht</div>
+      <div class="ni top" id="ni-docs" onclick="setView('docs')">&#128193; Dokumente</div>
+      <div class="ni top" id="ni-meetings" onclick="setView('meetings')">&#128483;&#65039; Besprechungen</div>
+      <div class="ni top" id="ni-todos" onclick="setView('todos')">&#9989; Todos</div>
       <div class="ndiv"></div>
       <div class="nsh open" id="dpHdr" onclick="toggleNS('dp')"><span>&#128203; Dienstplan</span><span class="arr">&#9660;</span></div>
       <div class="nsub open" id="dpSub">
@@ -104,17 +107,12 @@
         <div class="ni" id="ni-checklists" onclick="setView('checklists')">&#9745;&#65039; Checklisten</div>
       </div>
       <div class="ndiv"></div>
-      <div class="ni top" id="ni-docs" onclick="setView('docs')">&#128193; Dokumente</div>
-      <div class="ndiv"></div>
       <div class="nsh open" id="dpHdr" onclick="toggleNS('dp')"><span>&#128197; Dienstplanung</span><span class="arr">&#9660;</span></div>
       <div class="nsub open" id="dpSub">
         <div class="ni" id="ni-dp" onclick="setView('dp')">&#128203; Planerstellung</div>
         <div class="ni ni-admin-only" id="ni-dp-config" onclick="setView('dp-config')">&#9881;&#65039; Konfiguration</div>
         <div class="ni" id="ni-dp-mine" onclick="setView('dp-mine')">&#128100; Mein Dienstplan</div>
       </div>
-      <div class="ndiv"></div>
-      <div class="ni top" id="ni-meetings" onclick="setView('meetings')">&#128483;&#65039; Besprechungen</div>
-      <div class="ni top" id="ni-todos" onclick="setView('todos')">&#9989; Todos</div>
       <div class="ndiv"></div>
       <div class="nsh open" id="msgHdr" onclick="toggleNS('msg')"><span>&#9993;&#65039; Nachrichten <span class="nbdg" id="navMsgBdg" style="display:none">0</span></span><span class="arr">&#9660;</span></div>
       <div class="nsub open" id="msgSub">
@@ -1407,6 +1405,7 @@
           <option value="einmalig">Einmalig</option>
           <option value="jour_fixe">Jour Fixe (wiederkehrend)</option>
           <option value="ad_hoc">Ad hoc</option>
+          <option value="ungeplant">Ungeplant</option>
         </select>
       </div>
       <div id="mfRhythmDiv" style="display:none">

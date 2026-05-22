@@ -453,6 +453,24 @@ async function initDB() {
   created_by TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 )`,
+    `CREATE TABLE IF NOT EXISTS todo_item_assignees (
+  id TEXT PRIMARY KEY,
+  item_id TEXT NOT NULL REFERENCES todo_items(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL,
+  assigned_by TEXT NOT NULL,
+  assigned_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(item_id, user_id)
+)`,
+    `CREATE TABLE IF NOT EXISTS dp_generation_protocol (
+  id TEXT PRIMARY KEY,
+  plan_id TEXT NOT NULL REFERENCES dp_plans(id) ON DELETE CASCADE,
+  date DATE NOT NULL,
+  shift_type_id TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  employee_id TEXT,
+  details JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+)`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }

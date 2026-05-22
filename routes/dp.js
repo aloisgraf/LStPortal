@@ -550,11 +550,13 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
     const absenceSet = new Set(existingAssignments.filter(a=>a.absence_type_id).map(a=>`${a.employee_id}_${a.date?.toString().slice(0,10)}`));
 
     const newAssignments = [];
+    const protocolEntries = [];
 
     for (const slot of slots) {
       const slotHours = parseFloat(slot.shiftType.duration_hours)||0;
       const slotEndH = getShiftEndHour(slot.shiftType);
       const candidates = [];
+      const skipReasons = {}; // empId -> reason
 
       for (const [empId, state] of Object.entries(empState)) {
         const params = empParamMap[empId];
@@ -563,36 +565,66 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
         // Hard: employee must have at least one qualification defined,
         // and must be qualified for this specific shift type
         const empQuals = empQualMap[empId];
-        if (!empQuals || empQuals.size === 0) continue;
-        if (!empQuals.has(slot.shiftTypeId)) continue;
+        if (!empQuals || empQuals.size === 0) {
+          if (!skipReasons[empId]) skipReasons[empId] = 'no_qualifications';
+          continue;
+        }
+        if (!empQuals.has(slot.shiftTypeId)) {
+          if (!skipReasons[empId]) skipReasons[empId] = 'not_qualified';
+          continue;
+        }
 
         // Hard: blocked by absence
-        if (absenceSet.has(`${empId}_${slot.date}`)) continue;
+        if (absenceSet.has(`${empId}_${slot.date}`)) {
+          if (!skipReasons[empId]) skipReasons[empId] = 'has_absence';
+          continue;
+        }
 
         // Hard: already has a shift on this day
-        if (state.assignments.some(a=>a.date===slot.date && a.shift_type_id && !a.absence_type_id)) continue;
+        if (state.assignments.some(a=>a.date===slot.date && a.shift_type_id && !a.absence_type_id)) {
+          if (!skipReasons[empId]) skipReasons[empId] = 'already_assigned';
+          continue;
+        }
 
         // Hard: monthly hours cap — don't exceed target (allow up to +shift for last slot)
-        if (state.hoursAssigned >= state.monthlyTarget) continue;
+        if (state.hoursAssigned >= state.monthlyTarget) {
+          if (!skipReasons[empId]) skipReasons[empId] = 'monthly_cap_exceeded';
+          continue;
+        }
 
         // Hard: Austrian law — 48h/week cap
         const wk = getISOWeek(slot.date);
-        if ((state.weeklyHours[wk]||0) + slotHours > 48) continue;
+        if ((state.weeklyHours[wk]||0) + slotHours > 48) {
+          if (!skipReasons[empId]) skipReasons[empId] = 'weekly_cap_exceeded';
+          continue;
+        }
 
         // Hard: night restriction
-        if (slot.shiftType.is_night && !params.can_do_nights) continue;
+        if (slot.shiftType.is_night && !params.can_do_nights) {
+          if (!skipReasons[empId]) skipReasons[empId] = 'cannot_do_nights';
+          continue;
+        }
 
         // Hard: max nights/month
         if (slot.shiftType.is_night && params.max_nights_per_month!==null &&
-            state.nightsAssigned >= params.max_nights_per_month) continue;
+            state.nightsAssigned >= params.max_nights_per_month) {
+          if (!skipReasons[empId]) skipReasons[empId] = 'nights_max_exceeded';
+          continue;
+        }
 
         // Hard: Austrian Arbeitszeitgesetz — 11h minimum rest between shifts
         // Check previous shift end + 11h <= this shift start
         // Check this shift end + 11h <= next already-assigned shift start
-        if (!checkRestPeriod(state.assignments, slot, shiftTypes)) continue;
+        if (!checkRestPeriod(state.assignments, slot, shiftTypes)) {
+          if (!skipReasons[empId]) skipReasons[empId] = 'rest_period_violated';
+          continue;
+        }
 
         // Hard: max 6 consecutive days
-        if (getConsecutiveDays(state.assignments, slot.date) >= 6) continue;
+        if (getConsecutiveDays(state.assignments, slot.date) >= 6) {
+          if (!skipReasons[empId]) skipReasons[empId] = 'consecutive_days_limit';
+          continue;
+        }
 
         const isWishDay = wishSet.has(`${empId}_${slot.date}`);
         const hoursDeficit = state.monthlyTarget - state.hoursAssigned;
@@ -604,7 +636,20 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
         candidates.push({empId, score});
       }
 
-      if (candidates.length === 0) continue;
+      if (candidates.length === 0) {
+        // Log unfilled slot with most common reason
+        const reasons = Object.values(skipReasons);
+        const mainReason = reasons.length > 0 ? reasons[0] : 'no_candidates';
+        protocolEntries.push({
+          plan_id: plan.id,
+          date: slot.date,
+          shift_type_id: slot.shiftTypeId,
+          reason: mainReason,
+          employee_id: null,
+          details: {total_checked: Object.keys(empState).length}
+        });
+        continue;
+      }
 
       candidates.sort((a,b)=>a.score-b.score);
       const winnerId = candidates[0].empId;
@@ -637,7 +682,26 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
       }
     }
 
+    // Save protocol entries
+    for (const p of protocolEntries) {
+      await pool.query(
+        `INSERT INTO dp_generation_protocol (id,plan_id,date,shift_type_id,reason,employee_id,details)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [newId(), p.plan_id, p.date, p.shift_type_id, p.reason, p.employee_id, JSON.stringify(p.details||{})]
+      ).catch(()=>{});
+    }
+
     await pool.query(`UPDATE dp_plans SET generated_at=NOW(),generated_by=$1,status='reviewed' WHERE id=$2`,[req.uid,plan.id]);
+
+    // Check for weekly hour cap warnings
+    const weeklyCapWarnings = [];
+    for (const [empId, state] of Object.entries(empState)) {
+      for (const [wk, hours] of Object.entries(state.weeklyHours)) {
+        if (hours > 48) {
+          weeklyCapWarnings.push({employeeId: empId, week: wk, hours: parseFloat(hours.toFixed(2))});
+        }
+      }
+    }
 
     const violatedWishDays = [];
     for (const wd of wishDays) {
@@ -651,7 +715,13 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
       await pool.query(`UPDATE dp_wish_days SET status='violated' WHERE id=$1`,[id]).catch(()=>{});
     }
 
-    ok(res, {generated: newAssignments.length, total: slots.length, violations: violatedWishDays.length});
+    ok(res, {
+      generated: newAssignments.length,
+      total: slots.length,
+      violations: violatedWishDays.length,
+      unfilled: protocolEntries.length,
+      weeklyCapWarnings: weeklyCapWarnings
+    });
   } catch(e) { console.error('[dp/generate]',e.message,e.stack); bad(res,'Serverfehler',500); }
 });
 
