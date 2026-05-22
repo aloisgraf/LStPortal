@@ -56,12 +56,12 @@ router.delete('/meetings/:id', auth, async (req, res) => {
 // POST create instance for meeting
 router.post('/meetings/:id/instances', auth, async (req, res) => {
   try {
-    const { date, time, notes } = req.body;
+    const { date, time, notes, title } = req.body;
     const id = newId();
     await pool.query(
-      `INSERT INTO meeting_instances (id, meeting_id, date, time, notes, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6)`,
-      [id, req.params.id, date||null, time || '', notes || '', req.uid]
+      `INSERT INTO meeting_instances (id, meeting_id, date, time, notes, title, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [id, req.params.id, date||null, time || '', notes || '', title || null, req.uid]
     );
     const row = await q1('SELECT * FROM meeting_instances WHERE id=$1', [id]);
     ok(res, row);
@@ -131,14 +131,14 @@ router.post('/meetings/:id/next-instance', auth, async (req, res) => {
 // PUT update instance
 router.put('/meeting-instances/:id', auth, async (req, res) => {
   try {
-    const { date, time, status, notes } = req.body;
+    const { date, time, status, notes, title } = req.body;
     const inst = await q1('SELECT * FROM meeting_instances WHERE id=$1', [req.params.id]);
     if (!inst) return bad(res, 'Termin nicht gefunden', 404);
     // date can be explicitly set to null ("Datum noch offen")
     const newDate = Object.prototype.hasOwnProperty.call(req.body,'date') ? (date||null) : inst.date;
     await pool.query(
-      `UPDATE meeting_instances SET date=$1, time=COALESCE($2,time), status=COALESCE($3,status), notes=COALESCE($4,notes) WHERE id=$5`,
-      [newDate, time !== undefined ? time : null, status || null, notes !== undefined ? notes : null, req.params.id]
+      `UPDATE meeting_instances SET date=$1, time=COALESCE($2,time), status=COALESCE($3,status), notes=COALESCE($4,notes), title=COALESCE($5,title) WHERE id=$6`,
+      [newDate, time !== undefined ? time : null, status || null, notes !== undefined ? notes : null, title || null, req.params.id]
     );
     const row = await q1('SELECT * FROM meeting_instances WHERE id=$1', [req.params.id]);
     ok(res, row);
@@ -320,6 +320,23 @@ router.delete('/discussion-items/:id', auth, async (req, res) => {
     await pool.query('DELETE FROM discussion_items WHERE id=$1', [req.params.id]);
     ok(res, { deleted: true });
   } catch (e) { bad(res, 'Serverfehler', 500); }
+});
+
+// POST unlink copied item (break group_id link)
+router.post('/discussion-items/:id/unlink', auth, async (req, res) => {
+  try {
+    const item = await q1('SELECT di.*, mi.meeting_id FROM discussion_items di JOIN meeting_instances mi ON mi.id=di.instance_id WHERE di.id=$1',[req.params.id]);
+    if (!item) return bad(res,'Nicht gefunden',404);
+    if (!item.group_id) return bad(res,'Punkt ist nicht verknüpft',400);
+    const meetingOwner = await q1('SELECT created_by FROM meetings WHERE id=$1',[item.meeting_id]);
+    if (!req.p.manageUsers && item.created_by!==req.uid && meetingOwner?.created_by!==req.uid) return bad(res,'Keine Berechtigung',403);
+    const now = new Date().toISOString();
+    const oldGroupId = item.group_id;
+    await pool.query('UPDATE discussion_items SET group_id=NULL WHERE id=$1',[req.params.id]);
+    await addProtokoll(req.params.id,{ts:now,by:req.uid,type:'unlinked',fromGroupId:oldGroupId});
+    const row = await q1('SELECT * FROM discussion_items WHERE id=$1',[req.params.id]);
+    ok(res, row);
+  } catch(e) { console.error(e); bad(res,'Serverfehler',500); }
 });
 
 // POST follow-up item

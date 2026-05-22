@@ -3441,7 +3441,7 @@ function renderMeetingDetail(m, canManage) {
         const open=(i.items||[]).filter(it=>it.status==='open'||it.status==='redo').length;
         const statusColor={planned:'#3b82f6',done:'#10b981',cancelled:'#ef4444'}[i.status]||'#64748b';
         return`<div class="meetings-inst-tab${S._selInstance===i.id?' active':''}" onclick="S._selInstance='${i.id}';renderMeetings()">
-          <div style="font-size:12px;font-weight:600">${i.date?fmtDate(i.date):'📅 Datum offen'}${i.time?' '+i.time:''}</div>
+          <div style="font-size:12px;font-weight:600">${i.title?esc(i.title)+' • ':''}${i.date?fmtDate(i.date):'📅 Datum offen'}${i.time?' '+i.time:''}</div>
           <div style="display:flex;gap:4px;margin-top:2px">
             <span style="font-size:10px;color:${statusColor}">${{planned:'Geplant',done:'Abgeschlossen',cancelled:'Abgesagt'}[i.status]||i.status}</span>
             ${open>0?`<span style="font-size:10px;color:#92400e;background:#fef3c7;padding:0 4px;border-radius:8px">${open}</span>`:''}
@@ -3545,6 +3545,7 @@ function openInstanceForm(meetingId, id=null) {
   document.getElementById('instanceFormTitle').textContent = inst ? 'Termin bearbeiten' : 'Neuer Termin';
   document.getElementById('ifId').value = inst?.id||'';
   document.getElementById('ifMeetingId').value = meetingId;
+  document.getElementById('ifTitle').value = inst?.title||'';
   const dateOpen = inst && !inst.date;
   const cb = document.getElementById('ifDateOpen');
   cb.checked = dateOpen;
@@ -3561,7 +3562,7 @@ async function submitInstanceForm() {
   const dateOpen = document.getElementById('ifDateOpen').checked;
   const date = document.getElementById('ifDate').value;
   if (!dateOpen && !date) return toast('Datum erforderlich oder "Datum noch offen" aktivieren','err');
-  const body = { date: dateOpen ? null : date, time: document.getElementById('ifTime').value, notes: document.getElementById('ifNotes').value };
+  const body = { date: dateOpen ? null : date, time: document.getElementById('ifTime').value, notes: document.getElementById('ifNotes').value, title: document.getElementById('ifTitle').value };
   try {
     if (id) await api('PUT','/meeting-instances/'+id, body);
     else await api('POST','/meetings/'+meetingId+'/instances', body);
@@ -3615,14 +3616,16 @@ function openItemForm(instanceId, id=null) {
       if(e.type==='copied_to') return `<div style="margin-bottom:2px">📋 ${ts} · <b>${uName}</b>: Kopiert nach <i>${esc(e.toMeeting)}</i></div>`;
       if(e.type==='copied_from') return `<div style="margin-bottom:2px">📋 ${ts} · <b>${uName}</b>: Kopiert aus anderer Besprechung</div>`;
       if(e.type==='content_synced') return `<div style="margin-bottom:2px">🔄 ${ts} · Inhalt aktualisiert aus <i>${esc(e.fromMeeting)}</i></div>`;
+      if(e.type==='unlinked') return `<div style="margin-bottom:2px">🔓 ${ts} · <b>${uName}</b>: Verknüpfung aufgehoben</div>`;
       return '';
     }).join('');
   } else { protoSection.style.display='none'; }
-  // Move/Copy buttons (only when editing, only for meeting creators/managers)
+  // Move/Copy/Unlink buttons (only when editing, only for meeting creators/managers)
   const meeting = S.meetings.find(m=>m.instances.some(i=>i.id===instanceId));
   const canMng = meeting?._canManage||false;
   document.getElementById('itMoveBtn').style.display = (item && canMng) ? '' : 'none';
   document.getElementById('itCopyBtn').style.display = (item && canMng) ? '' : 'none';
+  document.getElementById('itUnlinkBtn').style.display = (item && item.groupId && canMng) ? '' : 'none';
   document.getElementById('itPartUser').innerHTML = S.users.map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('');
   renderItemParticipants(item?.participants||[]);
   const fbtn = document.getElementById('itFollowupBtn');
@@ -3793,6 +3796,17 @@ async function submitCopyItem() {
     closeModal('copyItemOv'); closeModal('itemFormOv');
     await fetchData(); renderMeetings(); toast('Punkt kopiert und verknüpft');
   } catch(e) { toast('Fehler beim Kopieren','err'); }
+}
+
+async function unlinkItem() {
+  const itemId = document.getElementById('itId').value;
+  if (!itemId) return;
+  if (!confirm('Verknüpfung zu den anderen Kopien aufheben? Künftige Änderungen werden nicht mehr synchronisiert.')) return;
+  try {
+    await api('POST',`/discussion-items/${itemId}/unlink`);
+    closeModal('itemFormOv');
+    await fetchData(); renderMeetings(); toast('Verknüpfung aufgehoben');
+  } catch(e) { toast('Fehler','err'); }
 }
 
 // Returns a readable text color for a given hex background color
@@ -4817,6 +4831,25 @@ function renderTodoDetail(t) {
     </div>`;
   }).join('');
 
+  const protokollHtml = (t.protokoll||[]).length > 0 ? [...(t.protokoll||[])].reverse().map(e=>{
+    const u=getU(e.by); const uName=u?.name||'?'; const ts=String(e.ts||'').slice(0,16).replace('T',' ');
+    let html = `<div style="margin-bottom:8px;padding:8px;background:var(--bg2);border-radius:6px;font-size:12px">`;
+    if(e.type==='updated') {
+      const changes = e.changes||{};
+      const changeLines = Object.entries(changes).map(([k,v])=>`<div style="margin-left:8px;color:var(--mu)">${k}: <b>${esc(String(v.from||''))}</b> → <b>${esc(String(v.to||''))}</b></div>`).join('');
+      html += `<div style="font-weight:600;margin-bottom:4px">📝 ${ts} · ${uName}</div>${changeLines}</div>`;
+    } else if(e.type==='assignee_added') {
+      const aUser = getU(e.userId);
+      html += `<div style="font-weight:600">👤 ${ts} · ${uName}</div><div style="margin-left:8px;color:var(--mu)">Zugewiesen an <b>${esc(aUser?.name||'?')}</b></div></div>`;
+    } else if(e.type==='assignee_removed') {
+      const aUser = getU(e.userId);
+      html += `<div style="font-weight:600">👤 ${ts} · ${uName}</div><div style="margin-left:8px;color:var(--mu)">Zuordnung von <b>${esc(aUser?.name||'?')}</b> entfernt</div></div>`;
+    } else {
+      html += `${ts} · ${uName} (${e.type})</div>`;
+    }
+    return html;
+  }).join('') : '<div style="color:var(--mu);font-size:12px;padding:8px">Noch keine Änderungen dokumentiert</div>';
+
   const statusColor = t.status === 'done' ? '#10b981' : t.status === 'cancelled' ? '#94a3b8' : '#f59e0b';
   const statusLabel = {open:'Offen', done:'Erledigt', cancelled:'Abgebrochen'}[t.status] || t.status;
 
@@ -4840,14 +4873,23 @@ function renderTodoDetail(t) {
       </div>` : ''}
     </div>
 
-    ${total > 0 ? `<div class="todo-progress" title="${pct}% erledigt">
-      <div class="todo-progress-bar" style="width:${pct}%"></div>
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin:12px 0">
+      <button class="btn-tab${(S._todoTab||'punkte')!=='protokoll'?' active':''}" onclick="S._todoTab='punkte';renderTodos()">Punkte</button>
+      <button class="btn-tab${(S._todoTab||'punkte')==='protokoll'?' active':''}" onclick="S._todoTab='protokoll';renderTodos()">Protokoll</button>
     </div>
-    <div style="font-size:12px;color:var(--mu);margin-bottom:12px">${done} von ${total} Punkten erledigt (${pct}%)</div>` : ''}
 
-    <div class="todo-checklist">${itemsHtml}</div>
+    ${(S._todoTab||'punkte')!=='protokoll' ? `
+      ${total > 0 ? `<div class="todo-progress" title="${pct}% erledigt">
+        <div class="todo-progress-bar" style="width:${pct}%"></div>
+      </div>
+      <div style="font-size:12px;color:var(--mu);margin-bottom:12px">${done} von ${total} Punkten erledigt (${pct}%)</div>` : ''}
 
-    ${canManageTodo ? `<button class="btn-p" style="margin-top:14px" onclick="openTodoItemForm('${t.id}')">+ Punkt hinzufügen</button>` : ''}
+      <div class="todo-checklist">${itemsHtml}</div>
+
+      ${canManageTodo ? `<button class="btn-p" style="margin-top:14px" onclick="openTodoItemForm('${t.id}')">+ Punkt hinzufügen</button>` : ''}
+    ` : `
+      <div style="padding:12px 0">${protokollHtml}</div>
+    `}
   </div>`;
 }
 

@@ -465,6 +465,8 @@ async function initDB() {
     `ALTER TABLE meetings ADD COLUMN IF NOT EXISTS link TEXT DEFAULT NULL`,
     `ALTER TABLE discussion_items ADD COLUMN IF NOT EXISTS protokoll JSONB DEFAULT '[]'`,
     `ALTER TABLE discussion_items ADD COLUMN IF NOT EXISTS group_id TEXT DEFAULT NULL`,
+    `ALTER TABLE meeting_instances ADD COLUMN IF NOT EXISTS title TEXT DEFAULT NULL`,
+    `ALTER TABLE todos ADD COLUMN IF NOT EXISTS protokoll JSONB DEFAULT '[]'`,
     `CREATE TABLE IF NOT EXISTS dp_generation_protocol (
   id TEXT PRIMARY KEY,
   plan_id TEXT NOT NULL REFERENCES dp_plans(id) ON DELETE CASCADE,

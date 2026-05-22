@@ -79,7 +79,7 @@ router.get('/', auth, async (req,res) => {
     const itemMap={};
     (itemsRaw||[]).forEach(it=>{if(!itemMap[it.instance_id])itemMap[it.instance_id]=[];itemMap[it.instance_id].push({id:it.id,instanceId:it.instance_id,title:it.title,description:it.description,status:it.status,dueDate:it.due_date,meetingDate:it.meeting_date,parentId:it.parent_id,delegatedTo:it.delegated_to,result:it.result,sortOrder:it.sort_order,createdBy:it.created_by,createdAt:it.created_at,groupId:it.group_id||null,protokoll:(()=>{try{return JSON.parse(it.protokoll||'[]');}catch{return [];}})(),participants:partMap[it.id]||[]});});
     const instMap={};
-    (instancesRaw||[]).forEach(inst=>{if(!instMap[inst.meeting_id])instMap[inst.meeting_id]=[];instMap[inst.meeting_id].push({id:inst.id,meetingId:inst.meeting_id,date:inst.date,time:inst.time||'',status:inst.status,notes:inst.notes||'',createdBy:inst.created_by,createdAt:inst.created_at,items:itemMap[inst.id]||[]});});
+    (instancesRaw||[]).forEach(inst=>{if(!instMap[inst.meeting_id])instMap[inst.meeting_id]=[];instMap[inst.meeting_id].push({id:inst.id,meetingId:inst.meeting_id,date:inst.date,time:inst.time||'',title:inst.title||null,status:inst.status,notes:inst.notes||'',createdBy:inst.created_by,createdAt:inst.created_at,items:itemMap[inst.id]||[]});});
     // Meetings: find which meetings the user has assigned items in
     const assignedMeetingIds = new Set();
     const itemIsAssignedToMe = new Set(); // item ids where user is participant
@@ -244,7 +244,8 @@ router.get('/', auth, async (req,res) => {
       dpProtocol: (dpProtocolRaw||[]).map(p=>({id:p.id,planId:p.plan_id,date:p.date,shiftTypeId:p.shift_type_id,reason:p.reason,employeeId:p.employee_id,details:p.details||{}})),
       todos: (todosRaw||[]).filter(t=>p.manageUsers||t.created_by===uid||assignedTodoIds.has(t.id)).map(t=>{
         const canMng=p.manageUsers||t.created_by===uid;
-        return {...t,_canManage:canMng,items:(todoItemsRaw||[]).filter(i=>i.todo_id===t.id).map(i=>({...i,_canEdit:canMng||todoItemIsAssignedToMe.has(i.id),assignees:(todoAssigneesRaw||[]).filter(a=>a.item_id===i.id)}))};
+        const protokoll=(()=>{try{return JSON.parse(t.protokoll||'[]');}catch{return [];}})();
+        return {...t,_canManage:canMng,protokoll,items:(todoItemsRaw||[]).filter(i=>i.todo_id===t.id).map(i=>({...i,_canEdit:canMng||todoItemIsAssignedToMe.has(i.id),assignees:(todoAssigneesRaw||[]).filter(a=>a.item_id===i.id)}))};
       }),
     });
   } catch(e) { console.error('[/api/data FEHLER]', e.message, e.stack?.split('\n')[1]); bad(res,'Serverfehler',500); }

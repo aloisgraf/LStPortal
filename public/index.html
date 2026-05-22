@@ -1433,6 +1433,7 @@
     <div class="mb2">
       <input type="hidden" id="ifId">
       <input type="hidden" id="ifMeetingId">
+      <div class="fg"><label>Titel (optional)</label><input type="text" id="ifTitle" placeholder="z.B. Kick-off"></div>
       <div class="fg">
         <label>Datum</label>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
@@ -1498,6 +1499,7 @@
         <button class="btn-s" id="itFollowupBtn" onclick="openFollowupForm()" style="display:none">&#128257; Folgebesprechung</button>
         <button class="btn-s" id="itMoveBtn" onclick="openMoveItemModal()" style="display:none">&#10145; Verschieben</button>
         <button class="btn-s" id="itCopyBtn" onclick="openCopyItemModal()" style="display:none">&#128203; In andere Besprechung</button>
+        <button class="btn-s" id="itUnlinkBtn" onclick="unlinkItem()" style="display:none">&#10005; Verknüpfung aufheben</button>
       </div>
       <button class="btn" onclick="submitItemForm()">&#10003; Speichern</button>
     </div>
