@@ -16,13 +16,13 @@ router.get('/meetings', auth, async (req, res) => {
 // POST create meeting
 router.post('/meetings', auth, async (req, res) => {
   try {
-    const { title, type, rhythm, rhythmDay, rhythmTime, description } = req.body;
+    const { title, type, rhythm, rhythmDay, rhythmTime, description, link } = req.body;
     if (!title) return bad(res, 'Titel erforderlich', 400);
     const id = newId();
     await pool.query(
-      `INSERT INTO meetings (id, title, type, rhythm, rhythm_day, rhythm_time, description, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [id, title, type || 'einmalig', rhythm || null, rhythmDay || null, rhythmTime || '', description || '', req.uid]
+      `INSERT INTO meetings (id, title, type, rhythm, rhythm_day, rhythm_time, description, link, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [id, title, type || 'einmalig', rhythm || null, rhythmDay || null, rhythmTime || '', description || '', link || null, req.uid]
     );
     const row = await q1('SELECT * FROM meetings WHERE id=$1', [id]);
     ok(res, row);
@@ -32,11 +32,11 @@ router.post('/meetings', auth, async (req, res) => {
 // PUT update meeting
 router.put('/meetings/:id', auth, async (req, res) => {
   try {
-    const { title, type, rhythm, rhythmDay, rhythmTime, description } = req.body;
+    const { title, type, rhythm, rhythmDay, rhythmTime, description, link } = req.body;
     await pool.query(
-      `UPDATE meetings SET title=$1, type=$2, rhythm=$3, rhythm_day=$4, rhythm_time=$5, description=$6
-       WHERE id=$7`,
-      [title, type || 'einmalig', rhythm || null, rhythmDay || null, rhythmTime || '', description || '', req.params.id]
+      `UPDATE meetings SET title=$1, type=$2, rhythm=$3, rhythm_day=$4, rhythm_time=$5, description=$6, link=$7
+       WHERE id=$8`,
+      [title, type || 'einmalig', rhythm || null, rhythmDay || null, rhythmTime || '', description || '', link || null, req.params.id]
     );
     const row = await q1('SELECT * FROM meetings WHERE id=$1', [req.params.id]);
     ok(res, row);

@@ -3426,6 +3426,7 @@ function renderMeetingDetail(m, canManage) {
         <h2 style="margin:0 0 4px;font-size:18px">${esc(m.title)}</h2>
         ${m.description?`<div style="font-size:13px;color:var(--mu)">${esc(m.description)}</div>`:''}
         ${m.type==='jour_fixe'?`<div style="font-size:12px;color:var(--mu);margin-top:4px">&#128257; ${rhythmLabels[m.rhythm]||m.rhythm||''} ${m.rhythmTime?'um '+m.rhythmTime:''}</div>`:''}
+        ${m.link?`<div style="margin-top:6px"><a href="${esc(m.link)}" target="_blank" rel="noopener noreferrer" style="font-size:12px;color:#3b6dd4;text-decoration:none;display:inline-flex;align-items:center;gap:4px"><span>🔗</span><span>${esc(m.link.slice(0,50))}${m.link.length>50?'…':''}</span></a></div>`:''}
       </div>
       <div style="display:flex;gap:8px;flex-shrink:0">
         ${canManage?`<button class="btn-s" onclick="openMeetingForm('${m.id}')">&#10002; Bearbeiten</button>`:''}
@@ -3495,6 +3496,7 @@ function openMeetingForm(id=null) {
   document.getElementById('mfTitle').value = m?.title||'';
   document.getElementById('mfType').value = m?.type||'einmalig';
   document.getElementById('mfDesc').value = m?.description||'';
+  document.getElementById('mfLink').value = m?.link||'';
   document.getElementById('mfRhythm').value = m?.rhythm||'weekly';
   document.getElementById('mfRhythmTime').value = m?.rhythmTime||'';
   document.getElementById('mfRhythmDiv').style.display = (m?.type||'einmalig')==='jour_fixe'?'':'none';
@@ -3514,6 +3516,7 @@ async function submitMeetingForm() {
     rhythm: document.getElementById('mfRhythm').value,
     rhythmTime: document.getElementById('mfRhythmTime').value,
     description: document.getElementById('mfDesc').value.trim(),
+    link: document.getElementById('mfLink').value.trim() || null,
   };
   try {
     if (id) await api('PUT','/meetings/'+id, body);

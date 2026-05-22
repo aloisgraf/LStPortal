@@ -234,7 +234,7 @@ router.get('/', auth, async (req,res) => {
       rolePermissions: (rolePermsRaw||[]).map(r=>({role:r.role,permission:r.permission,granted:r.granted})),
       meetings: (meetingsRaw||[]).filter(m=>p.manageUsers||m.created_by===uid||assignedMeetingIds.has(m.id)).map(m=>{
         const canMng=p.manageUsers||m.created_by===uid;
-        return {id:m.id,title:m.title,type:m.type,rhythm:m.rhythm,rhythmDay:m.rhythm_day,rhythmTime:m.rhythm_time||'',description:m.description||'',createdBy:m.created_by,createdAt:m.created_at,_canManage:canMng,
+        return {id:m.id,title:m.title,type:m.type,rhythm:m.rhythm,rhythmDay:m.rhythm_day,rhythmTime:m.rhythm_time||'',description:m.description||'',link:m.link||null,createdBy:m.created_by,createdAt:m.created_at,_canManage:canMng,
           instances:(instMap[m.id]||[]).map(inst=>({...inst,items:(inst.items||[]).map(it=>({...it,_canEdit:canMng||it.createdBy===uid||it.delegatedTo===uid||itemIsAssignedToMe.has(it.id)}))}))};
       }),
       dpShiftTypes: dpShiftTypesRaw||[],

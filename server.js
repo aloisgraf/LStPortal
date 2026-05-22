@@ -462,6 +462,7 @@ async function initDB() {
   UNIQUE(item_id, user_id)
 )`,
     `ALTER TABLE meeting_instances ALTER COLUMN date DROP NOT NULL`,
+    `ALTER TABLE meetings ADD COLUMN IF NOT EXISTS link TEXT DEFAULT NULL`,
     `CREATE TABLE IF NOT EXISTS dp_generation_protocol (
   id TEXT PRIMARY KEY,
   plan_id TEXT NOT NULL REFERENCES dp_plans(id) ON DELETE CASCADE,
