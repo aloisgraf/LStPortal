@@ -3402,11 +3402,11 @@ function renderMeetings() {
         const typeBadge={einmalig:'Einmalig',jour_fixe:'Jour Fixe',ad_hoc:'Ad hoc',ungeplant:'Ungeplant'}[mt.type]||mt.type;
         const canMng=mt._canManage||false;
         return`<div class="meetings-item${S._selMeeting===mt.id?' active':''}" onclick="S._selMeeting='${mt.id}';S._selInstance=null;renderMeetings()">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
             <div style="font-weight:600;font-size:13px;flex:1">${esc(mt.title)}</div>
-            ${canMng?`<div style="display:flex;gap:3px;flex-shrink:0" onclick="event.stopPropagation()">
-              <button class="btn-s" style="padding:2px 6px;font-size:11px" onclick="openMeetingForm('${mt.id}')">&#10002;</button>
-              <button class="btn-s btn-danger" style="padding:2px 6px;font-size:11px" onclick="deleteMeeting('${mt.id}')">&#128465;</button>
+            ${canMng?`<div style="display:flex;gap:2px;flex-shrink:0" onclick="event.stopPropagation()">
+              <button class="btn-s" style="padding:4px 8px;font-size:12px;border-radius:4px;transition:all .2s" title="Bearbeiten" onclick="openMeetingForm('${mt.id}')">✏️</button>
+              <button class="btn-s btn-danger" style="padding:4px 8px;font-size:12px;border-radius:4px;transition:all .2s" title="Löschen" onclick="deleteMeeting('${mt.id}')">🗑</button>
             </div>`:''}
           </div>
           <div style="display:flex;gap:6px;align-items:center;margin-top:3px">
@@ -4893,8 +4893,8 @@ function renderTodoDetail(t) {
     </div>
 
     <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin:12px 0">
-      <button class="btn-tab${(S._todoTab||'punkte')!=='protokoll'?' active':''}" onclick="S._todoTab='punkte';renderTodos()">Punkte</button>
-      <button class="btn-tab${(S._todoTab||'punkte')==='protokoll'?' active':''}" onclick="S._todoTab='protokoll';renderTodos()">Protokoll</button>
+      <button style="flex:1;padding:8px 12px;border:none;background:${(S._todoTab||'punkte')!=='protokoll'?'var(--acc)':'transparent'};color:${(S._todoTab||'punkte')!=='protokoll'?'#fff':'var(--tx)'};cursor:pointer;font-weight:600;font-size:13px" onclick="S._todoTab='punkte';renderTodos()">Punkte</button>
+      <button style="flex:1;padding:8px 12px;border:none;background:${(S._todoTab||'punkte')==='protokoll'?'var(--acc)':'transparent'};color:${(S._todoTab||'punkte')==='protokoll'?'#fff':'var(--tx)'};cursor:pointer;font-weight:600;font-size:13px" onclick="S._todoTab='protokoll';renderTodos()">Protokoll</button>
     </div>
 
     ${(S._todoTab||'punkte')!=='protokoll' ? `
