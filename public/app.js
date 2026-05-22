@@ -1492,6 +1492,12 @@ function renderTkDetail(){
         </div>`).join('')}</div>
       </div>`).join('')}
     </div>`:''}
+    <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
+      <div style="display:flex;gap:2px;background:var(--sf2);border:1px solid var(--border);border-radius:6px;padding:2px;margin-bottom:12px;width:fit-content">
+        ${['all','audit','note'].map(f=>`<button onclick="S._tkFeedFilter='${f}';renderTkDetail()" style="font-size:11px;padding:3px 10px;border:none;border-radius:4px;cursor:pointer;font-family:inherit;transition:.15s;background:${(S._tkFeedFilter||'all')===f?'var(--acc)':'transparent'};color:${(S._tkFeedFilter||'all')===f?'var(--act)':'var(--mu)'}">${f==='all'?'Alle':f==='audit'?'\u00c4nderungen':'Text'}</button>`).join('')}
+      </div>
+      <div class="nfeed">${_renderFeed(notes,tk.id,canEdit,S._tkFeedFilter||'all')}</div>
+    </div>
     ${noteInputHtml}`;
   const protocolHtml=`
     <div style="display:flex;gap:2px;background:var(--sf2);border:1px solid var(--border);border-radius:6px;padding:2px;margin-bottom:12px;width:fit-content">
@@ -1526,10 +1532,9 @@ function renderTkDetail(){
   document.getElementById('tkDetMain').innerHTML=`
     <div style="border-bottom:1px solid var(--border);margin:-18px -18px 14px;padding:0 18px;display:flex;gap:0">
       ${tabBtn('details','\ud83d\udccb Details')}
-      ${tabBtn('protocol','\ud83d\udd50 Protokoll'+(notes.length?` (${notes.length})`:''))}
       ${tabBtn('files','\ud83d\udcce Dateien'+(files.length?` (${files.length})`:''))}
     </div>
-    ${tab==='details'?detailsHtml:tab==='protocol'?protocolHtml:filesHtml}`;
+    ${tab==='details'?detailsHtml:filesHtml}`;
   document.getElementById('tkDetSB').innerHTML=`
     ${canEdit?`
     <div class="tkf"><label>Status</label><select onchange="updateTkField('${tk.id}','status',this.value)">${STATUSES.map(s=>`<option value="${s.id}"${tk.status===s.id?' selected':''}>${s.label}</option>`).join('')}</select></div>
