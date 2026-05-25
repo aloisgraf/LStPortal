@@ -872,6 +872,9 @@ function getRequiredCount(requirements, shiftTypeId, dayInfo) {
   // Check specific date first
   const specific = requirements.find(r=>r.shift_type_id===shiftTypeId && r.applies_to==='date' && r.specific_date?.toString().slice(0,10)===dayInfo.date);
   if (specific) return specific.slot_count;
+  // Daily (every day incl. holidays)
+  const daily = requirements.find(r=>r.shift_type_id===shiftTypeId && r.applies_to==='daily');
+  if (daily) return daily.slot_count;
   // Holiday
   if (dayInfo.isHoliday) {
     const hol = requirements.find(r=>r.shift_type_id===shiftTypeId && r.applies_to==='holiday');
