@@ -4329,8 +4329,9 @@ async function renderDPConfigEmpParams() {
 async function renderDPConfigRequirements() {
   let reqs = [];
   try { reqs = await api('GET', '/dp/shift-requirements'); } catch(e) {}
+  window.dpReqs = reqs; // for openDpReqForm access
 
-  const appliesLabel = {weekday:'Werktag',weekend:'Wochenende',holiday:'Feiertag',date:'Datum'};
+  const appliesLabel = {weekday:'Werktag',weekend:'Wochenende',holiday:'Feiertag',daily:'Mo–So',date:'Datum'};
   const wdLabel = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 
   const rows = reqs.map(r => {
@@ -4340,6 +4341,7 @@ async function renderDPConfigRequirements() {
       <span class="dp-color-dot" style="background:${st?.color||'#ccc'}"></span>
       <span class="dp-cfg-label">${esc(st?.name||r.shift_type_id)}</span>
       <span style="font-size:11px;color:var(--mu)">${appliesLabel[r.applies_to]||r.applies_to}${wd}${r.specific_date?' '+String(r.specific_date).slice(0,10):''}: ${r.slot_count} Slot(s)</span>
+      <button class="btn-s" onclick="openDpReqForm(window.dpReqs.find(x=>x.id==='${r.id}'))">✏️</button>
       <button class="btn-s" style="color:#ef4444" onclick="deleteDpRequirement('${r.id}')">✕</button>
     </div>`;
   }).join('');
@@ -4668,7 +4670,8 @@ function openDpReqForm(req) {
   stSel.innerHTML = S.dpShiftTypes.map(st=>`<option value="${st.id}"${req?.shift_type_id===st.id?' selected':''}>${esc(st.code)} – ${esc(st.name)}</option>`).join('');
   document.getElementById('dpRfAppliesTo').value = req?.applies_to||'weekday';
   document.getElementById('dpRfWeekday').value = req?.weekday||'';
-  document.getElementById('dpRfDate').value = req?.specific_date||'';
+  const specDate = req?.specific_date ? String(req.specific_date).slice(0,10) : '';
+  document.getElementById('dpRfDate').value = specDate;
   document.getElementById('dpRfSlots').value = req?.slot_count||1;
   onDpRfTypeChange();
   openModal('dpReqFormOv');
