@@ -692,6 +692,20 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
           if (slot.shiftType.is_night && !params.can_do_nights)
             { reasons[empId]='cannot_do_nights'; continue; }
 
+          // Hard: max nights per month (never relax this)
+          if (slot.shiftType.is_night && params.max_nights_per_month!==null &&
+              state.nightsAssigned >= params.max_nights_per_month)
+            { reasons[empId]='nights_max_exceeded'; continue; }
+
+          // Hard: consecutive nights restriction
+          if (slot.shiftType.is_night) {
+            const consecutiveNights = getConsecutiveNights(state.assignments, slot.date);
+            const maxConsec = params.double_nights_allowed ? 2 : 1;
+            if (consecutiveNights >= maxConsec) {
+              reasons[empId]='consecutive_nights_exceeded'; continue;
+            }
+          }
+
           // Hard: FD-Springer Typ A (FD→LS): quota cap — only schedule up to configured shifts
           if (params.fd_springer_type === 'FD_to_LS') {
             const quota = parseInt(params.fd_springer_shifts_per_month)||0;
@@ -717,9 +731,6 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
               { reasons[empId]='monthly_cap_exceeded'; continue; }
             if (getConsecutiveDays(state.assignments, slot.date) >= 6)
               { reasons[empId]='consecutive_days_limit'; continue; }
-            if (slot.shiftType.is_night && params.max_nights_per_month!==null &&
-                state.nightsAssigned >= params.max_nights_per_month)
-              { reasons[empId]='nights_max_exceeded'; continue; }
           }
 
           const isWishDay = wishSet.has(`${empId}_${slot.date}`);
@@ -1029,6 +1040,23 @@ function getConsecutiveDays(assignments, targetDate) {
     count++;
     d.setDate(d.getDate() - 1);
     if (count > 7) break;
+  }
+  return count;
+}
+
+// Count consecutive nights (is_night) up to but not including targetDate
+function getConsecutiveNights(assignments, targetDate) {
+  const nights = new Set(assignments
+    .filter(a=>!a.absence_type_id && a.shift_type_id && a.shiftType && a.shiftType.is_night)
+    .map(a=>a.date)
+  );
+  let count = 0;
+  let d = new Date(targetDate);
+  d.setDate(d.getDate() - 1);
+  while (nights.has(d.toISOString().slice(0,10))) {
+    count++;
+    d.setDate(d.getDate() - 1);
+    if (count > 30) break;
   }
   return count;
 }
