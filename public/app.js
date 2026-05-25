@@ -3983,14 +3983,26 @@ function renderDPMatrix(data) {
     let cells = days.map(d => {
       const required = requirements[d.date]?.[st.id] || 0;
       if (required === 0) {
-        // No requirement for this shift on this day — show neutral empty cell
+        // Keine Anforderung – aber es könnten Dienste zugewiesen sein (Überplanung)
+        const filled = (Object.entries(empAssignMap).filter(([empId, dateMap]) =>
+          dateMap[d.date] && dateMap[d.date].shift_type_id === st.id && !dateMap[d.date].absence_type_id
+        ).length);
+        if (filled > 0) {
+          return `<td style="background:#fbbf2422;color:#78350f;font-weight:bold;text-align:center;padding:3px 4px;cursor:default" title="Überplanung: ${filled} statt 0">+${filled}</td>`;
+        }
         return `<td style="background:var(--bg2)"></td>`;
       }
       const open = openSlots[d.date]?.[st.id] || 0;
       if (open > 0) {
         return `<td class="dp-cell-open" title="${esc(st.name)}: ${open} offen">-${open}</td>`;
       }
-      return `<td class="dp-cell-ok" title="Besetzt (${required}/${required})">✓</td>`;
+      if (open === 0) {
+        return `<td class="dp-cell-ok" title="Besetzt (${required}/${required})">✓</td>`;
+      }
+      // open < 0: zu viele Dienste eingetragen
+      const overbooking = Math.abs(open);
+      const filled = required + overbooking;
+      return `<td style="background:#fbbf2422;color:#78350f;font-weight:bold;text-align:center;padding:3px 4px;cursor:default" title="Zu viele: ${filled} statt ${required}">+${overbooking}</td>`;
     }).join('');
     return `<tr class="dp-open-row">
       <td class="dp-row-label"><span class="dp-color-dot" style="background:${st.color}"></span> ${esc(st.code)}</td>

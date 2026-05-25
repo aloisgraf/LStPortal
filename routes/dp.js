@@ -811,17 +811,21 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
           const isWishDay = wishSet.has(`${empId}_${slot.date}`);
 
           // ── SCORING: Ziel ist gleichmäßig niedrige Überstunden für alle Mitarbeiter ──
+          const deficit = Math.max(0, state.monthlyTarget - state.hoursAssigned);
           const overtime = Math.max(0, state.hoursAssigned - state.monthlyTarget);
 
           // Überstunden sind der DOMINANTE Faktor – alle sollten gleich wenig haben
           // Wenn bereits im Überstunden-Bereich: nach Überstunden-Menge sortieren (weniger = besser)
           let score;
           if (overtime > 0) {
-            score = 500 + overtime * 100; // Starke Penalisierung, aber nach OT-Menge differenziert
+            // Überstunden: Penalisiere nach absoluten Stunden (nicht Ratio)
+            // 5h OT bei 80h Target = 5h OT bei 160h Target (gleiche Strafe)
+            score = 1000 + overtime * 100;
           } else {
-            // Noch nicht am Ziel – nach Fill-Rate gleich verteilen
-            const fillRatio = state.hoursAssigned / (state.monthlyTarget || 160);
-            score = fillRatio * 100; // 0 bis ~100, je näher am Target desto höher
+            // Nicht über Target: Bevorzuge MA mit mehr Deficit (Ratio-basiert)
+            // 0/80 (100% deficit) und 0/160 (100% deficit) = gleiches Score
+            const deficitRatio = deficit / (state.monthlyTarget || 160);
+            score = deficitRatio * 100; // 0-100, lower is better
           }
 
           // Nächte und Wochenenden equalisieren
