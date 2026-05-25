@@ -959,8 +959,16 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
       }
     }
 
-    if (newAssignments.length > 0) {
-      for (const a of newAssignments) {
+    // ── POST-GENERATION: Überstunden ausgleichen ──
+    // Nach der Generierung iterativ versuchen Dienste zu verschieben
+    // um Überstunden auszugleichen
+    const rebalancedAssignments = await rebalanceOvertimeAssignments(
+      newAssignments, empState, empParamMap, empQualMap, shiftTypes,
+      AT_HOLIDAYS, plan, absenceSet
+    );
+
+    if (rebalancedAssignments.length > 0) {
+      for (const a of rebalancedAssignments) {
         await pool.query(
           `INSERT INTO dp_assignments (id,plan_id,employee_id,date,shift_type_id,absence_type_id,hours_credited,hours_source,is_overtime,is_locked,source,notes,created_by)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,false,false,'generated',$9,$10)`,
@@ -1297,6 +1305,157 @@ function getConsecutiveNights(assignments, targetDate) {
     if (count > 30) break;
   }
   return count;
+}
+
+// ── POST-GENERATION REBALANCING ───────────────────────────────────────────────
+// Versuche nach der Generierung Dienste zwischen MA zu verschieben um Überstunden
+// fair auszugleichen und MA mit Deficit zu bevorzugen
+async function rebalanceOvertimeAssignments(
+  assignments, empState, empParamMap, empQualMap, shiftTypes,
+  AT_HOLIDAYS, plan, absenceSet
+) {
+  let improved = true;
+  let iteration = 0;
+  const maxIterations = 5;
+
+  while (improved && iteration < maxIterations) {
+    improved = false;
+    iteration++;
+
+    // Berechne OT und Deficit pro MA basierend auf AKTUELLEN Assignments
+    const stats = {};
+    for (const [empId, state] of Object.entries(empState)) {
+      const totalHours = state.assignments
+        .filter(a => !a.absence_type_id)
+        .reduce((sum, a) => sum + (parseFloat(a.hours_credited) || 0), 0);
+      const target = state.monthlyTarget;
+      stats[empId] = {
+        target,
+        totalHours,
+        ot: Math.max(0, totalHours - target),
+        deficit: Math.max(0, target - totalHours),
+      };
+    }
+
+    // Berechne Durchschnitt OT (für alle die OT haben)
+    const empIdsWithOT = Object.entries(stats)
+      .filter(([id, s]) => s.ot > 0)
+      .map(([id]) => id);
+
+    if (empIdsWithOT.length === 0) break; // Keine OT mehr – fertig!
+
+    const avgOT = empIdsWithOT.reduce((sum, id) => sum + stats[id].ot, 0) / empIdsWithOT.length;
+    const fairnessTolerance = 3; // Tolerance: bis zu 3h Differenz OK
+
+    // Finde MA mit OT > avgOT + tolerance
+    const overtimeEmpIds = empIdsWithOT.filter(id => stats[id].ot > avgOT + fairnessTolerance);
+
+    for (const ovtEmpId of overtimeEmpIds) {
+      // Finde MA mit Deficit
+      const deficitEmpIds = Object.entries(stats)
+        .filter(([id, s]) => s.deficit > 2) // mindestens 2h Deficit
+        .map(([id]) => id);
+
+      if (deficitEmpIds.length === 0) continue;
+
+      // Finde Dienste von ovtEmpId die verschiebbar sind
+      // (kleine Dienste, nicht letzte in Reihe, etc.)
+      const ovtAssignments = assignments.filter(a =>
+        a.employee_id === ovtEmpId && a.shift_type_id && !a.absence_type_id
+      );
+
+      // Sortiere by Dauer (kleine first, einfacher zu verschieben)
+      ovtAssignments.sort((a, b) => (parseFloat(a.hours_credited) || 0) - (parseFloat(b.hours_credited) || 0));
+
+      for (const assignToMove of ovtAssignments) {
+        // Finde einen geeigneten Empfänger mit Deficit + Qualifikation
+        const deficitRecipients = deficitEmpIds.filter(recipId => {
+          const recipQuals = empQualMap[recipId];
+          if (!recipQuals?.has(assignToMove.shift_type_id)) return false;
+
+          // Hard-Rules checken für den neuen Empfänger:
+          // 1. Keine Abwesenheit an dem Tag
+          const dateStr = assignToMove.date instanceof Date
+            ? assignToMove.date.toISOString().slice(0, 10)
+            : String(assignToMove.date).slice(0, 10);
+          if (absenceSet.has(`${recipId}_${dateStr}`)) return false;
+
+          // 2. Keine andere Schicht an dem Tag
+          const hasOtherShift = empState[recipId]?.assignments.some(a => {
+            const aDate = a.date instanceof Date ? a.date.toISOString().slice(0, 10) : String(a.date).slice(0, 10);
+            return aDate === dateStr && a.shift_type_id && !a.absence_type_id && a.id !== assignToMove.id;
+          });
+          if (hasOtherShift) return false;
+
+          // 3. Weekly cap: würde die neue Schicht das Wochen-Limit sprengen?
+          const wk = getISOWeek(dateStr);
+          const weeklyHours = empState[recipId]?.assignments
+            .filter(a => {
+              const aDate = a.date instanceof Date ? a.date.toISOString().slice(0, 10) : String(a.date).slice(0, 10);
+              return getISOWeek(aDate) === wk && !a.absence_type_id;
+            })
+            .reduce((sum, a) => sum + (parseFloat(a.hours_credited) || 0), 0) || 0;
+          if (weeklyHours + (parseFloat(assignToMove.hours_credited) || 0) > 48) return false;
+
+          // 4. Rest period: 11h Ruhezeit (simplified check)
+          const prevDate = new Date(dateStr);
+          prevDate.setDate(prevDate.getDate() - 1);
+          const nextDate = new Date(dateStr);
+          nextDate.setDate(nextDate.getDate() + 1);
+          const prevDateStr = prevDate.toISOString().slice(0, 10);
+          const nextDateStr = nextDate.toISOString().slice(0, 10);
+
+          const prevAssign = empState[recipId]?.assignments.find(a => {
+            const aDate = a.date instanceof Date ? a.date.toISOString().slice(0, 10) : String(a.date).slice(0, 10);
+            return aDate === prevDateStr && a.shift_type_id && !a.absence_type_id;
+          });
+          const nextAssign = empState[recipId]?.assignments.find(a => {
+            const aDate = a.date instanceof Date ? a.date.toISOString().slice(0, 10) : String(a.date).slice(0, 10);
+            return aDate === nextDateStr && a.shift_type_id && !a.absence_type_id;
+          });
+
+          // Wenn vorher/nachher Schicht: check ob Rest-Period OK wäre (simplified)
+          if (prevAssign && prevAssign.shift_type_id) {
+            const prevSt = shiftTypes.find(s => s.id === prevAssign.shift_type_id);
+            const currSt = shiftTypes.find(s => s.id === assignToMove.shift_type_id);
+            // Vereinfachte Prüfung: wenn beide lange Dienste, skip
+            if ((prevSt?.duration_hours || 0) >= 10 && (currSt?.duration_hours || 0) >= 10) return false;
+          }
+          if (nextAssign && nextAssign.shift_type_id) {
+            const nextSt = shiftTypes.find(s => s.id === nextAssign.shift_type_id);
+            const currSt = shiftTypes.find(s => s.id === assignToMove.shift_type_id);
+            // Vereinfachte Prüfung: wenn beide lange Dienste, skip
+            if ((nextSt?.duration_hours || 0) >= 10 && (currSt?.duration_hours || 0) >= 10) return false;
+          }
+
+          return true; // Alle Checks bestanden
+        });
+
+        if (deficitRecipients.length === 0) continue;
+
+        // Nimm den Empfänger mit MEISTEN Deficit (am meisten zu füllen)
+        const bestRecipId = deficitRecipients.reduce((bestId, currId) =>
+          stats[currId].deficit > stats[bestId].deficit ? currId : bestId
+        );
+
+        // Verschiebe den Dienst
+        const assignIdx = assignments.indexOf(assignToMove);
+        if (assignIdx !== -1) {
+          assignments[assignIdx].employee_id = bestRecipId;
+
+          // Update empState (für nächste Iteration)
+          empState[ovtEmpId].assignments = empState[ovtEmpId].assignments.filter(a => a.id !== assignToMove.id);
+          empState[bestRecipId].assignments.push(assignToMove);
+
+          improved = true;
+          break; // Gehe zurück zu nächster Iteration
+        }
+      }
+      if (improved) break;
+    }
+  }
+
+  return assignments;
 }
 
 module.exports = router;
