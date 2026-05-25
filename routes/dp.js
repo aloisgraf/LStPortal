@@ -175,7 +175,7 @@ router.get('/employee-params', auth, async (req,res) => {
 router.post('/employee-params', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
   const {employeeId,validFrom,monthlyHours,canDoNights,maxNightsPerMonth,doubleNightsAllowed,isSpringer,
-         officePct,fdSpringerType,fdSpringerLocation,fdSpringerShiftsPerMonth} = req.body;
+         officePct,fdSpringerType,fdSpringerLocation,fdSpringerShiftsPerMonth,dailyHours} = req.body;
   if (!employeeId) return bad(res,'Mitarbeiter erforderlich',400);
   const mh = parseFloat(monthlyHours)||160;
   const wh = Math.round(mh / 4.33 * 100) / 100;
@@ -196,8 +196,8 @@ router.post('/employee-params', auth, async (req,res) => {
         `UPDATE dp_employee_params SET monthly_hours=$1,weekly_hours=$2,can_do_nights=$3,
          max_nights_per_month=$4,double_nights_allowed=$5,is_springer=$6,office_pct=$7,
          fd_springer_type=$8,fd_springer_location=$9,fd_springer_shifts_per_month=$10,
-         valid_from=$11,updated_at=NOW() WHERE id=$12 RETURNING *`,
-        [mh,wh,canDoNights!==false,maxNightsPerMonth||null,doubleNightsAllowed!==false,!!isSpringer,opct,fdType,fdLoc,fdSpm,vf,existing.id]
+         valid_from=$11,updated_at=NOW(),daily_hours=$13 WHERE id=$12 RETURNING *`,
+        [mh,wh,canDoNights!==false,maxNightsPerMonth||null,doubleNightsAllowed!==false,!!isSpringer,opct,fdType,fdLoc,fdSpm,vf,existing.id,dailyHours||null]
       );
       return ok(res,row);
     }
@@ -206,10 +206,10 @@ router.post('/employee-params', auth, async (req,res) => {
          (id,employee_id,monthly_hours,weekly_hours,work_days_per_week,can_do_nights,
           max_nights_per_month,double_nights_allowed,is_springer,office_pct,
           fd_springer_type,fd_springer_location,fd_springer_shifts_per_month,
-          valid_from,springer_config,locations,created_by)
-       VALUES ($1,$2,$3,$4,5,$5,$6,$7,$8,$9,$10,$11,$12,$13,'{}','[]',$14) RETURNING *`,
+          valid_from,springer_config,locations,created_by,daily_hours)
+       VALUES ($1,$2,$3,$4,5,$5,$6,$7,$8,$9,$10,$11,$12,$13,'{}','[]',$14,$15) RETURNING *`,
       [newId(),employeeId,mh,wh,canDoNights!==false,maxNightsPerMonth||null,
-       doubleNightsAllowed!==false,!!isSpringer,opct,fdType,fdLoc,fdSpm,vf,req.uid]
+       doubleNightsAllowed!==false,!!isSpringer,opct,fdType,fdLoc,fdSpm,vf,req.uid,dailyHours||null]
     );
     ok(res,row);
   } catch(e) { console.error(e); bad(res,'Serverfehler',500); }
@@ -424,7 +424,10 @@ router.get('/plans/:id/matrix', auth, async (req,res) => {
       const params = empParamMap[empId];
       if (!params) continue;
       const workDays = getWorkDaysInMonth(plan.year, plan.month, AT_HOLIDAYS);
-      const dailyTarget = params.weekly_hours / params.work_days_per_week;
+      // Tagessoll: daily_hours wenn gesetzt, sonst monthly_hours / 26 (Schichtarbeiter-Standard)
+      const dailyTarget = params.daily_hours
+        ? parseFloat(params.daily_hours)
+        : Math.round((parseFloat(params.monthly_hours)||160) / 26 * 10) / 10;
       const adjustedTarget = Math.max(0, (workDays - s.leaveDays) * dailyTarget);
       s.targetHours = Math.round(adjustedTarget * 10) / 10;
       s.dailyTarget = Math.round(dailyTarget * 10) / 10;
@@ -499,13 +502,15 @@ router.post('/plans/:id/assign', auth, async (req,res) => {
             hoursSource = 'shift';
           } else {
             // Get daily target
-            const params = await q1('SELECT weekly_hours,work_days_per_week FROM dp_employee_params WHERE employee_id=$1',[employeeId]);
-            hoursCredited = params ? parseFloat(params.weekly_hours)/parseInt(params.work_days_per_week) : 8;
+            const params = await q1('SELECT monthly_hours, daily_hours FROM dp_employee_params WHERE employee_id=$1',[employeeId]);
+            const mh = parseFloat(params?.monthly_hours) || 160;
+            hoursCredited = params?.daily_hours ? parseFloat(params.daily_hours) : Math.round(mh / 26 * 10) / 10;
             hoursSource = 'daily_target';
           }
         } else if (at.hours_calculation==='daily_target') {
-          const params = await q1('SELECT weekly_hours,work_days_per_week FROM dp_employee_params WHERE employee_id=$1',[employeeId]);
-          hoursCredited = params ? parseFloat(params.weekly_hours)/parseInt(params.work_days_per_week) : 8;
+          const params = await q1('SELECT monthly_hours, daily_hours FROM dp_employee_params WHERE employee_id=$1',[employeeId]);
+          const mh = parseFloat(params?.monthly_hours) || 160;
+          hoursCredited = params?.daily_hours ? parseFloat(params.daily_hours) : Math.round(mh / 26 * 10) / 10;
           hoursSource = 'daily_target';
         } else if (at.hours_calculation==='zero') {
           hoursCredited = 0; hoursSource = 'zero';

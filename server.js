@@ -509,6 +509,7 @@ async function initDB() {
     `ALTER TABLE dp_shift_types ADD COLUMN IF NOT EXISTS max_per_emp_per_month INTEGER DEFAULT NULL`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS category TEXT DEFAULT NULL`,
     `ALTER TABLE dp_plans ADD COLUMN IF NOT EXISTS generation_report JSONB DEFAULT NULL`,
+    `ALTER TABLE dp_employee_params ADD COLUMN IF NOT EXISTS daily_hours NUMERIC(4,2) DEFAULT NULL`,
     `CREATE TABLE IF NOT EXISTS dp_shift_preferences (
       id TEXT PRIMARY KEY,
       employee_id TEXT NOT NULL,

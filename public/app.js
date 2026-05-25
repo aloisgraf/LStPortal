@@ -4019,10 +4019,13 @@ function renderDPMatrix(data) {
       }
       const st = shiftTypes.find(x=>x.id===a.shift_type_id);
       const at = absenceTypes.find(x=>x.id===a.absence_type_id);
-      const label = at ? at.code : (st ? st.code : '?');
+      // Wenn Abwesenheit UND Dienst vorhanden: Abwesenheit groß, Dienst klein darunter
+      const label = at
+        ? `${esc(at.code)}${st ? `<br><span style="font-size:9px;opacity:0.65;font-weight:400">${esc(st.code)}</span>` : ''}`
+        : (st ? esc(st.code) : '?');
       const color = at ? at.color : (st ? st.color : '#ccc');
       const title = [at?.label, st?.name].filter(Boolean).join(' + ');
-      const style = `background:${color}22;color:${dpTextColor(color)};font-weight:700`;
+      const style = `background:${color}22;color:${dpTextColor(color)};font-weight:700;line-height:1.1`;
       if (canEdit) {
         return `<td class="dp-cell" style="${style}" onclick="openDpCellMenu('${emp.id}','${d.date}',event)" title="${esc(title)}">${esc(label)}</td>`;
       }
@@ -4126,14 +4129,15 @@ function openDpCellMenu(empId, date, evt) {
     </div>`;
   });
 
-  if (assign && assign.shift_type_id) {
-    html += `<div class="dp-menu-sep"></div><div class="dp-menu-hdr">Abwesenheit hinzufügen</div>`;
-    absenceTypes.forEach(at => {
-      html += `<div class="dp-menu-item" onclick="dpAssign('${empId}','${date}','${assign.shift_type_id}','${at.id}')" style="color:${at.color}">
-        <span class="dp-color-dot" style="background:${at.color}"></span>${esc(at.code)} – ${esc(at.label)}
-      </div>`;
-    });
-  }
+  // Abwesenheiten IMMER anzeigen, auch auf leeren Tagen
+  html += `<div class="dp-menu-sep"></div><div class="dp-menu-hdr">Abwesenheit</div>`;
+  absenceTypes.forEach(at => {
+    // Wenn bereits ein Dienst eingetragen: Dienst-ID übergeben (für Stunden-Berechnung und Anzeige)
+    const shiftArg = assign?.shift_type_id ? `'${assign.shift_type_id}'` : 'null';
+    html += `<div class="dp-menu-item" onclick="dpAssign('${empId}','${date}',${shiftArg},'${at.id}')" style="color:${at.color}">
+      <span class="dp-color-dot" style="background:${at.color}"></span>${esc(at.code)} – ${esc(at.label)}
+    </div>`;
+  });
 
   if (assign) {
     html += `<div class="dp-menu-sep"></div>`;
@@ -4937,6 +4941,7 @@ function openDpEmpParamForm(paramId) {
   document.getElementById('dpEpfParamId').value = p.id;
   document.getElementById('dpEpfValidFrom').value = p.valid_from ? String(p.valid_from).slice(0,10) : '';
   document.getElementById('dpEpfMonthly').value = p.monthly_hours || (p.weekly_hours ? Math.round(p.weekly_hours*4.33) : 160);
+  document.getElementById('dpEpfDailyHours').value = p?.daily_hours || '';
   document.getElementById('dpEpfNights').checked = !!p.can_do_nights;
   document.getElementById('dpEpfDoubleNights').checked = !!p.double_nights_allowed;
   document.getElementById('dpEpfSpringer').checked = !!p.is_springer;
@@ -4966,6 +4971,7 @@ function openDpEmpParamFormNew(empId) {
   document.getElementById('dpEpfParamId').value = '';
   document.getElementById('dpEpfValidFrom').value = '';
   document.getElementById('dpEpfMonthly').value = latest?.monthly_hours || (latest?.weekly_hours ? Math.round(latest.weekly_hours*4.33) : 160);
+  document.getElementById('dpEpfDailyHours').value = latest?.daily_hours || '';
   document.getElementById('dpEpfNights').checked = latest ? !!latest.can_do_nights : true;
   document.getElementById('dpEpfDoubleNights').checked = latest ? !!latest.double_nights_allowed : true;
   document.getElementById('dpEpfSpringer').checked = !!latest?.is_springer;
@@ -4997,6 +5003,7 @@ async function submitDpEmpParamForm() {
     fdSpringerType: fdType,
     fdSpringerLocation: fdType ? (document.getElementById('dpEpfFdLocation').value||null) : null,
     fdSpringerShiftsPerMonth: fdType ? (parseInt(document.getElementById('dpEpfFdShifts').value)||null) : null,
+    dailyHours: document.getElementById('dpEpfDailyHours').value ? parseFloat(document.getElementById('dpEpfDailyHours').value) : null,
   };
   try {
     await api('POST', '/dp/employee-params', body);
