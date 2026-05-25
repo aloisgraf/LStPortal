@@ -12,13 +12,13 @@ router.get('/shift-types', auth, async (req,res) => {
 
 router.post('/shift-types', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
-  const {name,code,location,role,startTime,endTime,durationHours,isNight,isZulage,isOffice,color,sortOrder} = req.body;
+  const {name,code,location,role,startTime,endTime,durationHours,isNight,isZulage,isOffice,color,sortOrder,validFrom} = req.body;
   if (!name?.trim()||!code?.trim()) return bad(res,'Name und Code erforderlich',400);
   try {
     const row = await q1(
-      `INSERT INTO dp_shift_types (id,name,code,location,role,start_time,end_time,duration_hours,is_night,is_zulage,is_office,color,sort_order,created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
-      [newId(),name.trim(),code.trim().toUpperCase(),location||'',role||'',startTime||'08:00',endTime||'20:00',durationHours||12,!!isNight,!!isZulage,!!isOffice,color||'#3b6dd4',sortOrder||0,req.uid]
+      `INSERT INTO dp_shift_types (id,name,code,location,role,start_time,end_time,duration_hours,is_night,is_zulage,is_office,color,sort_order,valid_from,created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+      [newId(),name.trim(),code.trim().toUpperCase(),location||'',role||'',startTime||'08:00',endTime||'20:00',durationHours||12,!!isNight,!!isZulage,!!isOffice,color||'#3b6dd4',sortOrder||0,validFrom||null,req.uid]
     );
     ok(res,row);
   } catch(e) { bad(res,'Serverfehler',500); }
@@ -26,12 +26,12 @@ router.post('/shift-types', auth, async (req,res) => {
 
 router.put('/shift-types/:id', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
-  const {name,code,location,role,startTime,endTime,durationHours,isNight,isZulage,isOffice,color,sortOrder} = req.body;
+  const {name,code,location,role,startTime,endTime,durationHours,isNight,isZulage,isOffice,color,sortOrder,validFrom} = req.body;
   try {
     const row = await q1(
       `UPDATE dp_shift_types SET name=$1,code=$2,location=$3,role=$4,start_time=$5,end_time=$6,
-       duration_hours=$7,is_night=$8,is_zulage=$9,is_office=$10,color=$11,sort_order=$12 WHERE id=$13 RETURNING *`,
-      [name,code?.toUpperCase(),location||'',role||'',startTime,endTime,durationHours,!!isNight,!!isZulage,!!isOffice,color,sortOrder||0,req.params.id]
+       duration_hours=$7,is_night=$8,is_zulage=$9,is_office=$10,color=$11,sort_order=$12,valid_from=$13 WHERE id=$14 RETURNING *`,
+      [name,code?.toUpperCase(),location||'',role||'',startTime,endTime,durationHours,!!isNight,!!isZulage,!!isOffice,color,sortOrder||0,validFrom||null,req.params.id]
     );
     if (!row) return bad(res,'Nicht gefunden',404);
     ok(res,row);
@@ -53,13 +53,13 @@ router.get('/shift-requirements', auth, async (req,res) => {
 
 router.post('/shift-requirements', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
-  const {shiftTypeId,appliesTo,weekday,specificDate,slotCount} = req.body;
+  const {shiftTypeId,appliesTo,weekday,specificDate,slotCount,validFrom} = req.body;
   if (!shiftTypeId||!slotCount) return bad(res,'Schichttyp und Anzahl erforderlich',400);
   try {
     const row = await q1(
-      `INSERT INTO dp_shift_requirements (id,shift_type_id,applies_to,weekday,specific_date,slot_count,created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [newId(),shiftTypeId,appliesTo||'weekday',weekday||null,specificDate||null,slotCount,req.uid]
+      `INSERT INTO dp_shift_requirements (id,shift_type_id,applies_to,weekday,specific_date,slot_count,valid_from,created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [newId(),shiftTypeId,appliesTo||'weekday',weekday||null,specificDate||null,slotCount,validFrom||null,req.uid]
     );
     ok(res,row);
   } catch(e) { bad(res,'Serverfehler',500); }
@@ -67,11 +67,11 @@ router.post('/shift-requirements', auth, async (req,res) => {
 
 router.put('/shift-requirements/:id', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
-  const {slotCount,weekday,appliesTo,specificDate} = req.body;
+  const {slotCount,weekday,appliesTo,specificDate,validFrom} = req.body;
   try {
     const row = await q1(
-      `UPDATE dp_shift_requirements SET slot_count=$1,weekday=$2,applies_to=$3,specific_date=$4 WHERE id=$5 RETURNING *`,
-      [slotCount,weekday||null,appliesTo,specificDate||null,req.params.id]
+      `UPDATE dp_shift_requirements SET slot_count=$1,weekday=$2,applies_to=$3,specific_date=$4,valid_from=$5 WHERE id=$6 RETURNING *`,
+      [slotCount,weekday||null,appliesTo,specificDate||null,validFrom||null,req.params.id]
     );
     ok(res,row);
   } catch(e) { bad(res,'Serverfehler',500); }
@@ -92,13 +92,13 @@ router.get('/absence-types', auth, async (req,res) => {
 
 router.post('/absence-types', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
-  const {code,label,color,hoursCalculation,fixedHours,adjustsMonthlyTarget,blocksScheduling,reopensShift,countsAsWorked,requiresApproval,sortOrder} = req.body;
+  const {code,label,color,hoursCalculation,fixedHours,adjustsMonthlyTarget,blocksScheduling,reopensShift,countsAsWorked,requiresApproval,sortOrder,validFrom} = req.body;
   if (!code?.trim()||!label?.trim()) return bad(res,'Code und Label erforderlich',400);
   try {
     const row = await q1(
-      `INSERT INTO dp_absence_types (id,code,label,color,hours_calculation,fixed_hours,adjusts_monthly_target,blocks_scheduling,reopens_shift,counts_as_worked,requires_approval,sort_order,created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
-      [newId(),code.trim().toUpperCase(),label.trim(),color||'#f59e0b',hoursCalculation||'daily_target',fixedHours||null,!!adjustsMonthlyTarget,blocksScheduling!==false,reopensShift!==false,countsAsWorked!==false,!!requiresApproval,sortOrder||0,req.uid]
+      `INSERT INTO dp_absence_types (id,code,label,color,hours_calculation,fixed_hours,adjusts_monthly_target,blocks_scheduling,reopens_shift,counts_as_worked,requires_approval,sort_order,valid_from,created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+      [newId(),code.trim().toUpperCase(),label.trim(),color||'#f59e0b',hoursCalculation||'daily_target',fixedHours||null,!!adjustsMonthlyTarget,blocksScheduling!==false,reopensShift!==false,countsAsWorked!==false,!!requiresApproval,sortOrder||0,validFrom||null,req.uid]
     );
     ok(res,row);
   } catch(e) { bad(res,'Serverfehler',500); }
@@ -106,13 +106,13 @@ router.post('/absence-types', auth, async (req,res) => {
 
 router.put('/absence-types/:id', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
-  const {code,label,color,hoursCalculation,fixedHours,adjustsMonthlyTarget,blocksScheduling,reopensShift,countsAsWorked,requiresApproval,sortOrder} = req.body;
+  const {code,label,color,hoursCalculation,fixedHours,adjustsMonthlyTarget,blocksScheduling,reopensShift,countsAsWorked,requiresApproval,sortOrder,validFrom} = req.body;
   try {
     const row = await q1(
       `UPDATE dp_absence_types SET code=$1,label=$2,color=$3,hours_calculation=$4,fixed_hours=$5,
        adjusts_monthly_target=$6,blocks_scheduling=$7,reopens_shift=$8,counts_as_worked=$9,
-       requires_approval=$10,sort_order=$11 WHERE id=$12 RETURNING *`,
-      [code?.toUpperCase(),label,color,hoursCalculation,fixedHours||null,!!adjustsMonthlyTarget,blocksScheduling!==false,reopensShift!==false,countsAsWorked!==false,!!requiresApproval,sortOrder||0,req.params.id]
+       requires_approval=$10,sort_order=$11,valid_from=$12 WHERE id=$13 RETURNING *`,
+      [code?.toUpperCase(),label,color,hoursCalculation,fixedHours||null,!!adjustsMonthlyTarget,blocksScheduling!==false,reopensShift!==false,countsAsWorked!==false,!!requiresApproval,sortOrder||0,validFrom||null,req.params.id]
     );
     if (!row) return bad(res,'Nicht gefunden',404);
     ok(res,row);
@@ -128,13 +128,13 @@ router.delete('/absence-types/:id', auth, async (req,res) => {
 // ── EMPLOYEE PARAMS ───────────────────────────────────────────────────────────
 
 router.get('/employee-params', auth, async (req,res) => {
-  try { ok(res, await q('SELECT * FROM dp_employee_params ORDER BY employee_id')); }
+  try { ok(res, await q('SELECT * FROM dp_employee_params ORDER BY employee_id, valid_from NULLS FIRST')); }
   catch(e) { bad(res,'Serverfehler',500); }
 });
 
 router.post('/employee-params', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
-  const {employeeId,monthlyHours,canDoNights,maxNightsPerMonth,doubleNightsAllowed,isSpringer,
+  const {employeeId,validFrom,monthlyHours,canDoNights,maxNightsPerMonth,doubleNightsAllowed,isSpringer,
          officePct,fdSpringerType,fdSpringerLocation,fdSpringerShiftsPerMonth} = req.body;
   if (!employeeId) return bad(res,'Mitarbeiter erforderlich',400);
   const mh = parseFloat(monthlyHours)||160;
@@ -143,16 +143,21 @@ router.post('/employee-params', auth, async (req,res) => {
   const fdType = ['FD_to_LS','LS_to_FD'].includes(fdSpringerType) ? fdSpringerType : null;
   const fdLoc  = ['Nord','Süd'].includes(fdSpringerLocation) ? fdSpringerLocation : null;
   const fdSpm  = fdType ? (parseInt(fdSpringerShiftsPerMonth)||null) : null;
+  const vf = validFrom || null;
   try {
-    const existing = await q1('SELECT id FROM dp_employee_params WHERE employee_id=$1',[employeeId]);
+    let existing;
+    if (vf === null) {
+      existing = await q1('SELECT id FROM dp_employee_params WHERE employee_id=$1 AND valid_from IS NULL',[employeeId]);
+    } else {
+      existing = await q1('SELECT id FROM dp_employee_params WHERE employee_id=$1 AND valid_from=$2::date',[employeeId,vf]);
+    }
     if (existing) {
       const row = await q1(
         `UPDATE dp_employee_params SET monthly_hours=$1,weekly_hours=$2,can_do_nights=$3,
          max_nights_per_month=$4,double_nights_allowed=$5,is_springer=$6,office_pct=$7,
          fd_springer_type=$8,fd_springer_location=$9,fd_springer_shifts_per_month=$10,
-         updated_at=NOW() WHERE employee_id=$11 RETURNING *`,
-        [mh,wh,canDoNights!==false,maxNightsPerMonth||null,doubleNightsAllowed!==false,
-         !!isSpringer,opct,fdType,fdLoc,fdSpm,employeeId]
+         valid_from=$11,updated_at=NOW() WHERE id=$12 RETURNING *`,
+        [mh,wh,canDoNights!==false,maxNightsPerMonth||null,doubleNightsAllowed!==false,!!isSpringer,opct,fdType,fdLoc,fdSpm,vf,existing.id]
       );
       return ok(res,row);
     }
@@ -161,12 +166,20 @@ router.post('/employee-params', auth, async (req,res) => {
          (id,employee_id,monthly_hours,weekly_hours,work_days_per_week,can_do_nights,
           max_nights_per_month,double_nights_allowed,is_springer,office_pct,
           fd_springer_type,fd_springer_location,fd_springer_shifts_per_month,
-          springer_config,locations,created_by)
-       VALUES ($1,$2,$3,$4,5,$5,$6,$7,$8,$9,$10,$11,$12,'{}','[]',$13) RETURNING *`,
+          valid_from,springer_config,locations,created_by)
+       VALUES ($1,$2,$3,$4,5,$5,$6,$7,$8,$9,$10,$11,$12,$13,'{}','[]',$14) RETURNING *`,
       [newId(),employeeId,mh,wh,canDoNights!==false,maxNightsPerMonth||null,
-       doubleNightsAllowed!==false,!!isSpringer,opct,fdType,fdLoc,fdSpm,req.uid]
+       doubleNightsAllowed!==false,!!isSpringer,opct,fdType,fdLoc,fdSpm,vf,req.uid]
     );
     ok(res,row);
+  } catch(e) { console.error(e); bad(res,'Serverfehler',500); }
+});
+
+router.delete('/employee-params/:id', auth, async (req,res) => {
+  if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+  try {
+    await q('DELETE FROM dp_employee_params WHERE id=$1',[req.params.id]);
+    ok(res);
   } catch(e) { bad(res,'Serverfehler',500); }
 });
 

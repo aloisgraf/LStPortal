@@ -494,6 +494,17 @@ async function initDB() {
   details JSONB DEFAULT '{}',
   created_at TIMESTAMPTZ DEFAULT NOW()
 )`,
+    `ALTER TABLE dp_employee_params ADD COLUMN IF NOT EXISTS valid_from DATE DEFAULT NULL`,
+    `ALTER TABLE dp_shift_requirements ADD COLUMN IF NOT EXISTS valid_from DATE DEFAULT NULL`,
+    `ALTER TABLE dp_employee_qualifications ADD COLUMN IF NOT EXISTS valid_from DATE DEFAULT NULL`,
+    `ALTER TABLE dp_shift_types ADD COLUMN IF NOT EXISTS valid_from DATE DEFAULT NULL`,
+    `ALTER TABLE dp_absence_types ADD COLUMN IF NOT EXISTS valid_from DATE DEFAULT NULL`,
+    `ALTER TABLE dp_employee_params DROP CONSTRAINT IF EXISTS dp_employee_params_employee_id_key`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS dp_emp_params_null_vf ON dp_employee_params(employee_id) WHERE valid_from IS NULL`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS dp_emp_params_date_vf ON dp_employee_params(employee_id, valid_from) WHERE valid_from IS NOT NULL`,
+    `ALTER TABLE dp_employee_qualifications DROP CONSTRAINT IF EXISTS dp_employee_qualifications_employee_id_shift_type_id_key`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS dp_qual_null_vf ON dp_employee_qualifications(employee_id, shift_type_id) WHERE valid_from IS NULL`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS dp_qual_date_vf ON dp_employee_qualifications(employee_id, shift_type_id, valid_from) WHERE valid_from IS NOT NULL`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }
