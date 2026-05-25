@@ -798,13 +798,18 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
           const isWishDay = wishSet.has(`${empId}_${slot.date}`);
 
           // ── SCORING: Ziel ist gleichmäßig niedrige Überstunden für alle Mitarbeiter ──
-          // Basis: Fill-Rate (0% bis 100%) → niedriger = bevorzugt
-          const fillRatio = state.hoursAssigned / (state.monthlyTarget || 160);
-          let score = fillRatio * 100;
+          const overtime = Math.max(0, state.hoursAssigned - state.monthlyTarget);
 
-          // Überstunden stark bestrafen – damit alle in etwa gleich viele OT haben
-          const overtimeNow = Math.max(0, state.hoursAssigned - state.monthlyTarget);
-          if (overtimeNow > 0) score += overtimeNow * 50;
+          // Überstunden sind der DOMINANTE Faktor – alle sollten gleich wenig haben
+          // Wenn bereits im Überstunden-Bereich: nach Überstunden-Menge sortieren (weniger = besser)
+          let score;
+          if (overtime > 0) {
+            score = 500 + overtime * 100; // Starke Penalisierung, aber nach OT-Menge differenziert
+          } else {
+            // Noch nicht am Ziel – nach Fill-Rate gleich verteilen
+            const fillRatio = state.hoursAssigned / (state.monthlyTarget || 160);
+            score = fillRatio * 100; // 0 bis ~100, je näher am Target desto höher
+          }
 
           // Nächte und Wochenenden equalisieren
           if (slot.shiftType.is_night) score += state.nightsAssigned * 20;

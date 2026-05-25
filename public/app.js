@@ -56,7 +56,7 @@ let S={
   dpPlans:[], dpShiftTypes:[], dpAbsenceTypes:[], dpEmpParams:[], dpQualifications:[], dpShiftPrefs:[], dpProtocol:[],
   todos:[], _selTodo:null,
   _dpPlanId:null, _dpMatrix:null, _dpStatsExpanded:false, _dpConfigTab:'shift-types',
-  _dpQualLocalChanges:{}, _dpQualLocalPrefsChanges:{}, _dpQualWeightsExpanded:{},
+  _dpQualLocalChanges:{}, _dpQualLocalPrefsChanges:{},
 };
 async function api(method,path2,body){
   const opts={method,credentials:'include',headers:{}};
@@ -4243,6 +4243,7 @@ async function renderDPConfig() {
     {id:'emp-params',label:'Mitarbeiter-Param.'},
     {id:'qualifications',label:'Qualifikationen'},
     {id:'requirements',label:'Schichtbedarf'},
+    {id:'scheduling-rules',label:'⚙️ Dienstplanregeln'},
     {id:'rules',label:'📋 Gesetzliche Regeln'},
   ];
 
@@ -4254,6 +4255,7 @@ async function renderDPConfig() {
   else if (tab === 'emp-params') content = await renderDPConfigEmpParams();
   else if (tab === 'qualifications') content = await renderDPConfigQualifications();
   else if (tab === 'requirements') content = await renderDPConfigRequirements();
+  else if (tab === 'scheduling-rules') content = renderDPConfigSchedulingRules();
   else if (tab === 'rules') content = renderDPConfigRules();
 
   el.innerHTML = `<div style="display:flex;flex-direction:column;height:calc(100vh - 56px)">
@@ -4276,6 +4278,7 @@ async function renderDPConfigTab() {
   else if (tab === 'emp-params') content = await renderDPConfigEmpParams();
   else if (tab === 'qualifications') content = await renderDPConfigQualifications();
   else if (tab === 'requirements') content = await renderDPConfigRequirements();
+  else if (tab === 'scheduling-rules') content = renderDPConfigSchedulingRules();
   else if (tab === 'rules') content = renderDPConfigRules();
   contentEl.innerHTML = content;
   contentEl.scrollTop = scrollTop;
@@ -4388,6 +4391,69 @@ async function renderDPConfigRequirements() {
   return `<div class="dp-cfg-card">
     <h3>Schichtbedarf <button class="btn-p" style="float:right;font-size:11px" onclick="openDpReqForm()">+ Hinzufügen</button></h3>
     ${rows||'<div style="color:var(--mu);font-size:13px">Noch kein Bedarf definiert.</div>'}
+  </div>`;
+}
+
+function renderDPConfigSchedulingRules() {
+  return `<div class="dp-cfg-card">
+    <h3>⚙️ Dienstplanregeln (Planungslogik)</h3>
+    <p style="font-size:13px;color:var(--mu);margin-bottom:16px">Regeln und Vorgaben für die Automatische Dienstplan-Generierung</p>
+
+    <div style="background:var(--sf2);border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:12px">
+      <h4 style="margin-top:0;font-size:14px;color:var(--fg)">📊 Überstunden-Ausgleich</h4>
+      <ul style="margin:8px 0;padding-left:20px;font-size:13px;line-height:1.6">
+        <li>Ziel: Alle Mitarbeiter sollen mit <strong>minimalen Überstunden</strong> enden</li>
+        <li>Gleichverteilung: Wenn Überstunden anfallen, dann sollten alle <strong>etwa gleich viele</strong> haben</li>
+        <li>Priorisierung:
+          <ul style="margin:4px 0;font-size:12px">
+            <li>1. MA unter Soll-Stunden erhalten Dienste (Füllen bis zur Sollarbeitszeit)</li>
+            <li>2. Wenn alle am/über Soll: der MA mit den <strong>wenigsten Überstunden</strong> erhält den nächsten Dienst</li>
+            <li>3. Feiertags-Toleranz: Überstunden dürfen bis zu den Feiertagsstunden im Monat anwachsen</li>
+          </ul>
+        </li>
+        <li>Effekt: MA mit kleineren Sollarbeitszeiten (zB 60h) bekommen nicht überproportional viele Überstunden</li>
+      </ul>
+    </div>
+
+    <div style="background:var(--sf2);border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:12px">
+      <h4 style="margin-top:0;font-size:14px;color:var(--fg)">🌙 Nachtdienst-Beschränkungen</h4>
+      <ul style="margin:8px 0;padding-left:20px;font-size:13px;line-height:1.6">
+        <li><strong>Global Max:</strong> 6 Nachtdienste pro Monat (falls in MA-Params nicht anders eingetragen)</li>
+        <li>Max aufeinanderfolgende Nächte:
+          <ul style="margin:4px 0;font-size:12px">
+            <li>Mit Doppelnächte erlaubt: max. 2 aufeinanderfolgende</li>
+            <li>Ohne Doppelnächte: max. 1 aufeinanderfolgende</li>
+          </ul>
+        </li>
+        <li>Priorisierung: Mitarbeiter mit weniger Nächten im Monat werden bevorzugt</li>
+      </ul>
+    </div>
+
+    <div style="background:var(--sf2);border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:12px">
+      <h4 style="margin-top:0;font-size:14px;color:var(--fg)">💼 Dienst-Gewichtungen</h4>
+      <ul style="margin:8px 0;padding-left:20px;font-size:13px;line-height:1.6">
+        <li>MA können <strong>Prozent-Gewichtungen</strong> (0–100%) pro Dienst eingeben</li>
+        <li>Der Generator versucht, die Dienste <strong>proportional</strong> zu verteilen:
+          <ul style="margin:4px 0;font-size:12px">
+            <li>Beispiel: C1 = 40%, C2 = 40%, C3 = 20% → MA bekommt 40% Zeit C1, 40% Zeit C2, 20% Zeit C3</li>
+            <li>Keine Angabe = gleichmäßig auf alle Qualifikationen verteilt</li>
+          </ul>
+        </li>
+        <li>Untererfüllte Dienste werden bevorzugt (Score-Bonus)</li>
+      </ul>
+    </div>
+
+    <div style="background:var(--sf2);border:1px solid var(--border);border-radius:6px;padding:12px">
+      <h4 style="margin-top:0;font-size:14px;color:var(--fg)">📋 Weitere Vorgaben</h4>
+      <ul style="margin:8px 0;padding-left:20px;font-size:13px;line-height:1.6">
+        <li><strong>Wochenarbeitszeit:</strong> Max. 48h pro Woche (AZG §9)</li>
+        <li><strong>Ruhezeit:</strong> Min. 11h zwischen Schichten (AZG §12)</li>
+        <li><strong>Wunschtage:</strong> Mitarbeiter können bis zu 3 Wunschtage pro Monat eintragen</li>
+        <li><strong>Abwesenheiten:</strong> Mitarbeiter mit Abwesenheit erhalten keinen Dienst an diesem Tag</li>
+        <li><strong>Qualifikation:</strong> Nur Mitarbeiter mit Qualifikation für einen Dienst können eingeplant werden</li>
+        <li><strong>Bürodienste (Phase 1):</strong> Vor regulären Diensten geplant, basierend auf office_pct (%)</li>
+      </ul>
+    </div>
   </div>`;
 }
 
@@ -4552,21 +4618,16 @@ async function renderDPConfigQualifications() {
     const remaining = 100 - qualPrefsSum;
     const sumColor = Math.abs(remaining) < 1 ? 'var(--ok, green)' : (remaining < 0 ? 'var(--err, red)' : 'var(--mu)');
 
-    const isWeightsExpanded = S._dpQualWeightsExpanded[empId] || false;
+    // Weight inputs – direkt unter den Chips, für jede ausgewählte Quali
     const weightsSection = selectedShiftTypes.length > 0 ? `
-  <div style="display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-    <button class="btn-s" onclick="toggleQualWeights('${empId}')" style="background:var(--bg);color:var(--fg);border:1px solid var(--border);font-size:12px">
-      ${isWeightsExpanded ? '▼' : '▶'} Gewichtungen
-    </button>
-    ${isWeightsExpanded ? `<span style="font-size:12px;color:${sumColor}">Summe: ${qualPrefsSum}% ${remaining !== 0 ? '('+Math.abs(remaining)+'% '+(remaining>0?'frei':'zu viel')+')' : '✓'}</span>` : ''}
-  </div>
-  ${isWeightsExpanded ? `<div style="background:var(--bg);padding:8px 12px;border-radius:4px;margin-top:8px">
+  <div style="background:var(--bg);padding:8px 12px;border-radius:4px;margin-top:8px;border:1px solid var(--border)">
+    <div style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--fg)">Gewichtungen:</div>
     ${weightsInputs}
-    <div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--border);font-size:13px;font-weight:600;color:${sumColor}">
-      Summe: ${qualPrefsSum}% ${remaining !== 0 ? '– noch '+Math.abs(remaining)+'% '+(remaining>0?'verfügbar':'zu viel') : '– vollständig'}
+    <div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--border);font-size:12px;font-weight:600;color:${sumColor}">
+      Summe: ${qualPrefsSum}% ${remaining !== 0 ? '– noch '+Math.abs(remaining)+'% '+(remaining>0?'verfügbar':'zu viel') : '– 100% ✓'}
     </div>
-    ${qualPrefsSum === 0 ? '<div style="font-size:11px;color:var(--mu);margin-top:4px">Keine Gewichtung = gleichmäßige Verteilung auf alle qualifizierten Dienste.</div>' : ''}
-  </div>` : ''}
+    ${qualPrefsSum === 0 ? '<div style="font-size:11px;color:var(--mu);margin-top:4px">Keine Angabe = gleichmäßig verteilt</div>' : ''}
+  </div>
 ` : '';
 
     // Changes detected?
@@ -4669,11 +4730,6 @@ async function openNewQualVersionDialog(empId) {
   const dateStr = prompt('Neue Version gültig ab (Format: JJJJ-MM-TT):', '');
   if (!dateStr) return;
   await submitQualChanges(empId, dateStr);
-}
-
-function toggleQualWeights(empId) {
-  S._dpQualWeightsExpanded[empId] = !S._dpQualWeightsExpanded[empId];
-  renderDPConfigTab();
 }
 
 function openDpShiftTypeForm(id) {
