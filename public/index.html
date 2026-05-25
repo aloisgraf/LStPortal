@@ -1588,6 +1588,7 @@
         <label class="rck"><input type="checkbox" id="dpStfOffice"> Bürodienst (B)</label>
       </div>
       <div class="fg" style="margin-top:8px"><label>Farbe</label><input type="color" id="dpStfColor" value="#3b6dd4"></div>
+      <div class="fg" style="margin-top:8px"><label>G&#252;ltig ab (leer = immer)</label><input type="date" id="dpStfValidFrom"></div>
     </div>
     <div class="mf"><button class="btn" onclick="submitDpShiftTypeForm()">&#10003; Speichern</button></div>
   </div>
@@ -1620,6 +1621,7 @@
         <label class="rck"><input type="checkbox" id="dpAtfCounts" checked> Z&#228;hlt als Arbeitszeit</label>
         <label class="rck"><input type="checkbox" id="dpAtfApproval"> Genehmigung erforderlich</label>
       </div>
+      <div class="fg" style="margin-top:8px"><label>G&#252;ltig ab (leer = immer)</label><input type="date" id="dpAtfValidFrom"></div>
     </div>
     <div class="mf"><button class="btn" onclick="submitDpAbsenceTypeForm()">&#10003; Speichern</button></div>
   </div>
@@ -1628,10 +1630,14 @@
 <!-- DP: Mitarbeiter-Parameter Form -->
 <div class="ov" id="dpEmpParamFormOv">
   <div class="modal sm">
-    <div class="mh"><h2>Mitarbeiter-Parameter</h2><button class="mc" onclick="closeModal('dpEmpParamFormOv')">&#10005;</button></div>
+    <div class="mh"><h2>Mitarbeiter-Parameter</h2><button class="mc" onclick="document.getElementById('dpEpfEmp').disabled=false;closeModal('dpEmpParamFormOv')">&#10005;</button></div>
     <div class="mb2">
       <input type="hidden" id="dpEpfEmpId">
+      <input type="hidden" id="dpEpfParamId">
       <div class="fg"><label>Mitarbeiter</label><select id="dpEpfEmp" onchange="document.getElementById('dpEpfEmpId').value=this.value"></select></div>
+      <div class="fg"><label>G&#252;ltig ab (leer = immer)</label><input type="date" id="dpEpfValidFrom">
+        <small style="color:var(--mu);font-size:11px">Ab diesem Datum gilt diese Konfiguration (z.B. nach Stundenreduzierung)</small>
+      </div>
       <div class="fg"><label>Monatsstunden (Soll)</label><input type="number" id="dpEpfMonthly" value="160" step="1" min="10" max="300" placeholder="z.B. 160">
         <small style="color:var(--mu);font-size:11px">Durchschnittliche Sollstunden pro Monat (Vollzeit ≈ 173h)</small></div>
       <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:4px">
@@ -1697,6 +1703,7 @@
       </div>
       <div class="fg" id="dpRfDateWrap" style="display:none"><label>Datum</label><input type="date" id="dpRfDate"></div>
       <div class="fg"><label>Anzahl Slots</label><input type="number" id="dpRfSlots" value="1" min="0" max="20"></div>
+      <div class="fg"><label>G&#252;ltig ab (leer = immer)</label><input type="date" id="dpRfValidFrom"></div>
     </div>
     <div class="mf"><button class="btn" onclick="submitDpReqForm()">&#10003; Speichern</button></div>
   </div>

@@ -4304,22 +4304,43 @@ async function renderDPConfigEmpParams() {
   let empParams = [];
   try { empParams = await api('GET', '/dp/employee-params'); } catch(e) {}
   S.dpEmpParams = empParams;
+  window.dpEmpParamsAll = empParams;
 
   const rows = S.users.map(u => {
-    const p = empParams.find(x=>x.employee_id===u.id);
-    if (!p) {
-      return `<div class="dp-cfg-row">
+    const userParams = empParams.filter(x=>x.employee_id===u.id)
+      .sort((a,b) => {
+        if (a.valid_from===null&&b.valid_from===null) return 0;
+        if (a.valid_from===null) return -1;
+        if (b.valid_from===null) return 1;
+        return String(b.valid_from).localeCompare(String(a.valid_from));
+      });
+    if (!userParams.length) {
+      return `<div class="dp-cfg-row" style="flex-wrap:wrap;gap:6px;align-items:center">
         <span class="av-sm" style="background:${u.color}">${esc(u.initials)}</span>
         <span class="dp-cfg-label">${esc(u.name)}</span>
         <span style="font-size:11px;color:var(--mu)">Nicht konfiguriert</span>
-        <button class="btn-s" onclick="openDpEmpParamForm('${u.id}')">+ Einrichten</button>
+        <button class="btn-s" onclick="openDpEmpParamFormNew('${u.id}')">+ Einrichten</button>
       </div>`;
     }
-    return `<div class="dp-cfg-row">
-      <span class="av-sm" style="background:${u.color}">${esc(u.initials)}</span>
-      <span class="dp-cfg-label">${esc(u.name)}</span>
-      <span style="font-size:11px;color:var(--mu)">${p.monthly_hours||Math.round(p.weekly_hours*4.33)}h/Mo${p.office_pct?' 🏢'+p.office_pct+'%':''}${p.can_do_nights?' 🌙':''}${p.is_springer?' 🔄':''}${p.fd_springer_type==='FD_to_LS'?' 🚑A-'+p.fd_springer_location:''}${p.fd_springer_type==='LS_to_FD'?' 🚑B-'+p.fd_springer_location:''}</span>
-      <button class="btn-s" onclick="openDpEmpParamForm('${u.id}')">✏️</button>
+    const versionRows = userParams.map((p,idx) => {
+      const vfBadge = p.valid_from
+        ? `<span style="background:#3b6dd422;color:var(--acc);border-radius:12px;padding:1px 8px;font-size:11px;font-weight:600">ab ${String(p.valid_from).slice(0,10)}</span>`
+        : `<span style="background:#10b98122;color:#10b981;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:600">Standard</span>`;
+      const canDelete = userParams.length > 1;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0 4px 28px;flex-wrap:wrap">
+        ${vfBadge}
+        <span style="font-size:11px;color:var(--mu)">${p.monthly_hours||Math.round(p.weekly_hours*4.33)}h/Mo${p.office_pct?' 🏢'+p.office_pct+'%':''}${p.can_do_nights?' 🌙':''}${p.is_springer?' 🔄':''}${p.fd_springer_type==='FD_to_LS'?' 🚑A-'+p.fd_springer_location:''}${p.fd_springer_type==='LS_to_FD'?' 🚑B-'+p.fd_springer_location:''}</span>
+        <button class="btn-s" onclick="openDpEmpParamForm('${p.id}')">✏️</button>
+        ${canDelete?`<button class="btn-s" style="color:#ef4444" onclick="deleteDpEmpParam('${p.id}')">✕</button>`:''}
+      </div>`;
+    }).join('');
+    return `<div class="dp-cfg-row" style="flex-direction:column;align-items:flex-start;gap:2px">
+      <div style="display:flex;align-items:center;gap:8px;width:100%">
+        <span class="av-sm" style="background:${u.color}">${esc(u.initials)}</span>
+        <span class="dp-cfg-label">${esc(u.name)}</span>
+        <button class="btn-s" style="margin-left:auto;font-size:11px" onclick="openDpEmpParamFormNew('${u.id}')">+ Neue Version</button>
+      </div>
+      ${versionRows}
     </div>`;
   }).join('');
 
@@ -4340,7 +4361,7 @@ async function renderDPConfigRequirements() {
     return `<div class="dp-cfg-row">
       <span class="dp-color-dot" style="background:${st?.color||'#ccc'}"></span>
       <span class="dp-cfg-label">${esc(st?.name||r.shift_type_id)}</span>
-      <span style="font-size:11px;color:var(--mu)">${appliesLabel[r.applies_to]||r.applies_to}${wd}${r.specific_date?' '+String(r.specific_date).slice(0,10):''}: ${r.slot_count} Slot(s)</span>
+      <span style="font-size:11px;color:var(--mu)">${appliesLabel[r.applies_to]||r.applies_to}${wd}${r.specific_date?' '+String(r.specific_date).slice(0,10):''}: ${r.slot_count} Slot(s)${r.valid_from?' (ab '+String(r.valid_from).slice(0,10)+')':''}</span>
       <button class="btn-s" onclick="openDpReqForm(window.dpReqs.find(x=>x.id==='${r.id}'))">✏️</button>
       <button class="btn-s" style="color:#ef4444" onclick="deleteDpRequirement('${r.id}')">✕</button>
     </div>`;
@@ -4486,7 +4507,9 @@ async function toggleDpQualification(empId, shiftTypeId, currentlyHas) {
     if (currentlyHas) {
       await api('DELETE', `/dp/employee-qualifications/${empId}/${shiftTypeId}`);
     } else {
-      await api('POST', '/dp/employee-qualifications', {employeeId:empId, shiftTypeId});
+      const dateStr = prompt('Gültig ab? (leer = immer, Format: JJJJ-MM-TT)', '');
+      if (dateStr === null) return; // user cancelled
+      await api('POST', '/dp/employee-qualifications', {employeeId:empId, shiftTypeId, validFrom: dateStr||null});
     }
     S._dpConfigTab = 'qualifications';
     renderDPConfig();
@@ -4508,6 +4531,7 @@ function openDpShiftTypeForm(id) {
   document.getElementById('dpStfZulage').checked = !!st?.is_zulage;
   document.getElementById('dpStfOffice').checked = !!st?.is_office;
   document.getElementById('dpStfColor').value = st?.color||'#3b6dd4';
+  document.getElementById('dpStfValidFrom').value = st?.valid_from ? String(st.valid_from).slice(0,10) : '';
   openModal('dpShiftTypeFormOv');
 }
 
@@ -4525,6 +4549,7 @@ async function submitDpShiftTypeForm() {
     isZulage: document.getElementById('dpStfZulage').checked,
     isOffice: document.getElementById('dpStfOffice').checked,
     color: document.getElementById('dpStfColor').value,
+    validFrom: document.getElementById('dpStfValidFrom').value||null,
   };
   if (!body.name||!body.code) return toast('Name und Code erforderlich','err');
   try {
@@ -4562,6 +4587,7 @@ function openDpAbsenceTypeForm(id) {
   document.getElementById('dpAtfReopens').checked = at?.reopens_shift!==false;
   document.getElementById('dpAtfCounts').checked = at?.counts_as_worked!==false;
   document.getElementById('dpAtfApproval').checked = !!at?.requires_approval;
+  document.getElementById('dpAtfValidFrom').value = at?.valid_from ? String(at.valid_from).slice(0,10) : '';
   document.getElementById('dpAtfHoursCalc').onchange = function() {
     document.getElementById('dpAtfFixedWrap').style.display = this.value==='fixed' ? '' : 'none';
   };
@@ -4582,6 +4608,7 @@ async function submitDpAbsenceTypeForm() {
     reopensShift: document.getElementById('dpAtfReopens').checked,
     countsAsWorked: document.getElementById('dpAtfCounts').checked,
     requiresApproval: document.getElementById('dpAtfApproval').checked,
+    validFrom: document.getElementById('dpAtfValidFrom').value||null,
   };
   if (!body.code||!body.label) return toast('Code und Bezeichnung erforderlich','err');
   try {
@@ -4618,22 +4645,56 @@ function dpEpfFdTypeChange() {
   document.getElementById('dpEpfFdDetails').style.display = val ? '' : 'none';
 }
 
-function openDpEmpParamForm(empId) {
-  const p = S.dpEmpParams?.find(x=>x.employee_id===empId);
+function openDpEmpParamForm(paramId) {
+  const p = (window.dpEmpParamsAll||S.dpEmpParams||[]).find(x=>x.id===paramId);
+  if (!p) return toast('Parameter nicht gefunden','err');
+  const empId = p.employee_id;
   const empSel = document.getElementById('dpEpfEmp');
   empSel.innerHTML = S.users.map(u=>`<option value="${u.id}"${u.id===empId?' selected':''}>${esc(u.name)}</option>`).join('');
-  document.getElementById('dpEpfEmpId').value = empId||'';
-  document.getElementById('dpEpfMonthly').value = p?.monthly_hours || (p?.weekly_hours ? Math.round(p.weekly_hours*4.33) : 160);
-  document.getElementById('dpEpfNights').checked = p ? !!p.can_do_nights : true;
-  document.getElementById('dpEpfDoubleNights').checked = p ? !!p.double_nights_allowed : true;
-  document.getElementById('dpEpfSpringer').checked = !!p?.is_springer;
-  document.getElementById('dpEpfMaxNights').value = p?.max_nights_per_month||'';
-  document.getElementById('dpEpfOfficePct').value = p?.office_pct||0;
-  const hasFdSpringer = !!p?.fd_springer_type;
-  document.getElementById('dpEpfFdSpringerSection').style.display = p?.is_springer ? '' : 'none';
-  document.getElementById('dpEpfFdType').value = p?.fd_springer_type||'';
-  document.getElementById('dpEpfFdLocation').value = p?.fd_springer_location||'Nord';
-  document.getElementById('dpEpfFdShifts').value = p?.fd_springer_shifts_per_month||'';
+  empSel.disabled = true;
+  document.getElementById('dpEpfEmpId').value = empId;
+  document.getElementById('dpEpfParamId').value = p.id;
+  document.getElementById('dpEpfValidFrom').value = p.valid_from ? String(p.valid_from).slice(0,10) : '';
+  document.getElementById('dpEpfMonthly').value = p.monthly_hours || (p.weekly_hours ? Math.round(p.weekly_hours*4.33) : 160);
+  document.getElementById('dpEpfNights').checked = !!p.can_do_nights;
+  document.getElementById('dpEpfDoubleNights').checked = !!p.double_nights_allowed;
+  document.getElementById('dpEpfSpringer').checked = !!p.is_springer;
+  document.getElementById('dpEpfMaxNights').value = p.max_nights_per_month||'';
+  document.getElementById('dpEpfOfficePct').value = p.office_pct||0;
+  const hasFdSpringer = !!p.fd_springer_type;
+  document.getElementById('dpEpfFdSpringerSection').style.display = p.is_springer ? '' : 'none';
+  document.getElementById('dpEpfFdType').value = p.fd_springer_type||'';
+  document.getElementById('dpEpfFdLocation').value = p.fd_springer_location||'Nord';
+  document.getElementById('dpEpfFdShifts').value = p.fd_springer_shifts_per_month||'';
+  document.getElementById('dpEpfFdDetails').style.display = hasFdSpringer ? '' : 'none';
+  openModal('dpEmpParamFormOv');
+}
+
+function openDpEmpParamFormNew(empId) {
+  // Pre-fill with latest existing config for this employee as starting point
+  const allParams = (window.dpEmpParamsAll||S.dpEmpParams||[]).filter(x=>x.employee_id===empId);
+  const latest = allParams.sort((a,b)=>{
+    if (a.valid_from===null) return -1;
+    if (b.valid_from===null) return 1;
+    return String(b.valid_from).localeCompare(String(a.valid_from));
+  })[0] || null;
+  const empSel = document.getElementById('dpEpfEmp');
+  empSel.innerHTML = S.users.map(u=>`<option value="${u.id}"${u.id===empId?' selected':''}>${esc(u.name)}</option>`).join('');
+  empSel.disabled = true;
+  document.getElementById('dpEpfEmpId').value = empId;
+  document.getElementById('dpEpfParamId').value = '';
+  document.getElementById('dpEpfValidFrom').value = '';
+  document.getElementById('dpEpfMonthly').value = latest?.monthly_hours || (latest?.weekly_hours ? Math.round(latest.weekly_hours*4.33) : 160);
+  document.getElementById('dpEpfNights').checked = latest ? !!latest.can_do_nights : true;
+  document.getElementById('dpEpfDoubleNights').checked = latest ? !!latest.double_nights_allowed : true;
+  document.getElementById('dpEpfSpringer').checked = !!latest?.is_springer;
+  document.getElementById('dpEpfMaxNights').value = latest?.max_nights_per_month||'';
+  document.getElementById('dpEpfOfficePct').value = latest?.office_pct||0;
+  const hasFdSpringer = !!latest?.fd_springer_type;
+  document.getElementById('dpEpfFdSpringerSection').style.display = latest?.is_springer ? '' : 'none';
+  document.getElementById('dpEpfFdType').value = latest?.fd_springer_type||'';
+  document.getElementById('dpEpfFdLocation').value = latest?.fd_springer_location||'Nord';
+  document.getElementById('dpEpfFdShifts').value = latest?.fd_springer_shifts_per_month||'';
   document.getElementById('dpEpfFdDetails').style.display = hasFdSpringer ? '' : 'none';
   openModal('dpEmpParamFormOv');
 }
@@ -4645,6 +4706,7 @@ async function submitDpEmpParamForm() {
   const fdType = isSpringer ? (document.getElementById('dpEpfFdType').value||null) : null;
   const body = {
     employeeId: empId,
+    validFrom: document.getElementById('dpEpfValidFrom').value||null,
     monthlyHours: parseFloat(document.getElementById('dpEpfMonthly').value)||160,
     canDoNights: document.getElementById('dpEpfNights').checked,
     doubleNightsAllowed: document.getElementById('dpEpfDoubleNights').checked,
@@ -4658,8 +4720,18 @@ async function submitDpEmpParamForm() {
   try {
     await api('POST', '/dp/employee-params', body);
     closeModal('dpEmpParamFormOv');
+    document.getElementById('dpEpfEmp').disabled = false;
     renderDPConfig();
     toast('Gespeichert');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+async function deleteDpEmpParam(id) {
+  if (!confirm('Diese Parameterversion löschen?')) return;
+  try {
+    await api('DELETE', '/dp/employee-params/'+id);
+    renderDPConfig();
+    toast('Gelöscht');
   } catch(e) { toast('Fehler: '+e.message,'err'); }
 }
 
@@ -4673,6 +4745,7 @@ function openDpReqForm(req) {
   const specDate = req?.specific_date ? String(req.specific_date).slice(0,10) : '';
   document.getElementById('dpRfDate').value = specDate;
   document.getElementById('dpRfSlots').value = req?.slot_count||1;
+  document.getElementById('dpRfValidFrom').value = req?.valid_from ? String(req.valid_from).slice(0,10) : '';
   onDpRfTypeChange();
   openModal('dpReqFormOv');
 }
@@ -4692,6 +4765,7 @@ async function submitDpReqForm() {
     weekday: appliesTo==='weekday' ? (document.getElementById('dpRfWeekday').value ? parseInt(document.getElementById('dpRfWeekday').value) : null) : null,
     specificDate: appliesTo==='date' ? document.getElementById('dpRfDate').value : null,
     slotCount: parseInt(document.getElementById('dpRfSlots').value)||1,
+    validFrom: document.getElementById('dpRfValidFrom').value||null,
   };
   if (!body.shiftTypeId) return toast('Schichttyp erforderlich','err');
   try {

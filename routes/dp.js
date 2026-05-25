@@ -192,13 +192,20 @@ router.get('/employee-qualifications', auth, async (req,res) => {
 
 router.post('/employee-qualifications', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
-  const {employeeId, shiftTypeId} = req.body;
+  const {employeeId, shiftTypeId, validFrom} = req.body;
   if (!employeeId||!shiftTypeId) return bad(res,'Pflichtfelder fehlen',400);
+  const vf = validFrom || null;
   try {
+    let existing;
+    if (vf === null) {
+      existing = await q1('SELECT id FROM dp_employee_qualifications WHERE employee_id=$1 AND shift_type_id=$2 AND valid_from IS NULL',[employeeId,shiftTypeId]);
+    } else {
+      existing = await q1('SELECT id FROM dp_employee_qualifications WHERE employee_id=$1 AND shift_type_id=$2 AND valid_from=$3::date',[employeeId,shiftTypeId,vf]);
+    }
+    if (existing) return ok(res,existing);
     const row = await q1(
-      `INSERT INTO dp_employee_qualifications (id,employee_id,shift_type_id,created_by) VALUES ($1,$2,$3,$4)
-       ON CONFLICT (employee_id,shift_type_id) DO NOTHING RETURNING *`,
-      [newId(),employeeId,shiftTypeId,req.uid]
+      `INSERT INTO dp_employee_qualifications (id,employee_id,shift_type_id,valid_from,created_by) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [newId(),employeeId,shiftTypeId,vf,req.uid]
     );
     ok(res, row||{employeeId,shiftTypeId});
   } catch(e) { bad(res,'Serverfehler',500); }
@@ -504,14 +511,15 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
     // Delete previously auto-generated assignments (keep manual + locked ones)
     await q(`DELETE FROM dp_assignments WHERE plan_id=$1 AND source='generated' AND is_locked=false`,[req.params.id]);
 
+    const planStartDate = `${plan.year}-${String(plan.month).padStart(2,'0')}-01`;
     const [shiftTypes,requirements,empParams,existingAssignments,wishDays,absenceTypes,qualifications] = await Promise.all([
-      q('SELECT * FROM dp_shift_types ORDER BY sort_order'),
-      q('SELECT * FROM dp_shift_requirements'),
-      q('SELECT * FROM dp_employee_params'),
+      q('SELECT * FROM dp_shift_types WHERE valid_from IS NULL OR valid_from <= $1 ORDER BY sort_order',[planStartDate]),
+      q(`SELECT DISTINCT ON (shift_type_id, applies_to, COALESCE(weekday::text,'x'), COALESCE(specific_date::text,'x')) * FROM dp_shift_requirements WHERE valid_from IS NULL OR valid_from <= $1 ORDER BY shift_type_id, applies_to, COALESCE(weekday::text,'x'), COALESCE(specific_date::text,'x'), valid_from DESC NULLS LAST`,[planStartDate]),
+      q(`SELECT DISTINCT ON (employee_id) * FROM dp_employee_params WHERE valid_from IS NULL OR valid_from <= $1 ORDER BY employee_id, valid_from DESC NULLS LAST`,[planStartDate]),
       q(`SELECT * FROM dp_assignments WHERE plan_id=$1`,[req.params.id]),
       q('SELECT * FROM dp_wish_days WHERE month=$1 AND year=$2',[plan.month,plan.year]),
-      q('SELECT * FROM dp_absence_types'),
-      q('SELECT * FROM dp_employee_qualifications'),
+      q('SELECT * FROM dp_absence_types WHERE valid_from IS NULL OR valid_from <= $1 ORDER BY sort_order, label',[planStartDate]),
+      q(`SELECT DISTINCT ON (employee_id, shift_type_id) * FROM dp_employee_qualifications WHERE valid_from IS NULL OR valid_from <= $1 ORDER BY employee_id, shift_type_id, valid_from DESC NULLS LAST`,[planStartDate]),
     ]);
 
     const daysInMonth = new Date(plan.year, plan.month, 0).getDate();
