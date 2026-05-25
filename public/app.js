@@ -56,7 +56,7 @@ let S={
   dpPlans:[], dpShiftTypes:[], dpAbsenceTypes:[], dpEmpParams:[], dpQualifications:[], dpShiftPrefs:[], dpProtocol:[],
   todos:[], _selTodo:null,
   _dpPlanId:null, _dpMatrix:null, _dpStatsExpanded:false, _dpConfigTab:'shift-types',
-  _dpQualLocalChanges:{}, _dpQualLocalPrefsChanges:{},
+  _dpQualLocalChanges:{}, _dpQualLocalPrefsChanges:{}, _dpQualWeightsExpanded:{},
 };
 async function api(method,path2,body){
   const opts={method,credentials:'include',headers:{}};
@@ -4530,8 +4530,8 @@ async function renderDPConfigQualifications() {
       </span>`;
     }).join(' ');
 
-    // Weights table HTML
-    const weightsRows = shiftTypes.map(st => {
+    // Weights table HTML - only for selected shifts
+    const weightsRows = shiftTypes.filter(st => currentQuals.has(st.id)).map(st => {
       const currentWeight = localPrefs[st.id] !== undefined ? localPrefs[st.id] : (empPrefs[st.id] || 0);
       const changed = localPrefs[st.id] !== undefined && localPrefs[st.id] !== (empPrefs[st.id] || 0);
       return `<div style="display:grid;grid-template-columns:100px 1fr 60px;gap:8px;align-items:center;font-size:13px;padding:4px 0${changed?';background:var(--acc20)':''}">
@@ -4540,6 +4540,18 @@ async function renderDPConfigQualifications() {
         <span style="text-align:right;min-width:35px">${currentWeight}%</span>
       </div>`;
     }).join('');
+
+    const isWeightsExpanded = S._dpQualWeightsExpanded[empId] || false;
+    const weightsSection = currentQuals.size > 0 ? `
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+        <button class="btn-s" onclick="toggleQualWeights('${empId}')" style="background:var(--bg);color:var(--fg);border:1px solid var(--border);font-size:12px">
+          ${isWeightsExpanded ? '▼ Gewichtungen' : '▶ Gewichtungen'}
+        </button>
+      </div>
+      ${isWeightsExpanded ? `<div style="background:var(--bg);padding:8px;border-radius:4px;margin-top:8px">
+        ${weightsRows}
+      </div>` : ''}
+    ` : '';
 
     // Changes detected?
     const hasChanges = localChanges.adds.size > 0 || localChanges.removes.size > 0 || Object.keys(localPrefs).length > 0;
@@ -4551,9 +4563,7 @@ async function renderDPConfigQualifications() {
         <span style="font-size:11px;color:var(--mu);background:var(--bg);padding:2px 6px;border-radius:3px">Standard</span>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px">${chips}</div>
-      <div style="background:var(--bg);padding:8px;border-radius:4px;margin-top:8px">
-        ${weightsRows}
-      </div>
+      ${weightsSection}
       ${hasChanges?`<div style="display:flex;gap:8px;margin-top:12px">
         <button class="btn-s" onclick="submitQualChanges('${empId}',null)">✓ Speichern</button>
         <button class="btn-s" style="background:var(--acc);color:white" onclick="openNewQualVersionDialog('${empId}')">+ Neue Version ab...</button>
@@ -4636,6 +4646,11 @@ async function openNewQualVersionDialog(empId) {
   const dateStr = prompt('Neue Version gültig ab (Format: JJJJ-MM-TT):', '');
   if (!dateStr) return;
   await submitQualChanges(empId, dateStr);
+}
+
+function toggleQualWeights(empId) {
+  S._dpQualWeightsExpanded[empId] = !S._dpQualWeightsExpanded[empId];
+  renderDPConfigTab();
 }
 
 function openDpShiftTypeForm(id) {
