@@ -1979,6 +1979,7 @@ function openUF(id){
   const u=id?getU(id):null;
   document.getElementById('ufT').textContent=u?'Benutzer bearbeiten':'Benutzer anlegen';
   document.getElementById('ufId').value=u?.id||'';document.getElementById('ufNm').value=u?.name||'';document.getElementById('ufIn').value=u?.initials||'';
+  document.getElementById('uffCategory').value=u?.category||'';
   document.getElementById('ufPWRR').style.display=u?'block':'none';document.getElementById('ufPWRst').checked=false;
   document.getElementById('ufErr').textContent='';S.ufColor=u?.color||pal()[0];
   document.getElementById('ufRoles').innerHTML=ROLES.map(r=>`<label class="rck"><input type="checkbox" value="${r.id}" ${(u?.roles||['standard']).includes(r.id)?'checked':''}><span>${r.icon} ${r.label}</span></label>`).join('');
@@ -1986,14 +1987,15 @@ function openUF(id){
 }
 async function saveUser(){
   const name=document.getElementById('ufNm').value.trim(),initials=document.getElementById('ufIn').value.trim().toUpperCase();
+  const category=document.getElementById('uffCategory').value.trim()||null;
   const errEl=document.getElementById('ufErr');errEl.textContent='';
   if(!name||!initials){errEl.textContent='\u26A0\uFE0F Name und K\u00fcrzel erforderlich!';return;}
   const roles=Array.from(document.querySelectorAll('#ufRoles input:checked')).map(cb=>cb.value);
   if(!roles.length){errEl.textContent='\u26A0\uFE0F Mindestens eine Rolle!';return;}
   const id=document.getElementById('ufId').value;loading(true);
   try{
-    if(id)await api('PUT','/users/'+id,{name,initials,roles,color:S.ufColor,resetPassword:document.getElementById('ufPWRst').checked});
-    else await api('POST','/users',{name,initials,roles,color:S.ufColor});
+    if(id)await api('PUT','/users/'+id,{name,initials,roles,color:S.ufColor,resetPassword:document.getElementById('ufPWRst').checked,category});
+    else await api('POST','/users',{name,initials,roles,color:S.ufColor,category});
     await fetchData();loadLoginUsers();backToAdmin('users');toast('\u2705 Benutzer gespeichert!');
   }catch(e){errEl.textContent='\u26A0\uFE0F '+e.message;}finally{loading(false);}
 }
@@ -2010,7 +2012,7 @@ function openModal(id){document.getElementById(id)?.classList.add('open');}
 function closeModal(id){document.getElementById(id)?.classList.remove('open');}
 function eyeToggle(inputId,btn){const inp=document.getElementById(inputId);const show=inp.type==='password';inp.type=show?'text':'password';btn.textContent=show?'\uD83D\uDE48':'\uD83D\uDC41';}
 function toast(msg,type='',dur=3200){const t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),dur);}
-const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOr','clFormOv','attachClOv','changelogOv','dpOv','rejectEinspOv','helpOv','msgFormOv','msgDetOv','gSearchOv','stLoginOv','docFormOv','docVerOv','docHistOv','docCatOv'];
+const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOr','clFormOv','attachClOv','changelogOv','dpOv','rejectEinspOv','helpOv','msgFormOv','msgDetOv','gSearchOv','stLoginOv','docFormOv','docVerOv','docHistOv','docCatOv','dpReportModal'];
 document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();openGSearch();return;}
   if(e.key==='Escape'){ALL_MODALS.forEach(closeModal);closeGSearch();}
@@ -4197,6 +4199,36 @@ async function generateDpPlan(planId) {
     const res = await api('POST', '/dp/plans/'+planId+'/generate');
     loading(false);
     toast(`Generiert: ${res.generated} Dienste (${res.violations} Wunschtag-Konflikte)`);
+
+    // Report anzeigen
+    if (res.report) {
+      let reportHtml = `<div style="max-height:60vh;overflow-y:auto;padding:12px;background:var(--sf2);border-radius:6px">
+        <h4>📋 Generierungs-Report</h4>`;
+
+      reportHtml += `<h5 style="margin-top:12px;color:var(--fg)">✅ Dienstplanregeln:</h5>`;
+      for (const rule of res.report.dienstplanRegeln) {
+        const icon = rule.status === 'OK' ? '✓' : (rule.status === 'WARNUNG' ? '⚠️' : '✗');
+        reportHtml += `<div style="padding:4px 0;font-size:12px"><span>${icon}</span> <strong>${rule.regel}:</strong> ${rule.details}</div>`;
+      }
+
+      reportHtml += `<h5 style="margin-top:12px;color:var(--fg)">📋 Gesetzliche Regeln:</h5>`;
+      for (const rule of res.report.gesetzlicheRegeln) {
+        const icon = rule.status === 'OK' ? '✓' : (rule.status === 'WARNUNG' ? '⚠️' : '✗');
+        reportHtml += `<div style="padding:4px 0;font-size:12px"><span>${icon}</span> <strong>${rule.regel}:</strong> ${rule.details}</div>`;
+      }
+
+      if (res.report.fehler.length > 0) {
+        reportHtml += `<h5 style="margin-top:12px;color:#f59e0b">⚠️ Fehler/Warnungen:</h5>`;
+        for (const err of res.report.fehler) {
+          reportHtml += `<div style="padding:4px 0;font-size:12px">❌ <strong>${err.kategorie}:</strong> ${err.details}</div>`;
+        }
+      }
+
+      reportHtml += `</div>`;
+      document.getElementById('dpReportContent').innerHTML = reportHtml;
+      openModal('dpReportModal');
+    }
+
     const data = await api('GET', '/dp/plans/'+planId+'/matrix');
     S._dpMatrix = data;
     renderDPMatrix(data);

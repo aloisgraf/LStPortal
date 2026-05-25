@@ -507,6 +507,8 @@ async function initDB() {
     `CREATE UNIQUE INDEX IF NOT EXISTS dp_qual_date_vf ON dp_employee_qualifications(employee_id, shift_type_id, valid_from) WHERE valid_from IS NOT NULL`,
     `ALTER TABLE dp_shift_types ADD COLUMN IF NOT EXISTS valid_until DATE DEFAULT NULL`,
     `ALTER TABLE dp_shift_types ADD COLUMN IF NOT EXISTS max_per_emp_per_month INTEGER DEFAULT NULL`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS category TEXT DEFAULT NULL`,
+    `ALTER TABLE dp_plans ADD COLUMN IF NOT EXISTS generation_report JSONB DEFAULT NULL`,
     `CREATE TABLE IF NOT EXISTS dp_shift_preferences (
       id TEXT PRIMARY KEY,
       employee_id TEXT NOT NULL,

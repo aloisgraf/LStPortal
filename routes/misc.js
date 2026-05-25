@@ -158,11 +158,11 @@ router.delete('/tags/:id', auth, adminOnly, async (req,res) => {
 });
 router.post('/users', auth, adminOnly, async (req,res) => {
   try {
-    const {name,initials,roles,color}=req.body;
+    const {name,initials,roles,color,category}=req.body;
     if (!name?.trim()||!initials?.trim()) return bad(res,'Name und Kürzel erforderlich');
     const id=newId(), hash=await bcrypt.hash('Passwort1',10);
-    await pool.query('INSERT INTO users (id,name,initials,roles,color,pw_hash,must_change_pw) VALUES ($1,$2,$3,$4,$5,$6,true)',
-      [id,name.trim(),initials.trim().toUpperCase(),JSON.stringify(roles||['standard']),color||'#64748b',hash]);
+    await pool.query('INSERT INTO users (id,name,initials,roles,color,pw_hash,must_change_pw,category) VALUES ($1,$2,$3,$4,$5,$6,true,$7)',
+      [id,name.trim(),initials.trim().toUpperCase(),JSON.stringify(roles||['standard']),color||'#64748b',hash,category||null]);
     ok(res,{id});
   } catch(e) { bad(res,'Serverfehler',500); }
 });
@@ -175,10 +175,10 @@ router.put('/users/:id', auth, async (req,res) => {
       await pool.query('UPDATE users SET color=$1 WHERE id=$2',[req.body.color||'#64748b',req.params.id]);
       return ok(res);
     }
-    const {name,initials,roles,color,resetPassword}=req.body;
+    const {name,initials,roles,color,resetPassword,category}=req.body;
     if (!name?.trim()||!initials?.trim()) return bad(res,'Name und Kürzel erforderlich');
-    await pool.query('UPDATE users SET name=$1,initials=$2,roles=$3,color=$4 WHERE id=$5',
-      [name.trim(),initials.trim().toUpperCase(),JSON.stringify(roles||['standard']),color||'#64748b',req.params.id]);
+    await pool.query('UPDATE users SET name=$1,initials=$2,roles=$3,color=$4,category=$5 WHERE id=$6',
+      [name.trim(),initials.trim().toUpperCase(),JSON.stringify(roles||['standard']),color||'#64748b',category||null,req.params.id]);
     if (resetPassword) await pool.query('UPDATE users SET pw_hash=$1,must_change_pw=true WHERE id=$2',
       [await bcrypt.hash('Passwort1',10),req.params.id]);
     ok(res);
