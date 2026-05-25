@@ -572,6 +572,11 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
     const daysInMonth = new Date(plan.year, plan.month, 0).getDate();
     const AT_HOLIDAYS = getAustrianHolidays(plan.year);
 
+    // Anzahl Feiertage dieses Monats für Überstunden-Toleranz
+    const monthHolidayCount = Object.keys(AT_HOLIDAYS).filter(d =>
+      d.startsWith(`${plan.year}-${String(plan.month).padStart(2,'0')}`)
+    ).length;
+
     // Build qualification maps:
     // empQualMap: empId -> Set of shiftTypeIds the employee is qualified for
     // An employee with zero qualifications cannot be auto-scheduled at all.
@@ -627,6 +632,8 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
         nightsAssigned: 0,
         weekendsAssigned: 0,
         weeklyHours: {},
+        shiftTypeCount: {}, // stId -> Anzahl zugewiesener Dienste dieses Typs (für proportionale Gewichtung)
+        totalShiftsAssigned: 0,
         assignments: existingAssignments.filter(a=>a.employee_id===p.employee_id).map(a=>({
           ...a, date: a.date?.toString().slice(0,10),
           shiftType: shiftTypes.find(s=>s.id===a.shift_type_id)||null,
@@ -748,8 +755,8 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
             { reasons[empId]='cannot_do_nights'; continue; }
 
           // Hard: max nights per month (never relax this)
-          if (slot.shiftType.is_night && params.max_nights_per_month!==null &&
-              state.nightsAssigned >= params.max_nights_per_month)
+          const maxNightsAllowed = params.max_nights_per_month !== null ? params.max_nights_per_month : 6;
+          if (slot.shiftType.is_night && state.nightsAssigned >= maxNightsAllowed)
             { reasons[empId]='nights_max_exceeded'; continue; }
 
           // Hard: consecutive nights restriction
@@ -789,22 +796,46 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
           }
 
           const isWishDay = wishSet.has(`${empId}_${slot.date}`);
-          let score = -(state.monthlyTarget - state.hoursAssigned);
-          if (slot.shiftType.is_night) score += state.nightsAssigned * 50;
-          if (slot.isWeekend || slot.isHoliday) score += state.weekendsAssigned * 30;
+
+          // ── SCORING: Ziel ist gleichmäßig niedrige Überstunden für alle Mitarbeiter ──
+          // Basis: Fill-Rate (0% bis 100%) → niedriger = bevorzugt
+          const fillRatio = state.hoursAssigned / (state.monthlyTarget || 160);
+          let score = fillRatio * 100;
+
+          // Überstunden stark bestrafen – damit alle in etwa gleich viele OT haben
+          const overtimeNow = Math.max(0, state.hoursAssigned - state.monthlyTarget);
+          if (overtimeNow > 0) score += overtimeNow * 50;
+
+          // Nächte und Wochenenden equalisieren
+          if (slot.shiftType.is_night) score += state.nightsAssigned * 20;
+          if (slot.isWeekend || slot.isHoliday) score += state.weekendsAssigned * 20;
+
+          // Wunschtag (schlechter Score = will nicht arbeiten)
           if (isWishDay) score += 10000;
 
-          // FD-Springer Typ B: strongly prefer FD slots until quota reached
+          // FD-Springer Typ B: FD-Slots stark bevorzugen bis Quote erreicht
           if (params.fd_springer_type === 'LS_to_FD' && slot.shiftType.code === 'FD') {
             const quota = parseInt(params.fd_springer_shifts_per_month)||0;
-            const deficit = quota - state.fdSpringerShiftsAssigned;
-            score -= Math.max(0, deficit) * 200; // highest priority for FD until quota
+            score -= Math.max(0, quota - state.fdSpringerShiftsAssigned) * 200;
           }
 
-          // Shift preference weighting
-          const pref = shiftPrefMap[empId]?.[slot.shiftTypeId];
-          if (pref !== undefined && pref > 0) {
-            score -= (pref || 50) * 0.5; // higher preference = lower score (better candidate)
+          // ── Proportionale Dienst-Gewichtung ──
+          // Wenn MA Gewichtungen hat: Score-Bonus für unterfüllte Dienste
+          const empPrefs = shiftPrefMap[empId];
+          if (empPrefs && Object.keys(empPrefs).length > 0) {
+            const totalPrefWeight = Object.values(empPrefs).reduce((s, v) => s + v, 0) || 100;
+            const pref = empPrefs[slot.shiftTypeId];
+            if (pref !== undefined) {
+              const targetRatio = pref / totalPrefWeight;
+              const total = state.totalShiftsAssigned;
+              const currentCount = state.shiftTypeCount[slot.shiftTypeId] || 0;
+              const currentRatio = total > 0 ? currentCount / total : 0;
+              // Je mehr dieser Dienst unterfüllt ist (Soll > Ist), desto besser der Score
+              score -= (targetRatio - currentRatio) * 300;
+            } else {
+              // Kein Gewichtungseintrag für diesen Dienst → leicht benachteiligen
+              score += 30;
+            }
           }
 
           cands.push({empId, score});
@@ -864,6 +895,28 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
         state.fdSpringerShiftsAssigned++;
       if (slot.isWeekend||slot.isHoliday) state.weekendsAssigned++;
       state.assignments.push(assignment);
+
+      state.shiftTypeCount[st.id] = (state.shiftTypeCount[st.id] || 0) + 1;
+      state.totalShiftsAssigned++;
+
+      // Überstunden protokollieren
+      const newOT = Math.max(0, state.hoursAssigned - state.monthlyTarget);
+      const prevOT = Math.max(0, (state.hoursAssigned - slotHours) - state.monthlyTarget);
+      if (newOT > prevOT) {
+        const dailyStd = state.monthlyTarget / 20;
+        const holidayAllowance = monthHolidayCount * dailyStd;
+        protocolEntries.push({
+          plan_id: plan.id, date: slot.date, shift_type_id: slot.shiftTypeId,
+          reason: 'overtime_assigned', employee_id: winnerId,
+          details: {
+            overtime_total_h: parseFloat(newOT.toFixed(2)),
+            shift_h: slotHours,
+            monthly_target_h: state.monthlyTarget,
+            holiday_allowance_h: parseFloat(holidayAllowance.toFixed(2)),
+            holiday_count: monthHolidayCount
+          }
+        });
+      }
     }
 
     if (newAssignments.length > 0) {

@@ -4530,28 +4530,44 @@ async function renderDPConfigQualifications() {
       </span>`;
     }).join(' ');
 
-    // Weights table HTML - only for selected shifts
-    const weightsRows = shiftTypes.filter(st => currentQuals.has(st.id)).map(st => {
-      const currentWeight = localPrefs[st.id] !== undefined ? localPrefs[st.id] : (empPrefs[st.id] || 0);
-      const changed = localPrefs[st.id] !== undefined && localPrefs[st.id] !== (empPrefs[st.id] || 0);
-      return `<div style="display:grid;grid-template-columns:100px 1fr 60px;gap:8px;align-items:center;font-size:13px;padding:4px 0${changed?';background:var(--acc20)':''}">
-        <span>${esc(st.code)}:</span>
-        <input type="range" min="0" max="100" value="${currentWeight}" style="flex:1" onchange="updateQualPrefLocal('${empId}','${st.id}',this.value)">
-        <span style="text-align:right;min-width:35px">${currentWeight}%</span>
-      </div>`;
+    // Weight inputs – nur für ausgewählte Dienste, als Zahlenfelder
+    const selectedShiftTypes = shiftTypes.filter(st => currentQuals.has(st.id));
+    const weightsInputs = selectedShiftTypes.map(st => {
+      const savedVal = empPrefs[st.id];
+      const localVal = localPrefs[st.id];
+      const displayVal = localVal !== undefined ? localVal : (savedVal !== undefined ? savedVal : '');
+      const changed = localVal !== undefined;
+      return `<div style="display:flex;align-items:center;gap:8px;font-size:13px;padding:2px 0${changed?';border-left:3px solid var(--acc);padding-left:5px':''}">
+    <span style="min-width:80px;flex-shrink:0">${esc(st.code)}:</span>
+    <input type="number" min="0" max="100" value="${displayVal}" placeholder="–" style="width:60px;padding:2px 6px;text-align:right;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--fg)" onchange="updateQualPrefLocal('${empId}','${st.id}',this.value)" oninput="updateQualPrefLocal('${empId}','${st.id}',this.value)">
+    <span style="color:var(--mu)">%</span>
+  </div>`;
     }).join('');
 
+    // Summe berechnen (nur eingetragene Werte)
+    const qualPrefsSum = selectedShiftTypes.reduce((sum, st) => {
+      const v = localPrefs[st.id] !== undefined ? localPrefs[st.id] : (empPrefs[st.id] || 0);
+      return sum + (parseInt(v) || 0);
+    }, 0);
+    const remaining = 100 - qualPrefsSum;
+    const sumColor = Math.abs(remaining) < 1 ? 'var(--ok, green)' : (remaining < 0 ? 'var(--err, red)' : 'var(--mu)');
+
     const isWeightsExpanded = S._dpQualWeightsExpanded[empId] || false;
-    const weightsSection = currentQuals.size > 0 ? `
-      <div style="display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-        <button class="btn-s" onclick="toggleQualWeights('${empId}')" style="background:var(--bg);color:var(--fg);border:1px solid var(--border);font-size:12px">
-          ${isWeightsExpanded ? '▼ Gewichtungen' : '▶ Gewichtungen'}
-        </button>
-      </div>
-      ${isWeightsExpanded ? `<div style="background:var(--bg);padding:8px;border-radius:4px;margin-top:8px">
-        ${weightsRows}
-      </div>` : ''}
-    ` : '';
+    const weightsSection = selectedShiftTypes.length > 0 ? `
+  <div style="display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+    <button class="btn-s" onclick="toggleQualWeights('${empId}')" style="background:var(--bg);color:var(--fg);border:1px solid var(--border);font-size:12px">
+      ${isWeightsExpanded ? '▼' : '▶'} Gewichtungen
+    </button>
+    ${isWeightsExpanded ? `<span style="font-size:12px;color:${sumColor}">Summe: ${qualPrefsSum}% ${remaining !== 0 ? '('+Math.abs(remaining)+'% '+(remaining>0?'frei':'zu viel')+')' : '✓'}</span>` : ''}
+  </div>
+  ${isWeightsExpanded ? `<div style="background:var(--bg);padding:8px 12px;border-radius:4px;margin-top:8px">
+    ${weightsInputs}
+    <div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--border);font-size:13px;font-weight:600;color:${sumColor}">
+      Summe: ${qualPrefsSum}% ${remaining !== 0 ? '– noch '+Math.abs(remaining)+'% '+(remaining>0?'verfügbar':'zu viel') : '– vollständig'}
+    </div>
+    ${qualPrefsSum === 0 ? '<div style="font-size:11px;color:var(--mu);margin-top:4px">Keine Gewichtung = gleichmäßige Verteilung auf alle qualifizierten Dienste.</div>' : ''}
+  </div>` : ''}
+` : '';
 
     // Changes detected?
     const hasChanges = localChanges.adds.size > 0 || localChanges.removes.size > 0 || Object.keys(localPrefs).length > 0;
@@ -4607,7 +4623,12 @@ function toggleQualChipLocal(empId, stId) {
 
 function updateQualPrefLocal(empId, stId, value) {
   if (!S._dpQualLocalPrefsChanges[empId]) S._dpQualLocalPrefsChanges[empId] = {};
-  S._dpQualLocalPrefsChanges[empId][stId] = parseInt(value);
+  const parsed = value === '' || value === null || value === undefined ? null : parseInt(value);
+  if (parsed === null) {
+    delete S._dpQualLocalPrefsChanges[empId][stId];
+  } else {
+    S._dpQualLocalPrefsChanges[empId][stId] = Math.max(0, Math.min(100, parsed));
+  }
   renderDPConfigTab();
 }
 
@@ -4624,9 +4645,11 @@ async function submitQualChanges(empId, validFrom) {
     for (const stId of ch.removes) {
       await api('DELETE', `/dp/employee-qualifications/${empId}/${stId}`);
     }
-    // Save preference weights
+    // Save preference weights (nur gespeicherte Werte, keine null)
     for (const [stId, weight] of Object.entries(prefs)) {
-      await api('POST', '/dp/shift-preferences', {employeeId: empId, shiftTypeId: stId, preferenceWeight: weight, validFrom: validFrom});
+      if (weight !== null && weight !== undefined) {
+        await api('POST', '/dp/shift-preferences', {employeeId: empId, shiftTypeId: stId, preferenceWeight: weight, validFrom: validFrom});
+      }
     }
 
     // Clear local changes
