@@ -12,13 +12,13 @@ router.get('/shift-types', auth, async (req,res) => {
 
 router.post('/shift-types', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
-  const {name,code,location,role,startTime,endTime,durationHours,isNight,isZulage,isOffice,color,sortOrder,validFrom,validUntil} = req.body;
+  const {name,code,location,role,startTime,endTime,durationHours,isNight,isZulage,isOffice,color,sortOrder,validFrom,validUntil,maxPerEmpPerMonth} = req.body;
   if (!name?.trim()||!code?.trim()) return bad(res,'Name und Code erforderlich',400);
   try {
     const row = await q1(
-      `INSERT INTO dp_shift_types (id,name,code,location,role,start_time,end_time,duration_hours,is_night,is_zulage,is_office,color,sort_order,valid_from,valid_until,created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
-      [newId(),name.trim(),code.trim().toUpperCase(),location||'',role||'',startTime||'08:00',endTime||'20:00',durationHours||12,!!isNight,!!isZulage,!!isOffice,color||'#3b6dd4',sortOrder||0,validFrom||null,validUntil||null,req.uid]
+      `INSERT INTO dp_shift_types (id,name,code,location,role,start_time,end_time,duration_hours,is_night,is_zulage,is_office,color,sort_order,valid_from,valid_until,max_per_emp_per_month,created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
+      [newId(),name.trim(),code.trim().toUpperCase(),location||'',role||'',startTime||'08:00',endTime||'20:00',durationHours||12,!!isNight,!!isZulage,!!isOffice,color||'#3b6dd4',sortOrder||0,validFrom||null,validUntil||null,maxPerEmpPerMonth||null,req.uid]
     );
     ok(res,row);
   } catch(e) { bad(res,'Serverfehler',500); }
@@ -26,12 +26,12 @@ router.post('/shift-types', auth, async (req,res) => {
 
 router.put('/shift-types/:id', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
-  const {name,code,location,role,startTime,endTime,durationHours,isNight,isZulage,isOffice,color,sortOrder,validFrom,validUntil} = req.body;
+  const {name,code,location,role,startTime,endTime,durationHours,isNight,isZulage,isOffice,color,sortOrder,validFrom,validUntil,maxPerEmpPerMonth} = req.body;
   try {
     const row = await q1(
       `UPDATE dp_shift_types SET name=$1,code=$2,location=$3,role=$4,start_time=$5,end_time=$6,
-       duration_hours=$7,is_night=$8,is_zulage=$9,is_office=$10,color=$11,sort_order=$12,valid_from=$13,valid_until=$14 WHERE id=$15 RETURNING *`,
-      [name,code?.toUpperCase(),location||'',role||'',startTime,endTime,durationHours,!!isNight,!!isZulage,!!isOffice,color,sortOrder||0,validFrom||null,validUntil||null,req.params.id]
+       duration_hours=$7,is_night=$8,is_zulage=$9,is_office=$10,color=$11,sort_order=$12,valid_from=$13,valid_until=$14,max_per_emp_per_month=$15 WHERE id=$16 RETURNING *`,
+      [name,code?.toUpperCase(),location||'',role||'',startTime,endTime,durationHours,!!isNight,!!isZulage,!!isOffice,color,sortOrder||0,validFrom||null,validUntil||null,maxPerEmpPerMonth||null,req.params.id]
     );
     if (!row) return bad(res,'Nicht gefunden',404);
     ok(res,row);
@@ -759,6 +759,14 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
           if (slot.shiftType.is_night && state.nightsAssigned >= maxNightsAllowed)
             { reasons[empId]='nights_max_exceeded'; continue; }
 
+          // Hard: max Dienste dieses Typs pro Monat für diesen MA
+          if (slot.shiftType.max_per_emp_per_month !== null && slot.shiftType.max_per_emp_per_month !== undefined) {
+            const countThisType = state.shiftTypeCount[slot.shiftTypeId] || 0;
+            if (countThisType >= slot.shiftType.max_per_emp_per_month) {
+              reasons[empId] = 'shift_type_monthly_limit'; continue;
+            }
+          }
+
           // Hard: consecutive nights restriction
           if (slot.shiftType.is_night) {
             const consecutiveNights = getConsecutiveNights(state.assignments, slot.date);
@@ -850,12 +858,31 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
 
       let {cands: candidates, reasons: skipReasons} = buildCandidates(true);
       let softViolated = false;
+
       if (candidates.length === 0) {
-        const retry = buildCandidates(false);
-        if (retry.cands.length > 0) {
-          candidates = retry.cands;
-          skipReasons = retry.reasons;
+        // Pass 2: Relax consecutive_days but STILL exclude employees already at/over target
+        // This ensures employees with deficit get priority over overtime employees
+        const pass2 = buildCandidates(false);
+        // Filter pass2 to only include employees not yet at their target
+        const pass2NoBonusOT = pass2.cands.filter(c => {
+          const st2 = empState[c.empId];
+          return st2 && st2.hoursAssigned < st2.monthlyTarget;
+        });
+        if (pass2NoBonusOT.length > 0) {
+          candidates = pass2NoBonusOT;
+          skipReasons = pass2.reasons;
           softViolated = true;
+          protocolEntries.push({plan_id:plan.id, date:slot.date, shift_type_id:slot.shiftTypeId,
+            reason:'consecutive_days_relaxed', employee_id:null,
+            details:{message:'consecutive_days limit relaxed, deficit employee used'}});
+        } else if (pass2.cands.length > 0) {
+          // Pass 3: No deficit employees available – allow overtime employees (last resort)
+          candidates = pass2.cands;
+          skipReasons = pass2.reasons;
+          softViolated = true;
+          protocolEntries.push({plan_id:plan.id, date:slot.date, shift_type_id:slot.shiftTypeId,
+            reason:'overtime_forced', employee_id:null,
+            details:{message:'all deficit employees unavailable, overtime employee used as last resort'}});
         }
       }
 

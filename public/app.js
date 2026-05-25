@@ -4605,7 +4605,7 @@ async function renderDPConfigQualifications() {
       const changed = localVal !== undefined;
       return `<div style="display:flex;align-items:center;gap:8px;font-size:13px;padding:2px 0${changed?';border-left:3px solid var(--acc);padding-left:5px':''}">
     <span style="min-width:80px;flex-shrink:0">${esc(st.code)}:</span>
-    <input type="number" min="0" max="100" value="${displayVal}" placeholder="–" style="width:60px;padding:2px 6px;text-align:right;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--fg)" onchange="updateQualPrefLocal('${empId}','${st.id}',this.value)" oninput="updateQualPrefLocal('${empId}','${st.id}',this.value)">
+    <input type="number" min="0" max="100" value="${displayVal}" placeholder="–" style="width:60px;padding:2px 6px;text-align:right;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--fg)" onchange="updateQualPrefLocal('${empId}','${st.id}',this.value)">
     <span style="color:var(--mu)">%</span>
   </div>`;
     }).join('');
@@ -4749,6 +4749,7 @@ function openDpShiftTypeForm(id) {
   document.getElementById('dpStfColor').value = st?.color||'#3b6dd4';
   document.getElementById('dpStfValidFrom').value = st?.valid_from ? String(st.valid_from).slice(0,10) : '';
   document.getElementById('dpStfValidUntil').value = st?.valid_until ? String(st.valid_until).slice(0,10) : '';
+  document.getElementById('dpStfMaxPerEmpPerMonth').value = st?.max_per_emp_per_month || '';
   openModal('dpShiftTypeFormOv');
 }
 
@@ -4768,6 +4769,7 @@ async function submitDpShiftTypeForm() {
     color: document.getElementById('dpStfColor').value,
     validFrom: document.getElementById('dpStfValidFrom').value||null,
     validUntil: document.getElementById('dpStfValidUntil').value||null,
+    maxPerEmpPerMonth: document.getElementById('dpStfMaxPerEmpPerMonth').value ? parseInt(document.getElementById('dpStfMaxPerEmpPerMonth').value) : null,
   };
   if (!body.name||!body.code) return toast('Name und Code erforderlich','err');
   try {
