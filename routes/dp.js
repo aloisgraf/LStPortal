@@ -67,11 +67,11 @@ router.post('/shift-requirements', auth, async (req,res) => {
 
 router.put('/shift-requirements/:id', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
-  const {slotCount,weekday,appliesTo,specificDate,validFrom} = req.body;
+  const {shiftTypeId,slotCount,weekday,appliesTo,specificDate,validFrom} = req.body;
   try {
     const row = await q1(
-      `UPDATE dp_shift_requirements SET slot_count=$1,weekday=$2,applies_to=$3,specific_date=$4,valid_from=$5 WHERE id=$6 RETURNING *`,
-      [slotCount,weekday||null,appliesTo,specificDate||null,validFrom||null,req.params.id]
+      `UPDATE dp_shift_requirements SET shift_type_id=COALESCE($1,shift_type_id),slot_count=$2,weekday=$3,applies_to=$4,specific_date=$5,valid_from=$6 WHERE id=$7 RETURNING *`,
+      [shiftTypeId||null,slotCount,weekday||null,appliesTo,specificDate||null,validFrom||null,req.params.id]
     );
     ok(res,row);
   } catch(e) { bad(res,'Serverfehler',500); }

@@ -4259,8 +4259,24 @@ async function renderDPConfig() {
       <h2 style="margin:0 16px 0 0;font-size:16px;font-weight:700">⚙️ DP-Konfiguration</h2>
       ${tabs.map(t=>{const on=t.id===tab;return`<button style="padding:8px 14px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:${on?'700':'400'};border-bottom:2px solid ${on?'var(--acc)':'transparent'};color:${on?'var(--acc)':'var(--mu)'}" onclick="S._dpConfigTab='${t.id}';renderDPConfig()">${t.label}</button>`;}).join('')}
     </div>
-    <div style="flex:1;overflow:auto;padding:16px">${content}</div>
+    <div id="dp-config-content" style="flex:1;overflow:auto;padding:16px">${content}</div>
   </div>`;
+}
+
+async function renderDPConfigTab() {
+  const contentEl = document.getElementById('dp-config-content');
+  if (!contentEl) return renderDPConfig();
+  const scrollTop = contentEl.scrollTop;
+  const tab = S._dpConfigTab;
+  let content = '';
+  if (tab === 'shift-types') content = await renderDPConfigShiftTypes();
+  else if (tab === 'absence-types') content = await renderDPConfigAbsenceTypes();
+  else if (tab === 'emp-params') content = await renderDPConfigEmpParams();
+  else if (tab === 'qualifications') content = await renderDPConfigQualifications();
+  else if (tab === 'requirements') content = await renderDPConfigRequirements();
+  else if (tab === 'rules') content = renderDPConfigRules();
+  contentEl.innerHTML = content;
+  contentEl.scrollTop = scrollTop;
 }
 
 async function renderDPConfigShiftTypes() {
@@ -4512,7 +4528,7 @@ async function toggleDpQualification(empId, shiftTypeId, currentlyHas) {
       await api('POST', '/dp/employee-qualifications', {employeeId:empId, shiftTypeId, validFrom: dateStr||null});
     }
     S._dpConfigTab = 'qualifications';
-    renderDPConfig();
+    renderDPConfigTab();
   } catch(e) { toast('Fehler: '+e.message,'err'); }
 }
 
