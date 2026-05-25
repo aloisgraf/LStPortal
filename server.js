@@ -505,6 +505,17 @@ async function initDB() {
     `ALTER TABLE dp_employee_qualifications DROP CONSTRAINT IF EXISTS dp_employee_qualifications_employee_id_shift_type_id_key`,
     `CREATE UNIQUE INDEX IF NOT EXISTS dp_qual_null_vf ON dp_employee_qualifications(employee_id, shift_type_id) WHERE valid_from IS NULL`,
     `CREATE UNIQUE INDEX IF NOT EXISTS dp_qual_date_vf ON dp_employee_qualifications(employee_id, shift_type_id, valid_from) WHERE valid_from IS NOT NULL`,
+    `ALTER TABLE dp_shift_types ADD COLUMN IF NOT EXISTS valid_until DATE DEFAULT NULL`,
+    `CREATE TABLE IF NOT EXISTS dp_shift_preferences (
+      id TEXT PRIMARY KEY,
+      employee_id TEXT NOT NULL,
+      shift_type_id TEXT NOT NULL,
+      preference_weight INTEGER NOT NULL DEFAULT 0,
+      valid_from DATE DEFAULT NULL,
+      created_by TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(employee_id, shift_type_id, valid_from)
+    )`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }

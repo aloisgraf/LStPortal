@@ -12,13 +12,13 @@ router.get('/shift-types', auth, async (req,res) => {
 
 router.post('/shift-types', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
-  const {name,code,location,role,startTime,endTime,durationHours,isNight,isZulage,isOffice,color,sortOrder,validFrom} = req.body;
+  const {name,code,location,role,startTime,endTime,durationHours,isNight,isZulage,isOffice,color,sortOrder,validFrom,validUntil} = req.body;
   if (!name?.trim()||!code?.trim()) return bad(res,'Name und Code erforderlich',400);
   try {
     const row = await q1(
-      `INSERT INTO dp_shift_types (id,name,code,location,role,start_time,end_time,duration_hours,is_night,is_zulage,is_office,color,sort_order,valid_from,created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
-      [newId(),name.trim(),code.trim().toUpperCase(),location||'',role||'',startTime||'08:00',endTime||'20:00',durationHours||12,!!isNight,!!isZulage,!!isOffice,color||'#3b6dd4',sortOrder||0,validFrom||null,req.uid]
+      `INSERT INTO dp_shift_types (id,name,code,location,role,start_time,end_time,duration_hours,is_night,is_zulage,is_office,color,sort_order,valid_from,valid_until,created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+      [newId(),name.trim(),code.trim().toUpperCase(),location||'',role||'',startTime||'08:00',endTime||'20:00',durationHours||12,!!isNight,!!isZulage,!!isOffice,color||'#3b6dd4',sortOrder||0,validFrom||null,validUntil||null,req.uid]
     );
     ok(res,row);
   } catch(e) { bad(res,'Serverfehler',500); }
@@ -26,12 +26,12 @@ router.post('/shift-types', auth, async (req,res) => {
 
 router.put('/shift-types/:id', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
-  const {name,code,location,role,startTime,endTime,durationHours,isNight,isZulage,isOffice,color,sortOrder,validFrom} = req.body;
+  const {name,code,location,role,startTime,endTime,durationHours,isNight,isZulage,isOffice,color,sortOrder,validFrom,validUntil} = req.body;
   try {
     const row = await q1(
       `UPDATE dp_shift_types SET name=$1,code=$2,location=$3,role=$4,start_time=$5,end_time=$6,
-       duration_hours=$7,is_night=$8,is_zulage=$9,is_office=$10,color=$11,sort_order=$12,valid_from=$13 WHERE id=$14 RETURNING *`,
-      [name,code?.toUpperCase(),location||'',role||'',startTime,endTime,durationHours,!!isNight,!!isZulage,!!isOffice,color,sortOrder||0,validFrom||null,req.params.id]
+       duration_hours=$7,is_night=$8,is_zulage=$9,is_office=$10,color=$11,sort_order=$12,valid_from=$13,valid_until=$14 WHERE id=$15 RETURNING *`,
+      [name,code?.toUpperCase(),location||'',role||'',startTime,endTime,durationHours,!!isNight,!!isZulage,!!isOffice,color,sortOrder||0,validFrom||null,validUntil||null,req.params.id]
     );
     if (!row) return bad(res,'Nicht gefunden',404);
     ok(res,row);
@@ -42,6 +42,46 @@ router.delete('/shift-types/:id', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
   try { await q('DELETE FROM dp_shift_types WHERE id=$1',[req.params.id]); ok(res); }
   catch(e) { bad(res,'Serverfehler',500); }
+});
+
+// ── SHIFT PREFERENCES ─────────────────────────────────────────────────────
+
+router.get('/shift-preferences', auth, async (req,res) => {
+  try { ok(res, await q('SELECT * FROM dp_shift_preferences ORDER BY employee_id, shift_type_id, valid_from NULLS FIRST')); }
+  catch(e) { bad(res,'Serverfehler',500); }
+});
+
+router.post('/shift-preferences', auth, async (req,res) => {
+  if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+  const {employeeId, shiftTypeId, preferenceWeight, validFrom} = req.body;
+  if (!employeeId || !shiftTypeId) return bad(res,'Pflichtfelder fehlen',400);
+  const pw = Math.max(0, Math.min(100, parseInt(preferenceWeight)||0));
+  const vf = validFrom || null;
+  try {
+    let existing;
+    if (vf === null) {
+      existing = await q1('SELECT id FROM dp_shift_preferences WHERE employee_id=$1 AND shift_type_id=$2 AND valid_from IS NULL', [employeeId, shiftTypeId]);
+    } else {
+      existing = await q1('SELECT id FROM dp_shift_preferences WHERE employee_id=$1 AND shift_type_id=$2 AND valid_from=$3::date', [employeeId, shiftTypeId, vf]);
+    }
+    if (existing) {
+      const row = await q1('UPDATE dp_shift_preferences SET preference_weight=$1, valid_from=$2 WHERE id=$3 RETURNING *', [pw, vf, existing.id]);
+      return ok(res, row);
+    }
+    const row = await q1(
+      `INSERT INTO dp_shift_preferences (id, employee_id, shift_type_id, preference_weight, valid_from, created_by) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [newId(), employeeId, shiftTypeId, pw, vf, req.uid]
+    );
+    ok(res, row);
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+router.delete('/shift-preferences/:id', auth, async (req,res) => {
+  if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+  try {
+    await q('DELETE FROM dp_shift_preferences WHERE id=$1', [req.params.id]);
+    ok(res);
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 
 // ── SHIFT REQUIREMENTS ────────────────────────────────────────────────────────
@@ -512,8 +552,9 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
     await q(`DELETE FROM dp_assignments WHERE plan_id=$1 AND source='generated' AND is_locked=false`,[req.params.id]);
 
     const planStartDate = `${plan.year}-${String(plan.month).padStart(2,'0')}-01`;
-    const [shiftTypes,requirements,empParams,existingAssignments,wishDays,absenceTypes,qualifications] = await Promise.all([
-      q('SELECT * FROM dp_shift_types WHERE valid_from IS NULL OR valid_from <= $1 ORDER BY sort_order',[planStartDate]),
+    const [shiftTypes,shiftPrefs,requirements,empParams,existingAssignments,wishDays,absenceTypes,qualifications] = await Promise.all([
+      q('SELECT * FROM dp_shift_types WHERE (valid_from IS NULL OR valid_from <= $1) AND (valid_until IS NULL OR valid_until >= $1) ORDER BY sort_order', [planStartDate]),
+      q('SELECT DISTINCT ON (employee_id, shift_type_id) * FROM dp_shift_preferences WHERE valid_from IS NULL OR valid_from <= $1 ORDER BY employee_id, shift_type_id, valid_from DESC NULLS LAST', [planStartDate]),
       q(`SELECT DISTINCT ON (shift_type_id, applies_to, COALESCE(weekday::text,'x'), COALESCE(specific_date::text,'x')) * FROM dp_shift_requirements WHERE valid_from IS NULL OR valid_from <= $1 ORDER BY shift_type_id, applies_to, COALESCE(weekday::text,'x'), COALESCE(specific_date::text,'x'), valid_from DESC NULLS LAST`,[planStartDate]),
       q(`SELECT DISTINCT ON (employee_id) * FROM dp_employee_params WHERE valid_from IS NULL OR valid_from <= $1 ORDER BY employee_id, valid_from DESC NULLS LAST`,[planStartDate]),
       q(`SELECT * FROM dp_assignments WHERE plan_id=$1`,[req.params.id]),
@@ -532,6 +573,14 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
     for (const q_ of qualifications) {
       if (!empQualMap[q_.employee_id]) empQualMap[q_.employee_id] = new Set();
       empQualMap[q_.employee_id].add(q_.shift_type_id);
+    }
+
+    // Build shift preference map:
+    // shiftPrefMap: empId -> shiftTypeId -> preference_weight
+    const shiftPrefMap = {};
+    for (const sp of shiftPrefs) {
+      if (!shiftPrefMap[sp.employee_id]) shiftPrefMap[sp.employee_id] = {};
+      shiftPrefMap[sp.employee_id][sp.shift_type_id] = sp.preference_weight;
     }
 
     // Build all required slots, sorted: nights first → weekends → date
@@ -744,6 +793,12 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
             const quota = parseInt(params.fd_springer_shifts_per_month)||0;
             const deficit = quota - state.fdSpringerShiftsAssigned;
             score -= Math.max(0, deficit) * 200; // highest priority for FD until quota
+          }
+
+          // Shift preference weighting
+          const pref = shiftPrefMap[empId]?.[slot.shiftTypeId];
+          if (pref !== undefined && pref > 0) {
+            score -= (pref || 50) * 0.5; // higher preference = lower score (better candidate)
           }
 
           cands.push({empId, score});

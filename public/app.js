@@ -53,7 +53,7 @@ let S={
   checklists:[],messages:[],notifications:[],abrechnung:{einspringer:[],homeoffice:[]},dienstplaene:[],
   p:{canApproveEvents:false,canSendMessages:false,seeAllEntries:true,editAllPersonal:false,addForOthers:false,addGeneral:false,manageUsers:false,seeAllAllw:false,editAllw:false,seeAllAbrechnung:false},
   tp:{seeAll:false,editAll:false,myDepts:[],canSetPublic:false,canAssign:false,canSeeSubcat:false,canEditSubcat:false,roles:[]},
-  dpPlans:[], dpShiftTypes:[], dpAbsenceTypes:[], dpEmpParams:[], dpQualifications:[], dpProtocol:[],
+  dpPlans:[], dpShiftTypes:[], dpAbsenceTypes:[], dpEmpParams:[], dpQualifications:[], dpShiftPrefs:[], dpProtocol:[],
   todos:[], _selTodo:null,
   _dpPlanId:null, _dpMatrix:null, _dpStatsExpanded:false, _dpConfigTab:'shift-types',
 };
@@ -85,6 +85,7 @@ async function fetchData(){
     S.dpAbsenceTypes=data.dpAbsenceTypes||[];
     S.dpPlans=data.dpPlans||[];
     S.dpQualifications=data.dpQualifications||[];
+    S.dpShiftPrefs=data.dpShiftPrefs||[];
     S.dpProtocol=data.dpProtocol||[];
     S.todos=data.todos||[];
     S.currentUser=data.currentUser;S.p=data.permissions||{};
@@ -4548,6 +4549,7 @@ function openDpShiftTypeForm(id) {
   document.getElementById('dpStfOffice').checked = !!st?.is_office;
   document.getElementById('dpStfColor').value = st?.color||'#3b6dd4';
   document.getElementById('dpStfValidFrom').value = st?.valid_from ? String(st.valid_from).slice(0,10) : '';
+  document.getElementById('dpStfValidUntil').value = st?.valid_until ? String(st.valid_until).slice(0,10) : '';
   openModal('dpShiftTypeFormOv');
 }
 
@@ -4566,6 +4568,7 @@ async function submitDpShiftTypeForm() {
     isOffice: document.getElementById('dpStfOffice').checked,
     color: document.getElementById('dpStfColor').value,
     validFrom: document.getElementById('dpStfValidFrom').value||null,
+    validUntil: document.getElementById('dpStfValidUntil').value||null,
   };
   if (!body.name||!body.code) return toast('Name und Code erforderlich','err');
   try {

@@ -9,7 +9,7 @@ router.get('/', auth, async (req,res) => {
     const uid=req.uid, p=req.p, tp=req.tp, roles=p.roles;
     const canManageDp = roles.some(r=>['admin','leitung','dienstplanung'].includes(r));
     const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
-           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw,dpQualificationsRaw,dpProtocolRaw,todosRaw,todoItemsRaw,todoAssigneesRaw,myDpPlanIdsRaw,todoNotificationsRaw] = await Promise.all([
+           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw,dpQualificationsRaw,dpShiftPrefsRaw,dpProtocolRaw,todosRaw,todoItemsRaw,todoAssigneesRaw,myDpPlanIdsRaw,todoNotificationsRaw] = await Promise.all([
       q('SELECT id,name,initials,roles,color,must_change_pw,last_seen FROM users ORDER BY name'),
       q('SELECT * FROM categories ORDER BY sort_order,label'),
       q('SELECT * FROM tags ORDER BY label'),
@@ -58,6 +58,7 @@ router.get('/', auth, async (req,res) => {
       q('SELECT * FROM dp_absence_types ORDER BY sort_order, label').catch(()=>[]),
       q('SELECT * FROM dp_plans ORDER BY year DESC, month DESC').catch(()=>[]),
       q('SELECT * FROM dp_employee_qualifications').catch(()=>[]),
+      q('SELECT * FROM dp_shift_preferences').catch(()=>[]),
       q('SELECT * FROM dp_generation_protocol ORDER BY created_at DESC').catch(()=>[]),
       q('SELECT * FROM todos ORDER BY created_at DESC').catch(()=>[]),
       q('SELECT * FROM todo_items ORDER BY sort_order, created_at').catch(()=>[]),
@@ -243,6 +244,7 @@ router.get('/', auth, async (req,res) => {
       dpAbsenceTypes: dpAbsenceTypesRaw||[],
       dpPlans: canManageDp ? (dpPlansRaw||[]) : (dpPlansRaw||[]).filter(p=>p.status==='published'&&myDpPlanIdSet.has(p.id)),
       dpQualifications: dpQualificationsRaw||[],
+      dpShiftPrefs: dpShiftPrefsRaw||[],
       dpProtocol: (dpProtocolRaw||[]).map(p=>({id:p.id,planId:p.plan_id,date:p.date,shiftTypeId:p.shift_type_id,reason:p.reason,employeeId:p.employee_id,details:p.details||{}})),
       todos: (todosRaw||[]).filter(t=>p.manageUsers||t.created_by===uid||assignedTodoIds.has(t.id)).map(t=>{
         const canMng=p.manageUsers||t.created_by===uid;
