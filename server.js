@@ -468,6 +468,8 @@ async function initDB() {
     `ALTER TABLE meeting_instances ADD COLUMN IF NOT EXISTS title TEXT DEFAULT NULL`,
     `ALTER TABLE todos ADD COLUMN IF NOT EXISTS protokoll JSONB DEFAULT '[]'`,
     `ALTER TABLE todo_items ADD COLUMN IF NOT EXISTS due_date DATE DEFAULT NULL`,
+    `ALTER TABLE dp_shift_types ADD COLUMN IF NOT EXISTS is_office BOOLEAN NOT NULL DEFAULT false`,
+    `ALTER TABLE dp_employee_params ADD COLUMN IF NOT EXISTS office_pct INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE discussion_items ADD COLUMN IF NOT EXISTS link TEXT DEFAULT NULL`,
     `CREATE TABLE IF NOT EXISTS todo_item_notifications (
   id TEXT PRIMARY KEY,

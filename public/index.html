@@ -1509,10 +1509,13 @@
 <!-- Move item to instance modal -->
 <div class="ov" id="moveItemOv">
   <div class="modal sm">
-    <div class="mh"><h2>Auf anderen Termin verschieben</h2><button class="mc" onclick="closeModal('moveItemOv')">&#10005;</button></div>
+    <div class="mh"><h2>Punkt verschieben</h2><button class="mc" onclick="closeModal('moveItemOv')">&#10005;</button></div>
     <div class="mb2">
       <input type="hidden" id="moveItemId">
-      <div class="fg"><label>Ziel-Termin (gleiche Besprechung)</label>
+      <div class="fg"><label>Besprechung</label>
+        <select id="moveItemMeeting" onchange="onMoveMeetingChange()"></select>
+      </div>
+      <div class="fg"><label>Ziel-Termin</label>
         <select id="moveItemInstance"></select>
       </div>
     </div>
@@ -1582,6 +1585,7 @@
       <div style="display:flex;gap:16px;margin-top:4px">
         <label class="rck"><input type="checkbox" id="dpStfNight"> Nachtdienst</label>
         <label class="rck"><input type="checkbox" id="dpStfZulage"> Zulagendienst</label>
+        <label class="rck"><input type="checkbox" id="dpStfOffice"> Bürodienst (B)</label>
       </div>
       <div class="fg" style="margin-top:8px"><label>Farbe</label><input type="color" id="dpStfColor" value="#3b6dd4"></div>
     </div>
@@ -1636,6 +1640,10 @@
         <label class="rck"><input type="checkbox" id="dpEpfSpringer"> Springer</label>
       </div>
       <div class="fg" style="margin-top:8px"><label>Max. N&#228;chte/Monat (leer = kein Limit)</label><input type="number" id="dpEpfMaxNights" placeholder="z.B. 4" min="0" max="31"></div>
+      <div class="fg" style="margin-top:8px"><label>Bürodienst-Anteil % (0 = kein Bürodienst)</label>
+        <input type="number" id="dpEpfOfficePct" value="0" min="0" max="100" step="5" placeholder="z.B. 30">
+        <small style="color:var(--mu);font-size:11px">Anteil der monatlichen Stunden als Bürodienst (B). 0 = kein Bürodienst-Anteil.</small>
+      </div>
     </div>
     <div class="mf"><button class="btn" onclick="submitDpEmpParamForm()">&#10003; Speichern</button></div>
   </div>

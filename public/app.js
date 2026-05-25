@@ -3777,15 +3777,29 @@ function openMoveItemModal() {
   const allItems = S.meetings.flatMap(m=>m.instances.flatMap(i=>i.items));
   const item = allItems.find(x=>x.id===itemId);
   if (!item) return;
-  // Find meeting and its instances (excluding current)
-  const meeting = S.meetings.find(m=>m.instances.some(i=>i.id===item.instanceId));
-  if (!meeting) return;
-  const otherInsts = (meeting.instances||[]).filter(i=>i.id!==item.instanceId);
-  if (!otherInsts.length) return toast('Keine anderen Termine in dieser Besprechung','err');
+  const currentMeeting = S.meetings.find(m=>m.instances.some(i=>i.id===item.instanceId));
+  if (!currentMeeting) return;
   document.getElementById('moveItemId').value = itemId;
-  const sel = document.getElementById('moveItemInstance');
-  sel.innerHTML = otherInsts.map(i=>`<option value="${i.id}">${i.date?fmtDate(i.date):'Datum offen'} ${i.time||''} (${{planned:'Geplant',done:'Abgeschlossen',cancelled:'Abgesagt'}[i.status]||i.status})</option>`).join('');
+  const mSel = document.getElementById('moveItemMeeting');
+  mSel.innerHTML = S.meetings.map(m=>`<option value="${m.id}"${m.id===currentMeeting.id?' selected':''}>${esc(m.title)}</option>`).join('');
+  onMoveMeetingChange();
   openModal('moveItemOv');
+}
+
+function onMoveMeetingChange() {
+  const itemId = document.getElementById('moveItemId').value;
+  const allItems = S.meetings.flatMap(m=>m.instances.flatMap(i=>i.items));
+  const item = allItems.find(x=>x.id===itemId);
+  const meetingId = document.getElementById('moveItemMeeting').value;
+  const meeting = S.meetings.find(m=>m.id===meetingId);
+  const instSel = document.getElementById('moveItemInstance');
+  const otherInsts = (meeting?.instances||[]).filter(i=>i.id!==item?.instanceId);
+  if (!otherInsts.length) {
+    instSel.innerHTML = '<option value="">— Keine anderen Termine —</option>';
+  } else {
+    const stLabel = {planned:'Geplant',done:'Abgeschlossen',cancelled:'Abgesagt'};
+    instSel.innerHTML = otherInsts.map(i=>`<option value="${i.id}">${i.title?esc(i.title)+' · ':''}${i.date?fmtDate(i.date):'Datum offen'} ${i.time||''} (${stLabel[i.status]||i.status})</option>`).join('');
+  }
 }
 
 async function submitMoveItem() {
@@ -4256,7 +4270,7 @@ async function renderDPConfigShiftTypes() {
   const rows = types.map(st => `<div class="dp-cfg-row">
     <span class="dp-color-dot" style="background:${st.color}"></span>
     <span class="dp-cfg-label"><strong>${esc(st.code)}</strong> – ${esc(st.name)}</span>
-    <span style="font-size:11px;color:var(--mu)">${st.start_time}–${st.end_time} (${st.duration_hours}h)${st.is_night?' 🌙':''}${st.is_zulage?' ⭐':''}</span>
+    <span style="font-size:11px;color:var(--mu)">${st.start_time}–${st.end_time} (${st.duration_hours}h)${st.is_night?' 🌙':''}${st.is_zulage?' ⭐':''}${st.is_office?' 🏢':''}</span>
     <button class="btn-s" onclick="openDpShiftTypeForm('${st.id}')">✏️</button>
     <button class="btn-s" style="color:#ef4444" onclick="deleteDpShiftType('${st.id}')">✕</button>
   </div>`).join('');
@@ -4304,7 +4318,7 @@ async function renderDPConfigEmpParams() {
     return `<div class="dp-cfg-row">
       <span class="av-sm" style="background:${u.color}">${esc(u.initials)}</span>
       <span class="dp-cfg-label">${esc(u.name)}</span>
-      <span style="font-size:11px;color:var(--mu)">${p.monthly_hours||Math.round(p.weekly_hours*4.33)}h/Mo${p.can_do_nights?' 🌙':''}${p.is_springer?' 🔄':''}</span>
+      <span style="font-size:11px;color:var(--mu)">${p.monthly_hours||Math.round(p.weekly_hours*4.33)}h/Mo${p.office_pct?' 🏢'+p.office_pct+'%':''}${p.can_do_nights?' 🌙':''}${p.is_springer?' 🔄':''}</span>
       <button class="btn-s" onclick="openDpEmpParamForm('${u.id}')">✏️</button>
     </div>`;
   }).join('');
@@ -4490,6 +4504,7 @@ function openDpShiftTypeForm(id) {
   document.getElementById('dpStfRole').value = st?.role||'';
   document.getElementById('dpStfNight').checked = !!st?.is_night;
   document.getElementById('dpStfZulage').checked = !!st?.is_zulage;
+  document.getElementById('dpStfOffice').checked = !!st?.is_office;
   document.getElementById('dpStfColor').value = st?.color||'#3b6dd4';
   openModal('dpShiftTypeFormOv');
 }
@@ -4506,6 +4521,7 @@ async function submitDpShiftTypeForm() {
     role: document.getElementById('dpStfRole').value.trim(),
     isNight: document.getElementById('dpStfNight').checked,
     isZulage: document.getElementById('dpStfZulage').checked,
+    isOffice: document.getElementById('dpStfOffice').checked,
     color: document.getElementById('dpStfColor').value,
   };
   if (!body.name||!body.code) return toast('Name und Code erforderlich','err');
@@ -4596,6 +4612,7 @@ function openDpEmpParamForm(empId) {
   document.getElementById('dpEpfDoubleNights').checked = p ? !!p.double_nights_allowed : true;
   document.getElementById('dpEpfSpringer').checked = !!p?.is_springer;
   document.getElementById('dpEpfMaxNights').value = p?.max_nights_per_month||'';
+  document.getElementById('dpEpfOfficePct').value = p?.office_pct||0;
   openModal('dpEmpParamFormOv');
 }
 
@@ -4609,6 +4626,7 @@ async function submitDpEmpParamForm() {
     doubleNightsAllowed: document.getElementById('dpEpfDoubleNights').checked,
     isSpringer: document.getElementById('dpEpfSpringer').checked,
     maxNightsPerMonth: document.getElementById('dpEpfMaxNights').value ? parseInt(document.getElementById('dpEpfMaxNights').value) : null,
+    officePct: parseInt(document.getElementById('dpEpfOfficePct').value)||0,
   };
   try {
     await api('POST', '/dp/employee-params', body);

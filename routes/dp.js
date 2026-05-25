@@ -12,13 +12,13 @@ router.get('/shift-types', auth, async (req,res) => {
 
 router.post('/shift-types', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
-  const {name,code,location,role,startTime,endTime,durationHours,isNight,isZulage,color,sortOrder} = req.body;
+  const {name,code,location,role,startTime,endTime,durationHours,isNight,isZulage,isOffice,color,sortOrder} = req.body;
   if (!name?.trim()||!code?.trim()) return bad(res,'Name und Code erforderlich',400);
   try {
     const row = await q1(
-      `INSERT INTO dp_shift_types (id,name,code,location,role,start_time,end_time,duration_hours,is_night,is_zulage,color,sort_order,created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
-      [newId(),name.trim(),code.trim().toUpperCase(),location||'',role||'',startTime||'08:00',endTime||'20:00',durationHours||12,!!isNight,!!isZulage,color||'#3b6dd4',sortOrder||0,req.uid]
+      `INSERT INTO dp_shift_types (id,name,code,location,role,start_time,end_time,duration_hours,is_night,is_zulage,is_office,color,sort_order,created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+      [newId(),name.trim(),code.trim().toUpperCase(),location||'',role||'',startTime||'08:00',endTime||'20:00',durationHours||12,!!isNight,!!isZulage,!!isOffice,color||'#3b6dd4',sortOrder||0,req.uid]
     );
     ok(res,row);
   } catch(e) { bad(res,'Serverfehler',500); }
@@ -26,12 +26,12 @@ router.post('/shift-types', auth, async (req,res) => {
 
 router.put('/shift-types/:id', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
-  const {name,code,location,role,startTime,endTime,durationHours,isNight,isZulage,color,sortOrder} = req.body;
+  const {name,code,location,role,startTime,endTime,durationHours,isNight,isZulage,isOffice,color,sortOrder} = req.body;
   try {
     const row = await q1(
       `UPDATE dp_shift_types SET name=$1,code=$2,location=$3,role=$4,start_time=$5,end_time=$6,
-       duration_hours=$7,is_night=$8,is_zulage=$9,color=$10,sort_order=$11 WHERE id=$12 RETURNING *`,
-      [name,code?.toUpperCase(),location||'',role||'',startTime,endTime,durationHours,!!isNight,!!isZulage,color,sortOrder||0,req.params.id]
+       duration_hours=$7,is_night=$8,is_zulage=$9,is_office=$10,color=$11,sort_order=$12 WHERE id=$13 RETURNING *`,
+      [name,code?.toUpperCase(),location||'',role||'',startTime,endTime,durationHours,!!isNight,!!isZulage,!!isOffice,color,sortOrder||0,req.params.id]
     );
     if (!row) return bad(res,'Nicht gefunden',404);
     ok(res,row);
@@ -134,26 +134,25 @@ router.get('/employee-params', auth, async (req,res) => {
 
 router.post('/employee-params', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
-  const {employeeId,monthlyHours,canDoNights,maxNightsPerMonth,doubleNightsAllowed,isSpringer} = req.body;
+  const {employeeId,monthlyHours,canDoNights,maxNightsPerMonth,doubleNightsAllowed,isSpringer,officePct} = req.body;
   if (!employeeId) return bad(res,'Mitarbeiter erforderlich',400);
   const mh = parseFloat(monthlyHours)||160;
-  // weekly_hours stored for legacy compatibility (monthly / 4.33)
   const wh = Math.round(mh / 4.33 * 100) / 100;
+  const opct = Math.min(100, Math.max(0, parseInt(officePct)||0));
   try {
     const existing = await q1('SELECT id FROM dp_employee_params WHERE employee_id=$1',[employeeId]);
     if (existing) {
       const row = await q1(
         `UPDATE dp_employee_params SET monthly_hours=$1,weekly_hours=$2,can_do_nights=$3,
-         max_nights_per_month=$4,double_nights_allowed=$5,is_springer=$6,updated_at=NOW() WHERE employee_id=$7 RETURNING *`,
-        [mh,wh,canDoNights!==false,maxNightsPerMonth||null,doubleNightsAllowed!==false,!!isSpringer,employeeId]
+         max_nights_per_month=$4,double_nights_allowed=$5,is_springer=$6,office_pct=$7,updated_at=NOW() WHERE employee_id=$8 RETURNING *`,
+        [mh,wh,canDoNights!==false,maxNightsPerMonth||null,doubleNightsAllowed!==false,!!isSpringer,opct,employeeId]
       );
       return ok(res,row);
     }
     const row = await q1(
-      `INSERT INTO dp_employee_params (id,employee_id,monthly_hours,weekly_hours,work_days_per_week,can_do_nights,max_nights_per_month,double_nights_allowed,is_springer,springer_config,locations,created_by)
-       VALUES ($1,$2,$3,$4,5,$5,$6,$7,$8,'{}','[]',$9) RETURNING *`,
-      [newId(),employeeId,mh,wh,canDoNights!==false,maxNightsPerMonth||null,doubleNightsAllowed!==false,!!isSpringer,req.uid]
-      /* Note: work_days_per_week literal 5 kept for schema compat, no longer user-input */
+      `INSERT INTO dp_employee_params (id,employee_id,monthly_hours,weekly_hours,work_days_per_week,can_do_nights,max_nights_per_month,double_nights_allowed,is_springer,office_pct,springer_config,locations,created_by)
+       VALUES ($1,$2,$3,$4,5,$5,$6,$7,$8,$9,'{}','[]',$10) RETURNING *`,
+      [newId(),employeeId,mh,wh,canDoNights!==false,maxNightsPerMonth||null,doubleNightsAllowed!==false,!!isSpringer,opct,req.uid]
     );
     ok(res,row);
   } catch(e) { bad(res,'Serverfehler',500); }
@@ -534,21 +533,22 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
       empState[p.employee_id] = {
         monthlyTarget,
         hoursAssigned: 0,
+        officeHoursAssigned: 0,
         nightsAssigned: 0,
         weekendsAssigned: 0,
-        // weekly hours tracking: weekKey (YYYY-Www) -> hours
         weeklyHours: {},
         assignments: existingAssignments.filter(a=>a.employee_id===p.employee_id).map(a=>({
           ...a, date: a.date?.toString().slice(0,10),
           shiftType: shiftTypes.find(s=>s.id===a.shift_type_id)||null,
         })),
       };
-      // Seed with existing assignment hours
       for (const a of empState[p.employee_id].assignments) {
         if (!a.absence_type_id) {
-          empState[p.employee_id].hoursAssigned += parseFloat(a.hours_credited)||0;
+          const h = parseFloat(a.hours_credited)||0;
+          empState[p.employee_id].hoursAssigned += h;
           const wk = getISOWeek(a.date);
-          empState[p.employee_id].weeklyHours[wk] = (empState[p.employee_id].weeklyHours[wk]||0) + (parseFloat(a.hours_credited)||0);
+          empState[p.employee_id].weeklyHours[wk] = (empState[p.employee_id].weeklyHours[wk]||0) + h;
+          if (a.shiftType?.is_office) empState[p.employee_id].officeHoursAssigned += h;
         }
       }
     }
@@ -613,6 +613,16 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
           if (slot.shiftType.is_night) score += state.nightsAssigned * 50;
           if (slot.isWeekend || slot.isHoliday) score += state.weekendsAssigned * 30;
           if (isWishDay) score += 10000;
+          // Office percentage scoring
+          if (params.office_pct > 0) {
+            const targetOfficeH = state.monthlyTarget * (params.office_pct / 100);
+            const officeDeficit = targetOfficeH - state.officeHoursAssigned;
+            if (slot.shiftType.is_office) {
+              score -= officeDeficit * 3; // strongly prefer employees who need office hours
+            } else {
+              score += Math.max(0, officeDeficit) * 1.5; // slightly penalize if still needs office hours
+            }
+          }
           cands.push({empId, score});
         }
         return {cands, reasons};
@@ -665,6 +675,7 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
       const wk = getISOWeek(slot.date);
       state.weeklyHours[wk] = (state.weeklyHours[wk]||0) + slotHours;
       if (st.is_night) state.nightsAssigned++;
+      if (st.is_office) state.officeHoursAssigned += slotHours;
       if (slot.isWeekend||slot.isHoliday) state.weekendsAssigned++;
       state.assignments.push(assignment);
     }
