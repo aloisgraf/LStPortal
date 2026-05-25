@@ -56,7 +56,7 @@ let S={
   dpPlans:[], dpShiftTypes:[], dpAbsenceTypes:[], dpEmpParams:[], dpQualifications:[], dpShiftPrefs:[], dpProtocol:[],
   todos:[], _selTodo:null,
   _dpPlanId:null, _dpMatrix:null, _dpStatsExpanded:false, _dpConfigTab:'shift-types',
-  _dpQualLocalChanges:{}, _dpQualLocalPrefsChanges:{},
+  _dpQualLocalChanges:{}, _dpQualLocalPrefsChanges:{}, _dpReportExpanded: false,
   _dpCategoryExpanded:{},
 };
 async function api(method,path2,body){
@@ -4027,9 +4027,9 @@ function renderDPMatrix(data) {
       const title = [at?.label, st?.name].filter(Boolean).join(' + ');
       const style = `background:${color}22;color:${dpTextColor(color)};font-weight:700;line-height:1.1`;
       if (canEdit) {
-        return `<td class="dp-cell" style="${style}" onclick="openDpCellMenu('${emp.id}','${d.date}',event)" title="${esc(title)}">${esc(label)}</td>`;
+        return `<td class="dp-cell" style="${style}" onclick="openDpCellMenu('${emp.id}','${d.date}',event)" title="${esc(title)}">${label}</td>`;
       }
-      return `<td class="dp-cell" style="${style}" title="${esc(title)}">${esc(label)}</td>`;
+      return `<td class="dp-cell" style="${style}" title="${esc(title)}">${label}</td>`;
     }).join('');
 
     const diff = (s.actualHours||0) - (s.targetHours||0);
@@ -4099,6 +4099,52 @@ function renderDPMatrix(data) {
       ${empRows}
     </tbody>
   </table>`;
+
+  // Generierungs-Protokoll am Ende des Plans (zusammenklappbar)
+  const reportData = data.plan?.generation_report;
+  if (reportData) {
+    const report = typeof reportData === 'string' ? JSON.parse(reportData) : reportData;
+    const isExpanded = S._dpReportExpanded || false;
+
+    const renderRuleRow = (rule) => {
+      const icon = rule.status === 'OK' ? '✓' : (rule.status === 'WARNUNG' ? '⚠️' : '✗');
+      const iconColor = rule.status === 'OK' ? '#10b981' : (rule.status === 'WARNUNG' ? '#f59e0b' : '#ef4444');
+      return `<div style="display:flex;gap:8px;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border)">
+        <span style="color:${iconColor};width:20px;flex-shrink:0">${icon}</span>
+        <div><strong>${esc(rule.regel)}</strong><br><span style="color:var(--mu)">${esc(rule.details||'')}</span></div>
+      </div>`;
+    };
+
+    const reportHtml = isExpanded ? `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px">
+        <div>
+          <h5 style="margin:0 0 8px;font-size:13px">⚙️ Dienstplanregeln</h5>
+          ${(report.dienstplanRegeln||[]).map(renderRuleRow).join('')}
+        </div>
+        <div>
+          <h5 style="margin:0 0 8px;font-size:13px">📋 Gesetzliche Regeln</h5>
+          ${(report.gesetzlicheRegeln||[]).map(renderRuleRow).join('')}
+        </div>
+      </div>
+      ${(report.fehler||[]).length > 0 ? `<div style="padding:8px 12px;border-top:1px solid var(--border)">
+        <h5 style="margin:0 0 8px;font-size:13px;color:#f59e0b">⚠️ Hinweise</h5>
+        ${report.fehler.map(e => `<div style="font-size:12px;padding:2px 0"><strong>${esc(e.kategorie||'')}:</strong> ${esc(e.details||e.count||'')}</div>`).join('')}
+      </div>` : ''}
+    ` : '';
+
+    const protDiv = document.createElement('div');
+    protDiv.style.cssText = 'margin-top:16px;border:1px solid var(--border);border-radius:6px;background:var(--sf2);overflow:hidden';
+    protDiv.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;user-select:none;background:var(--sf2)"
+           onclick="S._dpReportExpanded=!S._dpReportExpanded;renderDPMatrix(S._dpMatrix)">
+        <span style="flex:1;font-weight:600;font-size:13px">📋 Generierungs-Protokoll</span>
+        <span style="color:var(--mu);font-size:12px">${(report.dienstplanRegeln||[]).filter(r=>r.status!=='OK').length + (report.gesetzlicheRegeln||[]).filter(r=>r.status!=='OK').length} Warnungen</span>
+        <span>${isExpanded?'▲':'▼'}</span>
+      </div>
+      ${reportHtml}
+    `;
+    c.appendChild(protDiv);
+  }
 }
 
 function openDpCellMenu(empId, date, evt) {
