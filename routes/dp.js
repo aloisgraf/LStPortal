@@ -521,6 +521,7 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
       const wd = date.getDay();
       const dayInfo = {date:dateStr, weekday:wd, isWeekend:wd===0||wd===6, isHoliday:!!AT_HOLIDAYS[dateStr]};
       for (const st of shiftTypes) {
+        if (st.is_office) continue; // office shifts handled in Phase 1
         const needed = getRequiredCount(requirements, st.id, dayInfo);
         const alreadyFilled = existingAssignments.filter(a=>
           a.date?.toString().slice(0,10)===dateStr && a.shift_type_id===st.id && !a.absence_type_id
@@ -573,6 +574,65 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
     const newAssignments = [];
     const protocolEntries = [];
 
+    // ── PHASE 1: Bürodienste (Mo–Fr, 8h, basierend auf office_pct) ──────────────
+    const officeShiftTypes = shiftTypes.filter(st => st.is_office);
+    if (officeShiftTypes.length > 0) {
+      for (const p of empParams) {
+        if (!p.office_pct || p.office_pct <= 0) continue;
+        const empId = p.employee_id;
+        const state = empState[empId];
+        if (!state) continue;
+
+        // Find the first office shift type the employee is qualified for
+        const empQuals = empQualMap[empId];
+        const officeShiftType = officeShiftTypes.find(st => empQuals?.has(st.id));
+        if (!officeShiftType) continue;
+
+        const officeDuration = 8;
+        const targetOfficeH = (parseFloat(p.monthly_hours)||160) * (p.office_pct / 100);
+        const targetOfficeShifts = Math.round(targetOfficeH / officeDuration);
+        const alreadyOfficeShifts = Math.floor(state.officeHoursAssigned / officeDuration);
+        const needed = Math.max(0, targetOfficeShifts - alreadyOfficeShifts);
+        if (needed <= 0) continue;
+
+        // Collect available Mo–Fr days (no holidays, no absence, no existing shift, rules OK)
+        const availableDays = [];
+        for (let d = 1; d <= daysInMonth; d++) {
+          const date = new Date(plan.year, plan.month-1, d);
+          const wd = date.getDay();
+          if (wd === 0 || wd === 6) continue; // only Mo–Fr
+          const dateStr = date.toISOString().slice(0,10);
+          if (AT_HOLIDAYS[dateStr]) continue;
+          if (absenceSet.has(`${empId}_${dateStr}`)) continue;
+          if (state.assignments.some(a => a.date === dateStr && a.shift_type_id && !a.absence_type_id)) continue;
+          const wk = getISOWeek(dateStr);
+          if ((state.weeklyHours[wk]||0) + officeDuration > 48) continue;
+          if (!checkRestPeriod(state.assignments, {date: dateStr, shiftType: officeShiftType}, shiftTypes)) continue;
+          availableDays.push(dateStr);
+        }
+
+        // Distribute `needed` shifts evenly across available days
+        for (let i = 0; i < needed && i < availableDays.length; i++) {
+          const idx = Math.min(Math.floor((i / needed) * availableDays.length), availableDays.length - 1);
+          const dateStr = availableDays[idx];
+          const assignment = {
+            id: newId(), plan_id: plan.id, employee_id: empId,
+            date: dateStr, shift_type_id: officeShiftType.id, absence_type_id: null,
+            hours_credited: officeDuration, hours_source: 'shift',
+            is_overtime: false, is_locked: false, source: 'generated', notes: '',
+            created_by: req.uid, shiftType: officeShiftType,
+          };
+          newAssignments.push(assignment);
+          state.hoursAssigned += officeDuration;
+          state.officeHoursAssigned += officeDuration;
+          const wk = getISOWeek(dateStr);
+          state.weeklyHours[wk] = (state.weeklyHours[wk]||0) + officeDuration;
+          state.assignments.push(assignment);
+        }
+      }
+    }
+
+    // ── PHASE 2: Reguläre Dienste aus Anforderungen ──────────────────────────────
     for (const slot of slots) {
       const slotHours = parseFloat(slot.shiftType.duration_hours)||0;
 
@@ -646,17 +706,6 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
           if (slot.shiftType.is_night) score += state.nightsAssigned * 50;
           if (slot.isWeekend || slot.isHoliday) score += state.weekendsAssigned * 30;
           if (isWishDay) score += 10000;
-
-          // Office percentage scoring
-          if (params.office_pct > 0) {
-            const targetOfficeH = state.monthlyTarget * (params.office_pct / 100);
-            const officeDeficit = targetOfficeH - state.officeHoursAssigned;
-            if (slot.shiftType.is_office) {
-              score -= officeDeficit * 3;
-            } else {
-              score += Math.max(0, officeDeficit) * 1.5;
-            }
-          }
 
           // FD-Springer Typ B: strongly prefer FD slots until quota reached
           if (params.fd_springer_type === 'LS_to_FD' && slot.shiftType.code === 'FD') {
