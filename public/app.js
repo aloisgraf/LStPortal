@@ -4318,7 +4318,7 @@ async function renderDPConfigEmpParams() {
     return `<div class="dp-cfg-row">
       <span class="av-sm" style="background:${u.color}">${esc(u.initials)}</span>
       <span class="dp-cfg-label">${esc(u.name)}</span>
-      <span style="font-size:11px;color:var(--mu)">${p.monthly_hours||Math.round(p.weekly_hours*4.33)}h/Mo${p.office_pct?' 🏢'+p.office_pct+'%':''}${p.can_do_nights?' 🌙':''}${p.is_springer?' 🔄':''}</span>
+      <span style="font-size:11px;color:var(--mu)">${p.monthly_hours||Math.round(p.weekly_hours*4.33)}h/Mo${p.office_pct?' 🏢'+p.office_pct+'%':''}${p.can_do_nights?' 🌙':''}${p.is_springer?' 🔄':''}${p.fd_springer_type==='FD_to_LS'?' 🚑A-'+p.fd_springer_location:''}${p.fd_springer_type==='LS_to_FD'?' 🚑B-'+p.fd_springer_location:''}</span>
       <button class="btn-s" onclick="openDpEmpParamForm('${u.id}')">✏️</button>
     </div>`;
   }).join('');
@@ -4602,6 +4602,20 @@ async function deleteDpAbsenceType(id) {
   } catch(e) { toast('Fehler: '+e.message,'err'); }
 }
 
+function dpEpfSpringerChange() {
+  const checked = document.getElementById('dpEpfSpringer').checked;
+  document.getElementById('dpEpfFdSpringerSection').style.display = checked ? '' : 'none';
+  if (!checked) {
+    document.getElementById('dpEpfFdType').value = '';
+    document.getElementById('dpEpfFdDetails').style.display = 'none';
+  }
+}
+
+function dpEpfFdTypeChange() {
+  const val = document.getElementById('dpEpfFdType').value;
+  document.getElementById('dpEpfFdDetails').style.display = val ? '' : 'none';
+}
+
 function openDpEmpParamForm(empId) {
   const p = S.dpEmpParams?.find(x=>x.employee_id===empId);
   const empSel = document.getElementById('dpEpfEmp');
@@ -4613,20 +4627,31 @@ function openDpEmpParamForm(empId) {
   document.getElementById('dpEpfSpringer').checked = !!p?.is_springer;
   document.getElementById('dpEpfMaxNights').value = p?.max_nights_per_month||'';
   document.getElementById('dpEpfOfficePct').value = p?.office_pct||0;
+  const hasFdSpringer = !!p?.fd_springer_type;
+  document.getElementById('dpEpfFdSpringerSection').style.display = p?.is_springer ? '' : 'none';
+  document.getElementById('dpEpfFdType').value = p?.fd_springer_type||'';
+  document.getElementById('dpEpfFdLocation').value = p?.fd_springer_location||'Nord';
+  document.getElementById('dpEpfFdShifts').value = p?.fd_springer_shifts_per_month||'';
+  document.getElementById('dpEpfFdDetails').style.display = hasFdSpringer ? '' : 'none';
   openModal('dpEmpParamFormOv');
 }
 
 async function submitDpEmpParamForm() {
   const empId = document.getElementById('dpEpfEmpId').value || document.getElementById('dpEpfEmp').value;
   if (!empId) return toast('Mitarbeiter auswählen','err');
+  const isSpringer = document.getElementById('dpEpfSpringer').checked;
+  const fdType = isSpringer ? (document.getElementById('dpEpfFdType').value||null) : null;
   const body = {
     employeeId: empId,
     monthlyHours: parseFloat(document.getElementById('dpEpfMonthly').value)||160,
     canDoNights: document.getElementById('dpEpfNights').checked,
     doubleNightsAllowed: document.getElementById('dpEpfDoubleNights').checked,
-    isSpringer: document.getElementById('dpEpfSpringer').checked,
+    isSpringer,
     maxNightsPerMonth: document.getElementById('dpEpfMaxNights').value ? parseInt(document.getElementById('dpEpfMaxNights').value) : null,
     officePct: parseInt(document.getElementById('dpEpfOfficePct').value)||0,
+    fdSpringerType: fdType,
+    fdSpringerLocation: fdType ? (document.getElementById('dpEpfFdLocation').value||null) : null,
+    fdSpringerShiftsPerMonth: fdType ? (parseInt(document.getElementById('dpEpfFdShifts').value)||null) : null,
   };
   try {
     await api('POST', '/dp/employee-params', body);

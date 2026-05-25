@@ -1637,12 +1637,35 @@
       <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:4px">
         <label class="rck"><input type="checkbox" id="dpEpfNights" checked> Nachtdienste m&#246;glich</label>
         <label class="rck"><input type="checkbox" id="dpEpfDoubleNights" checked> Doppeln&#228;chte erlaubt</label>
-        <label class="rck"><input type="checkbox" id="dpEpfSpringer"> Springer</label>
+        <label class="rck"><input type="checkbox" id="dpEpfSpringer" onchange="dpEpfSpringerChange()"> Springer</label>
       </div>
       <div class="fg" style="margin-top:8px"><label>Max. N&#228;chte/Monat (leer = kein Limit)</label><input type="number" id="dpEpfMaxNights" placeholder="z.B. 4" min="0" max="31"></div>
       <div class="fg" style="margin-top:8px"><label>Bürodienst-Anteil % (0 = kein Bürodienst)</label>
         <input type="number" id="dpEpfOfficePct" value="0" min="0" max="100" step="5" placeholder="z.B. 30">
         <small style="color:var(--mu);font-size:11px">Anteil der monatlichen Stunden als Bürodienst (B). 0 = kein Bürodienst-Anteil.</small>
+      </div>
+      <div id="dpEpfFdSpringerSection" style="margin-top:12px;padding:10px 12px;background:var(--sf2);border-radius:6px;border:1px solid var(--border);display:none">
+        <div style="font-weight:600;font-size:12px;margin-bottom:8px">🚑 FD-Springer Konfiguration</div>
+        <div class="fg"><label>Springer-Typ</label>
+          <select id="dpEpfFdType" onchange="dpEpfFdTypeChange()">
+            <option value="">— kein FD-Springer —</option>
+            <option value="FD_to_LS">Typ A: FD → Leitstelle (FD-MA kommt in Leitstelle)</option>
+            <option value="LS_to_FD">Typ B: Leitstelle → FD (LS-MA geht in Fahrdienst)</option>
+          </select>
+        </div>
+        <div id="dpEpfFdDetails" style="display:none">
+          <div style="display:flex;gap:12px">
+            <div class="fg" style="flex:1"><label>Standort</label>
+              <select id="dpEpfFdLocation">
+                <option value="Nord">Nord</option>
+                <option value="Süd">Süd</option>
+              </select>
+            </div>
+            <div class="fg" style="flex:1"><label>Dienste/Monat</label>
+              <input type="number" id="dpEpfFdShifts" min="1" max="31" step="1" placeholder="z.B. 5">
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="mf"><button class="btn" onclick="submitDpEmpParamForm()">&#10003; Speichern</button></div>

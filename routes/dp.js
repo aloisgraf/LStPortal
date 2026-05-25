@@ -134,25 +134,37 @@ router.get('/employee-params', auth, async (req,res) => {
 
 router.post('/employee-params', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
-  const {employeeId,monthlyHours,canDoNights,maxNightsPerMonth,doubleNightsAllowed,isSpringer,officePct} = req.body;
+  const {employeeId,monthlyHours,canDoNights,maxNightsPerMonth,doubleNightsAllowed,isSpringer,
+         officePct,fdSpringerType,fdSpringerLocation,fdSpringerShiftsPerMonth} = req.body;
   if (!employeeId) return bad(res,'Mitarbeiter erforderlich',400);
   const mh = parseFloat(monthlyHours)||160;
   const wh = Math.round(mh / 4.33 * 100) / 100;
   const opct = Math.min(100, Math.max(0, parseInt(officePct)||0));
+  const fdType = ['FD_to_LS','LS_to_FD'].includes(fdSpringerType) ? fdSpringerType : null;
+  const fdLoc  = ['Nord','Süd'].includes(fdSpringerLocation) ? fdSpringerLocation : null;
+  const fdSpm  = fdType ? (parseInt(fdSpringerShiftsPerMonth)||null) : null;
   try {
     const existing = await q1('SELECT id FROM dp_employee_params WHERE employee_id=$1',[employeeId]);
     if (existing) {
       const row = await q1(
         `UPDATE dp_employee_params SET monthly_hours=$1,weekly_hours=$2,can_do_nights=$3,
-         max_nights_per_month=$4,double_nights_allowed=$5,is_springer=$6,office_pct=$7,updated_at=NOW() WHERE employee_id=$8 RETURNING *`,
-        [mh,wh,canDoNights!==false,maxNightsPerMonth||null,doubleNightsAllowed!==false,!!isSpringer,opct,employeeId]
+         max_nights_per_month=$4,double_nights_allowed=$5,is_springer=$6,office_pct=$7,
+         fd_springer_type=$8,fd_springer_location=$9,fd_springer_shifts_per_month=$10,
+         updated_at=NOW() WHERE employee_id=$11 RETURNING *`,
+        [mh,wh,canDoNights!==false,maxNightsPerMonth||null,doubleNightsAllowed!==false,
+         !!isSpringer,opct,fdType,fdLoc,fdSpm,employeeId]
       );
       return ok(res,row);
     }
     const row = await q1(
-      `INSERT INTO dp_employee_params (id,employee_id,monthly_hours,weekly_hours,work_days_per_week,can_do_nights,max_nights_per_month,double_nights_allowed,is_springer,office_pct,springer_config,locations,created_by)
-       VALUES ($1,$2,$3,$4,5,$5,$6,$7,$8,$9,'{}','[]',$10) RETURNING *`,
-      [newId(),employeeId,mh,wh,canDoNights!==false,maxNightsPerMonth||null,doubleNightsAllowed!==false,!!isSpringer,opct,req.uid]
+      `INSERT INTO dp_employee_params
+         (id,employee_id,monthly_hours,weekly_hours,work_days_per_week,can_do_nights,
+          max_nights_per_month,double_nights_allowed,is_springer,office_pct,
+          fd_springer_type,fd_springer_location,fd_springer_shifts_per_month,
+          springer_config,locations,created_by)
+       VALUES ($1,$2,$3,$4,5,$5,$6,$7,$8,$9,$10,$11,$12,'{}','[]',$13) RETURNING *`,
+      [newId(),employeeId,mh,wh,canDoNights!==false,maxNightsPerMonth||null,
+       doubleNightsAllowed!==false,!!isSpringer,opct,fdType,fdLoc,fdSpm,req.uid]
     );
     ok(res,row);
   } catch(e) { bad(res,'Serverfehler',500); }
@@ -534,6 +546,7 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
         monthlyTarget,
         hoursAssigned: 0,
         officeHoursAssigned: 0,
+        fdSpringerShiftsAssigned: 0,
         nightsAssigned: 0,
         weekendsAssigned: 0,
         weeklyHours: {},
@@ -549,6 +562,7 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
           const wk = getISOWeek(a.date);
           empState[p.employee_id].weeklyHours[wk] = (empState[p.employee_id].weeklyHours[wk]||0) + h;
           if (a.shiftType?.is_office) empState[p.employee_id].officeHoursAssigned += h;
+          if (a.shiftType?.code === 'FD') empState[p.employee_id].fdSpringerShiftsAssigned++;
         }
       }
     }
@@ -597,6 +611,25 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
           if (slot.shiftType.is_night && !params.can_do_nights)
             { reasons[empId]='cannot_do_nights'; continue; }
 
+          // Hard: FD-Springer Typ A (FD→LS): quota cap — only schedule up to configured shifts
+          if (params.fd_springer_type === 'FD_to_LS') {
+            const quota = parseInt(params.fd_springer_shifts_per_month)||0;
+            if (quota > 0 && state.fdSpringerShiftsAssigned >= quota) {
+              reasons[empId]='fd_springer_quota_reached'; continue;
+            }
+          }
+
+          // Hard: FD-Springer Typ B (LS→FD): only allowed in FD slots up to quota, never more
+          if (params.fd_springer_type === 'LS_to_FD' && slot.shiftType.code === 'FD') {
+            const quota = parseInt(params.fd_springer_shifts_per_month)||0;
+            if (state.fdSpringerShiftsAssigned >= quota)
+              { reasons[empId]='fd_springer_fd_quota_reached'; continue; }
+          }
+          // Hard: Non-FD-Springer employees must not be scheduled for FD slots
+          if (slot.shiftType.code === 'FD' && params.fd_springer_type !== 'LS_to_FD') {
+            reasons[empId]='not_fd_springer'; continue;
+          }
+
           // ── SOFT RULES (only enforced on first pass) ───────────────────
           if (enforceSoftRules) {
             if (state.hoursAssigned >= state.monthlyTarget)
@@ -613,16 +646,25 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
           if (slot.shiftType.is_night) score += state.nightsAssigned * 50;
           if (slot.isWeekend || slot.isHoliday) score += state.weekendsAssigned * 30;
           if (isWishDay) score += 10000;
+
           // Office percentage scoring
           if (params.office_pct > 0) {
             const targetOfficeH = state.monthlyTarget * (params.office_pct / 100);
             const officeDeficit = targetOfficeH - state.officeHoursAssigned;
             if (slot.shiftType.is_office) {
-              score -= officeDeficit * 3; // strongly prefer employees who need office hours
+              score -= officeDeficit * 3;
             } else {
-              score += Math.max(0, officeDeficit) * 1.5; // slightly penalize if still needs office hours
+              score += Math.max(0, officeDeficit) * 1.5;
             }
           }
+
+          // FD-Springer Typ B: strongly prefer FD slots until quota reached
+          if (params.fd_springer_type === 'LS_to_FD' && slot.shiftType.code === 'FD') {
+            const quota = parseInt(params.fd_springer_shifts_per_month)||0;
+            const deficit = quota - state.fdSpringerShiftsAssigned;
+            score -= Math.max(0, deficit) * 200; // highest priority for FD until quota
+          }
+
           cands.push({empId, score});
         }
         return {cands, reasons};
@@ -676,6 +718,8 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
       state.weeklyHours[wk] = (state.weeklyHours[wk]||0) + slotHours;
       if (st.is_night) state.nightsAssigned++;
       if (st.is_office) state.officeHoursAssigned += slotHours;
+      if (st.code === 'FD' || empParamMap[winnerId]?.fd_springer_type === 'FD_to_LS')
+        state.fdSpringerShiftsAssigned++;
       if (slot.isWeekend||slot.isHoliday) state.weekendsAssigned++;
       state.assignments.push(assignment);
     }

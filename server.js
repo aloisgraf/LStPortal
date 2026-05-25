@@ -470,6 +470,9 @@ async function initDB() {
     `ALTER TABLE todo_items ADD COLUMN IF NOT EXISTS due_date DATE DEFAULT NULL`,
     `ALTER TABLE dp_shift_types ADD COLUMN IF NOT EXISTS is_office BOOLEAN NOT NULL DEFAULT false`,
     `ALTER TABLE dp_employee_params ADD COLUMN IF NOT EXISTS office_pct INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE dp_employee_params ADD COLUMN IF NOT EXISTS fd_springer_type TEXT DEFAULT NULL`,
+    `ALTER TABLE dp_employee_params ADD COLUMN IF NOT EXISTS fd_springer_location TEXT DEFAULT NULL`,
+    `ALTER TABLE dp_employee_params ADD COLUMN IF NOT EXISTS fd_springer_shifts_per_month INTEGER DEFAULT NULL`,
     `ALTER TABLE discussion_items ADD COLUMN IF NOT EXISTS link TEXT DEFAULT NULL`,
     `CREATE TABLE IF NOT EXISTS todo_item_notifications (
   id TEXT PRIMARY KEY,
