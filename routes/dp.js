@@ -254,7 +254,13 @@ router.post('/employee-qualifications', auth, async (req,res) => {
 router.delete('/employee-qualifications/:empId/:stId', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
   try {
-    await q('DELETE FROM dp_employee_qualifications WHERE employee_id=$1 AND shift_type_id=$2',[req.params.empId,req.params.stId]);
+    // Delete from specific version or NULL version if not specified
+    const validFrom = req.body?.validFrom || null;
+    if (validFrom === null) {
+      await q('DELETE FROM dp_employee_qualifications WHERE employee_id=$1 AND shift_type_id=$2 AND valid_from IS NULL',[req.params.empId,req.params.stId]);
+    } else {
+      await q('DELETE FROM dp_employee_qualifications WHERE employee_id=$1 AND shift_type_id=$2 AND valid_from=$3::date',[req.params.empId,req.params.stId,validFrom]);
+    }
     ok(res);
   } catch(e) { bad(res,'Serverfehler',500); }
 });

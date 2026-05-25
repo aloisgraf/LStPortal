@@ -56,6 +56,7 @@ let S={
   dpPlans:[], dpShiftTypes:[], dpAbsenceTypes:[], dpEmpParams:[], dpQualifications:[], dpShiftPrefs:[], dpProtocol:[],
   todos:[], _selTodo:null,
   _dpPlanId:null, _dpMatrix:null, _dpStatsExpanded:false, _dpConfigTab:'shift-types',
+  _dpQualLocalChanges:{}, _dpQualLocalPrefsChanges:{},
 };
 async function api(method,path2,body){
   const opts={method,credentials:'include',headers:{}};
@@ -4482,34 +4483,87 @@ async function renderDPConfigQualifications() {
   try { qualifications = await api('GET', '/dp/employee-qualifications'); } catch(e) {}
   S.dpQualifications = qualifications;
 
+  let shiftPrefs = [];
+  try { shiftPrefs = await api('GET', '/dp/shift-preferences'); } catch(e) {}
+  S.dpShiftPrefs = shiftPrefs;
+
   const shiftTypes = S.dpShiftTypes;
   if (!shiftTypes.length) return '<div style="color:var(--mu)">Zuerst Schichttypen anlegen.</div>';
 
-  // Build map: empId -> Set of shiftTypeIds
+  // Build qualMap: empId -> Set of stIds (CURRENT qualifications, only non-versioned or today's active)
+  const today = new Date().toISOString().slice(0,10);
   const qualMap = {};
   for (const q of qualifications) {
-    if (!qualMap[q.employee_id]) qualMap[q.employee_id] = new Set();
-    qualMap[q.employee_id].add(q.shift_type_id);
+    if (!q.valid_from || q.valid_from <= today) {
+      if (!qualMap[q.employee_id]) qualMap[q.employee_id] = new Set();
+      qualMap[q.employee_id].add(q.shift_type_id);
+    }
+  }
+
+  // Build prefMap: empId -> {stId -> weight}
+  const prefMap = {};
+  for (const p of shiftPrefs) {
+    if (!p.valid_from || p.valid_from <= today) {
+      if (!prefMap[p.employee_id]) prefMap[p.employee_id] = {};
+      prefMap[p.employee_id][p.shift_type_id] = p.preference_weight;
+    }
   }
 
   const rows = S.users.map(u => {
-    const empQuals = qualMap[u.id] || new Set();
+    const empId = u.id;
+    const empQuals = qualMap[empId] || new Set();
+    const empPrefs = prefMap[empId] || {};
+    const localChanges = S._dpQualLocalChanges[empId] || {adds: new Set(), removes: new Set()};
+    const localPrefs = S._dpQualLocalPrefsChanges[empId] || {};
+
+    // Compute current state after local changes
+    const currentQuals = new Set(empQuals);
+    for (const stId of localChanges.adds) currentQuals.add(stId);
+    for (const stId of localChanges.removes) currentQuals.delete(stId);
+
+    // Chips HTML
     const chips = shiftTypes.map(st => {
-      const has = empQuals.has(st.id);
-      return `<span style="display:inline-flex;align-items:center;gap:4px;background:${has?st.color+'20':'var(--bg)'};color:${has?st.color:'var(--mu)'};border:1px solid ${has?st.color:'var(--border)'};border-radius:20px;padding:2px 10px;font-size:12px;cursor:pointer;font-weight:${has?'700':'400'}" onclick="toggleDpQualification('${u.id}','${st.id}',${has})" title="${has?'Entfernen':'Hinzufügen'}">
-        ${esc(st.code)}
+      const has = currentQuals.has(st.id);
+      const changed = localChanges.adds.has(st.id) || localChanges.removes.has(st.id);
+      return `<span style="display:inline-flex;align-items:center;gap:4px;background:${has?(st.color+'20'):'var(--bg)'};color:${has?st.color:'var(--mu)'};border:1px solid ${has?st.color:'var(--border)'};border-radius:20px;padding:2px 10px;font-size:12px;cursor:pointer;font-weight:${has?'700':'400'}${changed?';text-decoration:underline':''}" onclick="toggleQualChipLocal('${empId}','${st.id}')" title="${has?'Entfernen':'Hinzufügen'}">
+        ${esc(st.code)}${changed?' *':''}
       </span>`;
     }).join(' ');
-    return `<div class="dp-cfg-row">
-      <span class="av-sm" style="background:${u.color}">${esc(u.initials)}</span>
-      <span class="dp-cfg-label" style="min-width:120px">${esc(u.name)}</span>
-      <div style="display:flex;flex-wrap:wrap;gap:4px;flex:1">${chips}</div>
+
+    // Weights table HTML
+    const weightsRows = shiftTypes.map(st => {
+      const currentWeight = localPrefs[st.id] !== undefined ? localPrefs[st.id] : (empPrefs[st.id] || 0);
+      const changed = localPrefs[st.id] !== undefined && localPrefs[st.id] !== (empPrefs[st.id] || 0);
+      return `<div style="display:grid;grid-template-columns:100px 1fr 60px;gap:8px;align-items:center;font-size:13px;padding:4px 0${changed?';background:var(--acc20)':''}">
+        <span>${esc(st.code)}:</span>
+        <input type="range" min="0" max="100" value="${currentWeight}" style="flex:1" onchange="updateQualPrefLocal('${empId}','${st.id}',this.value)">
+        <span style="text-align:right;min-width:35px">${currentWeight}%</span>
+      </div>`;
+    }).join('');
+
+    // Changes detected?
+    const hasChanges = localChanges.adds.size > 0 || localChanges.removes.size > 0 || Object.keys(localPrefs).length > 0;
+
+    return `<div style="margin-bottom:24px;padding:12px;background:var(--sf2);border-radius:6px;border:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+        <span class="av-sm" style="background:${u.color}">${esc(u.initials)}</span>
+        <span style="font-weight:600;flex:1">${esc(u.name)}</span>
+        <span style="font-size:11px;color:var(--mu);background:var(--bg);padding:2px 6px;border-radius:3px">Standard</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px">${chips}</div>
+      <div style="background:var(--bg);padding:8px;border-radius:4px;margin-top:8px">
+        ${weightsRows}
+      </div>
+      ${hasChanges?`<div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn-s" onclick="submitQualChanges('${empId}',null)">✓ Speichern</button>
+        <button class="btn-s" style="background:var(--acc);color:white" onclick="openNewQualVersionDialog('${empId}')">+ Neue Version ab...</button>
+      </div>`:''}
     </div>`;
   }).join('');
 
   const anyDefined = qualifications.length > 0;
   const infoText = anyDefined
-    ? `<div style="color:var(--mu);font-size:12px;margin-bottom:10px">Nur markierte Schichttypen werden beim Auto-Generieren für den jeweiligen Mitarbeiter berücksichtigt. Schichttypen ohne <em>jegliche</em> Qualifikation können von allen vergeben werden.</div>`
+    ? `<div style="color:var(--mu);font-size:12px;margin-bottom:10px">Klicken Sie auf die Chips zum Aktivieren/Deaktivieren. Dienst-Gewichtungen (0-100%) bestimmen Planungspriorität.</div>`
     : `<div style="color:#f59e0b;font-size:12px;margin-bottom:10px">⚠️ Noch keine Qualifikationen definiert — der Scheduler kann jeden Mitarbeiter für jeden Dienst einteilen.</div>`;
 
   return `<div class="dp-cfg-card">
@@ -4519,18 +4573,69 @@ async function renderDPConfigQualifications() {
   </div>`;
 }
 
-async function toggleDpQualification(empId, shiftTypeId, currentlyHas) {
-  try {
-    if (currentlyHas) {
-      await api('DELETE', `/dp/employee-qualifications/${empId}/${shiftTypeId}`);
+function toggleQualChipLocal(empId, stId) {
+  if (!S._dpQualLocalChanges[empId]) S._dpQualLocalChanges[empId] = {adds: new Set(), removes: new Set()};
+  const ch = S._dpQualLocalChanges[empId];
+
+  // Toggle: if in adds, remove from adds; if in removes, remove from removes; otherwise add to one or the other
+  if (ch.adds.has(stId)) {
+    ch.adds.delete(stId);
+  } else if (ch.removes.has(stId)) {
+    ch.removes.delete(stId);
+  } else {
+    // Check current state
+    const today = new Date().toISOString().slice(0,10);
+    const qual = S.dpQualifications.find(q => q.employee_id === empId && q.shift_type_id === stId && (!q.valid_from || q.valid_from <= today));
+    if (qual) {
+      ch.removes.add(stId);
     } else {
-      const dateStr = prompt('Gültig ab? (leer = immer, Format: JJJJ-MM-TT)', '');
-      if (dateStr === null) return; // user cancelled
-      await api('POST', '/dp/employee-qualifications', {employeeId:empId, shiftTypeId, validFrom: dateStr||null});
+      ch.adds.add(stId);
     }
-    S._dpConfigTab = 'qualifications';
+  }
+  renderDPConfigTab();
+}
+
+function updateQualPrefLocal(empId, stId, value) {
+  if (!S._dpQualLocalPrefsChanges[empId]) S._dpQualLocalPrefsChanges[empId] = {};
+  S._dpQualLocalPrefsChanges[empId][stId] = parseInt(value);
+  renderDPConfigTab();
+}
+
+async function submitQualChanges(empId, validFrom) {
+  const ch = S._dpQualLocalChanges[empId] || {adds: new Set(), removes: new Set()};
+  const prefs = S._dpQualLocalPrefsChanges[empId] || {};
+
+  try {
+    // Add new qualifications
+    for (const stId of ch.adds) {
+      await api('POST', '/dp/employee-qualifications', {employeeId: empId, shiftTypeId: stId, validFrom: validFrom});
+    }
+    // Remove qualifications
+    for (const stId of ch.removes) {
+      await api('DELETE', `/dp/employee-qualifications/${empId}/${stId}`);
+    }
+    // Save preference weights
+    for (const [stId, weight] of Object.entries(prefs)) {
+      await api('POST', '/dp/shift-preferences', {employeeId: empId, shiftTypeId: stId, preferenceWeight: weight, validFrom: validFrom});
+    }
+
+    // Clear local changes
+    S._dpQualLocalChanges[empId] = {adds: new Set(), removes: new Set()};
+    S._dpQualLocalPrefsChanges[empId] = {};
+
+    // Reload qualifications
+    S.dpQualifications = await api('GET', '/dp/employee-qualifications');
+    S.dpShiftPrefs = await api('GET', '/dp/shift-preferences');
+
     renderDPConfigTab();
+    toast('Gespeichert');
   } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+async function openNewQualVersionDialog(empId) {
+  const dateStr = prompt('Neue Version gültig ab (Format: JJJJ-MM-TT):', '');
+  if (!dateStr) return;
+  await submitQualChanges(empId, dateStr);
 }
 
 function openDpShiftTypeForm(id) {
