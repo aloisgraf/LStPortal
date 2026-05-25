@@ -129,6 +129,7 @@ router.get('/', auth, async (req,res) => {
       users: usersRaw.map(u=>({
         id:u.id, name:u.name, initials:u.initials, roles:parseRoles(u.roles),
         color:u.color, mustChangePW:u.must_change_pw,
+        category:u.category||'',
         isOnline: !!(u.last_seen && new Date(u.last_seen) > fiveMinAgo),
       })),
       categories: cats,

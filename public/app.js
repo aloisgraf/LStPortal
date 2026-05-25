@@ -57,6 +57,7 @@ let S={
   todos:[], _selTodo:null,
   _dpPlanId:null, _dpMatrix:null, _dpStatsExpanded:false, _dpConfigTab:'shift-types',
   _dpQualLocalChanges:{}, _dpQualLocalPrefsChanges:{},
+  _dpCategoryExpanded:{},
 };
 async function api(method,path2,body){
   const opts={method,credentials:'include',headers:{}};
@@ -3998,8 +3999,15 @@ function renderDPMatrix(data) {
     </tr>`;
   }).join('');
 
-  // Build employee rows
-  let empRows = emps.map(emp => {
+  // Build employee rows grouped by category
+  const grouped = {};
+  for (const emp of emps) {
+    const cat = emp.category || '(ohne Kategorie)';
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push(emp);
+  }
+
+  const buildEmpRow = (emp) => {
     const s = summary[emp.id] || {};
     const assign = empAssignMap[emp.id] || {};
 
@@ -4046,6 +4054,27 @@ function renderDPMatrix(data) {
       </td>
       ${cells}${basicStats}${extraStats}
     </tr>`;
+  };
+
+  const categories = Object.keys(grouped).sort();
+  let empRows = categories.map(cat => {
+    const empList = grouped[cat].sort((a, b) => a.name.split(' ').pop().localeCompare(b.name.split(' ').pop(), 'de'));
+    const catId = 'dpcat_' + cat.replace(/\W/g, '_');
+    const isExpanded = S._dpCategoryExpanded?.[catId] ?? true;
+    const colSpan = days.length + 1 + statsBasic.length + (expanded?statsExtra.length:0);
+
+    let html = `<tr style="cursor:pointer;background:var(--sf2);font-weight:600" onclick="S._dpCategoryExpanded=S._dpCategoryExpanded||{}; S._dpCategoryExpanded['${catId}'] = !S._dpCategoryExpanded['${catId}']; renderDPMatrix(S._dpMatrix)">
+      <td colspan="${colSpan}" style="padding:8px 12px;display:flex;align-items:center;gap:8px">
+        <span>${isExpanded?'▼':'▶'}</span>
+        <span>${esc(cat)} (${empList.length})</span>
+      </td>
+    </tr>`;
+
+    if (isExpanded) {
+      html += empList.map(emp => buildEmpRow(emp)).join('');
+    }
+
+    return html;
   }).join('');
 
   // Stats header row
