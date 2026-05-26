@@ -4170,12 +4170,17 @@ function openDpCellMenu(empId, date, evt) {
   if (!S._dpMatrix) return;
   evt.stopPropagation();
 
-  const {shiftTypes, absenceTypes, empAssignMap} = S._dpMatrix;
+  const {shiftTypes, absenceTypes, empAssignMap, empQualMap, wishDaySet} = S._dpMatrix;
   const assign = empAssignMap[empId]?.[date];
   const u = getU(empId);
 
+  // Filter shift types to only those the employee is qualified for
+  const empQuals = empQualMap?.[empId] || [];
+  const qualifiedShiftTypes = empQuals.length > 0
+    ? shiftTypes.filter(st => empQuals.includes(st.id))
+    : shiftTypes; // if no qualifications defined, show all
+
   const dayWD = new Date(date).getDay();
-  const isWE = dayWD===0||dayWD===6;
   const dateDisplay = date.slice(8)+'.'+date.slice(5,7)+'. ('+WD_SHORT[dayWD]+')';
 
   let html = `<div class="dp-menu-hdr">${esc(u?.name||empId)} · ${dateDisplay}</div>`;
@@ -4187,37 +4192,54 @@ function openDpCellMenu(empId, date, evt) {
     html += `<div class="dp-menu-sep"></div>`;
   }
 
-  html += `<div class="dp-menu-hdr">Dienst zuweisen</div>`;
-  shiftTypes.forEach(st => {
-    html += `<div class="dp-menu-item" onclick="dpAssign('${empId}','${date}','${st.id}',null)" style="color:${st.color}">
-      <span class="dp-color-dot" style="background:${st.color}"></span>${esc(st.code)} – ${esc(st.name)}
-    </div>`;
-  });
+  // Only show qualified shift types
+  if (qualifiedShiftTypes.length > 0) {
+    html += `<div class="dp-menu-hdr">Dienst zuweisen</div>`;
+    qualifiedShiftTypes.forEach(st => {
+      html += `<div class="dp-menu-item" onclick="dpAssign('${empId}','${date}','${st.id}',null)" style="color:${st.color}">
+        <span class="dp-color-dot" style="background:${st.color}"></span>${esc(st.code)} – ${esc(st.name)}
+      </div>`;
+    });
+  }
 
-  // Abwesenheiten IMMER anzeigen, auch auf leeren Tagen
+  // Absences
   html += `<div class="dp-menu-sep"></div><div class="dp-menu-hdr">Abwesenheit</div>`;
   absenceTypes.forEach(at => {
-    // Wenn bereits ein Dienst eingetragen: Dienst-ID übergeben (für Stunden-Berechnung und Anzeige)
     const shiftArg = assign?.shift_type_id ? `'${assign.shift_type_id}'` : 'null';
     html += `<div class="dp-menu-item" onclick="dpAssign('${empId}','${date}',${shiftArg},'${at.id}')" style="color:${at.color}">
       <span class="dp-color-dot" style="background:${at.color}"></span>${esc(at.code)} – ${esc(at.label)}
     </div>`;
   });
 
+  // Wish day toggle
+  const wishSet = new Set(wishDaySet || []);
+  const isWishDay = wishSet.has(`${empId}_${date}`);
+  html += `<div class="dp-menu-sep"></div>`;
+  html += `<div class="dp-menu-item" onclick="dpToggleWishDay('${empId}','${date}',${isWishDay})" style="color:${isWishDay?'#f59e0b':'var(--mu)'}">
+    ${isWishDay ? '★ Wunschtag entfernen' : '☆ Als Wunschtag markieren'}
+  </div>`;
+
   if (assign) {
     html += `<div class="dp-menu-sep"></div>`;
     html += `<div class="dp-menu-item" style="color:#ef4444" onclick="dpClearAssign('${assign.id}','${date}')">✕ Eintrag löschen</div>`;
   }
 
+  // Position menu using fixed + viewport coords
   const menu = document.getElementById('dpCellMenu');
   menu.innerHTML = html;
   menu.style.display = 'block';
+  menu.style.maxHeight = '75vh';
+  menu.style.overflowY = 'auto';
+  menu.style.position = 'fixed';
 
   const rect = evt.target.getBoundingClientRect();
-  let left = rect.left + window.scrollX;
-  let top = rect.bottom + window.scrollY + 4;
-  if (left + 220 > window.innerWidth) left = window.innerWidth - 224;
-  if (top + 300 > window.innerHeight) top = rect.top + window.scrollY - 310;
+  let left = rect.left;
+  let top = rect.bottom + 4;
+  if (left + 230 > window.innerWidth) left = window.innerWidth - 234;
+  if (top + 300 > window.innerHeight) {
+    top = rect.top - Math.min(300, rect.top - 4);
+  }
+  if (top < 4) top = 4;
   menu.style.left = left + 'px';
   menu.style.top = top + 'px';
 
@@ -4255,6 +4277,26 @@ async function dpClearAssign(assignId, date) {
     S._dpMatrix = data;
     renderDPMatrix(data);
     toast('Gelöscht');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+async function dpToggleWishDay(empId, date, isCurrentlyWish) {
+  document.getElementById('dpCellMenu').style.display = 'none';
+  if (!S._dpPlanId) return;
+  try {
+    const [year, month] = [parseInt(date.slice(0,4)), parseInt(date.slice(5,7))];
+    if (isCurrentlyWish) {
+      // Find and delete the wish day
+      const wishDays = await api('GET', `/dp/wish-days?month=${month}&year=${year}`);
+      const wd = wishDays.find(w => w.employee_id === empId && String(w.date).slice(0,10) === date);
+      if (wd) await api('DELETE', `/dp/wish-days/${wd.id}`);
+    } else {
+      await api('POST', '/dp/wish-days', {employeeId: empId, date, month, year, reason: ''});
+    }
+    const data = await api('GET', '/dp/plans/'+S._dpPlanId+'/matrix');
+    S._dpMatrix = data;
+    renderDPMatrix(data);
+    toast(isCurrentlyWish ? 'Wunschtag entfernt' : 'Wunschtag gesetzt');
   } catch(e) { toast('Fehler: '+e.message,'err'); }
 }
 
@@ -4318,7 +4360,7 @@ async function generateDpPlan(planId) {
       if (res.report.fehler.length > 0) {
         reportHtml += `<h5 style="margin-top:12px;color:#f59e0b">⚠️ Fehler/Warnungen:</h5>`;
         for (const err of res.report.fehler) {
-          reportHtml += `<div style="padding:4px 0;font-size:12px">❌ <strong>${err.kategorie}:</strong> ${err.details}</div>`;
+          reportHtml += `<div style="padding:4px 0;font-size:12px">⚠️ <strong>${esc(err.kategorie)}:</strong> ${esc(err.details)}</div>`;
         }
       }
 
@@ -4799,9 +4841,9 @@ async function renderDPConfigQualifications() {
     <h3>Schicht-Qualifikationen</h3>
     ${infoText}
     <div style="margin-bottom:14px">
-      <input type="search" placeholder="Mitarbeiter suchen…" value="${esc(S._dpQualSearchQuery||'')}"
+      <input type="search" id="dpQualSearchInput" placeholder="Mitarbeiter suchen…" value="${esc(S._dpQualSearchQuery||'')}"
         style="width:100%;padding:7px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;box-sizing:border-box"
-        oninput="S._dpQualSearchQuery=this.value;renderDPConfigTab()">
+        oninput="S._dpQualSearchQuery=this.value;renderDPConfigTab();(function(){const el=document.getElementById('dpQualSearchInput');if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);}})();">
     </div>
     ${filteredUsers.length === 0 ? '<div style="color:var(--mu);font-size:13px;padding:8px 0">Keine Mitarbeiter gefunden.</div>' : rows}
   </div>`;

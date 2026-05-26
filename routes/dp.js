@@ -331,13 +331,25 @@ router.get('/plans/:id/matrix', auth, async (req,res) => {
       if(!hasAssignment) return bad(res,'Keine Berechtigung',403);
     }
 
-    const [shiftTypes, requirements, assignments, empParams, absenceTypes] = await Promise.all([
+    const [shiftTypes, requirements, assignments, empParams, absenceTypes, qualifications, wishDays] = await Promise.all([
       q('SELECT * FROM dp_shift_types ORDER BY sort_order, name'),
       q('SELECT * FROM dp_shift_requirements'),
       q('SELECT * FROM dp_assignments WHERE plan_id=$1 ORDER BY date, employee_id',[req.params.id]),
       q('SELECT * FROM dp_employee_params'),
       q('SELECT * FROM dp_absence_types ORDER BY sort_order'),
+      q(`SELECT DISTINCT ON (employee_id, shift_type_id) employee_id, shift_type_id FROM dp_employee_qualifications WHERE valid_from IS NULL OR valid_from <= NOW()::date ORDER BY employee_id, shift_type_id, valid_from DESC NULLS LAST`),
+      q(`SELECT employee_id, date FROM dp_wish_days WHERE month=$1 AND year=$2`, [plan.month, plan.year]),
     ]);
+
+    // Build empQualMap: empId -> [shiftTypeId, ...]
+    const empQualMap = {};
+    for (const q_ of qualifications) {
+      if (!empQualMap[q_.employee_id]) empQualMap[q_.employee_id] = [];
+      empQualMap[q_.employee_id].push(q_.shift_type_id);
+    }
+
+    // Build wishDaySet: "empId_date"
+    const wishDaySet = new Set(wishDays.map(w => `${w.employee_id}_${(w.date instanceof Date ? w.date.toISOString() : String(w.date)).slice(0,10)}`));
 
     // Build days array
     const daysInMonth = new Date(plan.year, plan.month, 0).getDate();
@@ -386,7 +398,7 @@ router.get('/plans/:id/matrix', auth, async (req,res) => {
       for (const [stId, needed] of Object.entries(reqMap[day.date]||{})) {
         const filled = (assignMap[day.date]?.[stId]||[]).length;
         const open = needed - filled;
-        if (open > 0) openSlots[day.date][stId] = open;
+        if (open !== 0) openSlots[day.date][stId] = open; // negative = over-filled
       }
     }
 
@@ -476,6 +488,8 @@ router.get('/plans/:id/matrix', auth, async (req,res) => {
         ])
       ),
       summary: summaryMap,
+      empQualMap,
+      wishDaySet: [...wishDaySet],
     });
   } catch(e) { console.error('[dp/matrix]',e.message); bad(res,'Serverfehler',500); }
 });
@@ -1098,11 +1112,19 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
 
     // 5. Unfilled Slots
     const unfilledCount = protocolEntries.filter(p => !p.employee_id).length;
-    report.fehler.push({
-      kategorie: 'Offene Dienste',
-      count: unfilledCount,
-      details: unfilledCount > 0 ? `${unfilledCount} Dienste konnten nicht besetzt werden.` : 'Alle Dienste besetzt.'
-    });
+    if (unfilledCount > 0) {
+      report.fehler.push({
+        kategorie: 'Offene Dienste',
+        count: unfilledCount,
+        details: `${unfilledCount} Dienste konnten nicht besetzt werden.`
+      });
+    } else {
+      report.dienstplanRegeln.push({
+        regel: 'Dienst-Besetzung',
+        status: 'OK',
+        details: 'Alle Dienste erfolgreich besetzt.'
+      });
+    }
 
     // Report speichern
     await pool.query(
@@ -1137,15 +1159,17 @@ router.get('/wish-days', auth, async (req,res) => {
 });
 
 router.post('/wish-days', auth, async (req,res) => {
-  const {date,month,year,reason} = req.body;
+  const {date,month,year,reason,employeeId} = req.body;
   if (!date||!month||!year) return bad(res,'Datum erforderlich',400);
+  // Admins may set wish days for any employee; others only for themselves
+  const targetEmpId = (req.p.manageUsers && employeeId) ? employeeId : req.uid;
   try {
     // Check max 3 per month
-    const existing = await q('SELECT id FROM dp_wish_days WHERE employee_id=$1 AND month=$2 AND year=$3',[req.uid,month,year]);
+    const existing = await q('SELECT id FROM dp_wish_days WHERE employee_id=$1 AND month=$2 AND year=$3',[targetEmpId,month,year]);
     if (existing.length >= 3) return bad(res,'Maximal 3 Wunschtage pro Monat',400);
     const row = await q1(
       `INSERT INTO dp_wish_days (id,employee_id,month,year,date,reason) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [newId(),req.uid,month,year,date,reason||'']
+      [newId(),targetEmpId,month,year,date,reason||'']
     );
     ok(res,row);
   } catch(e) { bad(res,'Serverfehler',500); }
