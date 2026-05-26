@@ -547,6 +547,7 @@ router.get('/plans/:id/matrix', auth, async (req,res) => {
       summary: summaryMap,
       empQualMap,
       wishDaySet: [...wishDaySet],
+      allEmpIds: empParams.map(p => p.employee_id), // alle MA mit Parametern → immer anzeigen
     });
   } catch(e) { console.error('[dp/matrix]',e.message); bad(res,'Serverfehler',500); }
 });

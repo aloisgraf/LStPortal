@@ -3940,15 +3940,15 @@ function renderDPMatrix(data) {
   const c = document.getElementById('dpMatrixContainer');
   if (!c) return;
 
-  const {plan, days, shiftTypes, absenceTypes, requirements, openSlots, empAssignMap, summary} = data;
+  const {plan, days, shiftTypes, absenceTypes, requirements, openSlots, empAssignMap, summary, allEmpIds} = data;
   const users = S.users;
   const canEdit = S.p.canManageDp;
 
   const today = new Date().toISOString().slice(0,10);
 
-  // Build employees list (only those with assignments or params)
-  const empIds = new Set(Object.keys(empAssignMap));
-  // Add all users who have any assignment
+  // Build employees list: alle mit Parametern (allEmpIds) + alle mit Einträgen
+  const empIds = new Set(allEmpIds || []);
+  Object.keys(empAssignMap).forEach(id => empIds.add(id));
   data.assignments?.forEach(a => empIds.add(a.employee_id));
   const emps = [...empIds].map(id => users.find(u => u.id === id)).filter(Boolean);
   emps.sort((a,b) => a.name.localeCompare(b.name));
