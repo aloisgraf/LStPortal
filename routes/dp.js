@@ -397,19 +397,22 @@ router.get('/plans/:id/matrix', auth, async (req,res) => {
     const summaryMap = {};
     for (const a of assignments) {
       const empId = a.employee_id;
-      if (!summaryMap[empId]) summaryMap[empId] = {actualHours:0,nightsWorked:0,weekendDays:0,freeWeekends:0,sickDays:0,vacationDays:0,zulageDays:0,leaveDays:0};
+      if (!summaryMap[empId]) summaryMap[empId] = {actualHours:0,shiftHours:0,absenceHours:0,nightsWorked:0,weekendDays:0,freeWeekends:0,sickDays:0,vacationDays:0,zulageDays:0,leaveDays:0};
       const s = summaryMap[empId];
       const dateStr = a.date instanceof Date ? a.date.toISOString().slice(0,10) : String(a.date).slice(0,10);
       const wd = new Date(dateStr).getDay();
       const isWE = wd===0||wd===6;
-      s.actualHours += parseFloat(a.hours_credited)||0;
-      if (a.shift_type_id) {
+      const h = parseFloat(a.hours_credited)||0;
+      s.actualHours += h;
+      if (a.shift_type_id && !a.absence_type_id) {
+        s.shiftHours += h; // nur reine Dienstzeit (kein Abwesenheitstag)
         const st = shiftTypes.find(x=>x.id===a.shift_type_id);
         if (st?.is_night) s.nightsWorked++;
         if (st?.is_zulage) s.zulageDays++;
         if (isWE) s.weekendDays++;
       }
       if (a.absence_type_id) {
+        s.absenceHours += h;
         const at = absenceTypes.find(x=>x.id===a.absence_type_id);
         if (at) {
           if (at.code==='K') s.sickDays++;
@@ -423,12 +426,15 @@ router.get('/plans/:id/matrix', auth, async (req,res) => {
     for (const [empId, s] of Object.entries(summaryMap)) {
       const params = empParamMap[empId];
       if (!params) continue;
-      const workDays = getWorkDaysInMonth(plan.year, plan.month, AT_HOLIDAYS);
-      // Tagessoll: daily_hours wenn gesetzt, sonst monthly_hours / 26 (Schichtarbeiter-Standard)
+      // Tagessoll: daily_hours wenn gesetzt, sonst monthly_hours / 26 (Schichtarbeiter-Durchschnitt)
       const dailyTarget = params.daily_hours
         ? parseFloat(params.daily_hours)
         : Math.round((parseFloat(params.monthly_hours)||160) / 26 * 10) / 10;
-      const adjustedTarget = Math.max(0, (workDays - s.leaveDays) * dailyTarget);
+      // Soll = Vertragsmonatszeit minus anteilige Abwesenheitsreduktion
+      // NICHT workDays×daily – das wäre falsch für Schichtarbeiter (zählt nur Mo-Fr)
+      const contractHours = parseFloat(params.monthly_hours) || 160;
+      const leaveReduction = s.leaveDays * dailyTarget;
+      const adjustedTarget = Math.max(0, contractHours - leaveReduction);
       s.targetHours = Math.round(adjustedTarget * 10) / 10;
       s.dailyTarget = Math.round(dailyTarget * 10) / 10;
     }

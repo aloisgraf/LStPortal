@@ -4045,14 +4045,20 @@ function renderDPMatrix(data) {
       return `<td class="dp-cell" style="${style}" title="${esc(title)}">${label}</td>`;
     }).join('');
 
-    const diff = (s.actualHours||0) - (s.targetHours||0);
+    // Ist = nur Dienststunden (shiftHours); actualHours enthält auch Abwesenheits-Gutschriften
+    const istHours = s.shiftHours !== undefined ? s.shiftHours : (s.actualHours || 0);
+    const diff = istHours - (s.targetHours||0);
     const diffStr = (diff>=0?'+':'')+Math.round(diff*10)/10;
-    const diffColor = diff>=0?'#10b981':'#ef4444';
+    const diffColor = diff > 0.5 ? '#f59e0b' : (diff < -0.5 ? '#ef4444' : '#10b981');
+    const absH = s.absenceHours || 0;
+    const istTitle = absH > 0
+      ? `Dienste: ${Math.round(istHours*10)/10}h + Abwesenheit: ${Math.round(absH*10)/10}h = Gesamt: ${Math.round((istHours+absH)*10)/10}h`
+      : `Dienststunden: ${Math.round(istHours*10)/10}h`;
 
     const basicStats = `
-      <td style="text-align:center;padding:3px 6px;font-size:12px">${s.targetHours||0}</td>
-      <td style="text-align:center;padding:3px 6px;font-size:12px">${Math.round((s.actualHours||0)*10)/10}</td>
-      <td style="text-align:center;padding:3px 6px;font-size:12px;color:${diffColor};font-weight:600">${diffStr}</td>`;
+      <td style="text-align:center;padding:3px 6px;font-size:12px" title="Vertragliches Monatssoll: ${s.targetHours||0}h">${s.targetHours||0}</td>
+      <td style="text-align:center;padding:3px 6px;font-size:12px;cursor:default" title="${esc(istTitle)}">${Math.round(istHours*10)/10}${absH>0?'<span style="font-size:9px;color:var(--mu)"> +'+Math.round(absH*10)/10+'</span>':''}</td>
+      <td style="text-align:center;padding:3px 6px;font-size:12px;color:${diffColor};font-weight:600" title="Differenz Dienste − Soll">${diffStr}</td>`;
 
     const extraStats = expanded ? `
       <td style="text-align:center;padding:3px 6px;font-size:12px">${s.zulageDays||0}</td>
