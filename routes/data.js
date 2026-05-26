@@ -244,6 +244,7 @@ router.get('/', auth, async (req,res) => {
       dpShiftTypes: dpShiftTypesRaw||[],
       dpAbsenceTypes: dpAbsenceTypesRaw||[],
       dpHoursProfiles: await q('SELECT * FROM dp_hours_profiles ORDER BY name').catch(()=>[]),
+      dpEmpCategories: await q('SELECT * FROM dp_emp_categories ORDER BY sort_order, name').catch(()=>[]),
       dpPlans: canManageDp ? (dpPlansRaw||[]) : (dpPlansRaw||[]).filter(p=>p.status==='published'&&myDpPlanIdSet.has(p.id)),
       dpQualifications: dpQualificationsRaw||[],
       dpShiftPrefs: dpShiftPrefsRaw||[],

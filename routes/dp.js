@@ -48,6 +48,65 @@ router.delete('/hours-profiles/:id', auth, async (req,res) => {
   } catch(e) { bad(res,'Serverfehler',500); }
 });
 
+// ── EMP CATEGORIES ──────────────────────────────────────────────────────────
+
+router.get('/emp-categories', auth, async (req,res) => {
+  try { ok(res, await q('SELECT * FROM dp_emp_categories ORDER BY sort_order, name')); }
+  catch(e) { bad(res,'Serverfehler',500); }
+});
+
+router.post('/emp-categories', auth, async (req,res) => {
+  if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+  const {name, color, sortOrder} = req.body;
+  if (!name?.trim()) return bad(res,'Name erforderlich',400);
+  try {
+    const row = await q1(
+      `INSERT INTO dp_emp_categories (id,name,color,sort_order) VALUES ($1,$2,$3,$4) RETURNING *`,
+      [newId(), name.trim(), color||'#64748b', sortOrder||0]
+    );
+    ok(res, row);
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+router.put('/emp-categories/:id', auth, async (req,res) => {
+  if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+  const {name, color, sortOrder} = req.body;
+  try {
+    const old = await q1('SELECT name FROM dp_emp_categories WHERE id=$1', [req.params.id]);
+    const row = await q1(
+      `UPDATE dp_emp_categories SET name=$1,color=$2,sort_order=$3 WHERE id=$4 RETURNING *`,
+      [name.trim(), color||'#64748b', sortOrder||0, req.params.id]
+    );
+    if (!row) return bad(res,'Nicht gefunden',404);
+    // Rename on all users who had the old name
+    if (old && old.name !== name.trim()) {
+      await q(`UPDATE users SET category=$1 WHERE category=$2`, [name.trim(), old.name]);
+    }
+    ok(res, row);
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+router.delete('/emp-categories/:id', auth, async (req,res) => {
+  if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+  try {
+    const cat = await q1('SELECT name FROM dp_emp_categories WHERE id=$1', [req.params.id]);
+    if (cat) await q(`UPDATE users SET category=NULL WHERE category=$1`, [cat.name]);
+    await q('DELETE FROM dp_emp_categories WHERE id=$1', [req.params.id]);
+    ok(res);
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+// Assign employee to category (or null to remove)
+router.post('/emp-categories/assign', auth, async (req,res) => {
+  if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+  const {employeeId, categoryName} = req.body;
+  if (!employeeId) return bad(res,'Mitarbeiter erforderlich',400);
+  try {
+    await q(`UPDATE users SET category=$1 WHERE id=$2`, [categoryName||null, employeeId]);
+    ok(res, {employeeId, categoryName});
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
 // ── SHIFT TYPES ───────────────────────────────────────────────────────────────
 
 router.get('/shift-types', auth, async (req,res) => {

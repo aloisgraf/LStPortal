@@ -87,6 +87,7 @@ async function fetchData(){
     S.dpShiftTypes=data.dpShiftTypes||[];
     S.dpAbsenceTypes=data.dpAbsenceTypes||[];
     S.dpHoursProfiles=data.dpHoursProfiles||[];
+    S.dpEmpCategories=data.dpEmpCategories||[];
     S.dpPlans=data.dpPlans||[];
     S.dpQualifications=data.dpQualifications||[];
     S.dpShiftPrefs=data.dpShiftPrefs||[];
@@ -4414,6 +4415,7 @@ async function renderDPConfig() {
     {id:'shift-types',label:'Schichttypen'},
     {id:'absence-types',label:'Abwesenheiten'},
     {id:'hours-profiles',label:'Stundenprofile'},
+    {id:'emp-categories',label:'Kategorien'},
     {id:'emp-params',label:'Mitarbeiter-Param.'},
     {id:'qualifications',label:'Qualifikationen'},
     {id:'requirements',label:'Schichtbedarf'},
@@ -4427,6 +4429,7 @@ async function renderDPConfig() {
   if (tab === 'shift-types') content = await renderDPConfigShiftTypes();
   else if (tab === 'absence-types') content = await renderDPConfigAbsenceTypes();
   else if (tab === 'hours-profiles') content = renderDPConfigHoursProfiles();
+  else if (tab === 'emp-categories') content = renderDPConfigEmpCategories();
   else if (tab === 'emp-params') content = await renderDPConfigEmpParams();
   else if (tab === 'qualifications') content = await renderDPConfigQualifications();
   else if (tab === 'requirements') content = await renderDPConfigRequirements();
@@ -4451,6 +4454,7 @@ async function renderDPConfigTab() {
   if (tab === 'shift-types') content = await renderDPConfigShiftTypes();
   else if (tab === 'absence-types') content = await renderDPConfigAbsenceTypes();
   else if (tab === 'hours-profiles') content = renderDPConfigHoursProfiles();
+  else if (tab === 'emp-categories') content = renderDPConfigEmpCategories();
   else if (tab === 'emp-params') content = await renderDPConfigEmpParams();
   else if (tab === 'qualifications') content = await renderDPConfigQualifications();
   else if (tab === 'requirements') content = await renderDPConfigRequirements();
@@ -4631,6 +4635,138 @@ async function deleteDpHoursProfile(id) {
     await api('DELETE', '/dp/hours-profiles/'+id);
     S.dpHoursProfiles = await api('GET', '/dp/hours-profiles');
     renderDPConfig();
+    toast('Gelöscht');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+function renderDPConfigEmpCategories() {
+  const categories = S.dpEmpCategories || [];
+  const users = S.users || [];
+
+  // Group users by category
+  const byCategory = {};
+  const uncategorized = [];
+  for (const u of users) {
+    if (u.category) {
+      if (!byCategory[u.category]) byCategory[u.category] = [];
+      byCategory[u.category].push(u);
+    } else {
+      uncategorized.push(u);
+    }
+  }
+
+  const catColumns = categories.map(cat => {
+    const emps = byCategory[cat.name] || [];
+    const empChips = emps.map(u => `
+      <div class="dp-cat-chip" draggable="true"
+        ondragstart="dpCatDragStart(event,'${u.id}')"
+        style="display:flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:4px 10px;cursor:grab;font-size:12px;margin-bottom:4px">
+        <span class="av-sm" style="background:${u.color};width:20px;height:20px;font-size:9px;flex-shrink:0">${esc(u.initials)}</span>
+        <span>${esc(u.name)}</span>
+        <button onclick="dpCatAssign('${u.id}',null)" style="border:none;background:none;cursor:pointer;color:var(--mu);font-size:11px;padding:0 0 0 4px" title="Aus Kategorie entfernen">✕</button>
+      </div>`).join('');
+
+    return `<div class="dp-cat-col"
+      style="flex:1;min-width:180px;background:var(--sf2);border-radius:8px;border:2px solid ${cat.color};padding:10px;min-height:120px"
+      ondragover="event.preventDefault()"
+      ondrop="dpCatDrop(event,'${esc(cat.name)}')">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <span style="width:10px;height:10px;border-radius:50%;background:${cat.color};flex-shrink:0"></span>
+        <span style="font-weight:600;font-size:13px;flex:1">${esc(cat.name)}</span>
+        <button class="btn-s" style="font-size:10px" onclick="openDpEmpCatForm('${cat.id}')">✏️</button>
+        <button class="btn-s" style="font-size:10px;color:#ef4444" onclick="deleteDpEmpCat('${cat.id}')">✕</button>
+      </div>
+      ${empChips || '<div style="color:var(--mu);font-size:11px;padding:4px 0">Hier ablegen…</div>'}
+    </div>`;
+  }).join('');
+
+  const uncatChips = uncategorized.map(u => `
+    <div class="dp-cat-chip" draggable="true"
+      ondragstart="dpCatDragStart(event,'${u.id}')"
+      style="display:inline-flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:4px 10px;cursor:grab;font-size:12px;margin:2px">
+      <span class="av-sm" style="background:${u.color};width:20px;height:20px;font-size:9px;flex-shrink:0">${esc(u.initials)}</span>
+      <span>${esc(u.name)}</span>
+    </div>`).join('');
+
+  return `<div class="dp-cfg-card">
+    <h3>Dienstplan-Kategorien <button class="btn-p" style="float:right;font-size:11px" onclick="openDpEmpCatForm()">+ Neue Kategorie</button></h3>
+    <p style="font-size:12px;color:var(--mu);margin-bottom:16px">Mitarbeiter per Drag &amp; Drop in Kategorien einteilen. Die Einteilung gilt für alle Dienstpläne.</p>
+
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start;margin-bottom:20px">
+      ${catColumns || '<div style="color:var(--mu);font-size:13px">Noch keine Kategorien angelegt.</div>'}
+    </div>
+
+    ${uncategorized.length > 0 ? `
+    <div style="background:var(--sf2);border-radius:8px;border:2px dashed var(--border);padding:10px">
+      <div style="font-size:12px;font-weight:600;color:var(--mu);margin-bottom:8px">Ohne Kategorie (ziehen um zuzuordnen):</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px">${uncatChips}</div>
+    </div>` : ''}
+  </div>`;
+}
+
+let _dpCatDragEmpId = null;
+
+function dpCatDragStart(evt, empId) {
+  _dpCatDragEmpId = empId;
+  evt.dataTransfer.effectAllowed = 'move';
+}
+
+async function dpCatDrop(evt, categoryName) {
+  evt.preventDefault();
+  if (!_dpCatDragEmpId) return;
+  await dpCatAssign(_dpCatDragEmpId, categoryName);
+  _dpCatDragEmpId = null;
+}
+
+async function dpCatAssign(empId, categoryName) {
+  try {
+    await api('POST', '/dp/emp-categories/assign', {employeeId: empId, categoryName: categoryName||null});
+    // Update local state
+    const u = S.users.find(x => x.id === empId);
+    if (u) u.category = categoryName || null;
+    renderDPConfigTab();
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+function openDpEmpCatForm(id) {
+  const cat = id ? (S.dpEmpCategories||[]).find(x=>x.id===id)||null : null;
+  document.getElementById('dpEcfTitle').textContent = cat ? 'Kategorie bearbeiten' : 'Neue Kategorie';
+  document.getElementById('dpEcfId').value = cat?.id||'';
+  document.getElementById('dpEcfName').value = cat?.name||'';
+  document.getElementById('dpEcfColor').value = cat?.color||'#64748b';
+  document.getElementById('dpEcfOrder').value = cat?.sort_order||0;
+  openModal('dpEmpCatFormOv');
+}
+
+async function submitDpEmpCatForm() {
+  const id = document.getElementById('dpEcfId').value;
+  const body = {
+    name: document.getElementById('dpEcfName').value.trim(),
+    color: document.getElementById('dpEcfColor').value,
+    sortOrder: parseInt(document.getElementById('dpEcfOrder').value)||0,
+  };
+  if (!body.name) return toast('Name erforderlich','err');
+  try {
+    if (id) await api('PUT', '/dp/emp-categories/'+id, body);
+    else await api('POST', '/dp/emp-categories', body);
+    S.dpEmpCategories = await api('GET', '/dp/emp-categories');
+    // If renamed, refresh users to get updated category
+    const dataResp = await api('GET', '/data').catch(()=>null);
+    if (dataResp) S.users = dataResp.users || S.users;
+    closeModal('dpEmpCatFormOv');
+    renderDPConfigTab();
+    toast('Gespeichert');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+async function deleteDpEmpCat(id) {
+  if (!confirm('Kategorie löschen? Mitarbeiter werden keiner Kategorie zugewiesen.')) return;
+  try {
+    await api('DELETE', '/dp/emp-categories/'+id);
+    S.dpEmpCategories = await api('GET', '/dp/emp-categories');
+    const dataResp = await api('GET', '/data').catch(()=>null);
+    if (dataResp) S.users = dataResp.users || S.users;
+    renderDPConfigTab();
     toast('Gelöscht');
   } catch(e) { toast('Fehler: '+e.message,'err'); }
 }

@@ -530,6 +530,13 @@ async function initDB() {
       created_at TIMESTAMPTZ DEFAULT NOW()
     )`,
     `ALTER TABLE dp_employee_params ADD COLUMN IF NOT EXISTS profile_id TEXT DEFAULT NULL`,
+    `CREATE TABLE IF NOT EXISTS dp_emp_categories (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  color TEXT DEFAULT '#64748b',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+)`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }
