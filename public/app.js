@@ -3941,7 +3941,8 @@ function renderDPMatrix(data) {
   const c = document.getElementById('dpMatrixContainer');
   if (!c) return;
 
-  const {plan, days, shiftTypes, absenceTypes, requirements, openSlots, empAssignMap, summary, allEmpIds} = data;
+  const {plan, days, shiftTypes, absenceTypes, requirements, openSlots, empAssignMap, summary, allEmpIds, wishDaySet} = data;
+  const wishSet = new Set(wishDaySet || []);
   const users = S.users;
   const canEdit = S.p.canManageDp;
 
@@ -4028,9 +4029,12 @@ function renderDPMatrix(data) {
 
     let cells = days.map(d => {
       const a = assign[d.date];
+      const isWish = wishSet.has(`${emp.id}_${d.date}`);
       if (!a) {
-        if (canEdit) return `<td class="dp-cell" onclick="openDpCellMenu('${emp.id}','${d.date}',event)" title="Klicken zum Zuweisen"></td>`;
-        return `<td class="dp-cell"></td>`;
+        const wishMark = isWish ? `<span style="font-size:9px;color:#f59e0b;line-height:1">★</span>` : '';
+        const wishTitle = isWish ? 'Wunschtag · ' : '';
+        if (canEdit) return `<td class="dp-cell" onclick="openDpCellMenu('${emp.id}','${d.date}',event)" title="${wishTitle}Klicken zum Zuweisen" style="${isWish?'background:#fef3c722;':''}">${wishMark}</td>`;
+        return `<td class="dp-cell" style="${isWish?'background:#fef3c722;':''}">${wishMark}</td>`;
       }
       const st = shiftTypes.find(x=>x.id===a.shift_type_id);
       const at = absenceTypes.find(x=>x.id===a.absence_type_id);
@@ -4047,20 +4051,21 @@ function renderDPMatrix(data) {
       return `<td class="dp-cell" style="${style}" title="${esc(title)}">${label}</td>`;
     }).join('');
 
-    // Ist = nur Dienststunden (shiftHours); actualHours enthält auch Abwesenheits-Gutschriften
-    const istHours = s.shiftHours !== undefined ? s.shiftHours : (s.actualHours || 0);
+    // Ist = Dienststunden + Abwesenheits-Gutschriften (beide zählen zur Sollerfüllung)
+    const shiftH = s.shiftHours || 0;
+    const absH = s.absenceHours || 0;
+    const istHours = shiftH + absH;
     const diff = istHours - (s.targetHours||0);
     const diffStr = (diff>=0?'+':'')+Math.round(diff*10)/10;
     const diffColor = diff > 0.5 ? '#f59e0b' : (diff < -0.5 ? '#ef4444' : '#10b981');
-    const absH = s.absenceHours || 0;
     const istTitle = absH > 0
-      ? `Dienste: ${Math.round(istHours*10)/10}h + Abwesenheit: ${Math.round(absH*10)/10}h = Gesamt: ${Math.round((istHours+absH)*10)/10}h`
-      : `Dienststunden: ${Math.round(istHours*10)/10}h`;
+      ? `Dienste: ${Math.round(shiftH*10)/10}h + Abwesenheit: ${Math.round(absH*10)/10}h = Gesamt: ${Math.round(istHours*10)/10}h`
+      : `Dienststunden: ${Math.round(shiftH*10)/10}h`;
 
     const basicStats = `
       <td style="text-align:center;padding:3px 6px;font-size:12px" title="Vertragliches Monatssoll: ${s.targetHours||0}h">${s.targetHours||0}</td>
-      <td style="text-align:center;padding:3px 6px;font-size:12px;cursor:default" title="${esc(istTitle)}">${Math.round(istHours*10)/10}${absH>0?'<span style="font-size:9px;color:var(--mu)"> +'+Math.round(absH*10)/10+'</span>':''}</td>
-      <td style="text-align:center;padding:3px 6px;font-size:12px;color:${diffColor};font-weight:600" title="Differenz Dienste − Soll">${diffStr}</td>`;
+      <td style="text-align:center;padding:3px 6px;font-size:12px;cursor:default" title="${esc(istTitle)}">${Math.round(istHours*10)/10}${absH>0?'<span style="font-size:9px;color:var(--mu);opacity:0.6"> (${Math.round(shiftH*10)/10}+${Math.round(absH*10)/10})</span>':''}</td>
+      <td style="text-align:center;padding:3px 6px;font-size:12px;color:${diffColor};font-weight:600" title="Differenz Ist − Soll">${diffStr}</td>`;
 
     const extraStats = expanded ? `
       <td style="text-align:center;padding:3px 6px;font-size:12px">${s.zulageDays||0}</td>
@@ -5048,7 +5053,7 @@ async function renderDPConfigQualifications() {
     <div style="margin-bottom:14px">
       <input type="search" id="dpQualSearchInput" placeholder="Mitarbeiter suchen…" value="${esc(S._dpQualSearchQuery||'')}"
         style="width:100%;padding:7px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;box-sizing:border-box"
-        oninput="S._dpQualSearchQuery=this.value;renderDPConfigTab();(function(){const el=document.getElementById('dpQualSearchInput');if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);}})();">
+        oninput="S._dpQualSearchQuery=this.value;renderDPConfigTab().then(()=>{const el=document.getElementById('dpQualSearchInput');if(el){const l=el.value.length;el.focus();el.setSelectionRange(l,l);}})">
     </div>
     ${filteredUsers.length === 0 ? '<div style="color:var(--mu);font-size:13px;padding:8px 0">Keine Mitarbeiter gefunden.</div>' : rows}
   </div>`;

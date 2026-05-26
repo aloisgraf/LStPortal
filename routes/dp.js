@@ -1375,20 +1375,19 @@ function getRequiredCount(requirements, shiftTypeId, dayInfo) {
   // Daily (every day incl. holidays)
   const daily = requirements.find(r=>r.shift_type_id===shiftTypeId && r.applies_to==='daily');
   if (daily) return daily.slot_count;
-  // Holiday
+  // Holiday: only 'holiday' rule applies — weekday/weekend rules do NOT fall through to holidays
   if (dayInfo.isHoliday) {
     const hol = requirements.find(r=>r.shift_type_id===shiftTypeId && r.applies_to==='holiday');
-    if (hol) return hol.slot_count;
+    return hol ? hol.slot_count : 0;
   }
-  // Weekend
+  // Weekend: only 'weekend' rule applies — weekday rules do NOT fall through to weekends
   if (dayInfo.isWeekend) {
     const we = requirements.find(r=>r.shift_type_id===shiftTypeId && r.applies_to==='weekend');
-    if (we) return we.slot_count;
+    return we ? we.slot_count : 0;
   }
-  // Specific weekday
+  // Weekday (Mon–Fri, non-holiday): specific weekday first, then general Mo–Fr
   const wdReq = requirements.find(r=>r.shift_type_id===shiftTypeId && r.applies_to==='weekday' && r.weekday===dayInfo.weekday);
   if (wdReq) return wdReq.slot_count;
-  // General weekday
   const general = requirements.find(r=>r.shift_type_id===shiftTypeId && r.applies_to==='weekday' && r.weekday===null);
   return general ? general.slot_count : 0;
 }
