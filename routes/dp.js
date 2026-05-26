@@ -3,6 +3,51 @@ const router = require('express').Router();
 const { q, q1, newId, pool } = require('../db');
 const { auth, ok, bad } = require('../middleware');
 
+// ── HOURS PROFILES ────────────────────────────────────────────────────────────
+
+router.get('/hours-profiles', auth, async (req,res) => {
+  try { ok(res, await q('SELECT * FROM dp_hours_profiles ORDER BY name')); }
+  catch(e) { bad(res,'Serverfehler',500); }
+});
+
+router.post('/hours-profiles', auth, async (req,res) => {
+  if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+  const {name, monthlyHours, dailyWorkHours, avgShiftDuration} = req.body;
+  if (!name?.trim() || !monthlyHours) return bad(res,'Name und Monatsstunden erforderlich',400);
+  try {
+    const row = await q1(
+      `INSERT INTO dp_hours_profiles (id,name,monthly_hours,daily_work_hours,avg_shift_duration,created_by)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [newId(), name.trim(), parseFloat(monthlyHours), dailyWorkHours ? parseFloat(dailyWorkHours) : null,
+       avgShiftDuration ? parseFloat(avgShiftDuration) : null, req.uid]
+    );
+    ok(res, row);
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+router.put('/hours-profiles/:id', auth, async (req,res) => {
+  if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+  const {name, monthlyHours, dailyWorkHours, avgShiftDuration} = req.body;
+  try {
+    const row = await q1(
+      `UPDATE dp_hours_profiles SET name=$1,monthly_hours=$2,daily_work_hours=$3,avg_shift_duration=$4 WHERE id=$5 RETURNING *`,
+      [name.trim(), parseFloat(monthlyHours), dailyWorkHours ? parseFloat(dailyWorkHours) : null,
+       avgShiftDuration ? parseFloat(avgShiftDuration) : null, req.params.id]
+    );
+    if (!row) return bad(res,'Nicht gefunden',404);
+    ok(res, row);
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+router.delete('/hours-profiles/:id', auth, async (req,res) => {
+  if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+  try {
+    await q('UPDATE dp_employee_params SET profile_id=NULL WHERE profile_id=$1', [req.params.id]);
+    await q('DELETE FROM dp_hours_profiles WHERE id=$1', [req.params.id]);
+    ok(res);
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
 // ── SHIFT TYPES ───────────────────────────────────────────────────────────────
 
 router.get('/shift-types', auth, async (req,res) => {
@@ -175,15 +220,27 @@ router.get('/employee-params', auth, async (req,res) => {
 router.post('/employee-params', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
   const {employeeId,validFrom,monthlyHours,canDoNights,maxNightsPerMonth,doubleNightsAllowed,isSpringer,
-         officePct,fdSpringerType,fdSpringerLocation,fdSpringerShiftsPerMonth,dailyHours} = req.body;
+         officePct,fdSpringerType,fdSpringerLocation,fdSpringerShiftsPerMonth,dailyHours,profileId} = req.body;
   if (!employeeId) return bad(res,'Mitarbeiter erforderlich',400);
-  const mh = parseFloat(monthlyHours)||160;
+
+  // Wenn Profil ausgewählt: Stunden aus Profil ableiten
+  let mh = parseFloat(monthlyHours)||160;
+  let dh = dailyHours ? parseFloat(dailyHours) : null;
+  if (profileId) {
+    const prof = await q1('SELECT * FROM dp_hours_profiles WHERE id=$1',[profileId]);
+    if (prof) {
+      mh = parseFloat(prof.monthly_hours)||mh;
+      if (prof.daily_work_hours) dh = parseFloat(prof.daily_work_hours);
+    }
+  }
+
   const wh = Math.round(mh / 4.33 * 100) / 100;
   const opct = Math.min(100, Math.max(0, parseInt(officePct)||0));
   const fdType = ['FD_to_LS','LS_to_FD'].includes(fdSpringerType) ? fdSpringerType : null;
   const fdLoc  = ['Nord','Süd'].includes(fdSpringerLocation) ? fdSpringerLocation : null;
   const fdSpm  = fdType ? (parseInt(fdSpringerShiftsPerMonth)||null) : null;
   const vf = validFrom || null;
+  const pid = profileId || null;
   try {
     let existing;
     if (vf === null) {
@@ -196,8 +253,8 @@ router.post('/employee-params', auth, async (req,res) => {
         `UPDATE dp_employee_params SET monthly_hours=$1,weekly_hours=$2,can_do_nights=$3,
          max_nights_per_month=$4,double_nights_allowed=$5,is_springer=$6,office_pct=$7,
          fd_springer_type=$8,fd_springer_location=$9,fd_springer_shifts_per_month=$10,
-         valid_from=$11,updated_at=NOW(),daily_hours=$13 WHERE id=$12 RETURNING *`,
-        [mh,wh,canDoNights!==false,maxNightsPerMonth||null,doubleNightsAllowed!==false,!!isSpringer,opct,fdType,fdLoc,fdSpm,vf,existing.id,dailyHours||null]
+         valid_from=$11,updated_at=NOW(),daily_hours=$13,profile_id=$14 WHERE id=$12 RETURNING *`,
+        [mh,wh,canDoNights!==false,maxNightsPerMonth||null,doubleNightsAllowed!==false,!!isSpringer,opct,fdType,fdLoc,fdSpm,vf,existing.id,dh,pid]
       );
       return ok(res,row);
     }
@@ -206,10 +263,10 @@ router.post('/employee-params', auth, async (req,res) => {
          (id,employee_id,monthly_hours,weekly_hours,work_days_per_week,can_do_nights,
           max_nights_per_month,double_nights_allowed,is_springer,office_pct,
           fd_springer_type,fd_springer_location,fd_springer_shifts_per_month,
-          valid_from,springer_config,locations,created_by,daily_hours)
-       VALUES ($1,$2,$3,$4,5,$5,$6,$7,$8,$9,$10,$11,$12,$13,'{}','[]',$14,$15) RETURNING *`,
+          valid_from,springer_config,locations,created_by,daily_hours,profile_id)
+       VALUES ($1,$2,$3,$4,5,$5,$6,$7,$8,$9,$10,$11,$12,$13,'{}','[]',$14,$15,$16) RETURNING *`,
       [newId(),employeeId,mh,wh,canDoNights!==false,maxNightsPerMonth||null,
-       doubleNightsAllowed!==false,!!isSpringer,opct,fdType,fdLoc,fdSpm,vf,req.uid,dailyHours||null]
+       doubleNightsAllowed!==false,!!isSpringer,opct,fdType,fdLoc,fdSpm,vf,req.uid,dh,pid]
     );
     ok(res,row);
   } catch(e) { console.error(e); bad(res,'Serverfehler',500); }
@@ -528,10 +585,30 @@ router.post('/plans/:id/assign', auth, async (req,res) => {
             hoursSource = 'daily_target';
           }
         } else if (at.hours_calculation==='daily_target') {
-          const params = await q1('SELECT monthly_hours, daily_hours FROM dp_employee_params WHERE employee_id=$1',[employeeId]);
+          const params = await q1('SELECT monthly_hours, daily_hours, profile_id FROM dp_employee_params WHERE employee_id=$1',[employeeId]);
           const mh = parseFloat(params?.monthly_hours) || 160;
           hoursCredited = params?.daily_hours ? parseFloat(params.daily_hours) : Math.round(mh / 26 * 10) / 10;
           hoursSource = 'daily_target';
+        } else if (at.hours_calculation==='avg_shift_duration') {
+          // Durchschnittliche Dienstdauer aus Profil oder daily_hours
+          const params = await q1('SELECT monthly_hours, daily_hours, profile_id FROM dp_employee_params WHERE employee_id=$1',[employeeId]);
+          let avgShift = null;
+          if (params?.profile_id) {
+            const prof = await q1('SELECT avg_shift_duration, daily_work_hours FROM dp_hours_profiles WHERE id=$1',[params.profile_id]);
+            avgShift = prof?.avg_shift_duration ? parseFloat(prof.avg_shift_duration) : (prof?.daily_work_hours ? parseFloat(prof.daily_work_hours) : null);
+          }
+          if (!avgShift) {
+            const mh = parseFloat(params?.monthly_hours) || 160;
+            avgShift = params?.daily_hours ? parseFloat(params.daily_hours) : Math.round(mh / 26 * 10) / 10;
+          }
+          // Wenn gleichzeitig Dienst: avg_shift_duration + Dienststunden (Feiertagszuschlag)
+          if (shiftTypeId) {
+            const st = await q1('SELECT duration_hours FROM dp_shift_types WHERE id=$1',[shiftTypeId]);
+            hoursCredited = avgShift + (parseFloat(st?.duration_hours)||0);
+          } else {
+            hoursCredited = avgShift;
+          }
+          hoursSource = 'avg_shift_duration';
         } else if (at.hours_calculation==='zero') {
           hoursCredited = 0; hoursSource = 'zero';
         } else if (at.hours_calculation==='fixed') {

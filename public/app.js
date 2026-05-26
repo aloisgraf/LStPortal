@@ -86,6 +86,7 @@ async function fetchData(){
     S.meetings=data.meetings||[];
     S.dpShiftTypes=data.dpShiftTypes||[];
     S.dpAbsenceTypes=data.dpAbsenceTypes||[];
+    S.dpHoursProfiles=data.dpHoursProfiles||[];
     S.dpPlans=data.dpPlans||[];
     S.dpQualifications=data.dpQualifications||[];
     S.dpShiftPrefs=data.dpShiftPrefs||[];
@@ -4412,6 +4413,7 @@ async function renderDPConfig() {
   const tabs = [
     {id:'shift-types',label:'Schichttypen'},
     {id:'absence-types',label:'Abwesenheiten'},
+    {id:'hours-profiles',label:'Stundenprofile'},
     {id:'emp-params',label:'Mitarbeiter-Param.'},
     {id:'qualifications',label:'Qualifikationen'},
     {id:'requirements',label:'Schichtbedarf'},
@@ -4424,6 +4426,7 @@ async function renderDPConfig() {
   let content = '';
   if (tab === 'shift-types') content = await renderDPConfigShiftTypes();
   else if (tab === 'absence-types') content = await renderDPConfigAbsenceTypes();
+  else if (tab === 'hours-profiles') content = renderDPConfigHoursProfiles();
   else if (tab === 'emp-params') content = await renderDPConfigEmpParams();
   else if (tab === 'qualifications') content = await renderDPConfigQualifications();
   else if (tab === 'requirements') content = await renderDPConfigRequirements();
@@ -4447,6 +4450,7 @@ async function renderDPConfigTab() {
   let content = '';
   if (tab === 'shift-types') content = await renderDPConfigShiftTypes();
   else if (tab === 'absence-types') content = await renderDPConfigAbsenceTypes();
+  else if (tab === 'hours-profiles') content = renderDPConfigHoursProfiles();
   else if (tab === 'emp-params') content = await renderDPConfigEmpParams();
   else if (tab === 'qualifications') content = await renderDPConfigQualifications();
   else if (tab === 'requirements') content = await renderDPConfigRequirements();
@@ -4478,7 +4482,7 @@ async function renderDPConfigAbsenceTypes() {
   const types = S.dpAbsenceTypes;
   if (!types.length) return `<div style="color:var(--mu);margin-bottom:12px">Noch keine Abwesenheitstypen.</div><button class="btn-p" onclick="openDpAbsenceTypeForm()">+ Hinzufügen</button>`;
 
-  const hcLabel = {daily_target:'Tagessoll',shift_hours:'Dienstst.',zero:'0h',fixed:'Fix'};
+  const hcLabel = {daily_target:'Tagessoll',shift_hours:'Dienstst.',zero:'0h',fixed:'Fix',avg_shift_duration:'Ø Dienstdauer'};
   const rows = types.map(at => `<div class="dp-cfg-row">
     <span class="dp-color-dot" style="background:${at.color}"></span>
     <span class="dp-cfg-label"><strong>${esc(at.code)}</strong> – ${esc(at.label)}</span>
@@ -4564,6 +4568,71 @@ async function renderDPConfigRequirements() {
     <h3>Schichtbedarf <button class="btn-p" style="float:right;font-size:11px" onclick="openDpReqForm()">+ Hinzufügen</button></h3>
     ${rows||'<div style="color:var(--mu);font-size:13px">Noch kein Bedarf definiert.</div>'}
   </div>`;
+}
+
+function renderDPConfigHoursProfiles() {
+  const profiles = S.dpHoursProfiles || [];
+  const rows = profiles.map(p => `
+    <div class="dp-cfg-row">
+      <span class="dp-cfg-label" style="font-weight:600">${esc(p.name)}</span>
+      <span style="font-size:12px;color:var(--mu)">${p.monthly_hours}h/Monat${p.daily_work_hours ? ' · Tagessoll '+p.daily_work_hours+'h' : ''}${p.avg_shift_duration ? ' · Ø Dienst '+p.avg_shift_duration+'h' : ''}</span>
+      <button class="btn-s" onclick="openDpHoursProfileForm('${p.id}')">✏️</button>
+      <button class="btn-s" style="color:#ef4444" onclick="deleteDpHoursProfile('${p.id}')">✕</button>
+    </div>`).join('');
+
+  return `<div class="dp-cfg-card">
+    <h3>Stundenprofile <button class="btn-p" style="float:right;font-size:11px" onclick="openDpHoursProfileForm()">+ Hinzufügen</button></h3>
+    <p style="font-size:12px;color:var(--mu);margin-bottom:12px">
+      Definiert Sollstunden und Durchschnittswerte pro Profil. Bei Mitarbeiter-Parametern dann Profil auswählen.
+    </p>
+    ${rows || '<div style="color:var(--mu);font-size:13px">Noch keine Profile definiert.</div>'}
+    <div style="margin-top:16px;padding:12px;background:var(--sf2);border-radius:6px;border:1px solid var(--border);font-size:12px;color:var(--mu)">
+      <strong>Felder:</strong><br>
+      <b>Monatssoll:</b> Vertragliche Sollstunden/Monat (z.B. 173h)<br>
+      <b>Tägliche Arbeitszeit:</b> Durchschnittliche tägliche Arbeitszeit — wird für Abwesenheiten mit "Tagessoll" verwendet (z.B. 8h)<br>
+      <b>Ø Dienstdauer:</b> Durchschnittliche Schichtdauer — wird für Abwesenheitstyp "Ø Dienstdauer" verwendet (z.B. 12h). Bei Feiertag: Ø Dienstdauer + Dienststunden wenn gearbeitet wird.
+    </div>
+  </div>`;
+}
+
+function openDpHoursProfileForm(id) {
+  const p = id ? (S.dpHoursProfiles||[]).find(x=>x.id===id)||null : null;
+  document.getElementById('dpHpfTitle').textContent = p ? 'Profil bearbeiten' : 'Neues Stundenprofil';
+  document.getElementById('dpHpfId').value = p?.id||'';
+  document.getElementById('dpHpfName').value = p?.name||'';
+  document.getElementById('dpHpfMonthly').value = p?.monthly_hours||'';
+  document.getElementById('dpHpfDaily').value = p?.daily_work_hours||'';
+  document.getElementById('dpHpfAvgShift').value = p?.avg_shift_duration||'';
+  openModal('dpHoursProfileFormOv');
+}
+
+async function submitDpHoursProfileForm() {
+  const id = document.getElementById('dpHpfId').value;
+  const body = {
+    name: document.getElementById('dpHpfName').value.trim(),
+    monthlyHours: parseFloat(document.getElementById('dpHpfMonthly').value)||0,
+    dailyWorkHours: document.getElementById('dpHpfDaily').value ? parseFloat(document.getElementById('dpHpfDaily').value) : null,
+    avgShiftDuration: document.getElementById('dpHpfAvgShift').value ? parseFloat(document.getElementById('dpHpfAvgShift').value) : null,
+  };
+  if (!body.name || !body.monthlyHours) return toast('Name und Monatssoll erforderlich','err');
+  try {
+    if (id) await api('PUT', '/dp/hours-profiles/'+id, body);
+    else await api('POST', '/dp/hours-profiles', body);
+    S.dpHoursProfiles = await api('GET', '/dp/hours-profiles');
+    closeModal('dpHoursProfileFormOv');
+    renderDPConfig();
+    toast('Gespeichert');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+async function deleteDpHoursProfile(id) {
+  if (!confirm('Stundenprofil löschen? Bei Mitarbeitern wird das Profil entfernt (Stunden bleiben).')) return;
+  try {
+    await api('DELETE', '/dp/hours-profiles/'+id);
+    S.dpHoursProfiles = await api('GET', '/dp/hours-profiles');
+    renderDPConfig();
+    toast('Gelöscht');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
 }
 
 function renderDPConfigSchedulingRules() {
@@ -5054,6 +5123,21 @@ function dpEpfFdTypeChange() {
   document.getElementById('dpEpfFdDetails').style.display = val ? '' : 'none';
 }
 
+function _dpEpfFillProfileDropdown(selectedProfileId) {
+  const sel = document.getElementById('dpEpfProfileId');
+  if (!sel) return;
+  sel.innerHTML = `<option value="">— kein Profil (manuelle Eingabe) —</option>` +
+    (S.dpHoursProfiles||[]).map(p=>`<option value="${p.id}"${p.id===selectedProfileId?' selected':''}>${esc(p.name)} (${p.monthly_hours}h)</option>`).join('');
+}
+
+function dpEpfProfileChange(profileId) {
+  if (!profileId) return;
+  const p = (S.dpHoursProfiles||[]).find(x=>x.id===profileId);
+  if (!p) return;
+  document.getElementById('dpEpfMonthly').value = p.monthly_hours;
+  if (p.daily_work_hours) document.getElementById('dpEpfDailyHours').value = p.daily_work_hours;
+}
+
 function openDpEmpParamForm(paramId) {
   const p = (window.dpEmpParamsAll||S.dpEmpParams||[]).find(x=>x.id===paramId);
   if (!p) return toast('Parameter nicht gefunden','err');
@@ -5066,6 +5150,7 @@ function openDpEmpParamForm(paramId) {
   document.getElementById('dpEpfValidFrom').value = p.valid_from ? String(p.valid_from).slice(0,10) : '';
   document.getElementById('dpEpfMonthly').value = p.monthly_hours || (p.weekly_hours ? Math.round(p.weekly_hours*4.33) : 160);
   document.getElementById('dpEpfDailyHours').value = p?.daily_hours || '';
+  _dpEpfFillProfileDropdown(p.profile_id||'');
   document.getElementById('dpEpfNights').checked = !!p.can_do_nights;
   document.getElementById('dpEpfDoubleNights').checked = !!p.double_nights_allowed;
   document.getElementById('dpEpfSpringer').checked = !!p.is_springer;
@@ -5096,6 +5181,7 @@ function openDpEmpParamFormNew(empId) {
   document.getElementById('dpEpfValidFrom').value = '';
   document.getElementById('dpEpfMonthly').value = latest?.monthly_hours || (latest?.weekly_hours ? Math.round(latest.weekly_hours*4.33) : 160);
   document.getElementById('dpEpfDailyHours').value = latest?.daily_hours || '';
+  _dpEpfFillProfileDropdown(latest?.profile_id||'');
   document.getElementById('dpEpfNights').checked = latest ? !!latest.can_do_nights : true;
   document.getElementById('dpEpfDoubleNights').checked = latest ? !!latest.double_nights_allowed : true;
   document.getElementById('dpEpfSpringer').checked = !!latest?.is_springer;
@@ -5128,6 +5214,7 @@ async function submitDpEmpParamForm() {
     fdSpringerLocation: fdType ? (document.getElementById('dpEpfFdLocation').value||null) : null,
     fdSpringerShiftsPerMonth: fdType ? (parseInt(document.getElementById('dpEpfFdShifts').value)||null) : null,
     dailyHours: document.getElementById('dpEpfDailyHours').value ? parseFloat(document.getElementById('dpEpfDailyHours').value) : null,
+    profileId: document.getElementById('dpEpfProfileId').value || null,
   };
   try {
     await api('POST', '/dp/employee-params', body);

@@ -1609,8 +1609,9 @@
       </div>
       <div class="fg"><label>Stundenberechnung</label>
         <select id="dpAtfHoursCalc">
-          <option value="daily_target">Tagessoll des Mitarbeiters</option>
-          <option value="shift_hours">Stunden des überschriebenen Dienstes</option>
+          <option value="daily_target">Tagessoll des Mitarbeiters (aus Profil: tägliche Arbeitszeit)</option>
+          <option value="avg_shift_duration">Ø Dienstdauer (aus Profil) — bei Feiertag+Dienst: Ø Dienst + Dienststunden</option>
+          <option value="shift_hours">Stunden des geplanten Dienstes</option>
           <option value="zero">0 Stunden (kein Anspruch)</option>
           <option value="fixed">Fixer Wert</option>
         </select>
@@ -1629,6 +1630,24 @@
   </div>
 </div>
 
+<!-- DP: Stundenprofil Form -->
+<div class="ov" id="dpHoursProfileFormOv">
+  <div class="modal sm">
+    <div class="mh"><h2 id="dpHpfTitle">Stundenprofil</h2><button class="mc" onclick="closeModal('dpHoursProfileFormOv')">&#10005;</button></div>
+    <div class="mb2">
+      <input type="hidden" id="dpHpfId">
+      <div class="fg"><label>Profilname *</label><input type="text" id="dpHpfName" placeholder="z.B. Vollzeit 173h"></div>
+      <div class="fg"><label>Monatssoll (Stunden) *</label><input type="number" id="dpHpfMonthly" step="0.5" min="1" placeholder="z.B. 173">
+        <small style="color:var(--mu);font-size:11px">Vertragliche Sollstunden pro Monat</small></div>
+      <div class="fg"><label>Tägliche Arbeitszeit (Stunden)</label><input type="number" id="dpHpfDaily" step="0.1" min="0.5" placeholder="z.B. 8 — leer = Monatssoll ÷ 26">
+        <small style="color:var(--mu);font-size:11px">Wird für Abwesenheiten mit "Tagessoll" verwendet (z.B. Urlaub, Krankenstand)</small></div>
+      <div class="fg"><label>Ø Dienstdauer (Stunden)</label><input type="number" id="dpHpfAvgShift" step="0.5" min="0.5" placeholder="z.B. 12 — leer = wie tägliche Arbeitszeit">
+        <small style="color:var(--mu);font-size:11px">Wird für Abwesenheitstyp "Ø Dienstdauer" verwendet, z.B. Feiertag: Ø Dienst + Dienststunden wenn gearbeitet wird</small></div>
+    </div>
+    <div class="mf"><button class="btn" onclick="submitDpHoursProfileForm()">&#10003; Speichern</button></div>
+  </div>
+</div>
+
 <!-- DP: Mitarbeiter-Parameter Form -->
 <div class="ov" id="dpEmpParamFormOv">
   <div class="modal sm">
@@ -1639,6 +1658,12 @@
       <div class="fg"><label>Mitarbeiter</label><select id="dpEpfEmp" onchange="document.getElementById('dpEpfEmpId').value=this.value"></select></div>
       <div class="fg"><label>G&#252;ltig ab (leer = immer)</label><input type="date" id="dpEpfValidFrom">
         <small style="color:var(--mu);font-size:11px">Ab diesem Datum gilt diese Konfiguration (z.B. nach Stundenreduzierung)</small>
+      </div>
+      <div class="fg"><label>Stundenprofil (optional)</label>
+        <select id="dpEpfProfileId" onchange="dpEpfProfileChange(this.value)">
+          <option value="">— kein Profil (manuelle Eingabe) —</option>
+        </select>
+        <small style="color:var(--mu);font-size:11px">Profil wählen füllt Monatssoll und Tagessoll automatisch</small>
       </div>
       <div class="fg"><label>Monatsstunden (Soll)</label><input type="number" id="dpEpfMonthly" value="160" step="1" min="10" max="300" placeholder="z.B. 160">
         <small style="color:var(--mu);font-size:11px">Durchschnittliche Sollstunden pro Monat (Vollzeit ≈ 173h)</small></div>
