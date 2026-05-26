@@ -4556,26 +4556,55 @@ async function renderDPConfigEmpParams() {
 async function renderDPConfigRequirements() {
   let reqs = [];
   try { reqs = await api('GET', '/dp/shift-requirements'); } catch(e) {}
-  window.dpReqs = reqs; // for openDpReqForm access
+  window.dpReqs = reqs;
 
   const appliesLabel = {weekday:'Werktag',weekend:'Wochenende',holiday:'Feiertag',daily:'Mo–So',date:'Datum'};
   const wdLabel = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+  const today = new Date().toISOString().slice(0,10);
 
-  const rows = reqs.map(r => {
+  const isActive = r => {
+    const from = r.valid_from ? String(r.valid_from).slice(0,10) : null;
+    const until = r.valid_until ? String(r.valid_until).slice(0,10) : null;
+    if (from && from > today) return false;
+    if (until && until < today) return false;
+    return true;
+  };
+
+  const buildRow = (r, dimmed) => {
     const st = S.dpShiftTypes.find(x=>x.id===r.shift_type_id);
     const wd = r.weekday!==null ? ' ('+wdLabel[r.weekday]+')' : '';
-    return `<div class="dp-cfg-row">
+    const from = r.valid_from ? String(r.valid_from).slice(0,10) : null;
+    const until = r.valid_until ? String(r.valid_until).slice(0,10) : null;
+    let dateRange = '';
+    if (from && until) dateRange = ` · ${from.slice(5)} – ${until.slice(5)}`;
+    else if (from) dateRange = ` · ab ${from.slice(5)}`;
+    else if (until) dateRange = ` · bis ${until.slice(5)}`;
+    return `<div class="dp-cfg-row" style="${dimmed?'opacity:0.5':''}">
       <span class="dp-color-dot" style="background:${st?.color||'#ccc'}"></span>
       <span class="dp-cfg-label">${esc(st?.name||r.shift_type_id)}</span>
-      <span style="font-size:11px;color:var(--mu)">${appliesLabel[r.applies_to]||r.applies_to}${wd}${r.specific_date?' '+String(r.specific_date).slice(0,10):''}: ${r.slot_count} Slot(s)${r.valid_from?' (ab '+String(r.valid_from).slice(0,10)+')':''}</span>
+      <span style="font-size:11px;color:var(--mu)">${appliesLabel[r.applies_to]||r.applies_to}${wd}${r.specific_date?' '+String(r.specific_date).slice(0,10):''}: ${r.slot_count} Slot(s)${dateRange}</span>
       <button class="btn-s" onclick="openDpReqForm(window.dpReqs.find(x=>x.id==='${r.id}'))">✏️</button>
       <button class="btn-s" style="color:#ef4444" onclick="deleteDpRequirement('${r.id}')">✕</button>
     </div>`;
-  }).join('');
+  };
+
+  const active = reqs.filter(r => isActive(r));
+  const inactive = reqs.filter(r => !isActive(r));
+
+  const activeHtml = active.length
+    ? active.map(r => buildRow(r, false)).join('')
+    : '<div style="color:var(--mu);font-size:13px">Noch kein aktiver Bedarf definiert.</div>';
+
+  const inactiveHtml = inactive.length
+    ? `<div style="margin-top:16px">
+        <div style="font-size:12px;font-weight:600;color:var(--mu);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em">Nicht mehr aktiv / zukünftig</div>
+        ${inactive.map(r => buildRow(r, true)).join('')}
+       </div>`
+    : '';
 
   return `<div class="dp-cfg-card">
     <h3>Schichtbedarf <button class="btn-p" style="float:right;font-size:11px" onclick="openDpReqForm()">+ Hinzufügen</button></h3>
-    ${rows||'<div style="color:var(--mu);font-size:13px">Noch kein Bedarf definiert.</div>'}
+    ${activeHtml}${inactiveHtml}
   </div>`;
 }
 
@@ -5146,8 +5175,6 @@ function openDpShiftTypeForm(id) {
   document.getElementById('dpStfZulage').checked = !!st?.is_zulage;
   document.getElementById('dpStfOffice').checked = !!st?.is_office;
   document.getElementById('dpStfColor').value = st?.color||'#3b6dd4';
-  document.getElementById('dpStfValidFrom').value = st?.valid_from ? String(st.valid_from).slice(0,10) : '';
-  document.getElementById('dpStfValidUntil').value = st?.valid_until ? String(st.valid_until).slice(0,10) : '';
   document.getElementById('dpStfMaxPerEmpPerMonth').value = st?.max_per_emp_per_month || '';
   openModal('dpShiftTypeFormOv');
 }
@@ -5166,8 +5193,6 @@ async function submitDpShiftTypeForm() {
     isZulage: document.getElementById('dpStfZulage').checked,
     isOffice: document.getElementById('dpStfOffice').checked,
     color: document.getElementById('dpStfColor').value,
-    validFrom: document.getElementById('dpStfValidFrom').value||null,
-    validUntil: document.getElementById('dpStfValidUntil').value||null,
     maxPerEmpPerMonth: document.getElementById('dpStfMaxPerEmpPerMonth').value ? parseInt(document.getElementById('dpStfMaxPerEmpPerMonth').value) : null,
   };
   if (!body.name||!body.code) return toast('Name und Code erforderlich','err');
@@ -5386,6 +5411,7 @@ function openDpReqForm(req) {
   document.getElementById('dpRfDate').value = specDate;
   document.getElementById('dpRfSlots').value = req?.slot_count||1;
   document.getElementById('dpRfValidFrom').value = req?.valid_from ? String(req.valid_from).slice(0,10) : '';
+  document.getElementById('dpRfValidUntil').value = req?.valid_until ? String(req.valid_until).slice(0,10) : '';
   onDpRfTypeChange();
   openModal('dpReqFormOv');
 }
@@ -5406,6 +5432,7 @@ async function submitDpReqForm() {
     specificDate: appliesTo==='date' ? document.getElementById('dpRfDate').value : null,
     slotCount: parseInt(document.getElementById('dpRfSlots').value)||1,
     validFrom: document.getElementById('dpRfValidFrom').value||null,
+    validUntil: document.getElementById('dpRfValidUntil').value||null,
   };
   if (!body.shiftTypeId) return toast('Schichttyp erforderlich','err');
   try {

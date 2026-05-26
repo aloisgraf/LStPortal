@@ -496,6 +496,7 @@ async function initDB() {
 )`,
     `ALTER TABLE dp_employee_params ADD COLUMN IF NOT EXISTS valid_from DATE DEFAULT NULL`,
     `ALTER TABLE dp_shift_requirements ADD COLUMN IF NOT EXISTS valid_from DATE DEFAULT NULL`,
+    `ALTER TABLE dp_shift_requirements ADD COLUMN IF NOT EXISTS valid_until DATE DEFAULT NULL`,
     `ALTER TABLE dp_employee_qualifications ADD COLUMN IF NOT EXISTS valid_from DATE DEFAULT NULL`,
     `ALTER TABLE dp_shift_types ADD COLUMN IF NOT EXISTS valid_from DATE DEFAULT NULL`,
     `ALTER TABLE dp_absence_types ADD COLUMN IF NOT EXISTS valid_from DATE DEFAULT NULL`,

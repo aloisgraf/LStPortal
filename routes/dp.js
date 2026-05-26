@@ -197,13 +197,13 @@ router.get('/shift-requirements', auth, async (req,res) => {
 
 router.post('/shift-requirements', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
-  const {shiftTypeId,appliesTo,weekday,specificDate,slotCount,validFrom} = req.body;
+  const {shiftTypeId,appliesTo,weekday,specificDate,slotCount,validFrom,validUntil} = req.body;
   if (!shiftTypeId||!slotCount) return bad(res,'Schichttyp und Anzahl erforderlich',400);
   try {
     const row = await q1(
-      `INSERT INTO dp_shift_requirements (id,shift_type_id,applies_to,weekday,specific_date,slot_count,valid_from,created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [newId(),shiftTypeId,appliesTo||'weekday',weekday||null,specificDate||null,slotCount,validFrom||null,req.uid]
+      `INSERT INTO dp_shift_requirements (id,shift_type_id,applies_to,weekday,specific_date,slot_count,valid_from,valid_until,created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      [newId(),shiftTypeId,appliesTo||'weekday',weekday||null,specificDate||null,slotCount,validFrom||null,validUntil||null,req.uid]
     );
     ok(res,row);
   } catch(e) { bad(res,'Serverfehler',500); }
@@ -211,11 +211,11 @@ router.post('/shift-requirements', auth, async (req,res) => {
 
 router.put('/shift-requirements/:id', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
-  const {shiftTypeId,slotCount,weekday,appliesTo,specificDate,validFrom} = req.body;
+  const {shiftTypeId,slotCount,weekday,appliesTo,specificDate,validFrom,validUntil} = req.body;
   try {
     const row = await q1(
-      `UPDATE dp_shift_requirements SET shift_type_id=COALESCE($1,shift_type_id),slot_count=$2,weekday=$3,applies_to=$4,specific_date=$5,valid_from=$6 WHERE id=$7 RETURNING *`,
-      [shiftTypeId||null,slotCount,weekday||null,appliesTo,specificDate||null,validFrom||null,req.params.id]
+      `UPDATE dp_shift_requirements SET shift_type_id=COALESCE($1,shift_type_id),slot_count=$2,weekday=$3,applies_to=$4,specific_date=$5,valid_from=$6,valid_until=$8 WHERE id=$7 RETURNING *`,
+      [shiftTypeId||null,slotCount,weekday||null,appliesTo,specificDate||null,validFrom||null,req.params.id,validUntil||null]
     );
     ok(res,row);
   } catch(e) { bad(res,'Serverfehler',500); }
@@ -767,7 +767,7 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
     const [shiftTypes,shiftPrefs,requirements,empParams,existingAssignments,wishDays,absenceTypes,qualifications] = await Promise.all([
       q('SELECT * FROM dp_shift_types WHERE (valid_from IS NULL OR valid_from <= $1) AND (valid_until IS NULL OR valid_until >= $1) ORDER BY sort_order', [planStartDate]),
       q('SELECT DISTINCT ON (employee_id, shift_type_id) * FROM dp_shift_preferences WHERE valid_from IS NULL OR valid_from <= $1 ORDER BY employee_id, shift_type_id, valid_from DESC NULLS LAST', [planStartDate]),
-      q(`SELECT DISTINCT ON (shift_type_id, applies_to, COALESCE(weekday::text,'x'), COALESCE(specific_date::text,'x')) * FROM dp_shift_requirements WHERE valid_from IS NULL OR valid_from <= $1 ORDER BY shift_type_id, applies_to, COALESCE(weekday::text,'x'), COALESCE(specific_date::text,'x'), valid_from DESC NULLS LAST`,[planStartDate]),
+      q('SELECT * FROM dp_shift_requirements ORDER BY shift_type_id, applies_to, weekday, valid_from DESC NULLS LAST'),
       q(`SELECT DISTINCT ON (employee_id) * FROM dp_employee_params WHERE valid_from IS NULL OR valid_from <= $1 ORDER BY employee_id, valid_from DESC NULLS LAST`,[planStartDate]),
       q(`SELECT * FROM dp_assignments WHERE plan_id=$1`,[req.params.id]),
       q('SELECT * FROM dp_wish_days WHERE month=$1 AND year=$2',[plan.month,plan.year]),
@@ -1369,26 +1369,35 @@ router.delete('/wish-days/:id', auth, async (req,res) => {
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 
 function getRequiredCount(requirements, shiftTypeId, dayInfo) {
+  // Filter to requirements valid on dayInfo.date
+  const date = dayInfo.date; // 'YYYY-MM-DD'
+  const validReqs = requirements.filter(r => {
+    const from = r.valid_from ? String(r.valid_from).slice(0,10) : null;
+    const until = r.valid_until ? String(r.valid_until).slice(0,10) : null;
+    if (from && from > date) return false;
+    if (until && until < date) return false;
+    return true;
+  });
   // Check specific date first
-  const specific = requirements.find(r=>r.shift_type_id===shiftTypeId && r.applies_to==='date' && r.specific_date?.toString().slice(0,10)===dayInfo.date);
+  const specific = validReqs.find(r=>r.shift_type_id===shiftTypeId && r.applies_to==='date' && r.specific_date?.toString().slice(0,10)===dayInfo.date);
   if (specific) return specific.slot_count;
   // Daily (every day incl. holidays)
-  const daily = requirements.find(r=>r.shift_type_id===shiftTypeId && r.applies_to==='daily');
+  const daily = validReqs.find(r=>r.shift_type_id===shiftTypeId && r.applies_to==='daily');
   if (daily) return daily.slot_count;
   // Holiday: only 'holiday' rule applies — weekday/weekend rules do NOT fall through to holidays
   if (dayInfo.isHoliday) {
-    const hol = requirements.find(r=>r.shift_type_id===shiftTypeId && r.applies_to==='holiday');
+    const hol = validReqs.find(r=>r.shift_type_id===shiftTypeId && r.applies_to==='holiday');
     return hol ? hol.slot_count : 0;
   }
   // Weekend: only 'weekend' rule applies — weekday rules do NOT fall through to weekends
   if (dayInfo.isWeekend) {
-    const we = requirements.find(r=>r.shift_type_id===shiftTypeId && r.applies_to==='weekend');
+    const we = validReqs.find(r=>r.shift_type_id===shiftTypeId && r.applies_to==='weekend');
     return we ? we.slot_count : 0;
   }
   // Weekday (Mon–Fri, non-holiday): specific weekday first, then general Mo–Fr
-  const wdReq = requirements.find(r=>r.shift_type_id===shiftTypeId && r.applies_to==='weekday' && r.weekday===dayInfo.weekday);
+  const wdReq = validReqs.find(r=>r.shift_type_id===shiftTypeId && r.applies_to==='weekday' && r.weekday===dayInfo.weekday);
   if (wdReq) return wdReq.slot_count;
-  const general = requirements.find(r=>r.shift_type_id===shiftTypeId && r.applies_to==='weekday' && r.weekday===null);
+  const general = validReqs.find(r=>r.shift_type_id===shiftTypeId && r.applies_to==='weekday' && r.weekday===null);
   return general ? general.slot_count : 0;
 }
 

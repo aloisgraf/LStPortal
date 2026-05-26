@@ -1588,8 +1588,6 @@
         <label class="rck"><input type="checkbox" id="dpStfOffice"> Bürodienst (B)</label>
       </div>
       <div class="fg" style="margin-top:8px"><label>Farbe</label><input type="color" id="dpStfColor" value="#3b6dd4"></div>
-      <div class="fg" style="margin-top:8px"><label>G&#252;ltig ab (leer = immer)</label><input type="date" id="dpStfValidFrom"></div>
-      <div class="fg" style="margin-top:8px"><label>G&#252;ltig bis (leer = immer)</label><input type="date" id="dpStfValidUntil"></div>
       <div class="fg" style="margin-top:8px"><label>Max. pro MA/Monat (leer = unbegrenzt)</label><input type="number" id="dpStfMaxPerEmpPerMonth" min="1" max="31" placeholder="z.B. 1 für max. 1x/Monat"></div>
     </div>
     <div class="mf"><button class="btn" onclick="submitDpShiftTypeForm()">&#10003; Speichern</button></div>
@@ -1747,7 +1745,8 @@
       </div>
       <div class="fg" id="dpRfDateWrap" style="display:none"><label>Datum</label><input type="date" id="dpRfDate"></div>
       <div class="fg"><label>Anzahl Slots</label><input type="number" id="dpRfSlots" value="1" min="0" max="20"></div>
-      <div class="fg"><label>G&#252;ltig ab (leer = immer)</label><input type="date" id="dpRfValidFrom"></div>
+      <div class="fg"><label>G&#252;ltig von (leer = immer)</label><input type="date" id="dpRfValidFrom"></div>
+      <div class="fg"><label>G&#252;ltig bis (leer = offen)</label><input type="date" id="dpRfValidUntil"></div>
     </div>
     <div class="mf"><button class="btn" onclick="submitDpReqForm()">&#10003; Speichern</button></div>
   </div>
