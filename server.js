@@ -500,6 +500,7 @@ async function initDB() {
     `ALTER TABLE dp_employee_qualifications ADD COLUMN IF NOT EXISTS valid_from DATE DEFAULT NULL`,
     `ALTER TABLE dp_shift_types ADD COLUMN IF NOT EXISTS valid_from DATE DEFAULT NULL`,
     `ALTER TABLE dp_absence_types ADD COLUMN IF NOT EXISTS valid_from DATE DEFAULT NULL`,
+    `ALTER TABLE dp_absence_types ADD COLUMN IF NOT EXISTS is_holiday_default BOOLEAN NOT NULL DEFAULT false`,
     `ALTER TABLE dp_employee_params DROP CONSTRAINT IF EXISTS dp_employee_params_employee_id_key`,
     `CREATE UNIQUE INDEX IF NOT EXISTS dp_emp_params_null_vf ON dp_employee_params(employee_id) WHERE valid_from IS NULL`,
     `CREATE UNIQUE INDEX IF NOT EXISTS dp_emp_params_date_vf ON dp_employee_params(employee_id, valid_from) WHERE valid_from IS NOT NULL`,

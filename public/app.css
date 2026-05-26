@@ -362,6 +362,9 @@ details.dash-card > summary { list-style: none; cursor: pointer; display: flex; 
 .dp-matrix thead th.dp-th-today{background:#dbeafe;color:#1d4ed8}
 .dp-matrix thead th.dp-th-weekend{background:#fef3c7}
 .dp-matrix thead th.dp-th-holiday{background:#fce7f3;color:#9d174d}
+.dp-matrix td.dp-th-today{background:#dbeafe22}
+.dp-matrix td.dp-th-weekend{background:#fef3c744}
+.dp-matrix td.dp-th-holiday{background:#fce7f366}
 .dp-row-label{position:sticky;left:0;z-index:5;background:var(--bg);width:170px;min-width:170px;max-width:220px;font-weight:600;padding:4px 8px !important;text-align:left !important;box-shadow:2px 0 4px rgba(0,0,0,.06)}
 .dp-matrix thead .dp-row-label{z-index:15;background:var(--bg2)}
 .dp-section-hdr td{background:var(--bg2);font-weight:700;font-size:11px;color:var(--mu);padding:3px 8px !important;letter-spacing:.5px}

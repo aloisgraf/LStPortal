@@ -236,13 +236,15 @@ router.get('/absence-types', auth, async (req,res) => {
 
 router.post('/absence-types', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
-  const {code,label,color,hoursCalculation,fixedHours,adjustsMonthlyTarget,blocksScheduling,reopensShift,countsAsWorked,requiresApproval,sortOrder,validFrom} = req.body;
+  const {code,label,color,hoursCalculation,fixedHours,adjustsMonthlyTarget,blocksScheduling,reopensShift,countsAsWorked,requiresApproval,sortOrder,validFrom,isHolidayDefault} = req.body;
   if (!code?.trim()||!label?.trim()) return bad(res,'Code und Label erforderlich',400);
   try {
+    // Only one type can be the holiday default – clear others first
+    if (isHolidayDefault) await q('UPDATE dp_absence_types SET is_holiday_default=false');
     const row = await q1(
-      `INSERT INTO dp_absence_types (id,code,label,color,hours_calculation,fixed_hours,adjusts_monthly_target,blocks_scheduling,reopens_shift,counts_as_worked,requires_approval,sort_order,valid_from,created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
-      [newId(),code.trim().toUpperCase(),label.trim(),color||'#f59e0b',hoursCalculation||'daily_target',fixedHours||null,!!adjustsMonthlyTarget,blocksScheduling!==false,reopensShift!==false,countsAsWorked!==false,!!requiresApproval,sortOrder||0,validFrom||null,req.uid]
+      `INSERT INTO dp_absence_types (id,code,label,color,hours_calculation,fixed_hours,adjusts_monthly_target,blocks_scheduling,reopens_shift,counts_as_worked,requires_approval,sort_order,valid_from,is_holiday_default,created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+      [newId(),code.trim().toUpperCase(),label.trim(),color||'#f59e0b',hoursCalculation||'daily_target',fixedHours||null,!!adjustsMonthlyTarget,blocksScheduling!==false,reopensShift!==false,countsAsWorked!==false,!!requiresApproval,sortOrder||0,validFrom||null,!!isHolidayDefault,req.uid]
     );
     ok(res,row);
   } catch(e) { bad(res,'Serverfehler',500); }
@@ -250,13 +252,14 @@ router.post('/absence-types', auth, async (req,res) => {
 
 router.put('/absence-types/:id', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
-  const {code,label,color,hoursCalculation,fixedHours,adjustsMonthlyTarget,blocksScheduling,reopensShift,countsAsWorked,requiresApproval,sortOrder,validFrom} = req.body;
+  const {code,label,color,hoursCalculation,fixedHours,adjustsMonthlyTarget,blocksScheduling,reopensShift,countsAsWorked,requiresApproval,sortOrder,validFrom,isHolidayDefault} = req.body;
   try {
+    if (isHolidayDefault) await q('UPDATE dp_absence_types SET is_holiday_default=false WHERE id!=$1',[req.params.id]);
     const row = await q1(
       `UPDATE dp_absence_types SET code=$1,label=$2,color=$3,hours_calculation=$4,fixed_hours=$5,
        adjusts_monthly_target=$6,blocks_scheduling=$7,reopens_shift=$8,counts_as_worked=$9,
-       requires_approval=$10,sort_order=$11,valid_from=$12 WHERE id=$13 RETURNING *`,
-      [code?.toUpperCase(),label,color,hoursCalculation,fixedHours||null,!!adjustsMonthlyTarget,blocksScheduling!==false,reopensShift!==false,countsAsWorked!==false,!!requiresApproval,sortOrder||0,validFrom||null,req.params.id]
+       requires_approval=$10,sort_order=$11,valid_from=$12,is_holiday_default=$13 WHERE id=$14 RETURNING *`,
+      [code?.toUpperCase(),label,color,hoursCalculation,fixedHours||null,!!adjustsMonthlyTarget,blocksScheduling!==false,reopensShift!==false,countsAsWorked!==false,!!requiresApproval,sortOrder||0,validFrom||null,!!isHolidayDefault,req.params.id]
     );
     if (!row) return bad(res,'Nicht gefunden',404);
     ok(res,row);
@@ -483,7 +486,7 @@ router.get('/plans/:id/matrix', auth, async (req,res) => {
     // Auto-seed Feiertag absences: insert absence records for all employees on public holidays
     // where no assignment exists yet (runs each load, skips already-assigned dates)
     {
-      const holidayAbsType = absenceTypes.find(at => at.applies_to === 'holiday');
+      const holidayAbsType = absenceTypes.find(at => at.is_holiday_default);
       const holidayDates = days.filter(d => d.isHoliday).map(d => d.date);
       if (holidayAbsType && holidayDates.length > 0) {
         const assignedKeys = new Set(assignments.map(a => {

@@ -4030,11 +4030,13 @@ function renderDPMatrix(data) {
     let cells = days.map(d => {
       const a = assign[d.date];
       const isWish = wishSet.has(`${emp.id}_${d.date}`);
+      const dayCls = d.isHoliday ? ' dp-th-holiday' : (d.isWeekend ? ' dp-th-weekend' : (d.date === today ? ' dp-th-today' : ''));
       if (!a) {
         const wishMark = isWish ? `<span style="font-size:9px;color:#f59e0b;line-height:1">★</span>` : '';
         const wishTitle = isWish ? 'Wunschtag · ' : '';
-        if (canEdit) return `<td class="dp-cell" onclick="openDpCellMenu('${emp.id}','${d.date}',event)" title="${wishTitle}Klicken zum Zuweisen" style="${isWish?'background:#fef3c722;':''}">${wishMark}</td>`;
-        return `<td class="dp-cell" style="${isWish?'background:#fef3c722;':''}">${wishMark}</td>`;
+        const wishStyle = isWish ? 'background:#fef3c722;' : '';
+        if (canEdit) return `<td class="dp-cell${dayCls}" onclick="openDpCellMenu('${emp.id}','${d.date}',event)" title="${wishTitle}Klicken zum Zuweisen"${wishStyle?` style="${wishStyle}"`:''} >${wishMark}</td>`;
+        return `<td class="dp-cell${dayCls}"${wishStyle?` style="${wishStyle}"`:''} >${wishMark}</td>`;
       }
       const st = shiftTypes.find(x=>x.id===a.shift_type_id);
       const at = absenceTypes.find(x=>x.id===a.absence_type_id);
@@ -4064,7 +4066,7 @@ function renderDPMatrix(data) {
 
     const basicStats = `
       <td style="text-align:center;padding:3px 6px;font-size:12px" title="Vertragliches Monatssoll: ${s.targetHours||0}h">${s.targetHours||0}</td>
-      <td style="text-align:center;padding:3px 6px;font-size:12px;cursor:default" title="${esc(istTitle)}">${Math.round(istHours*10)/10}${absH>0?'<span style="font-size:9px;color:var(--mu);opacity:0.6"> (${Math.round(shiftH*10)/10}+${Math.round(absH*10)/10})</span>':''}</td>
+      <td style="text-align:center;padding:3px 6px;font-size:12px;cursor:default" title="${esc(istTitle)}">${Math.round(istHours*10)/10}${absH>0?`<span style="font-size:9px;color:var(--mu);opacity:0.6"> (${Math.round(shiftH*10)/10}+${Math.round(absH*10)/10})</span>`:''}</td>
       <td style="text-align:center;padding:3px 6px;font-size:12px;color:${diffColor};font-weight:600" title="Differenz Ist − Soll">${diffStr}</td>`;
 
     const extraStats = expanded ? `
@@ -4495,7 +4497,7 @@ async function renderDPConfigAbsenceTypes() {
   const rows = types.map(at => `<div class="dp-cfg-row">
     <span class="dp-color-dot" style="background:${at.color}"></span>
     <span class="dp-cfg-label"><strong>${esc(at.code)}</strong> – ${esc(at.label)}</span>
-    <span style="font-size:11px;color:var(--mu)">${hcLabel[at.hours_calculation]||at.hours_calculation}${at.adjusts_monthly_target?' 📉':''}</span>
+    <span style="font-size:11px;color:var(--mu)">${hcLabel[at.hours_calculation]||at.hours_calculation}${at.adjusts_monthly_target?' 📉':''}${at.is_holiday_default?' 🏛️ Feiertag-Standard':''}</span>
     <button class="btn-s" onclick="openDpAbsenceTypeForm('${at.id}')">✏️</button>
     <button class="btn-s" style="color:#ef4444" onclick="deleteDpAbsenceType('${at.id}')">✕</button>
   </div>`).join('');
@@ -4588,23 +4590,31 @@ async function renderDPConfigRequirements() {
     </div>`;
   };
 
-  const active = reqs.filter(r => isActive(r));
-  const inactive = reqs.filter(r => !isActive(r));
+  const isFuture = r => { const from = r.valid_from ? String(r.valid_from).slice(0,10) : null; return from && from > today; };
+  const isExpired = r => { const until = r.valid_until ? String(r.valid_until).slice(0,10) : null; return until && until < today; };
+
+  const active  = reqs.filter(r => !isFuture(r) && !isExpired(r));
+  const future  = reqs.filter(r => isFuture(r));
+  const expired = reqs.filter(r => isExpired(r));
+
+  const sectionHdr = (label, note) =>
+    `<div style="font-size:12px;font-weight:600;color:var(--mu);margin:14px 0 6px;text-transform:uppercase;letter-spacing:0.05em">${label}${note?`<span style="font-weight:400;text-transform:none;font-size:11px"> — ${note}</span>`:''}</div>`;
 
   const activeHtml = active.length
     ? active.map(r => buildRow(r, false)).join('')
     : '<div style="color:var(--mu);font-size:13px">Noch kein aktiver Bedarf definiert.</div>';
 
-  const inactiveHtml = inactive.length
-    ? `<div style="margin-top:16px">
-        <div style="font-size:12px;font-weight:600;color:var(--mu);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em">Nicht mehr aktiv / zukünftig</div>
-        ${inactive.map(r => buildRow(r, true)).join('')}
-       </div>`
+  const futureHtml = future.length
+    ? sectionHdr('Zukünftig', 'wird im jeweiligen Planmonat automatisch angewendet') + future.map(r => buildRow(r, false)).join('')
+    : '';
+
+  const expiredHtml = expired.length
+    ? sectionHdr('Abgelaufen') + expired.map(r => buildRow(r, true)).join('')
     : '';
 
   return `<div class="dp-cfg-card">
     <h3>Schichtbedarf <button class="btn-p" style="float:right;font-size:11px" onclick="openDpReqForm()">+ Hinzufügen</button></h3>
-    ${activeHtml}${inactiveHtml}
+    ${activeHtml}${futureHtml}${expiredHtml}
   </div>`;
 }
 
@@ -5176,6 +5186,8 @@ function openDpShiftTypeForm(id) {
   document.getElementById('dpStfOffice').checked = !!st?.is_office;
   document.getElementById('dpStfColor').value = st?.color||'#3b6dd4';
   document.getElementById('dpStfMaxPerEmpPerMonth').value = st?.max_per_emp_per_month || '';
+  document.getElementById('dpStfValidFrom').value = st?.valid_from ? String(st.valid_from).slice(0,10) : '';
+  document.getElementById('dpStfValidUntil').value = st?.valid_until ? String(st.valid_until).slice(0,10) : '';
   openModal('dpShiftTypeFormOv');
 }
 
@@ -5194,6 +5206,8 @@ async function submitDpShiftTypeForm() {
     isOffice: document.getElementById('dpStfOffice').checked,
     color: document.getElementById('dpStfColor').value,
     maxPerEmpPerMonth: document.getElementById('dpStfMaxPerEmpPerMonth').value ? parseInt(document.getElementById('dpStfMaxPerEmpPerMonth').value) : null,
+    validFrom: document.getElementById('dpStfValidFrom').value||null,
+    validUntil: document.getElementById('dpStfValidUntil').value||null,
   };
   if (!body.name||!body.code) return toast('Name und Code erforderlich','err');
   try {
@@ -5231,6 +5245,7 @@ function openDpAbsenceTypeForm(id) {
   document.getElementById('dpAtfReopens').checked = at?.reopens_shift!==false;
   document.getElementById('dpAtfCounts').checked = at?.counts_as_worked!==false;
   document.getElementById('dpAtfApproval').checked = !!at?.requires_approval;
+  document.getElementById('dpAtfHolidayDefault').checked = !!at?.is_holiday_default;
   document.getElementById('dpAtfValidFrom').value = at?.valid_from ? String(at.valid_from).slice(0,10) : '';
   document.getElementById('dpAtfHoursCalc').onchange = function() {
     document.getElementById('dpAtfFixedWrap').style.display = this.value==='fixed' ? '' : 'none';
@@ -5252,6 +5267,7 @@ async function submitDpAbsenceTypeForm() {
     reopensShift: document.getElementById('dpAtfReopens').checked,
     countsAsWorked: document.getElementById('dpAtfCounts').checked,
     requiresApproval: document.getElementById('dpAtfApproval').checked,
+    isHolidayDefault: document.getElementById('dpAtfHolidayDefault').checked,
     validFrom: document.getElementById('dpAtfValidFrom').value||null,
   };
   if (!body.code||!body.label) return toast('Code und Bezeichnung erforderlich','err');
