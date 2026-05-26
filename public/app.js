@@ -57,6 +57,7 @@ let S={
   todos:[], _selTodo:null,
   _dpPlanId:null, _dpMatrix:null, _dpStatsExpanded:false, _dpConfigTab:'shift-types',
   _dpQualLocalChanges:{}, _dpQualLocalPrefsChanges:{}, _dpReportExpanded: false,
+  _dpQualWeightsExpanded:{}, _dpQualSearchQuery:'',
   _dpCategoryExpanded:{},
 };
 async function api(method,path2,body){
@@ -4698,7 +4699,13 @@ async function renderDPConfigQualifications() {
     }
   }
 
-  const rows = S.users.map(u => {
+  const searchQuery = (S._dpQualSearchQuery || '').toLowerCase().trim();
+
+  const filteredUsers = S.users.filter(u =>
+    !searchQuery || u.name.toLowerCase().includes(searchQuery) || (u.initials||'').toLowerCase().includes(searchQuery)
+  );
+
+  const rows = filteredUsers.map(u => {
     const empId = u.id;
     const empQuals = qualMap[empId] || new Set();
     const empPrefs = prefMap[empId] || {};
@@ -4719,52 +4726,58 @@ async function renderDPConfigQualifications() {
       </span>`;
     }).join(' ');
 
-    // Weight inputs – nur für ausgewählte Dienste, als Zahlenfelder
+    // Weight inputs – nur für ausgewählte Dienste
     const selectedShiftTypes = shiftTypes.filter(st => currentQuals.has(st.id));
-    const weightsInputs = selectedShiftTypes.map(st => {
-      const savedVal = empPrefs[st.id];
-      const localVal = localPrefs[st.id];
-      const displayVal = localVal !== undefined ? localVal : (savedVal !== undefined ? savedVal : '');
-      const changed = localVal !== undefined;
-      return `<div style="display:flex;align-items:center;gap:8px;font-size:13px;padding:2px 0${changed?';border-left:3px solid var(--acc);padding-left:5px':''}">
-    <span style="min-width:80px;flex-shrink:0">${esc(st.code)}:</span>
-    <input type="number" min="0" max="100" value="${displayVal}" placeholder="–" style="width:60px;padding:2px 6px;text-align:right;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--fg)" onchange="updateQualPrefLocal('${empId}','${st.id}',this.value)">
-    <span style="color:var(--mu)">%</span>
-  </div>`;
-    }).join('');
+    const weightsExpanded = !!S._dpQualWeightsExpanded[empId];
+    const hasWeightChanges = Object.keys(localPrefs).length > 0;
 
-    // Summe berechnen (nur eingetragene Werte)
+    // Summe berechnen
     const qualPrefsSum = selectedShiftTypes.reduce((sum, st) => {
       const v = localPrefs[st.id] !== undefined ? localPrefs[st.id] : (empPrefs[st.id] || 0);
       return sum + (parseInt(v) || 0);
     }, 0);
     const remaining = 100 - qualPrefsSum;
-    const sumColor = Math.abs(remaining) < 1 ? 'var(--ok, green)' : (remaining < 0 ? 'var(--err, red)' : 'var(--mu)');
+    const sumColor = Math.abs(remaining) < 1 ? '#22c55e' : (remaining < 0 ? '#ef4444' : 'var(--mu)');
 
-    // Weight inputs – direkt unter den Chips, für jede ausgewählte Quali
-    const weightsSection = selectedShiftTypes.length > 0 ? `
-  <div style="background:var(--bg);padding:8px 12px;border-radius:4px;margin-top:8px;border:1px solid var(--border)">
-    <div style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--fg)">Gewichtungen:</div>
-    ${weightsInputs}
-    <div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--border);font-size:12px;font-weight:600;color:${sumColor}">
-      Summe: ${qualPrefsSum}% ${remaining !== 0 ? '– noch '+Math.abs(remaining)+'% '+(remaining>0?'verfügbar':'zu viel') : '– 100% ✓'}
-    </div>
-    ${qualPrefsSum === 0 ? '<div style="font-size:11px;color:var(--mu);margin-top:4px">Keine Angabe = gleichmäßig verteilt</div>' : ''}
-  </div>
-` : '';
+    let weightsSection = '';
+    if (selectedShiftTypes.length > 0) {
+      const toggleLabel = weightsExpanded ? '▲ Gewichtungen einklappen' : '▼ Gewichtungen' + (qualPrefsSum > 0 ? ` (${qualPrefsSum}%)` : '');
+      const weightsInputs = selectedShiftTypes.map(st => {
+        const savedVal = empPrefs[st.id];
+        const localVal = localPrefs[st.id];
+        const displayVal = localVal !== undefined ? localVal : (savedVal !== undefined ? savedVal : '');
+        const changed = localVal !== undefined;
+        return `<div style="display:flex;align-items:center;gap:8px;font-size:13px;padding:2px 0${changed?';border-left:3px solid var(--acc);padding-left:5px':''}">
+          <span style="min-width:80px;flex-shrink:0">${esc(st.code)}:</span>
+          <input type="number" min="0" max="100" value="${displayVal}" placeholder="–" style="width:60px;padding:2px 6px;text-align:right;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--fg)" onchange="updateQualPrefLocal('${empId}','${st.id}',this.value)">
+          <span style="color:var(--mu)">%</span>
+        </div>`;
+      }).join('');
+
+      weightsSection = `<div style="margin-top:6px">
+        <button class="btn-s" style="font-size:11px;color:var(--mu)${hasWeightChanges?';border-color:var(--acc);color:var(--acc)':''}" onclick="S._dpQualWeightsExpanded['${empId}']=!S._dpQualWeightsExpanded['${empId}'];renderDPConfigTab()">${toggleLabel}</button>
+        ${weightsExpanded ? `<div style="background:var(--bg);padding:8px 12px;border-radius:4px;margin-top:6px;border:1px solid var(--border)">
+          ${weightsInputs}
+          <div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--border);font-size:12px;font-weight:600;color:${sumColor}">
+            Summe: ${qualPrefsSum}% ${remaining !== 0 ? '– noch '+Math.abs(remaining)+'% '+(remaining>0?'verfügbar':'zu viel') : '✓ 100%'}
+          </div>
+          ${qualPrefsSum === 0 ? '<div style="font-size:11px;color:var(--mu);margin-top:4px">Keine Angabe = gleichmäßig verteilt</div>' : ''}
+        </div>` : ''}
+      </div>`;
+    }
 
     // Changes detected?
     const hasChanges = localChanges.adds.size > 0 || localChanges.removes.size > 0 || Object.keys(localPrefs).length > 0;
 
-    return `<div style="margin-bottom:24px;padding:12px;background:var(--sf2);border-radius:6px;border:1px solid var(--border)">
+    return `<div style="margin-bottom:16px;padding:12px;background:var(--sf2);border-radius:6px;border:1px solid var(--border)">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
         <span class="av-sm" style="background:${u.color}">${esc(u.initials)}</span>
         <span style="font-weight:600;flex:1">${esc(u.name)}</span>
-        <span style="font-size:11px;color:var(--mu);background:var(--bg);padding:2px 6px;border-radius:3px">Standard</span>
+        ${hasChanges?'<span style="font-size:11px;color:var(--acc);font-weight:600">● ungespeichert</span>':''}
       </div>
-      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px">${chips}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${chips}</div>
       ${weightsSection}
-      ${hasChanges?`<div style="display:flex;gap:8px;margin-top:12px">
+      ${hasChanges?`<div style="display:flex;gap:8px;margin-top:10px">
         <button class="btn-s" onclick="submitQualChanges('${empId}',null)">✓ Speichern</button>
         <button class="btn-s" style="background:var(--acc);color:white" onclick="openNewQualVersionDialog('${empId}')">+ Neue Version ab...</button>
       </div>`:''}
@@ -4773,13 +4786,18 @@ async function renderDPConfigQualifications() {
 
   const anyDefined = qualifications.length > 0;
   const infoText = anyDefined
-    ? `<div style="color:var(--mu);font-size:12px;margin-bottom:10px">Klicken Sie auf die Chips zum Aktivieren/Deaktivieren. Dienst-Gewichtungen (0-100%) bestimmen Planungspriorität.</div>`
+    ? `<div style="color:var(--mu);font-size:12px;margin-bottom:10px">Chips klicken zum Aktivieren/Deaktivieren. Gewichtungen definieren den Stundenanteil pro Dienst (z.B. ND1=60%, FD=40% → 60% der Sollstunden als ND1).</div>`
     : `<div style="color:#f59e0b;font-size:12px;margin-bottom:10px">⚠️ Noch keine Qualifikationen definiert — der Scheduler kann jeden Mitarbeiter für jeden Dienst einteilen.</div>`;
 
   return `<div class="dp-cfg-card">
     <h3>Schicht-Qualifikationen</h3>
     ${infoText}
-    ${rows}
+    <div style="margin-bottom:14px">
+      <input type="search" placeholder="Mitarbeiter suchen…" value="${esc(S._dpQualSearchQuery||'')}"
+        style="width:100%;padding:7px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;box-sizing:border-box"
+        oninput="S._dpQualSearchQuery=this.value;renderDPConfigTab()">
+    </div>
+    ${filteredUsers.length === 0 ? '<div style="color:var(--mu);font-size:13px;padding:8px 0">Keine Mitarbeiter gefunden.</div>' : rows}
   </div>`;
 }
 

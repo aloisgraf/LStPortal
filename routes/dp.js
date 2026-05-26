@@ -637,7 +637,8 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
         nightsAssigned: 0,
         weekendsAssigned: 0,
         weeklyHours: {},
-        shiftTypeCount: {}, // stId -> Anzahl zugewiesener Dienste dieses Typs (für proportionale Gewichtung)
+        shiftTypeCount: {}, // stId -> Anzahl zugewiesener Dienste dieses Typs
+        shiftTypeHours: {}, // stId -> Stunden zugewiesener Dienste dieses Typs (für proportionale Stunden-Gewichtung)
         totalShiftsAssigned: 0,
         assignments: existingAssignments.filter(a=>a.employee_id===p.employee_id).map(a=>({
           ...a, date: a.date?.toString().slice(0,10),
@@ -715,6 +716,9 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
           state.officeHoursAssigned += officeDuration;
           const wk = getISOWeek(dateStr);
           state.weeklyHours[wk] = (state.weeklyHours[wk]||0) + officeDuration;
+          state.shiftTypeCount[officeShiftType.id] = (state.shiftTypeCount[officeShiftType.id]||0) + 1;
+          state.shiftTypeHours[officeShiftType.id] = (state.shiftTypeHours[officeShiftType.id]||0) + officeDuration;
+          state.totalShiftsAssigned++;
           state.assignments.push(assignment);
         }
       }
@@ -840,22 +844,28 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
             score -= Math.max(0, quota - state.fdSpringerShiftsAssigned) * 200;
           }
 
-          // ── Proportionale Dienst-Gewichtung ──
-          // Wenn MA Gewichtungen hat: Score-Bonus für unterfüllte Dienste
+          // ── Proportionale Dienst-Gewichtung (Stunden-basiert) ──
+          // Gewichtungen definieren ANTEIL der Monats-Sollstunden pro Dienst.
+          // 100% ND1 = der MA soll 100% seiner verfügbaren Stunden als ND1 bekommen, NICHT mehr.
+          // Max-Bonus ±25 damit er nie den primären Fill-Ratio-Score (0-100) überschreibt.
           const empPrefs = shiftPrefMap[empId];
           if (empPrefs && Object.keys(empPrefs).length > 0) {
-            const totalPrefWeight = Object.values(empPrefs).reduce((s, v) => s + v, 0) || 100;
-            const pref = empPrefs[slot.shiftTypeId];
-            if (pref !== undefined) {
-              const targetRatio = pref / totalPrefWeight;
-              const total = state.totalShiftsAssigned;
-              const currentCount = state.shiftTypeCount[slot.shiftTypeId] || 0;
-              const currentRatio = total > 0 ? currentCount / total : 0;
-              // Je mehr dieser Dienst unterfüllt ist (Soll > Ist), desto besser der Score
-              score -= (targetRatio - currentRatio) * 300;
-            } else {
-              // Kein Gewichtungseintrag für diesen Dienst → leicht benachteiligen
-              score += 30;
+            const totalPrefWeight = Object.values(empPrefs).reduce((s, v) => s + v, 0);
+            if (totalPrefWeight > 0) {
+              const pref = empPrefs[slot.shiftTypeId];
+              if (pref !== undefined) {
+                // Ziel-Stunden für diesen Diensttyp = Monatssoll * Anteil
+                const targetHoursForType = state.monthlyTarget * (pref / totalPrefWeight);
+                const assignedHoursForType = state.shiftTypeHours[slot.shiftTypeId] || 0;
+                // Deficit (positiv = noch unter Ziel, negativ = über Ziel)
+                const deficitH = targetHoursForType - assignedHoursForType;
+                // Normiert auf Monatszeit, max ±25 Punkte (sekundär zum Fill-Ratio)
+                const adj = Math.max(-25, Math.min(25, (deficitH / state.monthlyTarget) * 100));
+                score -= adj; // Deficit → adj positiv → score sinkt (besser)
+              } else {
+                // MA hat Gewichtungen, aber nicht für diesen Dienst → leicht benachteiligen
+                score += 10;
+              }
             }
           }
 
@@ -937,6 +947,7 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
       state.assignments.push(assignment);
 
       state.shiftTypeCount[st.id] = (state.shiftTypeCount[st.id] || 0) + 1;
+      state.shiftTypeHours[st.id] = (state.shiftTypeHours[st.id] || 0) + slotHours;
       state.totalShiftsAssigned++;
 
       // Überstunden protokollieren
