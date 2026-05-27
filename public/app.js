@@ -4054,14 +4054,19 @@ function renderDPMatrix(data) {
     }).join('');
 
     // Ist = Dienststunden + Abwesenheits-Gutschriften (beide zählen zur Sollerfüllung)
-    const shiftH = s.shiftHours || 0;
-    const absH = s.absenceHours || 0;
+    const shiftH   = s.shiftHours   || 0;
+    const absH     = s.absenceHours || 0;
+    const holH     = s.holidayHours || 0;
     const istHours = shiftH + absH;
     const diff = istHours - (s.targetHours||0);
     const diffStr = (diff>=0?'+':'')+Math.round(diff*10)/10;
     const diffColor = diff > 0.5 ? '#f59e0b' : (diff < -0.5 ? '#ef4444' : '#10b981');
+    const nonHolAbs = Math.round((absH - holH)*10)/10;
     const istTitle = absH > 0
-      ? `Dienste: ${Math.round(shiftH*10)/10}h + Abwesenheit: ${Math.round(absH*10)/10}h = Gesamt: ${Math.round(istHours*10)/10}h`
+      ? `Dienste: ${Math.round(shiftH*10)/10}h` +
+        (holH > 0 ? ` · Feiertage: ${Math.round(holH*10)/10}h` : '') +
+        (nonHolAbs > 0 ? ` · Abwesenheit: ${nonHolAbs}h` : '') +
+        ` = Gesamt: ${Math.round(istHours*10)/10}h`
       : `Dienststunden: ${Math.round(shiftH*10)/10}h`;
 
     const basicStats = `

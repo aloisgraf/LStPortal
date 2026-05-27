@@ -450,13 +450,14 @@ router.get('/plans/:id/matrix', auth, async (req,res) => {
       if(!hasAssignment) return bad(res,'Keine Berechtigung',403);
     }
 
-    const [shiftTypes, requirements, empParams, absenceTypes, qualifications, wishDays] = await Promise.all([
+    const [shiftTypes, requirements, empParams, absenceTypes, qualifications, wishDays, hoursProfiles] = await Promise.all([
       q('SELECT * FROM dp_shift_types ORDER BY sort_order, name'),
       q('SELECT * FROM dp_shift_requirements'),
       q('SELECT * FROM dp_employee_params'),
       q('SELECT * FROM dp_absence_types ORDER BY sort_order'),
       q(`SELECT DISTINCT ON (employee_id, shift_type_id) employee_id, shift_type_id FROM dp_employee_qualifications WHERE valid_from IS NULL OR valid_from <= NOW()::date ORDER BY employee_id, shift_type_id, valid_from DESC NULLS LAST`),
       q(`SELECT employee_id, date FROM dp_wish_days WHERE month=$1 AND year=$2`, [plan.month, plan.year]),
+      q('SELECT * FROM dp_hours_profiles'),
     ]);
     let assignments = await q('SELECT * FROM dp_assignments WHERE plan_id=$1 ORDER BY date, employee_id',[req.params.id]);
 
@@ -481,43 +482,6 @@ router.get('/plans/:id/matrix', auth, async (req,res) => {
       const isWeekend = wd===0||wd===6;
       const holiday = AT_HOLIDAYS[dateStr];
       days.push({date:dateStr, weekday:wd, isWeekend, isHoliday:!!holiday, holidayName:holiday||''});
-    }
-
-    // Auto-seed Feiertag absences: insert absence records for all employees on public holidays
-    // where no assignment exists yet (runs each load, skips already-assigned dates)
-    {
-      const holidayAbsType = absenceTypes.find(at => at.is_holiday_default);
-      const holidayDates = days.filter(d => d.isHoliday).map(d => d.date);
-      if (holidayAbsType && holidayDates.length > 0) {
-        const assignedKeys = new Set(assignments.map(a => {
-          const ds = a.date instanceof Date ? a.date.toISOString().slice(0,10) : String(a.date).slice(0,10);
-          return `${a.employee_id}_${ds}`;
-        }));
-        const inserts = [];
-        for (const p of empParams) {
-          for (const dateStr of holidayDates) {
-            if (assignedKeys.has(`${p.employee_id}_${dateStr}`)) continue;
-            const mh = parseFloat(p.monthly_hours) || 160;
-            const dailyH = p.daily_hours ? parseFloat(p.daily_hours) : Math.round(mh / 26 * 10) / 10;
-            let hours = 0;
-            const hc = holidayAbsType.hours_calculation;
-            if (hc === 'daily_target' || hc === 'shift_hours') hours = dailyH;
-            else if (hc === 'avg_shift_duration') hours = dailyH;
-            else if (hc === 'fixed') hours = parseFloat(holidayAbsType.fixed_hours) || 0;
-            inserts.push([newId(), plan.id, p.employee_id, dateStr, holidayAbsType.id, hours]);
-          }
-        }
-        if (inserts.length > 0) {
-          for (const [id, planId, empId, date, absTypeId, hours] of inserts) {
-            await q(
-              `INSERT INTO dp_assignments (id,plan_id,employee_id,date,absence_type_id,hours_credited,hours_source,is_locked,source,notes,created_by)
-               VALUES ($1,$2,$3,$4,$5,$6,'daily_target',false,'auto_holiday','','system')`,
-              [id, planId, empId, date, absTypeId, hours]
-            );
-          }
-          assignments = await q('SELECT * FROM dp_assignments WHERE plan_id=$1 ORDER BY date, employee_id',[req.params.id]);
-        }
-      }
     }
 
     // Build requirements map: date -> shiftTypeId -> count
@@ -597,19 +561,45 @@ router.get('/plans/:id/matrix', auth, async (req,res) => {
       }
     }
 
-    // Calculate target hours per employee (adjusted for leave)
+    // Credit avg_shift_duration for public holidays where employee has no assignment.
+    // No DB records are written – this is purely a summary calculation.
+    {
+      const profileMap = {};
+      for (const hp of hoursProfiles) profileMap[hp.id] = hp;
+      const holidayDates = days.filter(d => d.isHoliday).map(d => d.date);
+      if (holidayDates.length > 0) {
+        for (const p of empParams) {
+          const s = summaryMap[p.employee_id];
+          if (!s) continue;
+          // Determine avg_shift_duration: profile > daily_hours > monthly/26
+          const mh = parseFloat(p.monthly_hours) || 160;
+          let avgShift = null;
+          if (p.profile_id && profileMap[p.profile_id]) {
+            const prof = profileMap[p.profile_id];
+            avgShift = prof.avg_shift_duration ? parseFloat(prof.avg_shift_duration) : null;
+            if (!avgShift && prof.daily_work_hours) avgShift = parseFloat(prof.daily_work_hours);
+          }
+          if (!avgShift) avgShift = p.daily_hours ? parseFloat(p.daily_hours) : Math.round(mh / 26 * 10) / 10;
+          for (const dateStr of holidayDates) {
+            if (empAssignMap[p.employee_id]?.[dateStr]) continue; // already has an entry
+            s.absenceHours += avgShift;
+            s.holidayHours  = (s.holidayHours || 0) + avgShift;
+          }
+        }
+      }
+    }
+
+    // Calculate target hours per employee (adjusted for leave and holiday credits)
     for (const [empId, s] of Object.entries(summaryMap)) {
       const params = empParamMap[empId];
       if (!params) continue;
-      // Tagessoll: daily_hours wenn gesetzt, sonst monthly_hours / 26 (Schichtarbeiter-Durchschnitt)
       const dailyTarget = params.daily_hours
         ? parseFloat(params.daily_hours)
         : Math.round((parseFloat(params.monthly_hours)||160) / 26 * 10) / 10;
-      // Soll = Vertragsmonatszeit minus anteilige Abwesenheitsreduktion
-      // NICHT workDays×daily – das wäre falsch für Schichtarbeiter (zählt nur Mo-Fr)
       const contractHours = parseFloat(params.monthly_hours) || 160;
-      const leaveReduction = s.leaveDays * dailyTarget;
-      const adjustedTarget = Math.max(0, contractHours - leaveReduction);
+      const leaveReduction   = s.leaveDays * dailyTarget;
+      const holidayReduction = s.holidayHours || 0; // same hours credited → Soll sinkt entsprechend
+      const adjustedTarget = Math.max(0, contractHours - leaveReduction - holidayReduction);
       s.targetHours = Math.round(adjustedTarget * 10) / 10;
       s.dailyTarget = Math.round(dailyTarget * 10) / 10;
     }
