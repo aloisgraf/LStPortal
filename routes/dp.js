@@ -886,7 +886,9 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
     await q(`DELETE FROM dp_assignments WHERE plan_id=$1 AND source='generated' AND is_locked=false`,[req.params.id]);
 
     const planStartDate = `${plan.year}-${String(plan.month).padStart(2,'0')}-01`;
-    const [shiftTypes,shiftPrefs,requirements,empParams,existingAssignments,wishDays,absenceTypes,qualifications,empRulesAll] = await Promise.all([
+    // Normalize pg Date objects → ISO string (pg returns Date objects, not strings)
+    const toISODate = d => !d ? null : (d instanceof Date ? d.toISOString().slice(0,10) : String(d).slice(0,10));
+    const [shiftTypes,shiftPrefs,requirements,empParams,existingAssignments,wishDays,absenceTypes,qualifications,empRulesAll,hoursProfiles] = await Promise.all([
       q('SELECT * FROM dp_shift_types WHERE (valid_from IS NULL OR valid_from <= $1) AND (valid_until IS NULL OR valid_until >= $1) ORDER BY sort_order', [planStartDate]),
       q('SELECT DISTINCT ON (employee_id, shift_type_id) * FROM dp_shift_preferences WHERE valid_from IS NULL OR valid_from <= $1 ORDER BY employee_id, shift_type_id, valid_from DESC NULLS LAST', [planStartDate]),
       q('SELECT * FROM dp_shift_requirements ORDER BY shift_type_id, applies_to, weekday, valid_from DESC NULLS LAST'),
@@ -896,6 +898,7 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
       q('SELECT * FROM dp_absence_types WHERE valid_from IS NULL OR valid_from <= $1 ORDER BY sort_order, label',[planStartDate]),
       q(`SELECT DISTINCT ON (employee_id, shift_type_id) * FROM dp_employee_qualifications WHERE valid_from IS NULL OR valid_from <= $1 ORDER BY employee_id, shift_type_id, valid_from DESC NULLS LAST`,[planStartDate]),
       q('SELECT * FROM dp_emp_rules').catch(()=>[]),
+      q('SELECT * FROM dp_hours_profiles').catch(()=>[]),
     ]);
 
     // Build empRuleMap
@@ -941,7 +944,7 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
         if (st.is_office) continue; // office shifts handled in Phase 1
         const needed = getRequiredCount(requirements, st.id, dayInfo);
         const alreadyFilled = existingAssignments.filter(a=>
-          a.date?.toString().slice(0,10)===dateStr && a.shift_type_id===st.id && !a.absence_type_id
+          toISODate(a.date)===dateStr && a.shift_type_id===st.id && !a.absence_type_id
         ).length;
         for (let i = 0; i < needed - alreadyFilled; i++) {
           slots.push({...dayInfo, shiftTypeId:st.id, shiftType:st});
@@ -959,7 +962,38 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
     const empState = {};
     for (const p of empParams) {
       empParamMap[p.employee_id] = p;
-      const monthlyTarget = parseFloat(p.monthly_hours)||160;
+      const baseTarget = parseFloat(p.monthly_hours)||160;
+
+      // Subtract leave hours (absences with adjusts_monthly_target=true) from target
+      let leaveReduction = 0;
+      for (const a of existingAssignments) {
+        if (a.employee_id !== p.employee_id || !a.absence_type_id) continue;
+        const at = absenceTypes.find(x => x.id === a.absence_type_id);
+        if (at?.adjusts_monthly_target) leaveReduction += parseFloat(a.hours_credited || 0);
+      }
+
+      // Subtract public holiday credits (same logic as matrix Soll calculation)
+      const dailyH = p.daily_hours ? parseFloat(p.daily_hours) : null;
+      let avgShift = dailyH;
+      if (!avgShift && p.profile_id) {
+        const prof = (hoursProfiles||[]).find(hp => hp.id === p.profile_id);
+        avgShift = prof?.avg_shift_duration ? parseFloat(prof.avg_shift_duration)
+                 : prof?.daily_work_hours   ? parseFloat(prof.daily_work_hours) : null;
+      }
+      if (!avgShift) avgShift = Math.round(baseTarget / 26 * 10) / 10;
+
+      const planMonthPrefix = `${plan.year}-${String(plan.month).padStart(2,'0')}`;
+      let holidayCredit = 0;
+      for (const hd of Object.keys(AT_HOLIDAYS)) {
+        if (!hd.startsWith(planMonthPrefix)) continue;
+        // Credit applies only when employee has no assignment on that holiday
+        const hasAssign = existingAssignments.some(a =>
+          a.employee_id === p.employee_id && toISODate(a.date) === hd
+        );
+        if (!hasAssign) holidayCredit += avgShift;
+      }
+
+      const monthlyTarget = Math.max(0, baseTarget - leaveReduction - holidayCredit);
       empState[p.employee_id] = {
         monthlyTarget,
         hoursAssigned: 0,
@@ -973,7 +1007,7 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
         totalShiftsAssigned: 0,
         lastAssignedDay: 0,
         assignments: existingAssignments.filter(a=>a.employee_id===p.employee_id).map(a=>({
-          ...a, date: a.date?.toString().slice(0,10),
+          ...a, date: toISODate(a.date),
           shiftType: shiftTypes.find(s=>s.id===a.shift_type_id)||null,
         })),
       };
@@ -989,8 +1023,8 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
       }
     }
 
-    const wishSet = new Set(wishDays.map(w=>`${w.employee_id}_${w.date?.toString().slice(0,10)||w.date}`));
-    const absenceSet = new Set(existingAssignments.filter(a=>a.absence_type_id).map(a=>`${a.employee_id}_${a.date?.toString().slice(0,10)}`));
+    const wishSet = new Set(wishDays.map(w=>`${w.employee_id}_${toISODate(w.date)}`));
+    const absenceSet = new Set(existingAssignments.filter(a=>a.absence_type_id).map(a=>`${a.employee_id}_${toISODate(a.date)}`));
 
     const newAssignments = [];
     const protocolEntries = [];
@@ -1475,8 +1509,14 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
     // Feature 9: Weekend rebalancing
     rebalanceWeekendAssignments(rebalancedAssignments, empParams, empParamMap, shiftTypes, plan, absenceSet);
 
+    // Hard safety: never insert a generated shift on a day that already has a manual assignment
+    const manualDates = new Set(
+      existingAssignments.filter(a => a.source !== 'generated')
+        .map(a => `${a.employee_id}_${toISODate(a.date)}`)
+    );
     if (rebalancedAssignments.length > 0) {
       for (const a of rebalancedAssignments) {
+        if (manualDates.has(`${a.employee_id}_${a.date}`)) continue; // never overwrite manual entries
         await pool.query(
           `INSERT INTO dp_assignments (id,plan_id,employee_id,date,shift_type_id,absence_type_id,hours_credited,hours_source,is_overtime,is_locked,source,notes,created_by)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,false,false,'generated',$9,$10)`,
