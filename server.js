@@ -539,6 +539,23 @@ async function initDB() {
   color TEXT DEFAULT '#64748b',
   created_at TIMESTAMPTZ DEFAULT NOW()
 )`,
+    `ALTER TABLE dp_employee_params ADD COLUMN IF NOT EXISTS no_weekends BOOLEAN NOT NULL DEFAULT false`,
+    `ALTER TABLE dp_absence_types ADD COLUMN IF NOT EXISTS zero_on_free_days BOOLEAN NOT NULL DEFAULT false`,
+    `CREATE TABLE IF NOT EXISTS dp_plan_versions (
+  id TEXT PRIMARY KEY, plan_id TEXT NOT NULL,
+  version_name TEXT NOT NULL,
+  assignments JSONB NOT NULL DEFAULT '[]',
+  created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
+)`,
+    `CREATE TABLE IF NOT EXISTS dp_emp_rules (
+  id TEXT PRIMARY KEY,
+  employee_id TEXT NOT NULL,
+  rule_type TEXT NOT NULL,
+  day_of_week INTEGER DEFAULT NULL,
+  shift_type_id TEXT DEFAULT NULL,
+  valid_from DATE DEFAULT NULL,
+  created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
+)`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }

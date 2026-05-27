@@ -236,15 +236,15 @@ router.get('/absence-types', auth, async (req,res) => {
 
 router.post('/absence-types', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
-  const {code,label,color,hoursCalculation,fixedHours,adjustsMonthlyTarget,blocksScheduling,reopensShift,countsAsWorked,requiresApproval,sortOrder,validFrom,isHolidayDefault} = req.body;
+  const {code,label,color,hoursCalculation,fixedHours,adjustsMonthlyTarget,blocksScheduling,reopensShift,countsAsWorked,requiresApproval,sortOrder,validFrom,isHolidayDefault,zeroOnFreeDays} = req.body;
   if (!code?.trim()||!label?.trim()) return bad(res,'Code und Label erforderlich',400);
   try {
     // Only one type can be the holiday default – clear others first
     if (isHolidayDefault) await q('UPDATE dp_absence_types SET is_holiday_default=false');
     const row = await q1(
-      `INSERT INTO dp_absence_types (id,code,label,color,hours_calculation,fixed_hours,adjusts_monthly_target,blocks_scheduling,reopens_shift,counts_as_worked,requires_approval,sort_order,valid_from,is_holiday_default,created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
-      [newId(),code.trim().toUpperCase(),label.trim(),color||'#f59e0b',hoursCalculation||'daily_target',fixedHours||null,!!adjustsMonthlyTarget,blocksScheduling!==false,reopensShift!==false,countsAsWorked!==false,!!requiresApproval,sortOrder||0,validFrom||null,!!isHolidayDefault,req.uid]
+      `INSERT INTO dp_absence_types (id,code,label,color,hours_calculation,fixed_hours,adjusts_monthly_target,blocks_scheduling,reopens_shift,counts_as_worked,requires_approval,sort_order,valid_from,is_holiday_default,zero_on_free_days,created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+      [newId(),code.trim().toUpperCase(),label.trim(),color||'#f59e0b',hoursCalculation||'daily_target',fixedHours||null,!!adjustsMonthlyTarget,blocksScheduling!==false,reopensShift!==false,countsAsWorked!==false,!!requiresApproval,sortOrder||0,validFrom||null,!!isHolidayDefault,!!zeroOnFreeDays,req.uid]
     );
     ok(res,row);
   } catch(e) { bad(res,'Serverfehler',500); }
@@ -252,14 +252,14 @@ router.post('/absence-types', auth, async (req,res) => {
 
 router.put('/absence-types/:id', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
-  const {code,label,color,hoursCalculation,fixedHours,adjustsMonthlyTarget,blocksScheduling,reopensShift,countsAsWorked,requiresApproval,sortOrder,validFrom,isHolidayDefault} = req.body;
+  const {code,label,color,hoursCalculation,fixedHours,adjustsMonthlyTarget,blocksScheduling,reopensShift,countsAsWorked,requiresApproval,sortOrder,validFrom,isHolidayDefault,zeroOnFreeDays} = req.body;
   try {
     if (isHolidayDefault) await q('UPDATE dp_absence_types SET is_holiday_default=false WHERE id!=$1',[req.params.id]);
     const row = await q1(
       `UPDATE dp_absence_types SET code=$1,label=$2,color=$3,hours_calculation=$4,fixed_hours=$5,
        adjusts_monthly_target=$6,blocks_scheduling=$7,reopens_shift=$8,counts_as_worked=$9,
-       requires_approval=$10,sort_order=$11,valid_from=$12,is_holiday_default=$13 WHERE id=$14 RETURNING *`,
-      [code?.toUpperCase(),label,color,hoursCalculation,fixedHours||null,!!adjustsMonthlyTarget,blocksScheduling!==false,reopensShift!==false,countsAsWorked!==false,!!requiresApproval,sortOrder||0,validFrom||null,!!isHolidayDefault,req.params.id]
+       requires_approval=$10,sort_order=$11,valid_from=$12,is_holiday_default=$13,zero_on_free_days=$15 WHERE id=$14 RETURNING *`,
+      [code?.toUpperCase(),label,color,hoursCalculation,fixedHours||null,!!adjustsMonthlyTarget,blocksScheduling!==false,reopensShift!==false,countsAsWorked!==false,!!requiresApproval,sortOrder||0,validFrom||null,!!isHolidayDefault,req.params.id,!!zeroOnFreeDays]
     );
     if (!row) return bad(res,'Nicht gefunden',404);
     ok(res,row);
@@ -282,7 +282,7 @@ router.get('/employee-params', auth, async (req,res) => {
 router.post('/employee-params', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
   const {employeeId,validFrom,monthlyHours,canDoNights,maxNightsPerMonth,doubleNightsAllowed,isSpringer,
-         officePct,fdSpringerType,fdSpringerLocation,fdSpringerShiftsPerMonth,dailyHours,profileId} = req.body;
+         officePct,fdSpringerType,fdSpringerLocation,fdSpringerShiftsPerMonth,dailyHours,profileId,noWeekends} = req.body;
   if (!employeeId) return bad(res,'Mitarbeiter erforderlich',400);
 
   // Wenn Profil ausgewählt: Stunden aus Profil ableiten
@@ -310,13 +310,14 @@ router.post('/employee-params', auth, async (req,res) => {
     } else {
       existing = await q1('SELECT id FROM dp_employee_params WHERE employee_id=$1 AND valid_from=$2::date',[employeeId,vf]);
     }
+    const noWE = !!noWeekends;
     if (existing) {
       const row = await q1(
         `UPDATE dp_employee_params SET monthly_hours=$1,weekly_hours=$2,can_do_nights=$3,
          max_nights_per_month=$4,double_nights_allowed=$5,is_springer=$6,office_pct=$7,
          fd_springer_type=$8,fd_springer_location=$9,fd_springer_shifts_per_month=$10,
-         valid_from=$11,updated_at=NOW(),daily_hours=$13,profile_id=$14 WHERE id=$12 RETURNING *`,
-        [mh,wh,canDoNights!==false,maxNightsPerMonth||null,doubleNightsAllowed!==false,!!isSpringer,opct,fdType,fdLoc,fdSpm,vf,existing.id,dh,pid]
+         valid_from=$11,updated_at=NOW(),daily_hours=$13,profile_id=$14,no_weekends=$15 WHERE id=$12 RETURNING *`,
+        [mh,wh,canDoNights!==false,maxNightsPerMonth||null,doubleNightsAllowed!==false,!!isSpringer,opct,fdType,fdLoc,fdSpm,vf,existing.id,dh,pid,noWE]
       );
       return ok(res,row);
     }
@@ -325,10 +326,10 @@ router.post('/employee-params', auth, async (req,res) => {
          (id,employee_id,monthly_hours,weekly_hours,work_days_per_week,can_do_nights,
           max_nights_per_month,double_nights_allowed,is_springer,office_pct,
           fd_springer_type,fd_springer_location,fd_springer_shifts_per_month,
-          valid_from,springer_config,locations,created_by,daily_hours,profile_id)
-       VALUES ($1,$2,$3,$4,5,$5,$6,$7,$8,$9,$10,$11,$12,$13,'{}','[]',$14,$15,$16) RETURNING *`,
+          valid_from,springer_config,locations,created_by,daily_hours,profile_id,no_weekends)
+       VALUES ($1,$2,$3,$4,5,$5,$6,$7,$8,$9,$10,$11,$12,$13,'{}','[]',$14,$15,$16,$17) RETURNING *`,
       [newId(),employeeId,mh,wh,canDoNights!==false,maxNightsPerMonth||null,
-       doubleNightsAllowed!==false,!!isSpringer,opct,fdType,fdLoc,fdSpm,vf,req.uid,dh,pid]
+       doubleNightsAllowed!==false,!!isSpringer,opct,fdType,fdLoc,fdSpm,vf,req.uid,dh,pid,noWE]
     );
     ok(res,row);
   } catch(e) { console.error(e); bad(res,'Serverfehler',500); }
@@ -544,8 +545,13 @@ router.get('/plans/:id/matrix', auth, async (req,res) => {
         if (isWE) s.weekendDays++;
       }
       if (a.absence_type_id) {
-        s.absenceHours += h;
-        const at = absenceTypes.find(x=>x.id===a.absence_type_id);
+        const at2 = absenceTypes.find(x=>x.id===a.absence_type_id);
+        const wd2 = new Date(dateStr).getDay();
+        const isWE2 = wd2===0||wd2===6;
+        const isHol2 = !!AT_HOLIDAYS[dateStr];
+        const effectiveH = (at2?.zero_on_free_days && (isWE2||isHol2)) ? 0 : h;
+        s.absenceHours += effectiveH;
+        const at = at2;
         if (at) {
           if (at.code==='K') s.sickDays++;
           else if (at.code==='U') s.vacationDays++;
@@ -648,6 +654,62 @@ router.get('/plans/:id/matrix', auth, async (req,res) => {
   } catch(e) { console.error('[dp/matrix]',e.message); bad(res,'Serverfehler',500); }
 });
 
+// ── PLAN RESET ────────────────────────────────────────────────────────────────
+
+router.post('/plans/:id/reset', auth, async (req,res) => {
+  const canEdit = req.p.manageUsers || (req.p.roles||[]).some(r=>['admin','dienstplanung','leitung'].includes(r));
+  if (!canEdit) return bad(res,'Keine Berechtigung',403);
+  try {
+    // Delete shift assignments (no absence) and combined shift+absence
+    // Keep pure absence records (absence_type_id IS NOT NULL AND shift_type_id IS NULL)
+    await q(`DELETE FROM dp_assignments WHERE plan_id=$1 AND (shift_type_id IS NOT NULL AND absence_type_id IS NULL)`, [req.params.id]);
+    ok(res);
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+// ── PLAN VERSIONS ─────────────────────────────────────────────────────────────
+
+router.get('/plans/:id/versions', auth, async (req,res) => {
+  try { ok(res, await q('SELECT id,plan_id,version_name,created_by,created_at FROM dp_plan_versions WHERE plan_id=$1 ORDER BY created_at DESC',[req.params.id])); }
+  catch(e) { bad(res,'Serverfehler',500); }
+});
+
+router.post('/plans/:id/versions', auth, async (req,res) => {
+  const canEdit = req.p.manageUsers || (req.p.roles||[]).some(r=>['admin','dienstplanung','leitung'].includes(r));
+  if (!canEdit) return bad(res,'Keine Berechtigung',403);
+  const {versionName} = req.body;
+  if (!versionName?.trim()) return bad(res,'Name erforderlich',400);
+  try {
+    const assignments = await q('SELECT * FROM dp_assignments WHERE plan_id=$1',[req.params.id]);
+    const row = await q1(`INSERT INTO dp_plan_versions (id,plan_id,version_name,assignments,created_by) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [newId(), req.params.id, versionName.trim(), JSON.stringify(assignments), req.uid]);
+    ok(res, {id:row.id, plan_id:row.plan_id, version_name:row.version_name, created_at:row.created_at});
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+router.post('/plans/:id/versions/:vId/restore', auth, async (req,res) => {
+  const canEdit = req.p.manageUsers || (req.p.roles||[]).some(r=>['admin','dienstplanung','leitung'].includes(r));
+  if (!canEdit) return bad(res,'Keine Berechtigung',403);
+  try {
+    const ver = await q1('SELECT assignments FROM dp_plan_versions WHERE id=$1 AND plan_id=$2',[req.params.vId,req.params.id]);
+    if (!ver) return bad(res,'Version nicht gefunden',404);
+    const snapshotAssigns = typeof ver.assignments === 'string' ? JSON.parse(ver.assignments) : ver.assignments;
+    await q('DELETE FROM dp_assignments WHERE plan_id=$1',[req.params.id]);
+    for (const a of snapshotAssigns) {
+      await q(`INSERT INTO dp_assignments (id,plan_id,employee_id,date,shift_type_id,absence_type_id,hours_credited,hours_source,is_overtime,is_locked,source,notes,created_by,created_at)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) ON CONFLICT (id) DO NOTHING`,
+        [a.id,req.params.id,a.employee_id,a.date,a.shift_type_id||null,a.absence_type_id||null,a.hours_credited,a.hours_source,a.is_overtime,a.is_locked,a.source||'restored',a.notes||'',a.created_by||req.uid,a.created_at||new Date()]);
+    }
+    ok(res);
+  } catch(e) { console.error(e); bad(res,'Serverfehler',500); }
+});
+
+router.delete('/plans/:id/versions/:vId', auth, async (req,res) => {
+  if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+  try { await q('DELETE FROM dp_plan_versions WHERE id=$1 AND plan_id=$2',[req.params.vId,req.params.id]); ok(res); }
+  catch(e) { bad(res,'Serverfehler',500); }
+});
+
 // ── ASSIGNMENTS ───────────────────────────────────────────────────────────────
 
 router.post('/plans/:id/assign', auth, async (req,res) => {
@@ -658,6 +720,8 @@ router.post('/plans/:id/assign', auth, async (req,res) => {
     if (!plan) return bad(res,'Plan nicht gefunden',404);
     const {employeeId,date,shiftTypeId,absenceTypeId,notes} = req.body;
     if (!employeeId||!date) return bad(res,'Mitarbeiter und Datum erforderlich',400);
+
+    const shiftTypes = await q('SELECT * FROM dp_shift_types');
 
     // Calculate hours
     let hoursCredited = 0, hoursSource = 'shift';
@@ -711,6 +775,14 @@ router.post('/plans/:id/assign', auth, async (req,res) => {
         } else if (at.hours_calculation==='fixed') {
           hoursCredited = parseFloat(at.fixed_hours)||0; hoursSource = 'fixed';
         }
+
+        // Feature 5: zero_on_free_days
+        if (at?.zero_on_free_days) {
+          const wd = new Date(date).getDay();
+          const isWE = wd===0||wd===6;
+          const isHol = !!getAustrianHolidays(new Date(date).getFullYear())[date];
+          if (isWE||isHol) hoursCredited = 0;
+        }
       }
     }
 
@@ -732,7 +804,31 @@ router.post('/plans/:id/assign', auth, async (req,res) => {
       ).catch(()=>{});
     }
 
-    ok(res,{...row, date: row.date instanceof Date ? row.date.toISOString().slice(0,10) : String(row.date).slice(0,10)});
+    // Feature 2: Validation warnings (non-blocking)
+    const warnings = [];
+    if (shiftTypeId) {
+      // Check 48h/week
+      const wk = getISOWeek(date);
+      const weekStart = getISOWeekStart(wk, new Date(date).getFullYear());
+      const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate()+6);
+      const wsStr = weekStart.toISOString().slice(0,10);
+      const weStr = weekEnd.toISOString().slice(0,10);
+      const weekAssigns = await q(`SELECT hours_credited FROM dp_assignments WHERE plan_id=$1 AND employee_id=$2 AND date>=$3 AND date<=$4 AND shift_type_id IS NOT NULL AND absence_type_id IS NULL`,[req.params.id,employeeId,wsStr,weStr]);
+      const weekHours = weekAssigns.reduce((s,a)=>s+parseFloat(a.hours_credited||0),0);
+      if (weekHours > 48) warnings.push(`48h/Woche überschritten: ${weekHours.toFixed(1)}h in KW${wk}`);
+      // Check 11h rest
+      const prevAssigns = await q(`SELECT date, hours_credited FROM dp_assignments WHERE plan_id=$1 AND employee_id=$2 AND shift_type_id IS NOT NULL AND absence_type_id IS NULL AND date != $3 ORDER BY date DESC LIMIT 3`,[req.params.id,employeeId,date]);
+      const st = shiftTypes.find(x=>x.id===shiftTypeId);
+      // Simple: check if previous day has a shift ending within 11h
+      const prevDay = new Date(date); prevDay.setDate(prevDay.getDate()-1);
+      const prevStr = prevDay.toISOString().slice(0,10);
+      const prevAssign = prevAssigns.find(a=>String(a.date).slice(0,10)===prevStr);
+      if (prevAssign && parseFloat(prevAssign.hours_credited||0) + (st ? parseFloat(st.duration_hours||0) : 0) > 13) {
+        warnings.push('Möglicherweise <11h Ruhezeit zum Vortag');
+      }
+    }
+
+    return ok(res, {...row, date: row.date instanceof Date ? row.date.toISOString().slice(0,10) : String(row.date).slice(0,10), warnings: warnings.length ? warnings : undefined});
   } catch(e) { console.error('[dp/assign]',e.message); bad(res,'Serverfehler',500); }
 });
 
@@ -757,7 +853,7 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
     await q(`DELETE FROM dp_assignments WHERE plan_id=$1 AND source='generated' AND is_locked=false`,[req.params.id]);
 
     const planStartDate = `${plan.year}-${String(plan.month).padStart(2,'0')}-01`;
-    const [shiftTypes,shiftPrefs,requirements,empParams,existingAssignments,wishDays,absenceTypes,qualifications] = await Promise.all([
+    const [shiftTypes,shiftPrefs,requirements,empParams,existingAssignments,wishDays,absenceTypes,qualifications,empRulesAll] = await Promise.all([
       q('SELECT * FROM dp_shift_types WHERE (valid_from IS NULL OR valid_from <= $1) AND (valid_until IS NULL OR valid_until >= $1) ORDER BY sort_order', [planStartDate]),
       q('SELECT DISTINCT ON (employee_id, shift_type_id) * FROM dp_shift_preferences WHERE valid_from IS NULL OR valid_from <= $1 ORDER BY employee_id, shift_type_id, valid_from DESC NULLS LAST', [planStartDate]),
       q('SELECT * FROM dp_shift_requirements ORDER BY shift_type_id, applies_to, weekday, valid_from DESC NULLS LAST'),
@@ -766,7 +862,15 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
       q('SELECT * FROM dp_wish_days WHERE month=$1 AND year=$2',[plan.month,plan.year]),
       q('SELECT * FROM dp_absence_types WHERE valid_from IS NULL OR valid_from <= $1 ORDER BY sort_order, label',[planStartDate]),
       q(`SELECT DISTINCT ON (employee_id, shift_type_id) * FROM dp_employee_qualifications WHERE valid_from IS NULL OR valid_from <= $1 ORDER BY employee_id, shift_type_id, valid_from DESC NULLS LAST`,[planStartDate]),
+      q('SELECT * FROM dp_emp_rules').catch(()=>[]),
     ]);
+
+    // Build empRuleMap
+    const empRuleMap = {};
+    for (const r of empRulesAll) {
+      if (!empRuleMap[r.employee_id]) empRuleMap[r.employee_id] = [];
+      empRuleMap[r.employee_id].push(r);
+    }
 
     const daysInMonth = new Date(plan.year, plan.month, 0).getDate();
     const AT_HOLIDAYS = getAustrianHolidays(plan.year);
@@ -1359,6 +1463,30 @@ router.delete('/wish-days/:id', auth, async (req,res) => {
   } catch(e) { bad(res,'Serverfehler',500); }
 });
 
+// ── EMP RULES ─────────────────────────────────────────────────────────────────
+
+router.get('/emp-rules', auth, async (req,res) => {
+  try { ok(res, await q('SELECT * FROM dp_emp_rules ORDER BY employee_id, day_of_week')); }
+  catch(e) { bad(res,'Serverfehler',500); }
+});
+
+router.post('/emp-rules', auth, async (req,res) => {
+  if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+  const {employeeId, ruleType, dayOfWeek, shiftTypeId, validFrom} = req.body;
+  if (!employeeId||!ruleType) return bad(res,'Pflichtfelder fehlen',400);
+  try {
+    const row = await q1(`INSERT INTO dp_emp_rules (id,employee_id,rule_type,day_of_week,shift_type_id,valid_from,created_by) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [newId(),employeeId,ruleType,dayOfWeek!==undefined?dayOfWeek:null,shiftTypeId||null,validFrom||null,req.uid]);
+    ok(res,row);
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+router.delete('/emp-rules/:id', auth, async (req,res) => {
+  if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+  try { await q('DELETE FROM dp_emp_rules WHERE id=$1',[req.params.id]); ok(res); }
+  catch(e) { bad(res,'Serverfehler',500); }
+});
+
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 
 function getRequiredCount(requirements, shiftTypeId, dayInfo) {
@@ -1433,6 +1561,17 @@ function getAustrianHolidays(year) {
 function getEasterDate(year) {
   const a=year%19,b=Math.floor(year/100),c=year%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),month=Math.floor((h+l-7*m+114)/31),day=((h+l-7*m+114)%31)+1;
   return new Date(year,month-1,day);
+}
+
+// Returns the Monday of the ISO week as a Date object
+function getISOWeekStart(isoWeekStr, year) {
+  // isoWeekStr format: "YYYY-Www"
+  const weekNum = parseInt(isoWeekStr.split('-W')[1]);
+  const jan4 = new Date(year, 0, 4);
+  const jan4Day = jan4.getDay() || 7;
+  const monday = new Date(jan4);
+  monday.setDate(jan4.getDate() - jan4Day + 1 + (weekNum - 1) * 7);
+  return monday;
 }
 
 // Returns ISO week string YYYY-Www for a date string
