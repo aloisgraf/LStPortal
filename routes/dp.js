@@ -639,6 +639,11 @@ router.get('/plans/:id/matrix', auth, async (req,res) => {
       absenceTypes,
       requirements: reqMap,
       openSlots,
+      _debug: {
+        rawReqs: requirements.map(r=>({id:r.id,st:r.shift_type_id,at:r.applies_to,vf:String(r.valid_from||''),vu:String(r.valid_until||''),sc:r.slot_count})),
+        reqMap08: reqMap['2026-07-08']||null,
+        shiftTypeIds: shiftTypes.map(s=>({id:s.id,code:s.code,vf:String(s.valid_from||''),vu:String(s.valid_until||'')})),
+      },
       assignments: assignments.map(a=>({
         ...a,
         date: a.date instanceof Date ? a.date.toISOString().slice(0,10) : String(a.date).slice(0,10)
