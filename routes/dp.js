@@ -546,9 +546,8 @@ router.get('/plans/:id/matrix', auth, async (req,res) => {
       if (a.absence_type_id) {
         const at2 = absenceTypes.find(x=>x.id===a.absence_type_id);
         const wd2 = new Date(dateStr).getDay();
-        const isWE2 = wd2===0||wd2===6;
-        const isHol2 = !!AT_HOLIDAYS[dateStr];
-        const effectiveH = (at2?.zero_on_free_days && (isWE2||isHol2)) ? 0 : h;
+        const isSundayOrHol2 = wd2===0 || !!AT_HOLIDAYS[dateStr];
+        const effectiveH = (at2?.zero_on_free_days && isSundayOrHol2) ? 0 : h;
         s.absenceHours += effectiveH;
         const at = at2;
         if (at) {
@@ -775,12 +774,11 @@ router.post('/plans/:id/assign', auth, async (req,res) => {
           hoursCredited = parseFloat(at.fixed_hours)||0; hoursSource = 'fixed';
         }
 
-        // Feature 5: zero_on_free_days
+        // Feature 5: zero_on_free_days — only Sundays and holidays, not Saturdays
         if (at?.zero_on_free_days) {
           const wd = new Date(date).getDay();
-          const isWE = wd===0||wd===6;
-          const isHol = !!getAustrianHolidays(new Date(date).getFullYear())[date];
-          if (isWE||isHol) hoursCredited = 0;
+          const isSundayOrHol = wd===0 || !!getAustrianHolidays(new Date(date).getFullYear())[date];
+          if (isSundayOrHol) hoursCredited = 0;
         }
       }
     }
