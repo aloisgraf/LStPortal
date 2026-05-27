@@ -494,12 +494,6 @@ router.get('/plans/:id/matrix', auth, async (req,res) => {
         if (count > 0) reqMap[day.date][st.id] = count;
       }
     }
-    // DEBUG: log requirements and reqMap for diagnosis
-    console.log('[dp/matrix] raw requirements count:', requirements.length);
-    console.log('[dp/matrix] raw requirements:', JSON.stringify(requirements.map(r=>({id:r.id,st:r.shift_type_id,at:r.applies_to,vf:r.valid_from,vu:r.valid_until,sc:r.slot_count}))));
-    const nonEmptyDays = Object.entries(reqMap).filter(([,v])=>Object.keys(v).length>0);
-    console.log('[dp/matrix] reqMap non-empty days:', nonEmptyDays.length, JSON.stringify(nonEmptyDays.slice(0,5)));
-
     // Build assignment map: date -> shiftTypeId -> [assignments]
     const assignMap = {};
     const empAssignMap = {}; // empId -> date -> assignment
@@ -639,11 +633,6 @@ router.get('/plans/:id/matrix', auth, async (req,res) => {
       absenceTypes,
       requirements: reqMap,
       openSlots,
-      _debug: {
-        rawReqs: requirements.map(r=>({id:r.id,st:r.shift_type_id,at:r.applies_to,vf:String(r.valid_from||''),vu:String(r.valid_until||''),sc:r.slot_count})),
-        reqMap08: reqMap['2026-07-08']||null,
-        shiftTypeIds: shiftTypes.map(s=>({id:s.id,code:s.code,vf:String(s.valid_from||''),vu:String(s.valid_until||'')})),
-      },
       assignments: assignments.map(a=>({
         ...a,
         date: a.date instanceof Date ? a.date.toISOString().slice(0,10) : String(a.date).slice(0,10)
@@ -1557,9 +1546,10 @@ router.delete('/emp-rules/:id', auth, async (req,res) => {
 function getRequiredCount(requirements, shiftTypeId, dayInfo) {
   // Filter to requirements valid on dayInfo.date
   const date = dayInfo.date; // 'YYYY-MM-DD'
+  const toISO = d => !d ? null : (d instanceof Date ? d.toISOString().slice(0,10) : String(d).slice(0,10));
   const validReqs = requirements.filter(r => {
-    const from = r.valid_from ? String(r.valid_from).slice(0,10) : null;
-    const until = r.valid_until ? String(r.valid_until).slice(0,10) : null;
+    const from = toISO(r.valid_from);
+    const until = toISO(r.valid_until);
     if (from && from > date) return false;
     if (until && until < date) return false;
     return true;
