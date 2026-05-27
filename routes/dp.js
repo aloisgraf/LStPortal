@@ -805,6 +805,40 @@ router.post('/plans/:id/assign', auth, async (req,res) => {
 
     // Feature 2: Validation warnings (non-blocking)
     const warnings = [];
+
+    // Check: Nachtdienst vor/nach Dienst oder Abwesenheit
+    {
+      const prevDate = new Date(date); prevDate.setDate(prevDate.getDate()-1);
+      const prevDateStr = prevDate.toISOString().slice(0,10);
+      const nextDate = new Date(date); nextDate.setDate(nextDate.getDate()+1);
+      const nextDateStr = nextDate.toISOString().slice(0,10);
+      const assignedSt = shiftTypes.find(x=>x.id===shiftTypeId);
+      const isNightSlot = !!assignedSt?.is_night;
+
+      // If assigning non-night shift OR absence: check if yesterday was a night shift
+      if (!isNightSlot || absenceTypeId) {
+        const prevNight = await q1(
+          `SELECT a.id FROM dp_assignments a JOIN dp_shift_types s ON s.id=a.shift_type_id
+           WHERE a.plan_id=$1 AND a.employee_id=$2 AND a.date=$3 AND s.is_night=true AND a.absence_type_id IS NULL`,
+          [req.params.id, employeeId, prevDateStr]
+        );
+        if (prevNight) warnings.push('Nachtdienst am Vortag – Eintrag am Folgetag nicht zulässig');
+      }
+
+      // If assigning a night shift: check if tomorrow already has an absence or non-night shift
+      if (isNightSlot && !absenceTypeId) {
+        const nextAssign = await q1(
+          `SELECT a.id, s.is_night FROM dp_assignments a
+           LEFT JOIN dp_shift_types s ON s.id=a.shift_type_id
+           WHERE a.plan_id=$1 AND a.employee_id=$2 AND a.date=$3`,
+          [req.params.id, employeeId, nextDateStr]
+        );
+        if (nextAssign && !nextAssign.is_night) {
+          warnings.push('Nachtdienst vor Dienst/Abwesenheit am Folgetag nicht zulässig');
+        }
+      }
+    }
+
     if (shiftTypeId) {
       // Check 48h/week
       const wk = getISOWeek(date);
@@ -1091,6 +1125,29 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
             const maxConsec = params.double_nights_allowed ? 2 : 1;
             if (consecutiveNights >= maxConsec) {
               reasons[empId]='consecutive_nights_exceeded'; continue;
+            }
+          }
+
+          // Hard: Nachtdienst vor Dienst/Abwesenheit am Folgetag nicht zulässig
+          {
+            const prevDate = new Date(slot.date); prevDate.setDate(prevDate.getDate()-1);
+            const prevDateStr = prevDate.toISOString().slice(0,10);
+            const nextDate = new Date(slot.date); nextDate.setDate(nextDate.getDate()+1);
+            const nextDateStr = nextDate.toISOString().slice(0,10);
+
+            if (!slot.shiftType.is_night) {
+              // Nicht-Nacht-Slot: war gestern ein Nachtdienst? → gesperrt
+              const hadNightYest = state.assignments.some(a =>
+                a.date === prevDateStr && !a.absence_type_id && a.shiftType?.is_night
+              );
+              if (hadNightYest) { reasons[empId]='rest_after_night_required'; continue; }
+            } else {
+              // Nacht-Slot: hat der MA morgen eine Abwesenheit oder Nicht-Nacht-Dienst? → gesperrt
+              const nextAbsence = absenceSet.has(`${empId}_${nextDateStr}`);
+              const nextNonNight = state.assignments.some(a =>
+                a.date === nextDateStr && a.shift_type_id && !a.absence_type_id && !a.shiftType?.is_night
+              );
+              if (nextAbsence || nextNonNight) { reasons[empId]='night_before_absence_or_shift'; continue; }
             }
           }
 
@@ -1442,7 +1499,31 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
       details: 'Prüfung während Generierung durchgeführt.'
     });
 
-    // 5. Unfilled Slots
+    // 5. Nachtdienst vor Abwesenheit/Dienst
+    {
+      const nightBeforeViolations = [];
+      for (const [empId, state] of Object.entries(empState)) {
+        const sortedA = state.assignments.slice().sort((a,b)=>a.date.localeCompare(b.date));
+        for (let i=0; i<sortedA.length-1; i++) {
+          const cur = sortedA[i], nxt = sortedA[i+1];
+          const nextDay = new Date(cur.date); nextDay.setDate(nextDay.getDate()+1);
+          if (nxt.date !== nextDay.toISOString().slice(0,10)) continue;
+          if (cur.shiftType?.is_night && !cur.absence_type_id) {
+            const nextIsNight = nxt.shiftType?.is_night && !nxt.absence_type_id;
+            if (!nextIsNight) nightBeforeViolations.push(empId);
+          }
+        }
+      }
+      report.dienstplanRegeln.push({
+        regel: 'Nachtdienst vor Dienst/Abwesenheit',
+        status: nightBeforeViolations.length === 0 ? 'OK' : 'FEHLER',
+        details: nightBeforeViolations.length === 0
+          ? 'Keine Verstöße.'
+          : `${nightBeforeViolations.length} Verstöße (Nachtdienst direkt vor Dienst/Abwesenheit).`
+      });
+    }
+
+    // 6. Unfilled Slots
     const unfilledCount = protocolEntries.filter(p => !p.employee_id).length;
     if (unfilledCount > 0) {
       report.fehler.push({
