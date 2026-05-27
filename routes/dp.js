@@ -938,6 +938,7 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
         shiftTypeCount: {}, // stId -> Anzahl zugewiesener Dienste dieses Typs
         shiftTypeHours: {}, // stId -> Stunden zugewiesener Dienste dieses Typs (für proportionale Stunden-Gewichtung)
         totalShiftsAssigned: 0,
+        lastAssignedDay: 0,
         assignments: existingAssignments.filter(a=>a.employee_id===p.employee_id).map(a=>({
           ...a, date: a.date?.toString().slice(0,10),
           shiftType: shiftTypes.find(s=>s.id===a.shift_type_id)||null,
@@ -1057,6 +1058,17 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
           if (!checkRestPeriod(state.assignments, slot, shiftTypes))
             { reasons[empId]='rest_period_violated'; continue; }
 
+          // Hard: no_weekends
+          if (params.no_weekends && (new Date(slot.date).getDay()===0 || new Date(slot.date).getDay()===6))
+            { reasons[empId]='no_weekends'; continue; }
+
+          // Fixed rules
+          const empRules = empRuleMap[empId] || [];
+          const slotWD = new Date(slot.date).getDay();
+          if (empRules.some(r => r.rule_type==='always_free' && r.day_of_week===slotWD)) { reasons[empId]='fixed_rule_free'; continue; }
+          const alwaysShiftRule = empRules.find(r => r.rule_type==='always_shift' && r.day_of_week===slotWD);
+          if (alwaysShiftRule && alwaysShiftRule.shift_type_id !== slot.shiftTypeId) { reasons[empId]='fixed_rule_other_shift'; continue; }
+
           // Hard: night restriction
           if (slot.shiftType.is_night && !params.can_do_nights)
             { reasons[empId]='cannot_do_nights'; continue; }
@@ -1141,6 +1153,15 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
             const quota = parseInt(params.fd_springer_shifts_per_month)||0;
             score -= Math.max(0, quota - state.fdSpringerShiftsAssigned) * 200;
           }
+
+          // Feature 8: Fair distribution: penalize if assigned too recently vs others
+          const dayNum = parseInt(slot.date.slice(8)); // day of month
+          const daysSinceLast = dayNum - (state.lastAssignedDay || 0);
+          const avgDaysSince = Object.values(empState).filter(es=>es.totalShiftsAssigned>0)
+            .reduce((sum,es)=>sum+(dayNum-(es.lastAssignedDay||0)),0) /
+            Math.max(1, Object.values(empState).filter(es=>es.totalShiftsAssigned>0).length);
+          // Bonus for employees who haven't been assigned in a while, penalty for recent
+          score += Math.min(15, Math.max(-15, (daysSinceLast - avgDaysSince) * 1.5));
 
           // ── Proportionale Dienst-Gewichtung (Stunden-basiert) ──
           // Gewichtungen definieren ANTEIL der Monats-Sollstunden pro Dienst.
@@ -1247,6 +1268,7 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
       state.shiftTypeCount[st.id] = (state.shiftTypeCount[st.id] || 0) + 1;
       state.shiftTypeHours[st.id] = (state.shiftTypeHours[st.id] || 0) + slotHours;
       state.totalShiftsAssigned++;
+      state.lastAssignedDay = parseInt(slot.date.slice(8));
 
       // Überstunden protokollieren
       const newOT = Math.max(0, state.hoursAssigned - state.monthlyTarget);
@@ -1268,6 +1290,36 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
       }
     }
 
+    // ── PHASE 3: Springer FD-Pairing ────────────────────────────────────────────
+    // For each FD_to_LS springer assigned to a Leitstelle (is_office) shift,
+    // ensure a LS_to_FD springer is also assigned an FD shift on a day near that date.
+    const lsSpringers = empParams.filter(p => p.fd_springer_type === 'FD_to_LS');
+    const fdSpringers = empParams.filter(p => p.fd_springer_type === 'LS_to_FD');
+    const officeShiftsList = shiftTypes.filter(st => st.is_office);
+    const fdShiftsList = shiftTypes.filter(st => !st.is_office && !st.is_night);
+
+    for (const lsSpr of lsSpringers) {
+      const lsAssigns = newAssignments.filter(a => a.employee_id===lsSpr.employee_id && officeShiftsList.some(os=>os.id===a.shift_type_id));
+      for (const la of lsAssigns) {
+        // Check if any fdSpringer already has an FD shift on same day
+        const alreadyCovered = fdSpringers.some(fdSpr => newAssignments.some(a=>a.employee_id===fdSpr.employee_id&&a.date===la.date&&a.shift_type_id));
+        if (alreadyCovered) continue;
+        // Find an available fdSpringer
+        for (const fdSpr of fdSpringers) {
+          if (absenceSet.has(`${fdSpr.employee_id}_${la.date}`)) continue;
+          if (newAssignments.some(a=>a.employee_id===fdSpr.employee_id&&a.date===la.date&&a.shift_type_id)) continue;
+          const fdSt = fdShiftsList[0]; // use first available FD shift type
+          if (!fdSt) continue;
+          const wk = getISOWeek(la.date);
+          const fdWeekH = newAssignments.filter(a=>a.employee_id===fdSpr.employee_id&&getISOWeek(a.date)===wk&&a.shift_type_id&&!a.absence_type_id).reduce((s,a)=>s+parseFloat(a.hours_credited||0),0);
+          if (fdWeekH + parseFloat(fdSt.duration_hours||0) > 48) continue;
+          if (!checkRestPeriod(newAssignments.filter(a=>a.employee_id===fdSpr.employee_id), {date:la.date,shiftType:fdSt}, shiftTypes)) continue;
+          newAssignments.push({id:newId(),plan_id:plan.id,employee_id:fdSpr.employee_id,date:la.date,shift_type_id:fdSt.id,absence_type_id:null,hours_credited:parseFloat(fdSt.duration_hours||0),hours_source:'shift',is_overtime:false,is_locked:false,source:'springer_pairing',notes:`Springer für ${lsSpr.employee_id}`,created_by:req.uid});
+          break;
+        }
+      }
+    }
+
     // ── POST-GENERATION: Überstunden ausgleichen ──
     // Nach der Generierung iterativ versuchen Dienste zu verschieben
     // um Überstunden auszugleichen
@@ -1275,6 +1327,9 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
       newAssignments, empState, empParamMap, empQualMap, shiftTypes,
       AT_HOLIDAYS, plan, absenceSet
     );
+
+    // Feature 9: Weekend rebalancing
+    rebalanceWeekendAssignments(rebalancedAssignments, empParams, empParamMap, shiftTypes, plan, absenceSet);
 
     if (rebalancedAssignments.length > 0) {
       for (const a of rebalancedAssignments) {
@@ -1818,6 +1873,59 @@ async function rebalanceOvertimeAssignments(
   }
 
   return assignments;
+}
+
+// ── WEEKEND REBALANCING ───────────────────────────────────────────────────────
+function rebalanceWeekendAssignments(newAssignments, empParams, empParamMap, shiftTypes, plan, absenceSet) {
+  const daysInMonth = new Date(plan.year, plan.month, 0).getDate();
+  const AT_HOLIDAYS = getAustrianHolidays(plan.year);
+
+  for (let iter = 0; iter < 3; iter++) {
+    // Calculate free weekends per employee
+    const freeWE = {};
+    for (const p of empParams) {
+      const empId = p.employee_id;
+      freeWE[empId] = 0;
+      for (let d = 1; d <= daysInMonth; d++) {
+        const date = new Date(plan.year, plan.month-1, d);
+        if (date.getDay() !== 6) continue;
+        const satStr = date.toISOString().slice(0,10);
+        const sun = new Date(plan.year, plan.month-1, d+1);
+        const sunStr = sun.toISOString().slice(0,10);
+        const satWork = newAssignments.some(a=>a.employee_id===empId&&a.date===satStr&&a.shift_type_id&&!a.absence_type_id);
+        const sunWork = newAssignments.some(a=>a.employee_id===empId&&a.date===sunStr&&a.shift_type_id&&!a.absence_type_id);
+        if (!satWork && !sunWork) freeWE[empId]++;
+      }
+    }
+    const maxFree = Math.max(...Object.values(freeWE));
+    const minFree = Math.min(...Object.values(freeWE));
+    if (maxFree - minFree < 2) break;
+
+    const richEmp = Object.keys(freeWE).find(id => freeWE[id] === maxFree);
+    const poorEmp = Object.keys(freeWE).find(id => freeWE[id] === minFree);
+    if (!richEmp || !poorEmp) break;
+
+    let moved = false;
+
+    for (const a of newAssignments.filter(a=>a.employee_id===poorEmp&&a.shift_type_id&&!a.absence_type_id)) {
+      const wd = new Date(a.date).getDay();
+      if (wd !== 0 && wd !== 6) continue; // only weekends
+      if (absenceSet.has(`${richEmp}_${a.date}`)) continue;
+      if (newAssignments.some(a2=>a2.employee_id===richEmp&&a2.date===a.date&&a2.shift_type_id)) continue;
+      const st = shiftTypes.find(x=>x.id===a.shift_type_id);
+      if (!st) continue;
+      // Check weekly hours
+      const wk = getISOWeek(a.date);
+      const richWeekH = newAssignments.filter(a2=>a2.employee_id===richEmp&&getISOWeek(a2.date)===wk&&a2.shift_type_id&&!a2.absence_type_id).reduce((s,a2)=>s+parseFloat(a2.hours_credited||0),0);
+      if (richWeekH + parseFloat(st.duration_hours||0) > 48) continue;
+      if (!checkRestPeriod(newAssignments.filter(a2=>a2.employee_id===richEmp), {date:a.date,shiftType:st}, shiftTypes)) continue;
+      // Move: reassign from poorEmp to richEmp
+      a.employee_id = richEmp;
+      moved = true;
+      break;
+    }
+    if (!moved) break;
+  }
 }
 
 module.exports = router;

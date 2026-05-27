@@ -53,7 +53,7 @@ let S={
   checklists:[],messages:[],notifications:[],abrechnung:{einspringer:[],homeoffice:[]},dienstplaene:[],
   p:{canApproveEvents:false,canSendMessages:false,seeAllEntries:true,editAllPersonal:false,addForOthers:false,addGeneral:false,manageUsers:false,seeAllAllw:false,editAllw:false,seeAllAbrechnung:false},
   tp:{seeAll:false,editAll:false,myDepts:[],canSetPublic:false,canAssign:false,canSeeSubcat:false,canEditSubcat:false,roles:[]},
-  dpPlans:[], dpShiftTypes:[], dpAbsenceTypes:[], dpEmpParams:[], dpQualifications:[], dpShiftPrefs:[], dpProtocol:[],
+  dpPlans:[], dpShiftTypes:[], dpAbsenceTypes:[], dpEmpParams:[], dpQualifications:[], dpShiftPrefs:[], dpProtocol:[], dpEmpRules:[],
   todos:[], _selTodo:null,
   _dpPlanId:null, _dpMatrix:null, _dpStatsExpanded:false, _dpConfigTab:'shift-types',
   _dpQualLocalChanges:{}, _dpQualLocalPrefsChanges:{}, _dpReportExpanded: false,
@@ -92,6 +92,7 @@ async function fetchData(){
     S.dpQualifications=data.dpQualifications||[];
     S.dpShiftPrefs=data.dpShiftPrefs||[];
     S.dpProtocol=data.dpProtocol||[];
+    S.dpEmpRules=data.dpEmpRules||[];
     S.todos=data.todos||[];
     S.currentUser=data.currentUser;S.p=data.permissions||{};
     const u=getU(S.currentUser);const roles=u?.roles||['standard'];
@@ -3913,6 +3914,9 @@ function renderDP() {
       <div style="flex:1"></div>
       ${canEdit?`<button class="btn-s" onclick="openDpPlanForm()">+ Neuer Plan</button>`:''}
       ${canEdit&&activePlan&&st!=='published'?`<button class="btn-s" onclick="generateDpPlan('${activePlan.id}')">⚡ Auto-Generieren</button>`:''}
+      ${canEdit&&activePlan&&st!=='published'?`<button class="btn-s" style="color:#ef4444" onclick="dpResetPlan()">↺ Zurücksetzen</button>`:''}
+      ${canEdit&&activePlan?`<button class="btn-s" onclick="dpSaveVersion()">💾 Version speichern</button>`:''}
+      ${canEdit&&activePlan?`<button class="btn-s" onclick="dpShowVersions()">🕐 Versionen</button>`:''}
       ${canEdit&&activePlan&&st!=='published'?`<button class="btn-p" onclick="publishDpPlan('${activePlan.id}')">✓ Freigeben</button>`:''}
       ${canEdit&&activePlan&&st!=='published'?`<button class="btn-s" style="color:#ef4444" onclick="deleteDpPlan('${activePlan.id}')">🗑 Plan löschen</button>`:''}
     </div>
@@ -4092,8 +4096,11 @@ function renderDPMatrix(data) {
     </tr>`;
   };
 
-  const categories = Object.keys(grouped).sort();
-  let empRows = categories.map(cat => {
+  const catOrder = {};
+  (S.dpEmpCategories||[]).forEach((c,i) => { catOrder[c.name] = c.sort_order ?? i; });
+  catOrder['(ohne Kategorie)'] = 99999;
+  const sortedCats = Object.keys(grouped).sort((a,b) => (catOrder[a]??9999) - (catOrder[b]??9999) || a.localeCompare(b));
+  let empRows = sortedCats.map(cat => {
     const empList = grouped[cat].sort((a, b) => a.name.split(' ').pop().localeCompare(b.name.split(' ').pop(), 'de'));
     const catId = 'dpcat_' + cat.replace(/\W/g, '_');
     const isExpanded = S._dpCategoryExpanded?.[catId] ?? true;
@@ -4272,13 +4279,82 @@ async function dpAssign(empId, date, shiftTypeId, absenceTypeId) {
   document.getElementById('dpCellMenu').style.display = 'none';
   if (!S._dpPlanId) return;
   try {
-    await api('POST', '/dp/plans/'+S._dpPlanId+'/assign', {
+    const result = await api('POST', '/dp/plans/'+S._dpPlanId+'/assign', {
       employeeId: empId, date, shiftTypeId: shiftTypeId||null, absenceTypeId: absenceTypeId||null
     });
+    if (result.warnings?.length) toast('⚠️ '+result.warnings.join(' | '),'warn');
     const data = await api('GET', '/dp/plans/'+S._dpPlanId+'/matrix');
     S._dpMatrix = data;
     renderDPMatrix(data);
-    toast('Gespeichert');
+    if (!result.warnings?.length) toast('Gespeichert');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+async function dpResetPlan() {
+  if (!S._dpPlanId) return;
+  if (!confirm('Plan zurücksetzen? Alle Dienste werden gelöscht, Abwesenheiten bleiben erhalten.')) return;
+  try {
+    await api('POST', '/dp/plans/'+S._dpPlanId+'/reset');
+    const data = await api('GET', '/dp/plans/'+S._dpPlanId+'/matrix');
+    S._dpMatrix = data;
+    renderDPMatrix(data);
+    toast('Plan zurückgesetzt');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+async function dpSaveVersion() {
+  if (!S._dpPlanId) return;
+  const versionName = prompt('Versionsname:');
+  if (!versionName?.trim()) return;
+  try {
+    await api('POST', '/dp/plans/'+S._dpPlanId+'/versions', {versionName: versionName.trim()});
+    toast('Version gespeichert');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+async function dpShowVersions() {
+  if (!S._dpPlanId) return;
+  try {
+    const versions = await api('GET', '/dp/plans/'+S._dpPlanId+'/versions');
+    const listEl = document.getElementById('dpVersionsList');
+    if (!listEl) return;
+    if (!versions.length) {
+      listEl.innerHTML = '<div style="padding:12px;color:var(--mu)">Keine Versionen vorhanden.</div>';
+    } else {
+      listEl.innerHTML = versions.map(v => `
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:13px">${esc(v.version_name)}</div>
+            <div style="font-size:11px;color:var(--mu)">${new Date(v.created_at).toLocaleString('de')}</div>
+          </div>
+          <button class="btn-s" onclick="dpRestoreVersion('${v.id}')">↩ Wiederherstellen</button>
+          ${S.p.manageUsers?`<button class="btn-s" style="color:#ef4444" onclick="dpDeleteVersion('${v.id}')">✕</button>`:''}
+        </div>`).join('');
+    }
+    openModal('dpVersionsOv');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+async function dpRestoreVersion(vId) {
+  if (!S._dpPlanId) return;
+  if (!confirm('Version wiederherstellen? Aktueller Plan wird überschrieben.')) return;
+  try {
+    await api('POST', '/dp/plans/'+S._dpPlanId+'/versions/'+vId+'/restore');
+    closeModal('dpVersionsOv');
+    const data = await api('GET', '/dp/plans/'+S._dpPlanId+'/matrix');
+    S._dpMatrix = data;
+    renderDPMatrix(data);
+    toast('Version wiederhergestellt');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+async function dpDeleteVersion(vId) {
+  if (!S._dpPlanId) return;
+  if (!confirm('Version löschen?')) return;
+  try {
+    await api('DELETE', '/dp/plans/'+S._dpPlanId+'/versions/'+vId);
+    dpShowVersions();
+    toast('Version gelöscht');
   } catch(e) { toast('Fehler: '+e.message,'err'); }
 }
 
@@ -4547,13 +4623,27 @@ async function renderDPConfigEmpParams() {
         ${canDelete?`<button class="btn-s" style="color:#ef4444" onclick="deleteDpEmpParam('${p.id}')">✕</button>`:''}
       </div>`;
     }).join('');
+    const userRules = (S.dpEmpRules||[]).filter(r=>r.employee_id===u.id);
+    const wdNames = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+    const rulesHtml = userRules.map(r => {
+      const ruleLabel = r.rule_type==='always_free' ? `Immer frei am ${wdNames[r.day_of_week]??r.day_of_week}` :
+        r.rule_type==='always_shift' ? `Immer Dienst am ${wdNames[r.day_of_week]??r.day_of_week}: ${esc((S.dpShiftTypes||[]).find(x=>x.id===r.shift_type_id)?.code||r.shift_type_id)}` :
+        esc(r.rule_type);
+      return `<div style="display:flex;align-items:center;gap:6px;padding:2px 0 2px 28px;font-size:11px">
+        <span style="color:var(--mu)">${ruleLabel}</span>
+        ${S.p.manageUsers?`<button class="btn-s" style="font-size:10px;padding:1px 6px;color:#ef4444" onclick="deleteDpEmpRule('${r.id}')">✕</button>`:''}
+      </div>`;
+    }).join('');
+    const addRuleBtn = S.p.manageUsers ? `<button class="btn-s" style="font-size:11px" onclick="openDpEmpRuleForm('${u.id}')">+ Fixregel</button>` : '';
     return `<div class="dp-cfg-row" style="flex-direction:column;align-items:flex-start;gap:2px">
       <div style="display:flex;align-items:center;gap:8px;width:100%">
         <span class="av-sm" style="background:${u.color}">${esc(u.initials)}</span>
         <span class="dp-cfg-label">${esc(u.name)}</span>
+        ${addRuleBtn}
         <button class="btn-s" style="margin-left:auto;font-size:11px" onclick="openDpEmpParamFormNew('${u.id}')">+ Neue Version</button>
       </div>
       ${versionRows}
+      ${rulesHtml}
     </div>`;
   }).join('');
 
@@ -5252,6 +5342,8 @@ function openDpAbsenceTypeForm(id) {
   document.getElementById('dpAtfApproval').checked = !!at?.requires_approval;
   document.getElementById('dpAtfHolidayDefault').checked = !!at?.is_holiday_default;
   document.getElementById('dpAtfValidFrom').value = at?.valid_from ? String(at.valid_from).slice(0,10) : '';
+  const zfdEl = document.getElementById('dpAtfZeroFreeDays');
+  if (zfdEl) zfdEl.checked = !!at?.zero_on_free_days;
   document.getElementById('dpAtfHoursCalc').onchange = function() {
     document.getElementById('dpAtfFixedWrap').style.display = this.value==='fixed' ? '' : 'none';
   };
@@ -5274,6 +5366,7 @@ async function submitDpAbsenceTypeForm() {
     requiresApproval: document.getElementById('dpAtfApproval').checked,
     isHolidayDefault: document.getElementById('dpAtfHolidayDefault').checked,
     validFrom: document.getElementById('dpAtfValidFrom').value||null,
+    zeroOnFreeDays: document.getElementById('dpAtfZeroFreeDays') ? document.getElementById('dpAtfZeroFreeDays').checked : false,
   };
   if (!body.code||!body.label) return toast('Code und Bezeichnung erforderlich','err');
   try {
@@ -5349,6 +5442,8 @@ function openDpEmpParamForm(paramId) {
   document.getElementById('dpEpfFdLocation').value = p.fd_springer_location||'Nord';
   document.getElementById('dpEpfFdShifts').value = p.fd_springer_shifts_per_month||'';
   document.getElementById('dpEpfFdDetails').style.display = hasFdSpringer ? '' : 'none';
+  const noWEEl = document.getElementById('dpEpfNoWeekends');
+  if (noWEEl) noWEEl.checked = !!p?.no_weekends;
   openModal('dpEmpParamFormOv');
 }
 
@@ -5380,6 +5475,8 @@ function openDpEmpParamFormNew(empId) {
   document.getElementById('dpEpfFdLocation').value = latest?.fd_springer_location||'Nord';
   document.getElementById('dpEpfFdShifts').value = latest?.fd_springer_shifts_per_month||'';
   document.getElementById('dpEpfFdDetails').style.display = hasFdSpringer ? '' : 'none';
+  const noWEElNew = document.getElementById('dpEpfNoWeekends');
+  if (noWEElNew) noWEElNew.checked = !!latest?.no_weekends;
   openModal('dpEmpParamFormOv');
 }
 
@@ -5402,6 +5499,7 @@ async function submitDpEmpParamForm() {
     fdSpringerShiftsPerMonth: fdType ? (parseInt(document.getElementById('dpEpfFdShifts').value)||null) : null,
     dailyHours: document.getElementById('dpEpfDailyHours').value ? parseFloat(document.getElementById('dpEpfDailyHours').value) : null,
     profileId: document.getElementById('dpEpfProfileId').value || null,
+    noWeekends: document.getElementById('dpEpfNoWeekends') ? document.getElementById('dpEpfNoWeekends').checked : false,
   };
   try {
     await api('POST', '/dp/employee-params', body);
@@ -5417,6 +5515,46 @@ async function deleteDpEmpParam(id) {
   try {
     await api('DELETE', '/dp/employee-params/'+id);
     renderDPConfig();
+    toast('Gelöscht');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+function openDpEmpRuleForm(empId) {
+  document.getElementById('dpErfEmpId').value = empId;
+  document.getElementById('dpErfType').value = 'always_free';
+  document.getElementById('dpErfDay').value = '1';
+  const stSel = document.getElementById('dpErfShiftType');
+  stSel.innerHTML = S.dpShiftTypes.map(st=>`<option value="${st.id}">${esc(st.code)} – ${esc(st.name)}</option>`).join('');
+  dpErfTypeChange();
+  openModal('dpEmpRuleFormOv');
+}
+
+function dpErfTypeChange() {
+  const v = document.getElementById('dpErfType').value;
+  document.getElementById('dpErfShiftWrap').style.display = v==='always_shift' ? '' : 'none';
+}
+
+async function submitDpEmpRuleForm() {
+  const empId = document.getElementById('dpErfEmpId').value;
+  const ruleType = document.getElementById('dpErfType').value;
+  const dayOfWeek = parseInt(document.getElementById('dpErfDay').value);
+  const shiftTypeId = ruleType==='always_shift' ? document.getElementById('dpErfShiftType').value : null;
+  if (!empId||!ruleType) return toast('Pflichtfelder fehlen','err');
+  try {
+    await api('POST', '/dp/emp-rules', {employeeId:empId, ruleType, dayOfWeek, shiftTypeId});
+    closeModal('dpEmpRuleFormOv');
+    await fetchData();
+    renderDPConfigTab();
+    toast('Fixregel gespeichert');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+async function deleteDpEmpRule(id) {
+  if (!confirm('Fixregel löschen?')) return;
+  try {
+    await api('DELETE', '/dp/emp-rules/'+id);
+    await fetchData();
+    renderDPConfigTab();
     toast('Gelöscht');
   } catch(e) { toast('Fehler: '+e.message,'err'); }
 }

@@ -1628,6 +1628,7 @@
         <label class="rck"><input type="checkbox" id="dpAtfCounts" checked> Z&#228;hlt als Arbeitszeit</label>
         <label class="rck"><input type="checkbox" id="dpAtfApproval"> Genehmigung erforderlich</label>
         <label class="rck" title="Dieser Typ wird automatisch f&#252;r alle Mitarbeiter an gesetzlichen Feiertagen eingebucht"><input type="checkbox" id="dpAtfHolidayDefault"> &#127981; Automatisch f&#252;r Feiertage</label>
+        <label class="rck"><input type="checkbox" id="dpAtfZeroFreeDays"> Keine Stunden an Wochenenden/Feiertagen</label>
       </div>
       <div class="fg" style="margin-top:8px"><label>G&#252;ltig ab (leer = immer)</label><input type="date" id="dpAtfValidFrom"></div>
     </div>
@@ -1693,6 +1694,7 @@
         <label class="rck"><input type="checkbox" id="dpEpfNights" checked> Nachtdienste m&#246;glich</label>
         <label class="rck"><input type="checkbox" id="dpEpfDoubleNights" checked> Doppeln&#228;chte erlaubt</label>
         <label class="rck"><input type="checkbox" id="dpEpfSpringer" onchange="dpEpfSpringerChange()"> Springer</label>
+        <label class="rck"><input type="checkbox" id="dpEpfNoWeekends"> Keine Wochenenden</label>
       </div>
       <div class="fg" style="margin-top:8px"><label>Max. N&#228;chte/Monat (leer = kein Limit)</label><input type="number" id="dpEpfMaxNights" placeholder="z.B. 4" min="0" max="31"></div>
       <div class="fg" style="margin-top:8px"><label>Bürodienst-Anteil % (0 = kein Bürodienst)</label>
@@ -1761,6 +1763,40 @@
 
 <!-- DP: Zell-Menü (dynamisch positioniert) -->
 <div id="dpCellMenu" class="dp-menu" style="display:none"></div>
+
+<!-- DP: Versionshistorie Modal -->
+<div class="ov" id="dpVersionsOv">
+  <div class="modal sm">
+    <div class="mh"><h2>Versionshistorie</h2><button class="mc" onclick="closeModal('dpVersionsOv')">&#10005;</button></div>
+    <div class="mb2" id="dpVersionsList" style="max-height:50vh;overflow-y:auto"></div>
+    <div class="mf"><button class="btn-s" onclick="closeModal('dpVersionsOv')">Schlie&#223;en</button></div>
+  </div>
+</div>
+
+<!-- DP: Fixregel Form -->
+<div class="ov" id="dpEmpRuleFormOv">
+  <div class="modal sm">
+    <div class="mh"><h2>Fixregel</h2><button class="mc" onclick="closeModal('dpEmpRuleFormOv')">&#10005;</button></div>
+    <div class="mb2">
+      <input type="hidden" id="dpErfEmpId">
+      <div class="fg"><label>Regel</label>
+        <select id="dpErfType" onchange="dpErfTypeChange()">
+          <option value="always_free">Immer frei</option>
+          <option value="always_shift">Immer dieser Dienst</option>
+        </select>
+      </div>
+      <div class="fg"><label>Wochentag</label>
+        <select id="dpErfDay">
+          <option value="1">Montag</option><option value="2">Dienstag</option><option value="3">Mittwoch</option>
+          <option value="4">Donnerstag</option><option value="5">Freitag</option>
+          <option value="6">Samstag</option><option value="0">Sonntag</option>
+        </select>
+      </div>
+      <div class="fg" id="dpErfShiftWrap" style="display:none"><label>Dienst</label><select id="dpErfShiftType"></select></div>
+    </div>
+    <div class="mf"><button class="btn" onclick="submitDpEmpRuleForm()">&#10003; Speichern</button></div>
+  </div>
+</div>
 
 <!-- DP: Report Modal -->
 <div class="ov" id="dpReportModal">
