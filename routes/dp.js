@@ -1347,9 +1347,96 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
       }
     }
 
-    // ── PHASE 3: Springer FD-Pairing ────────────────────────────────────────────
-    // For each FD_to_LS springer assigned to a Leitstelle (is_office) shift,
-    // ensure a LS_to_FD springer is also assigned an FD shift on a day near that date.
+    // ── PHASE 3: FD-Springer – direkte Monatskontingent-Einteilung ───────────────
+    // Für Mitarbeiter mit fd_springer_type='LS_to_FD': fd_springer_shifts_per_month
+    // FD-Dienste direkt und gleichmäßig über den Monat verteilen, ohne Schichtbedarf.
+    {
+      const fdSt = shiftTypes.find(st => st.code === 'FD');
+      const lsToFdEmps = empParams.filter(p => p.fd_springer_type === 'LS_to_FD' && parseInt(p.fd_springer_shifts_per_month) > 0);
+
+      if (fdSt && lsToFdEmps.length > 0) {
+        const daysInMonth = new Date(plan.year, plan.month, 0).getDate();
+        const allMonthDates = Array.from({length: daysInMonth}, (_, i) =>
+          `${plan.year}-${String(plan.month).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`
+        );
+        const fdH = parseFloat(fdSt.duration_hours || 0);
+
+        for (const p of lsToFdEmps) {
+          const quota = parseInt(p.fd_springer_shifts_per_month) || 0;
+          const state = empState[p.employee_id];
+          if (!state) continue;
+
+          // Check qualification (if qualifications are defined for this employee)
+          const quals = empQualMap[p.employee_id];
+          if (quals && quals.size > 0 && !quals.has(fdSt.id)) continue;
+
+          // Count FD shifts already in plan (pre-existing + generated so far)
+          const alreadyFd = state.assignments.filter(a => a.shift_type_id === fdSt.id && !a.absence_type_id).length;
+          const needed = Math.max(0, quota - alreadyFd);
+          if (needed <= 0) continue;
+
+          const takenDates = new Set(state.assignments.map(a => a.date));
+
+          // Available days: no absence, no existing assignment, no_weekends respected
+          const available = allMonthDates.filter(d => {
+            if (absenceSet.has(`${p.employee_id}_${d}`)) return false;
+            if (takenDates.has(d)) return false;
+            if (p.no_weekends) {
+              const wd = new Date(d).getDay();
+              if (wd === 0 || wd === 6) return false;
+            }
+            return true;
+          });
+
+          // Pick evenly-spaced candidate days; fall through to remaining if a candidate fails
+          const targetIdxs = new Set(
+            Array.from({length: Math.min(needed, available.length)}, (_, j) =>
+              Math.round(j * available.length / Math.max(needed, 1))
+            )
+          );
+          const candidates = [
+            ...([...targetIdxs].map(i => available[i])),
+            ...available.filter((_, i) => !targetIdxs.has(i)),
+          ];
+
+          let assigned = 0;
+          for (const d of candidates) {
+            if (assigned >= needed) break;
+
+            // Hard: Nachtdienst am Vortag
+            const prevDate = new Date(d); prevDate.setDate(prevDate.getDate() - 1);
+            const prevDateStr = prevDate.toISOString().slice(0, 10);
+            if (state.assignments.some(a => a.date === prevDateStr && !a.absence_type_id && a.shiftType?.is_night)) continue;
+
+            // Hard: 11h Ruhezeit
+            if (!checkRestPeriod(state.assignments, {date: d, shiftType: fdSt}, shiftTypes)) continue;
+
+            // Hard: 48h/Woche
+            const wk = getISOWeek(d);
+            if ((state.weeklyHours[wk] || 0) + fdH > 48) continue;
+
+            const a = {
+              id: newId(), plan_id: plan.id, employee_id: p.employee_id,
+              date: d, shift_type_id: fdSt.id, absence_type_id: null,
+              hours_credited: fdH, hours_source: 'shift',
+              is_overtime: false, is_locked: false, source: 'generated',
+              notes: 'FD-Springer', shiftType: fdSt, created_by: req.uid,
+            };
+            newAssignments.push(a);
+            state.assignments.push(a);
+            takenDates.add(d);
+            state.hoursAssigned += fdH;
+            state.weeklyHours[wk] = (state.weeklyHours[wk] || 0) + fdH;
+            state.fdSpringerShiftsAssigned++;
+            assigned++;
+          }
+        }
+      }
+    }
+
+    // ── PHASE 4: Springer FD-Pairing (FD→LS mit Bürodienst-Kopplung) ────────────
+    // Wenn ein FD_to_LS Springer eine Bürodienst-Schicht (is_office) bekommt,
+    // wird ein LS_to_FD Springer für denselben Tag auf FD eingeteilt.
     const lsSpringers = empParams.filter(p => p.fd_springer_type === 'FD_to_LS');
     const fdSpringers = empParams.filter(p => p.fd_springer_type === 'LS_to_FD');
     const officeShiftsList = shiftTypes.filter(st => st.is_office);
@@ -1478,7 +1565,28 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
       details: nightsExceeded.length === 0 ? 'Alle MA unter Nachtdienst-Limit.' : `${nightsExceeded.length} MA überschreitet Limit.`
     });
 
-    // 3. Wochenarbeitszeit 48h
+    // 3. FD-Springer Quota
+    {
+      const fdStRep = shiftTypes.find(st => st.code === 'FD');
+      const springerUnder = [];
+      for (const p of empParams.filter(ep => ep.fd_springer_type === 'LS_to_FD' && parseInt(ep.fd_springer_shifts_per_month) > 0)) {
+        const quota = parseInt(p.fd_springer_shifts_per_month);
+        const state = empState[p.employee_id];
+        const fdCount = state ? state.assignments.filter(a => a.shift_type_id === fdStRep?.id && !a.absence_type_id).length : 0;
+        if (fdCount < quota) springerUnder.push({empId: p.employee_id, got: fdCount, quota});
+      }
+      if (empParams.some(ep => ep.fd_springer_type === 'LS_to_FD' && parseInt(ep.fd_springer_shifts_per_month) > 0)) {
+        report.dienstplanRegeln.push({
+          regel: 'FD-Springer Quota',
+          status: springerUnder.length === 0 ? 'OK' : 'WARNUNG',
+          details: springerUnder.length === 0
+            ? 'Alle FD-Springer haben ihre Quota erreicht.'
+            : `${springerUnder.length} Springer unter Quota (${springerUnder.map(x=>`${x.got}/${x.quota}`).join(', ')}).`
+        });
+      }
+    }
+
+    // 4. Wochenarbeitszeit 48h
     const weeklyExceeded = [];
     for (const [empId, state] of Object.entries(empState)) {
       for (const [week, hours] of Object.entries(state.weeklyHours)) {
