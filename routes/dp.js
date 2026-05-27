@@ -139,6 +139,7 @@ router.put('/shift-types/:id', auth, async (req,res) => {
     );
     if (!row) return bad(res,'Nicht gefunden',404);
     ok(res,row);
+    recalcShiftTypeAssignments(row).catch(e => console.error('[recalc-shift]', e.message));
   } catch(e) { bad(res,'Serverfehler',500); }
 });
 
@@ -263,6 +264,7 @@ router.put('/absence-types/:id', auth, async (req,res) => {
     );
     if (!row) return bad(res,'Nicht gefunden',404);
     ok(res,row);
+    recalcAbsenceTypeAssignments(row).catch(e => console.error('[recalc-absence]', e.message));
   } catch(e) { bad(res,'Serverfehler',500); }
 });
 
@@ -1538,6 +1540,86 @@ router.delete('/emp-rules/:id', auth, async (req,res) => {
   try { await q('DELETE FROM dp_emp_rules WHERE id=$1',[req.params.id]); ok(res); }
   catch(e) { bad(res,'Serverfehler',500); }
 });
+
+// ── RETROACTIVE RECALCULATION ─────────────────────────────────────────────────
+
+async function recalcAbsenceTypeAssignments(at) {
+  if (at.hours_calculation === 'shift_hours') return; // depends on per-day context, skip
+  const toISO = d => !d ? null : (d instanceof Date ? d.toISOString().slice(0,10) : String(d).slice(0,10));
+  const validFrom = toISO(at.valid_from);
+
+  // Build date filter clause
+  const buildClause = (startIdx) => {
+    const params = [];
+    let clause = '';
+    if (validFrom) { params.push(validFrom); clause = ` AND date >= $${startIdx + params.length}::date`; }
+    return {clause, params};
+  };
+
+  // Uniform-value fast paths (single SQL UPDATE)
+  if (at.hours_calculation === 'zero' && !at.zero_on_free_days) {
+    const {clause, params} = buildClause(2);
+    await q(`UPDATE dp_assignments SET hours_credited=0,hours_source='zero' WHERE absence_type_id=$1 AND is_locked=false${clause}`, [at.id,...params]);
+    return;
+  }
+  if (at.hours_calculation === 'fixed' && !at.zero_on_free_days) {
+    const h = parseFloat(at.fixed_hours)||0;
+    const {clause, params} = buildClause(3);
+    await q(`UPDATE dp_assignments SET hours_credited=$1,hours_source='fixed' WHERE absence_type_id=$2 AND is_locked=false${clause}`, [h, at.id,...params]);
+    return;
+  }
+
+  // Per-employee calculation
+  const {clause, params: dp} = buildClause(2);
+  const assignments = await q(
+    `SELECT id,employee_id,date FROM dp_assignments WHERE absence_type_id=$1 AND is_locked=false${clause}`,
+    [at.id,...dp]
+  );
+  if (!assignments.length) return;
+
+  const empIds = [...new Set(assignments.map(a => a.employee_id))];
+  const allEP = await q('SELECT * FROM dp_employee_params WHERE employee_id=ANY($1::uuid[])', [empIds]);
+  const epMap = Object.fromEntries(allEP.map(p => [p.employee_id, p]));
+  const profileIds = [...new Set(allEP.map(p => p.profile_id).filter(Boolean))];
+  const allProf = profileIds.length ? await q('SELECT * FROM dp_hours_profiles WHERE id=ANY($1::uuid[])', [profileIds]) : [];
+  const profMap = Object.fromEntries(allProf.map(p => [p.id, p]));
+  const holCache = {};
+  const getHols = y => holCache[y] || (holCache[y] = getAustrianHolidays(y));
+
+  const updates = [];
+  for (const a of assignments) {
+    const ds = a.date instanceof Date ? a.date.toISOString().slice(0,10) : String(a.date).slice(0,10);
+    const ep = epMap[a.employee_id] || {};
+    const mh = parseFloat(ep.monthly_hours)||160;
+    const dailyH = ep.daily_hours ? parseFloat(ep.daily_hours) : Math.round(mh/26*10)/10;
+    const prof = ep.profile_id ? profMap[ep.profile_id] : null;
+    const avgShift = prof?.avg_shift_duration ? parseFloat(prof.avg_shift_duration)
+                   : prof?.daily_work_hours ? parseFloat(prof.daily_work_hours) : dailyH;
+    let h, hs;
+    if (at.hours_calculation==='fixed')           { h=parseFloat(at.fixed_hours)||0; hs='fixed'; }
+    else if (at.hours_calculation==='daily_target'){ h=dailyH; hs='daily_target'; }
+    else if (at.hours_calculation==='avg_shift_duration'){ h=avgShift; hs='avg_shift_duration'; }
+    else if (at.hours_calculation==='zero')        { h=0; hs='zero'; }
+    else continue;
+    if (at.zero_on_free_days) {
+      const wd = new Date(ds).getDay();
+      if (wd===0 || !!getHols(new Date(ds).getFullYear())[ds]) h=0;
+    }
+    updates.push([h, hs, a.id]);
+  }
+  await Promise.all(updates.map(([h,hs,id]) => q('UPDATE dp_assignments SET hours_credited=$1,hours_source=$2 WHERE id=$3',[h,hs,id])));
+}
+
+async function recalcShiftTypeAssignments(st) {
+  const durationHours = parseFloat(st.duration_hours)||0;
+  const toISO = d => !d ? null : (d instanceof Date ? d.toISOString().slice(0,10) : String(d).slice(0,10));
+  const params = [durationHours, st.id];
+  let dateClause = '';
+  const vf = toISO(st.valid_from), vu = toISO(st.valid_until);
+  if (vf) { params.push(vf); dateClause += ` AND date>=$${params.length}::date`; }
+  if (vu) { params.push(vu); dateClause += ` AND date<=$${params.length}::date`; }
+  await q(`UPDATE dp_assignments SET hours_credited=$1,hours_source='shift' WHERE shift_type_id=$2 AND absence_type_id IS NULL AND is_locked=false${dateClause}`, params);
+}
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 

@@ -4225,7 +4225,7 @@ function renderDpMultiBar() {
   }
   if (!S._dpSelection || S._dpSelection.size === 0) { bar.style.display = 'none'; return; }
 
-  const {shiftTypes, empQualMap} = S._dpMatrix || {};
+  const {shiftTypes, absenceTypes, empQualMap} = S._dpMatrix || {};
   if (!shiftTypes) { bar.style.display = 'none'; return; }
 
   const entries = [...S._dpSelection].map(k => { const [empId,date]=k.split('|'); return {empId,date}; });
@@ -4243,39 +4243,44 @@ function renderDpMultiBar() {
     ? dates.map(d => d.slice(8)+'.'+d.slice(5,7)+'.').join(', ')
     : dates.length + ' Tage';
 
-  let html = `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-    <div>
-      <span style="font-weight:700;font-size:13px">${count} Zelle${count>1?'n':''} ausgewählt</span>
-      <span style="color:var(--mu);font-size:12px;margin-left:8px">${dateLabel}</span>
+  let html = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <div style="flex-shrink:0">
+      <span style="font-weight:700;font-size:13px">${count} Zelle${count>1?'n':''}</span>
+      <span style="color:var(--mu);font-size:12px;margin-left:6px">${dateLabel}</span>
+      <span style="color:var(--mu);font-size:11px;margin-left:8px;font-style:italic">Strg+Klick</span>
     </div>
-    <div style="color:var(--mu);font-size:11px;font-style:italic">Strg+Klick zum Auswählen</div>
-    <div style="flex:1"></div>`;
+    <div style="width:1px;height:24px;background:var(--border);flex-shrink:0"></div>`;
 
   if (common.length > 0) {
-    html += common.map(st => `<button onclick="dpMultiAssign('${st.id}')" style="background:${st.color}22;color:${dpTextColor(st.color)};border:1.5px solid ${st.color};border-radius:6px;padding:5px 12px;cursor:pointer;font-weight:700;font-size:12px;display:inline-flex;align-items:center;gap:6px"><span style="width:9px;height:9px;background:${st.color};border-radius:50%;display:inline-block;flex-shrink:0"></span>${esc(st.code)}</button>`).join('');
+    html += common.map(st => `<button onclick="dpMultiAssign('${st.id}',null)" style="background:${st.color}22;color:${dpTextColor(st.color)};border:1.5px solid ${st.color};border-radius:6px;padding:4px 10px;cursor:pointer;font-weight:700;font-size:12px;display:inline-flex;align-items:center;gap:5px"><span style="width:8px;height:8px;background:${st.color};border-radius:50%;flex-shrink:0"></span>${esc(st.code)}</button>`).join('');
   } else {
-    html += `<span style="color:var(--mu);font-size:12px;font-style:italic">Keine gemeinsamen Dienste verfügbar</span>`;
+    html += `<span style="color:var(--mu);font-size:12px;font-style:italic">Keine gemeinsamen Dienste</span>`;
   }
 
-  html += `<button onclick="dpClearSelection()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;color:var(--mu)">✕ Abbrechen</button></div>`;
+  if (absenceTypes?.length) {
+    html += `<div style="width:1px;height:24px;background:var(--border);flex-shrink:0"></div>`;
+    html += (absenceTypes||[]).map(at => `<button onclick="dpMultiAssign(null,'${at.id}')" style="background:${at.color}22;color:${dpTextColor(at.color)};border:1.5px solid ${at.color};border-radius:6px;padding:4px 10px;cursor:pointer;font-weight:700;font-size:12px;display:inline-flex;align-items:center;gap:5px"><span style="width:8px;height:8px;background:${at.color};border-radius:50%;flex-shrink:0"></span>${esc(at.code)}</button>`).join('');
+  }
+
+  html += `<div style="flex:1"></div><button onclick="dpClearSelection()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;color:var(--mu)">✕</button></div>`;
 
   bar.innerHTML = html;
   bar.style.cssText = 'display:block;position:fixed;bottom:0;left:0;right:0;background:var(--bg);border-top:2px solid var(--acc);padding:10px 16px;z-index:998;box-shadow:0 -4px 20px rgba(0,0,0,.12)';
 }
 
-async function dpMultiAssign(shiftTypeId) {
+async function dpMultiAssign(shiftTypeId, absenceTypeId) {
   if (!S._dpPlanId || !S._dpSelection.size) return;
   const entries = [...S._dpSelection].map(k => k.split('|')).map(([empId,date]) => ({empId,date}));
   S._dpSelection.clear();
   updateDpSelectionUI();
   try {
     await Promise.all(entries.map(({empId,date}) =>
-      api('POST', '/dp/plans/'+S._dpPlanId+'/assign', {employeeId:empId, date, shiftTypeId, absenceTypeId:null})
+      api('POST', '/dp/plans/'+S._dpPlanId+'/assign', {employeeId:empId, date, shiftTypeId:shiftTypeId||null, absenceTypeId:absenceTypeId||null})
     ));
     const data = await api('GET', '/dp/plans/'+S._dpPlanId+'/matrix');
     S._dpMatrix = data;
     renderDPMatrix(data);
-    toast(entries.length + ' Dienste gespeichert');
+    toast(entries.length + ' Einträge gespeichert');
   } catch(e) { toast('Fehler: '+e.message,'err'); }
 }
 
