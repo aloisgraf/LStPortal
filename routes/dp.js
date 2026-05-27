@@ -494,6 +494,11 @@ router.get('/plans/:id/matrix', auth, async (req,res) => {
         if (count > 0) reqMap[day.date][st.id] = count;
       }
     }
+    // DEBUG: log requirements and reqMap for diagnosis
+    console.log('[dp/matrix] raw requirements count:', requirements.length);
+    console.log('[dp/matrix] raw requirements:', JSON.stringify(requirements.map(r=>({id:r.id,st:r.shift_type_id,at:r.applies_to,vf:r.valid_from,vu:r.valid_until,sc:r.slot_count}))));
+    const nonEmptyDays = Object.entries(reqMap).filter(([,v])=>Object.keys(v).length>0);
+    console.log('[dp/matrix] reqMap non-empty days:', nonEmptyDays.length, JSON.stringify(nonEmptyDays.slice(0,5)));
 
     // Build assignment map: date -> shiftTypeId -> [assignments]
     const assignMap = {};
