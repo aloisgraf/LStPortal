@@ -1099,8 +1099,9 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
           const empRules = empRuleMap[empId] || [];
           const slotWD = new Date(slot.date).getDay();
           if (empRules.some(r => r.rule_type==='always_free' && r.day_of_week===slotWD)) { reasons[empId]='fixed_rule_free'; continue; }
-          const alwaysShiftRule = empRules.find(r => r.rule_type==='always_shift' && r.day_of_week===slotWD);
-          if (alwaysShiftRule && alwaysShiftRule.shift_type_id !== slot.shiftTypeId) { reasons[empId]='fixed_rule_other_shift'; continue; }
+          // always_shift + if_shift_then: both block other shift types on this weekday
+          const shiftConstraint = empRules.find(r => (r.rule_type==='always_shift'||r.rule_type==='if_shift_then') && r.day_of_week===slotWD);
+          if (shiftConstraint && shiftConstraint.shift_type_id !== slot.shiftTypeId) { reasons[empId]='fixed_rule_other_shift'; continue; }
 
           // Hard: night restriction
           if (slot.shiftType.is_night && !params.can_do_nights)

@@ -4734,8 +4734,10 @@ async function renderDPConfigEmpParams() {
     const userRules = (S.dpEmpRules||[]).filter(r=>r.employee_id===u.id);
     const wdNames = ['So','Mo','Di','Mi','Do','Fr','Sa'];
     const rulesHtml = userRules.map(r => {
+      const _stCode = r.shift_type_id ? esc((S.dpShiftTypes||[]).find(x=>x.id===r.shift_type_id)?.code||r.shift_type_id) : '?';
       const ruleLabel = r.rule_type==='always_free' ? `Immer frei am ${wdNames[r.day_of_week]??r.day_of_week}` :
-        r.rule_type==='always_shift' ? `Immer Dienst am ${wdNames[r.day_of_week]??r.day_of_week}: ${esc((S.dpShiftTypes||[]).find(x=>x.id===r.shift_type_id)?.code||r.shift_type_id)}` :
+        r.rule_type==='always_shift' ? `Immer Dienst am ${wdNames[r.day_of_week]??r.day_of_week}: ${_stCode}` :
+        r.rule_type==='if_shift_then' ? `Wenn Dienst am ${wdNames[r.day_of_week]??r.day_of_week}: nur ${_stCode}` :
         esc(r.rule_type);
       return `<div style="display:flex;align-items:center;gap:6px;padding:2px 0 2px 28px;font-size:11px">
         <span style="color:var(--mu)">${ruleLabel}</span>
@@ -5639,14 +5641,14 @@ function openDpEmpRuleForm(empId) {
 
 function dpErfTypeChange() {
   const v = document.getElementById('dpErfType').value;
-  document.getElementById('dpErfShiftWrap').style.display = v==='always_shift' ? '' : 'none';
+  document.getElementById('dpErfShiftWrap').style.display = (v==='always_shift'||v==='if_shift_then') ? '' : 'none';
 }
 
 async function submitDpEmpRuleForm() {
   const empId = document.getElementById('dpErfEmpId').value;
   const ruleType = document.getElementById('dpErfType').value;
   const dayOfWeek = parseInt(document.getElementById('dpErfDay').value);
-  const shiftTypeId = ruleType==='always_shift' ? document.getElementById('dpErfShiftType').value : null;
+  const shiftTypeId = (ruleType==='always_shift'||ruleType==='if_shift_then') ? document.getElementById('dpErfShiftType').value : null;
   if (!empId||!ruleType) return toast('Pflichtfelder fehlen','err');
   try {
     await api('POST', '/dp/emp-rules', {employeeId:empId, ruleType, dayOfWeek, shiftTypeId});
