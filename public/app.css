@@ -389,6 +389,7 @@ details.dash-card > summary { list-style: none; cursor: pointer; display: flex; 
 .dp-menu-item{padding:7px 12px;border-radius:6px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px}
 .dp-menu-item:hover{background:var(--bg2)}
 .dp-menu-sep{height:1px;background:var(--border);margin:4px 0}
+.dp-cell-selected{outline:2px solid var(--acc);outline-offset:-2px;position:relative;z-index:1}
 /* Config panels */
 .dp-cfg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;padding:16px}
 .dp-cfg-card{background:var(--bg2);border-radius:10px;padding:14px}

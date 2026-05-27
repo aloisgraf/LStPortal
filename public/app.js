@@ -55,7 +55,7 @@ let S={
   tp:{seeAll:false,editAll:false,myDepts:[],canSetPublic:false,canAssign:false,canSeeSubcat:false,canEditSubcat:false,roles:[]},
   dpPlans:[], dpShiftTypes:[], dpAbsenceTypes:[], dpEmpParams:[], dpQualifications:[], dpShiftPrefs:[], dpProtocol:[], dpEmpRules:[],
   todos:[], _selTodo:null,
-  _dpPlanId:null, _dpMatrix:null, _dpStatsExpanded:false, _dpConfigTab:'shift-types',
+  _dpPlanId:null, _dpMatrix:null, _dpStatsExpanded:false, _dpConfigTab:'shift-types', _dpSelection:new Set(),
   _dpQualLocalChanges:{}, _dpQualLocalPrefsChanges:{}, _dpReportExpanded: false,
   _dpQualWeightsExpanded:{}, _dpQualSearchQuery:'',
   _dpCategoryExpanded:{},
@@ -4039,7 +4039,7 @@ function renderDPMatrix(data) {
         const wishMark = isWish ? `<span style="font-size:9px;color:#f59e0b;line-height:1">★</span>` : '';
         const wishTitle = isWish ? 'Wunschtag · ' : '';
         const wishStyle = isWish ? 'background:#fef3c722;' : '';
-        if (canEdit) return `<td class="dp-cell${dayCls}" onclick="openDpCellMenu('${emp.id}','${d.date}',event)" title="${wishTitle}Klicken zum Zuweisen"${wishStyle?` style="${wishStyle}"`:''} >${wishMark}</td>`;
+        if (canEdit) return `<td id="dpc_${emp.id}_${d.date}" class="dp-cell${dayCls}" onclick="dpCellClick('${emp.id}','${d.date}',event)" title="${wishTitle}Klicken zum Zuweisen"${wishStyle?` style="${wishStyle}"`:''} >${wishMark}</td>`;
         return `<td class="dp-cell${dayCls}"${wishStyle?` style="${wishStyle}"`:''} >${wishMark}</td>`;
       }
       const st = shiftTypes.find(x=>x.id===a.shift_type_id);
@@ -4052,7 +4052,7 @@ function renderDPMatrix(data) {
       const title = [at?.label, st?.name].filter(Boolean).join(' + ');
       const style = `background:${color}22;color:${dpTextColor(color)};font-weight:700;line-height:1.1`;
       if (canEdit) {
-        return `<td class="dp-cell" style="${style}" onclick="openDpCellMenu('${emp.id}','${d.date}',event)" title="${esc(title)}">${label}</td>`;
+        return `<td id="dpc_${emp.id}_${d.date}" class="dp-cell" style="${style}" onclick="dpCellClick('${emp.id}','${d.date}',event)" title="${esc(title)}">${label}</td>`;
       }
       return `<td class="dp-cell" style="${style}" title="${esc(title)}">${label}</td>`;
     }).join('');
@@ -4185,6 +4185,103 @@ function renderDPMatrix(data) {
     `;
     c.appendChild(protDiv);
   }
+  updateDpSelectionUI();
+}
+
+function dpCellClick(empId, date, evt) {
+  evt.stopPropagation();
+  if (evt.ctrlKey || evt.metaKey || evt.shiftKey) {
+    const key = empId + '|' + date;
+    if (S._dpSelection.has(key)) S._dpSelection.delete(key);
+    else S._dpSelection.add(key);
+    updateDpSelectionUI();
+    document.getElementById('dpCellMenu').style.display = 'none';
+  } else {
+    if (S._dpSelection.size > 0) {
+      S._dpSelection.clear();
+      updateDpSelectionUI();
+      return;
+    }
+    openDpCellMenu(empId, date, evt);
+  }
+}
+
+function updateDpSelectionUI() {
+  document.querySelectorAll('.dp-cell-selected').forEach(el => el.classList.remove('dp-cell-selected'));
+  S._dpSelection.forEach(key => {
+    const [empId, date] = key.split('|');
+    const td = document.getElementById('dpc_' + empId + '_' + date);
+    if (td) td.classList.add('dp-cell-selected');
+  });
+  renderDpMultiBar();
+}
+
+function renderDpMultiBar() {
+  let bar = document.getElementById('dpMultiBar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'dpMultiBar';
+    document.body.appendChild(bar);
+  }
+  if (!S._dpSelection || S._dpSelection.size === 0) { bar.style.display = 'none'; return; }
+
+  const {shiftTypes, empQualMap} = S._dpMatrix || {};
+  if (!shiftTypes) { bar.style.display = 'none'; return; }
+
+  const entries = [...S._dpSelection].map(k => { const [empId,date]=k.split('|'); return {empId,date}; });
+
+  // Intersection of qualified shift types across all selected employees
+  const empQualSets = entries.map(({empId}) => {
+    const quals = empQualMap?.[empId] || [];
+    return quals.length > 0 ? new Set(quals) : new Set(shiftTypes.map(st => st.id));
+  });
+  const common = shiftTypes.filter(st => empQualSets.every(s => s.has(st.id)));
+
+  const count = S._dpSelection.size;
+  const dates = [...new Set(entries.map(e => e.date))].sort();
+  const dateLabel = dates.length <= 3
+    ? dates.map(d => d.slice(8)+'.'+d.slice(5,7)+'.').join(', ')
+    : dates.length + ' Tage';
+
+  let html = `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <div>
+      <span style="font-weight:700;font-size:13px">${count} Zelle${count>1?'n':''} ausgewählt</span>
+      <span style="color:var(--mu);font-size:12px;margin-left:8px">${dateLabel}</span>
+    </div>
+    <div style="color:var(--mu);font-size:11px;font-style:italic">Strg+Klick zum Auswählen</div>
+    <div style="flex:1"></div>`;
+
+  if (common.length > 0) {
+    html += common.map(st => `<button onclick="dpMultiAssign('${st.id}')" style="background:${st.color}22;color:${dpTextColor(st.color)};border:1.5px solid ${st.color};border-radius:6px;padding:5px 12px;cursor:pointer;font-weight:700;font-size:12px;display:inline-flex;align-items:center;gap:6px"><span style="width:9px;height:9px;background:${st.color};border-radius:50%;display:inline-block;flex-shrink:0"></span>${esc(st.code)}</button>`).join('');
+  } else {
+    html += `<span style="color:var(--mu);font-size:12px;font-style:italic">Keine gemeinsamen Dienste verfügbar</span>`;
+  }
+
+  html += `<button onclick="dpClearSelection()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;color:var(--mu)">✕ Abbrechen</button></div>`;
+
+  bar.innerHTML = html;
+  bar.style.cssText = 'display:block;position:fixed;bottom:0;left:0;right:0;background:var(--bg);border-top:2px solid var(--acc);padding:10px 16px;z-index:998;box-shadow:0 -4px 20px rgba(0,0,0,.12)';
+}
+
+async function dpMultiAssign(shiftTypeId) {
+  if (!S._dpPlanId || !S._dpSelection.size) return;
+  const entries = [...S._dpSelection].map(k => k.split('|')).map(([empId,date]) => ({empId,date}));
+  S._dpSelection.clear();
+  updateDpSelectionUI();
+  try {
+    await Promise.all(entries.map(({empId,date}) =>
+      api('POST', '/dp/plans/'+S._dpPlanId+'/assign', {employeeId:empId, date, shiftTypeId, absenceTypeId:null})
+    ));
+    const data = await api('GET', '/dp/plans/'+S._dpPlanId+'/matrix');
+    S._dpMatrix = data;
+    renderDPMatrix(data);
+    toast(entries.length + ' Dienste gespeichert');
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+function dpClearSelection() {
+  S._dpSelection.clear();
+  updateDpSelectionUI();
 }
 
 function openDpCellMenu(empId, date, evt) {
@@ -4248,18 +4345,24 @@ function openDpCellMenu(empId, date, evt) {
   // Position menu using fixed + viewport coords
   const menu = document.getElementById('dpCellMenu');
   menu.innerHTML = html;
-  menu.style.display = 'block';
-  menu.style.maxHeight = '75vh';
-  menu.style.overflowY = 'auto';
   menu.style.position = 'fixed';
+  menu.style.visibility = 'hidden';
+  menu.style.left = '0px';
+  menu.style.top = '0px';
+  menu.style.display = 'block';
+  const mh = menu.offsetHeight;
+  const mw = menu.offsetWidth;
+  menu.style.visibility = '';
 
   const rect = evt.target.getBoundingClientRect();
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const multiBarH = (S._dpSelection?.size > 0) ? 56 : 0;
+  const usableH = vh - multiBarH;
   let left = rect.left;
   let top = rect.bottom + 4;
-  if (left + 230 > window.innerWidth) left = window.innerWidth - 234;
-  if (top + 300 > window.innerHeight) {
-    top = rect.top - Math.min(300, rect.top - 4);
-  }
+  if (left + mw + 4 > vw) left = vw - mw - 4;
+  if (left < 4) left = 4;
+  if (top + mh + 4 > usableH) top = Math.max(4, rect.top - mh - 4);
   if (top < 4) top = 4;
   menu.style.left = left + 'px';
   menu.style.top = top + 'px';
