@@ -5130,13 +5130,30 @@ function renderDPConfigRules() {
         </div>
       </div>
 
+      <div style="margin-bottom:14px;margin-left:4px">
+        <div style="font-weight:600;margin-bottom:3px">6. Nachtdienst-Ruhezeit: kein Dienst/Abwesenheit am Folgetag</div>
+        <div style="color:var(--mu);font-size:12px;margin-left:12px">
+          Nach einem Nachtdienst ist der Folgetag zwingend frei (kein Dienst, keine Abwesenheit).<br>
+          Ebenso darf ein Nachtdienst nicht geplant werden, wenn am nächsten Tag bereits ein Dienst oder eine Abwesenheit eingetragen ist.<br>
+          Ausnahme: Doppelnacht (zwei aufeinanderfolgende Nächte) ist erlaubt, wenn beim Mitarbeiter aktiviert.
+        </div>
+      </div>
+
+      <div style="margin-bottom:14px;margin-left:4px">
+        <div style="font-weight:600;margin-bottom:3px">7. Nach Doppelnacht: mindestens 2 Tage frei</div>
+        <div style="color:var(--mu);font-size:12px;margin-left:12px">
+          Nach zwei aufeinanderfolgenden Nachtdiensten (Doppelnacht) müssen mindestens 2 Tage frei bleiben.<br>
+          Beispiel: 02.06. Nacht + 03.06. Nacht → 04.06. und 05.06. sind zwingend frei, frühester nächster Dienst: 06.06.
+        </div>
+      </div>
+
       <div style="margin:24px 0 20px;padding:12px 14px;background:#f59e0b12;border-left:4px solid #f59e0b;border-radius:6px">
         <div style="font-weight:700;color:#f59e0b;font-size:14px;margin-bottom:4px">🟡 Weiche Regeln — werden im Normalfall eingehalten</div>
         <div style="color:var(--mu);font-size:12px">Diese Regeln werden zunächst strikt angewendet. Wenn kein Mitarbeiter verfügbar ist, darf die weiche Regel im Ausnahmefall verletzt werden. Der Vorgang wird im Protokoll als Regelverstoß dokumentiert.</div>
       </div>
 
       <div style="margin-bottom:14px;margin-left:4px">
-        <div style="font-weight:600;margin-bottom:3px">6. Monatliches Stundenziel</div>
+        <div style="font-weight:600;margin-bottom:3px">8. Monatliches Stundenziel</div>
         <div style="color:var(--mu);font-size:12px;margin-left:12px">
           Mitarbeiter werden nicht über ihr monatliches Stundensoll hinaus eingeteilt.<br>
           Im Ausnahmefall (kein anderer Mitarbeiter verfügbar) kann das Stundenziel überschritten werden.
@@ -5144,7 +5161,7 @@ function renderDPConfigRules() {
       </div>
 
       <div style="margin-bottom:14px;margin-left:4px">
-        <div style="font-weight:600;margin-bottom:3px">7. Maximale aufeinanderfolgende Arbeitstage: 6 Tage</div>
+        <div style="font-weight:600;margin-bottom:3px">9. Maximale aufeinanderfolgende Arbeitstage: 6 Tage</div>
         <div style="color:var(--mu);font-size:12px;margin-left:12px">
           Nach 6 aufeinanderfolgenden Arbeitstagen muss ein Ruhetag folgen (AZG §12).<br>
           Im Ausnahmefall kann auf 7 aufeinanderfolgende Tage ausgeweitet werden.
@@ -5152,10 +5169,26 @@ function renderDPConfigRules() {
       </div>
 
       <div style="margin-bottom:14px;margin-left:4px">
-        <div style="font-weight:600;margin-bottom:3px">8. Maximale Nachtdienste pro Monat</div>
+        <div style="font-weight:600;margin-bottom:3px">10. Maximale Nachtdienste pro Monat</div>
         <div style="color:var(--mu);font-size:12px;margin-left:12px">
           Mitarbeiter werden bis zum konfigurierten Limit für Nachtdienste eingeteilt.<br>
           Im Ausnahmefall kann dieses Limit überschritten werden.
+        </div>
+      </div>
+
+      <div style="margin-bottom:14px;margin-left:4px">
+        <div style="font-weight:600;margin-bottom:3px">11. Einzelnachtdienste: mindestens 5 Tage Abstand</div>
+        <div style="color:var(--mu);font-size:12px;margin-left:12px">
+          Nach einem einzelnen Nachtdienst muss der nächste Nachtdienst mindestens 5 Tage später liegen.<br>
+          Beispiel: Nacht am 01.06. → nächste Nacht frühestens 06.06.
+        </div>
+      </div>
+
+      <div style="margin-bottom:14px;margin-left:4px">
+        <div style="font-weight:600;margin-bottom:3px">12. Doppelnacht-Blöcke: mindestens 10 Tage Abstand</div>
+        <div style="color:var(--mu);font-size:12px;margin-left:12px">
+          Zwischen zwei Doppelnacht-Blöcken (je 2 aufeinanderfolgende Nächte) müssen mindestens 10 Tage liegen.<br>
+          Beispiel: Doppelnacht endet 03.06. → nächste Nacht frühestens 13.06.
         </div>
       </div>
 

@@ -1186,6 +1186,17 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
             }
           }
 
+          // Hard: Nach Doppelnacht mindestens 2 Tage frei (Tag+2 nach Doppelnacht)
+          if (!slot.shiftType.is_night) {
+            const d2ago = new Date(slot.date); d2ago.setDate(d2ago.getDate()-2);
+            const d2agoStr = d2ago.toISOString().slice(0,10);
+            const d3ago = new Date(slot.date); d3ago.setDate(d3ago.getDate()-3);
+            const d3agoStr = d3ago.toISOString().slice(0,10);
+            const night2ago = state.assignments.some(a => a.date === d2agoStr && !a.absence_type_id && a.shiftType?.is_night);
+            const night3ago = state.assignments.some(a => a.date === d3agoStr && !a.absence_type_id && a.shiftType?.is_night);
+            if (night2ago && night3ago) { reasons[empId]='rest_after_double_night_required'; continue; }
+          }
+
           // Hard: FD-Springer Typ A (FD→LS): quota cap — only schedule up to configured shifts
           if (params.fd_springer_type === 'FD_to_LS') {
             const quota = parseInt(params.fd_springer_shifts_per_month)||0;
@@ -1211,6 +1222,26 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
               { reasons[empId]='monthly_cap_exceeded'; continue; }
             if (getConsecutiveDays(state.assignments, slot.date) >= 6)
               { reasons[empId]='consecutive_days_limit'; continue; }
+
+            // Weich: Nachtdienst-Abstände — Einzelnacht min 5 Tage, Doppelnacht-Block min 10 Tage
+            if (slot.shiftType.is_night) {
+              const prevNights = state.assignments
+                .filter(a => !a.absence_type_id && a.shiftType?.is_night && a.date < slot.date)
+                .map(a => a.date)
+                .sort();
+              if (prevNights.length > 0) {
+                const lastNight = prevNights[prevNights.length - 1];
+                const daysSinceLast = Math.round((new Date(slot.date) - new Date(lastNight)) / 86400000);
+                const secondLastNight = prevNights.length >= 2 ? prevNights[prevNights.length - 2] : null;
+                const wasDoubleBlock = secondLastNight &&
+                  Math.round((new Date(lastNight) - new Date(secondLastNight)) / 86400000) === 1;
+                const minDays = wasDoubleBlock ? 10 : 5;
+                if (daysSinceLast < minDays) {
+                  reasons[empId] = wasDoubleBlock ? 'double_night_block_distance_10days' : 'night_distance_min5days';
+                  continue;
+                }
+              }
+            }
           }
 
           const isWishDay = wishSet.has(`${empId}_${slot.date}`);
@@ -1382,20 +1413,24 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
     }
 
     // ── PHASE 3: FD-Springer – direkte Monatskontingent-Einteilung ───────────────
-    // Für Mitarbeiter mit fd_springer_type='LS_to_FD': fd_springer_shifts_per_month
+    // Für Mitarbeiter mit fd_springer_type='LS_to_FD' oder 'FD_to_LS': fd_springer_shifts_per_month
     // FD-Dienste direkt und gleichmäßig über den Monat verteilen, ohne Schichtbedarf.
+    // FD-Dienste IMMER nur Mo-Fr, niemals Samstag/Sonntag/Feiertag.
     {
       const fdSt = shiftTypes.find(st => st.code === 'FD');
-      const lsToFdEmps = empParams.filter(p => p.fd_springer_type === 'LS_to_FD' && parseInt(p.fd_springer_shifts_per_month) > 0);
+      const allFdSpringerEmps = empParams.filter(p =>
+        (p.fd_springer_type === 'LS_to_FD' || p.fd_springer_type === 'FD_to_LS') &&
+        parseInt(p.fd_springer_shifts_per_month) > 0
+      );
 
-      if (fdSt && lsToFdEmps.length > 0) {
+      if (fdSt && allFdSpringerEmps.length > 0) {
         const daysInMonth = new Date(plan.year, plan.month, 0).getDate();
         const allMonthDates = Array.from({length: daysInMonth}, (_, i) =>
           `${plan.year}-${String(plan.month).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`
         );
         const fdH = parseFloat(fdSt.duration_hours || 0);
 
-        for (const p of lsToFdEmps) {
+        for (const p of allFdSpringerEmps) {
           const quota = parseInt(p.fd_springer_shifts_per_month) || 0;
           const state = empState[p.employee_id];
           if (!state) continue;
@@ -1411,14 +1446,13 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
 
           const takenDates = new Set(state.assignments.map(a => a.date));
 
-          // Available days: no absence, no existing assignment, no_weekends respected
+          // Available days: FD IMMER nur Mo-Fr, niemals Sa/So/Feiertag
           const available = allMonthDates.filter(d => {
             if (absenceSet.has(`${p.employee_id}_${d}`)) return false;
             if (takenDates.has(d)) return false;
-            if (p.no_weekends) {
-              const wd = new Date(d).getDay();
-              if (wd === 0 || wd === 6) return false;
-            }
+            const wd = new Date(d).getDay();
+            if (wd === 0 || wd === 6) return false;
+            if (AT_HOLIDAYS[d]) return false;
             return true;
           });
 
