@@ -4155,6 +4155,12 @@ function renderDPMatrix(data) {
       </div>`;
     };
 
+    const openSuggestions = (report.zusatzVorschlaege||[]).filter(v => {
+      // Bereits übernommene Vorschläge ausblenden (Zelle inzwischen belegt)
+      const cellAssign = empAssignMap[v.empId]?.[v.date];
+      return !cellAssign;
+    });
+
     const reportHtml = isExpanded ? `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px">
         <div>
@@ -4166,6 +4172,27 @@ function renderDPMatrix(data) {
           ${(report.gesetzlicheRegeln||[]).map(renderRuleRow).join('')}
         </div>
       </div>
+      ${(report.warnungen||[]).length > 0 ? `<div style="padding:8px 12px;border-top:1px solid var(--border)">
+        <h5 style="margin:0 0 8px;font-size:13px;color:#f59e0b">🟡 Fairness-Warnungen</h5>
+        ${report.warnungen.map(w => `<div style="font-size:12px;padding:2px 0"><strong>${esc(w.kategorie||'')}:</strong> ${esc(w.details||'')}${
+          (w.betroffene||[]).length ? '<br><span style="color:var(--mu)">Betroffen: '+w.betroffene.map(b=>{
+            const u = S.users.find(x=>x.id===b.empId);
+            return esc((u?.name||b.empId)+' ('+b.anteilProzent+'%)');
+          }).join(', ')+'</span>' : ''
+        }</div>`).join('')}
+      </div>` : ''}
+      ${openSuggestions.length > 0 ? `<div style="padding:8px 12px;border-top:1px solid var(--border)">
+        <h5 style="margin:0 0 8px;font-size:13px;color:#0ea5e9">💡 Zusatzdienst-Vorschläge (Restkapazität)</h5>
+        <div style="font-size:11px;color:var(--mu);margin-bottom:6px">Vorschläge des Generators für Mitarbeiter unter Soll — werden erst durch „Übernehmen" fix zugewiesen.</div>
+        ${openSuggestions.map(v => {
+          const u = S.users.find(x=>x.id===v.empId);
+          const dd = v.date.slice(8)+'.'+v.date.slice(5,7)+'.';
+          return `<div style="display:flex;align-items:center;gap:8px;font-size:12px;padding:3px 0">
+            <span style="flex:1"><strong>${esc(u?.name||v.empId)}</strong> — ${esc(v.code)} am ${dd} (${v.hours}h)</span>
+            ${canEdit ? `<button class="btn-s" style="padding:2px 10px;font-size:11px" onclick="dpAcceptSuggestion('${v.empId}','${v.date}','${v.shiftTypeId}')">✓ Übernehmen</button>` : ''}
+          </div>`;
+        }).join('')}
+      </div>` : ''}
       ${(report.fehler||[]).length > 0 ? `<div style="padding:8px 12px;border-top:1px solid var(--border)">
         <h5 style="margin:0 0 8px;font-size:13px;color:#f59e0b">⚠️ Hinweise</h5>
         ${report.fehler.map(e => `<div style="font-size:12px;padding:2px 0"><strong>${esc(e.kategorie||'')}:</strong> ${esc(e.details||e.count||'')}</div>`).join('')}
@@ -4178,7 +4205,8 @@ function renderDPMatrix(data) {
       <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;user-select:none;background:var(--sf2)"
            onclick="S._dpReportExpanded=!S._dpReportExpanded;renderDPMatrix(S._dpMatrix)">
         <span style="flex:1;font-weight:600;font-size:13px">📋 Generierungs-Protokoll</span>
-        <span style="color:var(--mu);font-size:12px">${(report.dienstplanRegeln||[]).filter(r=>r.status!=='OK').length + (report.gesetzlicheRegeln||[]).filter(r=>r.status!=='OK').length} Warnungen</span>
+        ${openSuggestions.length > 0 ? `<span style="color:#0ea5e9;font-size:12px">💡 ${openSuggestions.length} Vorschläge</span>` : ''}
+        <span style="color:var(--mu);font-size:12px">${(report.dienstplanRegeln||[]).filter(r=>r.status!=='OK').length + (report.gesetzlicheRegeln||[]).filter(r=>r.status!=='OK').length + (report.warnungen||[]).length} Warnungen</span>
         <span>${isExpanded?'▲':'▼'}</span>
       </div>
       ${reportHtml}
@@ -4186,6 +4214,17 @@ function renderDPMatrix(data) {
     c.appendChild(protDiv);
   }
   updateDpSelectionUI();
+}
+
+// §11 Fall B: Zusatzdienst-Vorschlag per Klick fix zuweisen
+async function dpAcceptSuggestion(empId, date, shiftTypeId) {
+  try {
+    await api('POST', '/dp/plans/'+S._dpPlanId+'/assign', {employeeId: empId, date, shiftTypeId, absenceTypeId: null});
+    toast('Zusatzdienst übernommen');
+    const data = await api('GET', '/dp/plans/'+S._dpPlanId+'/matrix');
+    S._dpMatrix = data;
+    renderDPMatrix(data);
+  } catch(e) { toast('Fehler: '+e.message,'err'); }
 }
 
 function dpCellClick(empId, date, evt) {
@@ -4536,7 +4575,10 @@ async function generateDpPlan(planId) {
     loading(true);
     const res = await api('POST', '/dp/plans/'+planId+'/generate');
     loading(false);
-    toast(`Generiert: ${res.generated} Dienste (${res.violations} Wunschtag-Konflikte)`);
+    const extras = [];
+    if (res.violations) extras.push(`${res.violations} Wunschtag-Konflikte`);
+    if (res.zusatzVorschlaege) extras.push(`${res.zusatzVorschlaege} Zusatzdienst-Vorschläge`);
+    toast(`Generiert: ${res.generated} Dienste${extras.length ? ' ('+extras.join(', ')+')' : ''}`);
 
     // Report anzeigen
     if (res.report) {
@@ -4553,6 +4595,18 @@ async function generateDpPlan(planId) {
       for (const rule of res.report.gesetzlicheRegeln) {
         const icon = rule.status === 'OK' ? '✓' : (rule.status === 'WARNUNG' ? '⚠️' : '✗');
         reportHtml += `<div style="padding:4px 0;font-size:12px"><span>${icon}</span> <strong>${rule.regel}:</strong> ${rule.details}</div>`;
+      }
+
+      if ((res.report.warnungen||[]).length > 0) {
+        reportHtml += `<h5 style="margin-top:12px;color:#f59e0b">🟡 Fairness-Warnungen:</h5>`;
+        for (const w of res.report.warnungen) {
+          reportHtml += `<div style="padding:4px 0;font-size:12px">⚠️ <strong>${esc(w.kategorie||'')}:</strong> ${esc(w.details||'')}</div>`;
+        }
+      }
+
+      if ((res.report.zusatzVorschlaege||[]).length > 0) {
+        reportHtml += `<h5 style="margin-top:12px;color:#0ea5e9">💡 Zusatzdienst-Vorschläge:</h5>
+          <div style="padding:4px 0;font-size:12px">${res.report.zusatzVorschlaege.length} Vorschläge für Mitarbeiter mit Restkapazität — Details und „Übernehmen" im Generierungs-Protokoll unter dem Plan.</div>`;
       }
 
       if (res.report.fehler.length > 0) {
@@ -5464,12 +5518,14 @@ async function submitDpShiftTypeForm() {
   };
   if (!body.name||!body.code) return toast('Name und Code erforderlich','err');
   try {
-    if (id) await api('PUT', '/dp/shift-types/'+id, body);
-    else await api('POST', '/dp/shift-types', body);
+    let saved;
+    if (id) saved = await api('PUT', '/dp/shift-types/'+id, body);
+    else saved = await api('POST', '/dp/shift-types', body);
     closeModal('dpShiftTypeFormOv');
     await fetchData();
     renderDPConfig();
-    toast('Gespeichert');
+    if (saved?.recalcError) toast(saved.recalcError, 'err');
+    else toast(id ? 'Gespeichert — bestehende Pläne rückwirkend aktualisiert' : 'Gespeichert');
   } catch(e) { toast('Fehler: '+e.message,'err'); }
 }
 
@@ -5528,12 +5584,14 @@ async function submitDpAbsenceTypeForm() {
   };
   if (!body.code||!body.label) return toast('Code und Bezeichnung erforderlich','err');
   try {
-    if (id) await api('PUT', '/dp/absence-types/'+id, body);
-    else await api('POST', '/dp/absence-types', body);
+    let saved;
+    if (id) saved = await api('PUT', '/dp/absence-types/'+id, body);
+    else saved = await api('POST', '/dp/absence-types', body);
     closeModal('dpAbsenceTypeFormOv');
     await fetchData();
     renderDPConfig();
-    toast('Gespeichert');
+    if (saved?.recalcError) toast(saved.recalcError, 'err');
+    else toast(id ? 'Gespeichert — bestehende Pläne rückwirkend aktualisiert' : 'Gespeichert');
   } catch(e) { toast('Fehler: '+e.message,'err'); }
 }
 

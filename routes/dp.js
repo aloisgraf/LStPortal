@@ -1613,7 +1613,7 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
           const n = Math.min(wanted, freeDays.length);
           for (let j = 0; j < n; j++) {
             const ds = freeDays[Math.round(j * (freeDays.length - 1) / Math.max(n - 1, 1))];
-            zusatzVorschlaege.push({empId, date: ds, code: c3St.code, hours: c3H});
+            zusatzVorschlaege.push({empId, date: ds, code: c3St.code, hours: c3H, shiftTypeId: c3St.id});
             protocolEntries.push({
               plan_id: plan.id, date: ds, shift_type_id: c3St.id,
               reason: 'zusatzdienst_vorschlag', employee_id: empId,
@@ -1723,7 +1723,8 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
         });
       }
 
-      // Fall B: Zusatzdienst-Vorschläge ausweisen
+      // Fall B: Zusatzdienst-Vorschläge ausweisen (inkl. Liste für die UI)
+      report.zusatzVorschlaege = zusatzVorschlaege;
       if (zusatzVorschlaege.length > 0) {
         report.dienstplanRegeln.push({
           regel: 'Zusatzdienst-Vorschläge (§11 Fall B)',
