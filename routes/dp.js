@@ -3,6 +3,23 @@ const router = require('express').Router();
 const { q, q1, newId, pool } = require('../db');
 const { auth, ok, bad } = require('../middleware');
 
+// Regel-Engine: reine Funktionen + zentrale Planungs-Konstanten (testbar, lib/dp-rules.js)
+const {
+  MAX_WEEKLY_HOURS, DEFAULT_MAX_NIGHTS_PER_MONTH, MAX_CONSECUTIVE_DAYS,
+  FAIRNESS_OT_TOLERANCE_H, FAIRNESS_SALDO_SPREAD_WARN_H, FAIRNESS_CLUSTER_WARN_RATIO,
+  toISODate, addDaysISO,
+  getAustrianHolidays, getWorkDaysInMonth, getISOWeek, getISOWeekStart,
+  getShiftStartHour, getShiftEndHour,
+  checkRestPeriod, getConsecutiveDays, getConsecutiveNights,
+  checkNightHardRules, checkNightGapSoft,
+  fairnessStats, clusterRatio, localDensity,
+} = require('../lib/dp-rules');
+
+// In-Memory-Lock gegen parallele Generierungs-Läufe desselben Plans (K3).
+// Single-Process-Deployment → In-Memory ausreichend, kein Stuck-State bei Crash.
+const generatingPlans = new Set();
+
+
 // ── HOURS PROFILES ────────────────────────────────────────────────────────────
 
 router.get('/hours-profiles', auth, async (req,res) => {
@@ -138,8 +155,12 @@ router.put('/shift-types/:id', auth, async (req,res) => {
       [name,code?.toUpperCase(),location||'',role||'',startTime,endTime,durationHours,!!isNight,!!isZulage,!!isOffice,color,sortOrder||0,validFrom||null,validUntil||null,maxPerEmpPerMonth||null,req.params.id]
     );
     if (!row) return bad(res,'Nicht gefunden',404);
-    ok(res,row);
-    recalcShiftTypeAssignments(row).catch(e => console.error('[recalc-shift]', e.message));
+    // K4: Neuberechnung VOR der Antwort ausführen — kein fire-and-forget mehr.
+    // Fehler blockieren das Speichern nicht, werden aber sichtbar gemeldet.
+    let recalcError = null;
+    try { await recalcShiftTypeAssignments(row); }
+    catch(e) { recalcError = e.message; console.error('[recalc-shift]', e.message); }
+    ok(res, recalcError ? {...row, recalcError: `Rückwirkende Neuberechnung fehlgeschlagen: ${recalcError}`} : row);
   } catch(e) { bad(res,'Serverfehler',500); }
 });
 
@@ -263,8 +284,11 @@ router.put('/absence-types/:id', auth, async (req,res) => {
       [code?.toUpperCase(),label,color,hoursCalculation,fixedHours||null,!!adjustsMonthlyTarget,blocksScheduling!==false,reopensShift!==false,countsAsWorked!==false,!!requiresApproval,sortOrder||0,validFrom||null,!!isHolidayDefault,req.params.id,!!zeroOnFreeDays]
     );
     if (!row) return bad(res,'Nicht gefunden',404);
-    ok(res,row);
-    recalcAbsenceTypeAssignments(row).catch(e => console.error('[recalc-absence]', e.message));
+    // K4: Neuberechnung VOR der Antwort ausführen — kein fire-and-forget mehr.
+    let recalcError = null;
+    try { await recalcAbsenceTypeAssignments(row); }
+    catch(e) { recalcError = e.message; console.error('[recalc-absence]', e.message); }
+    ok(res, recalcError ? {...row, recalcError: `Rückwirkende Neuberechnung fehlgeschlagen: ${recalcError}`} : row);
   } catch(e) { bad(res,'Serverfehler',500); }
 });
 
@@ -848,7 +872,7 @@ router.post('/plans/:id/assign', auth, async (req,res) => {
       const weStr = weekEnd.toISOString().slice(0,10);
       const weekAssigns = await q(`SELECT hours_credited FROM dp_assignments WHERE plan_id=$1 AND employee_id=$2 AND date>=$3 AND date<=$4 AND shift_type_id IS NOT NULL AND absence_type_id IS NULL`,[req.params.id,employeeId,wsStr,weStr]);
       const weekHours = weekAssigns.reduce((s,a)=>s+parseFloat(a.hours_credited||0),0);
-      if (weekHours > 48) warnings.push(`48h/Woche überschritten: ${weekHours.toFixed(1)}h in KW${wk}`);
+      if (weekHours > MAX_WEEKLY_HOURS) warnings.push(`48h/Woche überschritten: ${weekHours.toFixed(1)}h in KW${wk}`);
       // Check 11h rest
       const prevAssigns = await q(`SELECT date, hours_credited FROM dp_assignments WHERE plan_id=$1 AND employee_id=$2 AND shift_type_id IS NOT NULL AND absence_type_id IS NULL AND date != $3 ORDER BY date DESC LIMIT 3`,[req.params.id,employeeId,date]);
       const st = shiftTypes.find(x=>x.id===shiftTypeId);
@@ -878,17 +902,16 @@ router.delete('/plans/:id/assign/:aid', auth, async (req,res) => {
 
 router.post('/plans/:id/generate', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+  // K3: Lock gegen parallele Läufe desselben Plans (Doppelklick / zweiter Tab)
+  if (generatingPlans.has(req.params.id))
+    return bad(res,'Für diesen Plan läuft bereits eine Generierung',409);
+  generatingPlans.add(req.params.id);
   try {
     const plan = await q1('SELECT * FROM dp_plans WHERE id=$1',[req.params.id]);
     if (!plan) return bad(res,'Plan nicht gefunden',404);
 
-    // Delete previously auto-generated assignments (keep manual + locked ones)
-    await q(`DELETE FROM dp_assignments WHERE plan_id=$1 AND source='generated' AND is_locked=false`,[req.params.id]);
-
     const planStartDate = `${plan.year}-${String(plan.month).padStart(2,'0')}-01`;
-    // Normalize pg Date objects → ISO string (pg returns Date objects, not strings)
-    const toISODate = d => !d ? null : (d instanceof Date ? d.toISOString().slice(0,10) : String(d).slice(0,10));
-    const [shiftTypes,shiftPrefs,requirements,empParams,existingAssignments,wishDays,absenceTypes,qualifications,empRulesAll,hoursProfiles] = await Promise.all([
+    let [shiftTypes,shiftPrefs,requirements,empParams,existingAssignments,wishDays,absenceTypes,qualifications,empRulesAll,hoursProfiles] = await Promise.all([
       q('SELECT * FROM dp_shift_types WHERE (valid_from IS NULL OR valid_from <= $1) AND (valid_until IS NULL OR valid_until >= $1) ORDER BY sort_order', [planStartDate]),
       q('SELECT DISTINCT ON (employee_id, shift_type_id) * FROM dp_shift_preferences WHERE valid_from IS NULL OR valid_from <= $1 ORDER BY employee_id, shift_type_id, valid_from DESC NULLS LAST', [planStartDate]),
       q('SELECT * FROM dp_shift_requirements ORDER BY shift_type_id, applies_to, weekday, valid_from DESC NULLS LAST'),
@@ -900,6 +923,12 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
       q('SELECT * FROM dp_emp_rules').catch(()=>[]),
       q('SELECT * FROM dp_hours_profiles').catch(()=>[]),
     ]);
+
+    // K1: Alte auto-generierte Einträge werden NICHT mehr vorab gelöscht, sondern
+    // nur im Speicher ausgeblendet. Das physische DELETE passiert erst in der
+    // finalen Transaktion zusammen mit den INSERTs — ein Absturz während der
+    // Berechnung lässt den bestehenden Plan damit vollständig intakt.
+    existingAssignments = existingAssignments.filter(a => !(a.source === 'generated' && !a.is_locked));
 
     // Build empRuleMap
     const empRuleMap = {};
@@ -1061,7 +1090,7 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
           if (absenceSet.has(`${empId}_${dateStr}`)) continue;
           if (state.assignments.some(a => a.date === dateStr && a.shift_type_id && !a.absence_type_id)) continue;
           const wk = getISOWeek(dateStr);
-          if ((state.weeklyHours[wk]||0) + officeDuration > 48) continue;
+          if ((state.weeklyHours[wk]||0) + officeDuration > MAX_WEEKLY_HOURS) continue;
           if (!checkRestPeriod(state.assignments, {date: dateStr, shiftType: officeShiftType}, shiftTypes)) continue;
           availableDays.push(dateStr);
         }
@@ -1113,7 +1142,7 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
           // Hard: 48h/week cap (AZG §9)
           const wk = getISOWeek(slot.date);
           const projectedWeekHours = (state.weeklyHours[wk]||0) + slotHours;
-          if (projectedWeekHours > 48) {
+          if (projectedWeekHours > MAX_WEEKLY_HOURS) {
             reasons[empId]='weekly_cap_exceeded';
             protocolEntries.push({plan_id:plan.id,date:slot.date,shift_type_id:slot.shiftTypeId,
               reason:'weekly_cap_exceeded',employee_id:empId,
@@ -1142,7 +1171,7 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
             { reasons[empId]='cannot_do_nights'; continue; }
 
           // Hard: max nights per month (never relax this)
-          const maxNightsAllowed = params.max_nights_per_month !== null ? params.max_nights_per_month : 6;
+          const maxNightsAllowed = params.max_nights_per_month !== null ? params.max_nights_per_month : DEFAULT_MAX_NIGHTS_PER_MONTH;
           if (slot.shiftType.is_night && state.nightsAssigned >= maxNightsAllowed)
             { reasons[empId]='nights_max_exceeded'; continue; }
 
@@ -1163,38 +1192,16 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
             }
           }
 
-          // Hard: Nachtdienst vor Dienst/Abwesenheit am Folgetag nicht zulässig
+          // Hard: Nachtdienst-Ruheregeln (Folgetag frei, Doppelnacht → 2 Tage frei,
+          // keine Nacht vor Abwesenheit/Nicht-Nacht-Dienst) — lib/dp-rules.js
           {
-            const prevDate = new Date(slot.date); prevDate.setDate(prevDate.getDate()-1);
-            const prevDateStr = prevDate.toISOString().slice(0,10);
-            const nextDate = new Date(slot.date); nextDate.setDate(nextDate.getDate()+1);
-            const nextDateStr = nextDate.toISOString().slice(0,10);
-
-            if (!slot.shiftType.is_night) {
-              // Nicht-Nacht-Slot: war gestern ein Nachtdienst? → gesperrt
-              const hadNightYest = state.assignments.some(a =>
-                a.date === prevDateStr && !a.absence_type_id && a.shiftType?.is_night
-              );
-              if (hadNightYest) { reasons[empId]='rest_after_night_required'; continue; }
-            } else {
-              // Nacht-Slot: hat der MA morgen eine Abwesenheit oder Nicht-Nacht-Dienst? → gesperrt
-              const nextAbsence = absenceSet.has(`${empId}_${nextDateStr}`);
-              const nextNonNight = state.assignments.some(a =>
-                a.date === nextDateStr && a.shift_type_id && !a.absence_type_id && !a.shiftType?.is_night
-              );
-              if (nextAbsence || nextNonNight) { reasons[empId]='night_before_absence_or_shift'; continue; }
-            }
-          }
-
-          // Hard: Nach Doppelnacht mindestens 2 Tage frei (Tag+2 nach Doppelnacht)
-          if (!slot.shiftType.is_night) {
-            const d2ago = new Date(slot.date); d2ago.setDate(d2ago.getDate()-2);
-            const d2agoStr = d2ago.toISOString().slice(0,10);
-            const d3ago = new Date(slot.date); d3ago.setDate(d3ago.getDate()-3);
-            const d3agoStr = d3ago.toISOString().slice(0,10);
-            const night2ago = state.assignments.some(a => a.date === d2agoStr && !a.absence_type_id && a.shiftType?.is_night);
-            const night3ago = state.assignments.some(a => a.date === d3agoStr && !a.absence_type_id && a.shiftType?.is_night);
-            if (night2ago && night3ago) { reasons[empId]='rest_after_double_night_required'; continue; }
+            const nightViolation = checkNightHardRules({
+              assignments: state.assignments,
+              slotDate: slot.date,
+              slotIsNight: !!slot.shiftType.is_night,
+              hasAbsenceOn: d => absenceSet.has(`${empId}_${d}`),
+            });
+            if (nightViolation) { reasons[empId] = nightViolation; continue; }
           }
 
           // Hard: FD-Springer Typ A (FD→LS): quota cap — only schedule up to configured shifts
@@ -1220,27 +1227,13 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
           if (enforceSoftRules) {
             if (state.hoursAssigned >= state.monthlyTarget)
               { reasons[empId]='monthly_cap_exceeded'; continue; }
-            if (getConsecutiveDays(state.assignments, slot.date) >= 6)
+            if (getConsecutiveDays(state.assignments, slot.date) >= MAX_CONSECUTIVE_DAYS)
               { reasons[empId]='consecutive_days_limit'; continue; }
 
-            // Weich: Nachtdienst-Abstände — Einzelnacht min 5 Tage, Doppelnacht-Block min 10 Tage
+            // Weich: Nachtdienst-Abstände (Einzelnacht 5 Tage, Doppelnacht-Block 10 Tage) — lib/dp-rules.js
             if (slot.shiftType.is_night) {
-              const prevNights = state.assignments
-                .filter(a => !a.absence_type_id && a.shiftType?.is_night && a.date < slot.date)
-                .map(a => a.date)
-                .sort();
-              if (prevNights.length > 0) {
-                const lastNight = prevNights[prevNights.length - 1];
-                const daysSinceLast = Math.round((new Date(slot.date) - new Date(lastNight)) / 86400000);
-                const secondLastNight = prevNights.length >= 2 ? prevNights[prevNights.length - 2] : null;
-                const wasDoubleBlock = secondLastNight &&
-                  Math.round((new Date(lastNight) - new Date(secondLastNight)) / 86400000) === 1;
-                const minDays = wasDoubleBlock ? 10 : 5;
-                if (daysSinceLast < minDays) {
-                  reasons[empId] = wasDoubleBlock ? 'double_night_block_distance_10days' : 'night_distance_min5days';
-                  continue;
-                }
-              }
+              const gapViolation = checkNightGapSoft(state.assignments, slot.date);
+              if (gapViolation) { reasons[empId] = gapViolation; continue; }
             }
           }
 
@@ -1481,7 +1474,7 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
 
             // Hard: 48h/Woche
             const wk = getISOWeek(d);
-            if ((state.weeklyHours[wk] || 0) + fdH > 48) continue;
+            if ((state.weeklyHours[wk] || 0) + fdH > MAX_WEEKLY_HOURS) continue;
 
             const a = {
               id: newId(), plan_id: plan.id, employee_id: p.employee_id,
@@ -1524,7 +1517,7 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
           if (!fdSt) continue;
           const wk = getISOWeek(la.date);
           const fdWeekH = newAssignments.filter(a=>a.employee_id===fdSpr.employee_id&&getISOWeek(a.date)===wk&&a.shift_type_id&&!a.absence_type_id).reduce((s,a)=>s+parseFloat(a.hours_credited||0),0);
-          if (fdWeekH + parseFloat(fdSt.duration_hours||0) > 48) continue;
+          if (fdWeekH + parseFloat(fdSt.duration_hours||0) > MAX_WEEKLY_HOURS) continue;
           if (!checkRestPeriod(newAssignments.filter(a=>a.employee_id===fdSpr.employee_id), {date:la.date,shiftType:fdSt}, shiftTypes)) continue;
           newAssignments.push({id:newId(),plan_id:plan.id,employee_id:fdSpr.employee_id,date:la.date,shift_type_id:fdSt.id,absence_type_id:null,hours_credited:parseFloat(fdSt.duration_hours||0),hours_source:'shift',is_overtime:false,is_locked:false,source:'springer_pairing',notes:`Springer für ${lsSpr.employee_id}`,created_by:req.uid});
           break;
@@ -1548,33 +1541,13 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
       existingAssignments.filter(a => a.source !== 'generated')
         .map(a => `${a.employee_id}_${toISODate(a.date)}`)
     );
-    if (rebalancedAssignments.length > 0) {
-      for (const a of rebalancedAssignments) {
-        if (manualDates.has(`${a.employee_id}_${a.date}`)) continue; // never overwrite manual entries
-        await pool.query(
-          `INSERT INTO dp_assignments (id,plan_id,employee_id,date,shift_type_id,absence_type_id,hours_credited,hours_source,is_overtime,is_locked,source,notes,created_by)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,false,false,'generated',$9,$10)`,
-          [a.id,a.plan_id,a.employee_id,a.date,a.shift_type_id,null,a.hours_credited,'shift',a.notes,a.created_by]
-        ).catch(()=>{});
-      }
-    }
-
-    // Save protocol entries
-    for (const p of protocolEntries) {
-      await pool.query(
-        `INSERT INTO dp_generation_protocol (id,plan_id,date,shift_type_id,reason,employee_id,details)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-        [newId(), p.plan_id, p.date, p.shift_type_id, p.reason, p.employee_id, JSON.stringify(p.details||{})]
-      ).catch(()=>{});
-    }
-
-    await pool.query(`UPDATE dp_plans SET generated_at=NOW(),generated_by=$1,status='reviewed' WHERE id=$2`,[req.uid,plan.id]);
+    const toInsert = rebalancedAssignments.filter(a => !manualDates.has(`${a.employee_id}_${a.date}`));
 
     // Check for weekly hour cap warnings
     const weeklyCapWarnings = [];
     for (const [empId, state] of Object.entries(empState)) {
       for (const [wk, hours] of Object.entries(state.weeklyHours)) {
-        if (hours > 48) {
+        if (hours > MAX_WEEKLY_HOURS) {
           weeklyCapWarnings.push({employeeId: empId, week: wk, hours: parseFloat(hours.toFixed(2))});
         }
       }
@@ -1587,9 +1560,6 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
         a.employee_id===wd.employee_id && a.date?.toString().slice(0,10)===wdDate && a.shift_type_id && !a.absence_type_id
       );
       if (assigned) violatedWishDays.push(wd.id);
-    }
-    for (const id of violatedWishDays) {
-      await pool.query(`UPDATE dp_wish_days SET status='violated' WHERE id=$1`,[id]).catch(()=>{});
     }
 
     // ── ANALYSE & PROTOKOLL-REPORT ──
@@ -1628,7 +1598,7 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
     const nightsExceeded = [];
     for (const [empId, state] of Object.entries(empState)) {
       const params = empParamMap[empId];
-      const maxNights = params?.max_nights_per_month !== null ? params.max_nights_per_month : 6;
+      const maxNights = params?.max_nights_per_month !== null ? params.max_nights_per_month : DEFAULT_MAX_NIGHTS_PER_MONTH;
       if (state.nightsAssigned > maxNights) {
         nightsExceeded.push({empId, actual: state.nightsAssigned, max: maxNights});
       }
@@ -1664,7 +1634,7 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
     const weeklyExceeded = [];
     for (const [empId, state] of Object.entries(empState)) {
       for (const [week, hours] of Object.entries(state.weeklyHours)) {
-        if (hours > 48) {
+        if (hours > MAX_WEEKLY_HOURS) {
           weeklyExceeded.push({empId, week, hours: parseFloat(hours.toFixed(2))});
         }
       }
@@ -1722,14 +1692,51 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
       });
     }
 
-    // Report speichern
-    await pool.query(
-      `UPDATE dp_plans SET generation_report=$1 WHERE id=$2`,
-      [JSON.stringify(report), plan.id]
-    ).catch(()=>{});
+    // ── K1/K2: ATOMARER SCHREIBVORGANG ──
+    // Alle Mutationen (DELETE alte generierte, INSERTs, Protokoll, Wunschtage,
+    // Plan-Status + Report) in EINER Transaktion. Schlägt irgendetwas fehl,
+    // wird komplett zurückgerollt und der Fehler gemeldet — keine stillen
+    // Teilschreibvorgänge mehr.
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `DELETE FROM dp_assignments WHERE plan_id=$1 AND source='generated' AND is_locked=false`,
+        [plan.id]
+      );
+      for (const a of toInsert) {
+        await client.query(
+          `INSERT INTO dp_assignments (id,plan_id,employee_id,date,shift_type_id,absence_type_id,hours_credited,hours_source,is_overtime,is_locked,source,notes,created_by)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,false,false,'generated',$9,$10)`,
+          [a.id,a.plan_id,a.employee_id,a.date,a.shift_type_id,null,a.hours_credited,'shift',a.notes,a.created_by]
+        );
+      }
+      for (const p of protocolEntries) {
+        await client.query(
+          `INSERT INTO dp_generation_protocol (id,plan_id,date,shift_type_id,reason,employee_id,details)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+          [newId(), p.plan_id, p.date, p.shift_type_id, p.reason, p.employee_id, JSON.stringify(p.details||{})]
+        );
+      }
+      for (const id of violatedWishDays) {
+        await client.query(`UPDATE dp_wish_days SET status='violated' WHERE id=$1`,[id]);
+      }
+      await client.query(
+        `UPDATE dp_plans SET generated_at=NOW(),generated_by=$1,status='reviewed',generation_report=$2 WHERE id=$3`,
+        [req.uid, JSON.stringify(report), plan.id]
+      );
+      await client.query('COMMIT');
+    } catch(txErr) {
+      await client.query('ROLLBACK').catch(()=>{});
+      console.error('[dp/generate] Transaktion fehlgeschlagen, Rollback:', txErr.message);
+      return bad(res, `Generierung fehlgeschlagen — Plan unverändert (${txErr.message})`, 500);
+    } finally {
+      client.release();
+    }
 
     ok(res, {
-      generated: newAssignments.length,
+      generated: toInsert.length,
+      skippedManualConflicts: rebalancedAssignments.length - toInsert.length,
       total: slots.length,
       violations: violatedWishDays.length,
       unfilled: protocolEntries.length,
@@ -1737,6 +1744,7 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
       report: report
     });
   } catch(e) { console.error('[dp/generate]',e.message,e.stack); bad(res,'Serverfehler',500); }
+  finally { generatingPlans.delete(req.params.id); }
 });
 
 // ── WISH DAYS ─────────────────────────────────────────────────────────────────
@@ -1809,7 +1817,7 @@ router.delete('/emp-rules/:id', auth, async (req,res) => {
 
 async function recalcAbsenceTypeAssignments(at) {
   if (at.hours_calculation === 'shift_hours') return; // depends on per-day context, skip
-  const toISO = d => !d ? null : (d instanceof Date ? d.toISOString().slice(0,10) : String(d).slice(0,10));
+  const toISO = toISODate;
   const validFrom = toISO(at.valid_from);
 
   // Build date filter clause
@@ -1876,7 +1884,7 @@ async function recalcAbsenceTypeAssignments(at) {
 
 async function recalcShiftTypeAssignments(st) {
   const durationHours = parseFloat(st.duration_hours)||0;
-  const toISO = d => !d ? null : (d instanceof Date ? d.toISOString().slice(0,10) : String(d).slice(0,10));
+  const toISO = toISODate;
   const params = [durationHours, st.id];
   let dateClause = '';
   const vf = toISO(st.valid_from), vu = toISO(st.valid_until);
@@ -1890,7 +1898,7 @@ async function recalcShiftTypeAssignments(st) {
 function getRequiredCount(requirements, shiftTypeId, dayInfo) {
   // Filter to requirements valid on dayInfo.date
   const date = dayInfo.date; // 'YYYY-MM-DD'
-  const toISO = d => !d ? null : (d instanceof Date ? d.toISOString().slice(0,10) : String(d).slice(0,10));
+  const toISO = toISODate;
   const validReqs = requirements.filter(r => {
     const from = toISO(r.valid_from);
     const until = toISO(r.valid_until);
@@ -1921,152 +1929,10 @@ function getRequiredCount(requirements, shiftTypeId, dayInfo) {
   return general ? general.slot_count : 0;
 }
 
-function getWorkDaysInMonth(year, month, holidays) {
-  const days = new Date(year, month, 0).getDate();
-  let count = 0;
-  for (let d = 1; d <= days; d++) {
-    const date = new Date(year, month-1, d);
-    const dateStr = date.toISOString().slice(0,10);
-    const wd = date.getDay();
-    if (wd !== 0 && wd !== 6 && !holidays[dateStr]) count++;
-  }
-  return count;
-}
+// getWorkDaysInMonth, getAustrianHolidays, getEasterDate, getISOWeek(Start),
+// getShiftStartHour/EndHour → lib/dp-rules.js
 
-function getAustrianHolidays(year) {
-  // Fixed Austrian public holidays
-  const holidays = {
-    [`${year}-01-01`]: 'Neujahr',
-    [`${year}-01-06`]: 'Heilige Drei Könige',
-    [`${year}-05-01`]: 'Staatsfeiertag',
-    [`${year}-08-15`]: 'Mariä Himmelfahrt',
-    [`${year}-10-26`]: 'Nationalfeiertag',
-    [`${year}-11-01`]: 'Allerheiligen',
-    [`${year}-12-08`]: 'Mariä Empfängnis',
-    [`${year}-12-25`]: 'Christtag',
-    [`${year}-12-26`]: 'Stefanitag',
-  };
-  // Moveable holidays (Easter-based)
-  const easter = getEasterDate(year);
-  const addDays = (date, days) => { const d = new Date(date); d.setDate(d.getDate()+days); return d.toISOString().slice(0,10); };
-  holidays[addDays(easter, -2)] = 'Karfreitag';
-  holidays[addDays(easter, 1)]  = 'Ostermontag';
-  holidays[addDays(easter, 39)] = 'Christi Himmelfahrt';
-  holidays[addDays(easter, 49)] = 'Pfingstmontag';
-  holidays[addDays(easter, 60)] = 'Fronleichnam';
-  return holidays;
-}
-
-function getEasterDate(year) {
-  const a=year%19,b=Math.floor(year/100),c=year%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),month=Math.floor((h+l-7*m+114)/31),day=((h+l-7*m+114)%31)+1;
-  return new Date(year,month-1,day);
-}
-
-// Returns the Monday of the ISO week as a Date object
-function getISOWeekStart(isoWeekStr, year) {
-  // isoWeekStr format: "YYYY-Www"
-  const weekNum = parseInt(isoWeekStr.split('-W')[1]);
-  const jan4 = new Date(year, 0, 4);
-  const jan4Day = jan4.getDay() || 7;
-  const monday = new Date(jan4);
-  monday.setDate(jan4.getDate() - jan4Day + 1 + (weekNum - 1) * 7);
-  return monday;
-}
-
-// Returns ISO week string YYYY-Www for a date string
-function getISOWeek(dateStr) {
-  const d = new Date(dateStr);
-  const day = d.getDay()||7;
-  d.setDate(d.getDate() + 4 - day);
-  const yearStart = new Date(d.getFullYear(), 0, 1);
-  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-  return `${d.getFullYear()}-W${String(weekNo).padStart(2,'0')}`;
-}
-
-// Returns decimal hour when shift ends (handles overnight: end_time < start_time adds 24)
-function getShiftEndHour(st) {
-  const [sh, sm] = (st.start_time||'08:00').split(':').map(Number);
-  const [eh, em] = (st.end_time||'20:00').split(':').map(Number);
-  const startH = sh + sm/60;
-  let endH = eh + em/60;
-  if (endH <= startH) endH += 24;
-  return endH;
-}
-
-function getShiftStartHour(st) {
-  const [h, m] = (st.start_time||'08:00').split(':').map(Number);
-  return h + m/60;
-}
-
-// Check 11h rest period (Austrian AZG §12)
-function checkRestPeriod(assignments, slot, shiftTypes) {
-  const slotStartH = getShiftStartHour(slot.shiftType);
-  const slotEndH   = getShiftEndHour(slot.shiftType);
-
-  for (const a of assignments) {
-    if (!a.date || a.absence_type_id || !a.shift_type_id) continue;
-    const prevSt = a.shiftType || shiftTypes.find(s=>s.id===a.shift_type_id);
-    if (!prevSt) continue;
-
-    const diffDays = (new Date(slot.date) - new Date(a.date)) / 86400000;
-    if (Math.abs(diffDays) > 2) continue; // far enough apart, skip
-
-    if (diffDays === 0) return false; // same day
-
-    const prevStartH = getShiftStartHour(prevSt);
-    const prevEndH   = getShiftEndHour(prevSt);
-
-    if (diffDays > 0) {
-      // prev is before slot: prev shift ends at (prevEndH + diffDays*24) before slot
-      // slot starts at slotStartH on slot.date
-      // rest = slotStartH - (prevEndH - diffDays*24 relative to slot date)
-      // Simplified: absolute hours
-      const prevEndAbs = prevEndH; // hours from midnight of prev.date
-      const slotStartAbs = slotStartH + diffDays * 24; // hours from midnight of prev.date
-      if (slotStartAbs - prevEndAbs < 11) return false;
-    } else {
-      // prev is after slot (diffDays < 0): slot ends, then prev starts
-      const slotEndAbs = slotEndH; // hours from midnight of slot.date
-      const prevStartAbs = prevStartH + Math.abs(diffDays) * 24;
-      if (prevStartAbs - slotEndAbs < 11) return false;
-    }
-  }
-  return true;
-}
-
-// Count consecutive days worked up to (not including) targetDate
-function getConsecutiveDays(assignments, targetDate) {
-  const worked = new Set(assignments
-    .filter(a=>!a.absence_type_id && a.shift_type_id)
-    .map(a=>a.date)
-  );
-  let count = 0;
-  let d = new Date(targetDate);
-  d.setDate(d.getDate() - 1);
-  while (worked.has(d.toISOString().slice(0,10))) {
-    count++;
-    d.setDate(d.getDate() - 1);
-    if (count > 7) break;
-  }
-  return count;
-}
-
-// Count consecutive nights (is_night) up to but not including targetDate
-function getConsecutiveNights(assignments, targetDate) {
-  const nights = new Set(assignments
-    .filter(a=>!a.absence_type_id && a.shift_type_id && a.shiftType && a.shiftType.is_night)
-    .map(a=>a.date)
-  );
-  let count = 0;
-  let d = new Date(targetDate);
-  d.setDate(d.getDate() - 1);
-  while (nights.has(d.toISOString().slice(0,10))) {
-    count++;
-    d.setDate(d.getDate() - 1);
-    if (count > 30) break;
-  }
-  return count;
-}
+// checkRestPeriod, getConsecutiveDays, getConsecutiveNights → lib/dp-rules.js
 
 // ── POST-GENERATION REBALANCING ───────────────────────────────────────────────
 // Versuche nach der Generierung Dienste zwischen MA zu verschieben um Überstunden
@@ -2106,7 +1972,7 @@ async function rebalanceOvertimeAssignments(
     if (empIdsWithOT.length === 0) break; // Keine OT mehr – fertig!
 
     const avgOT = empIdsWithOT.reduce((sum, id) => sum + stats[id].ot, 0) / empIdsWithOT.length;
-    const fairnessTolerance = 3; // Tolerance: bis zu 3h Differenz OK
+    const fairnessTolerance = FAIRNESS_OT_TOLERANCE_H; // tolerierte OT-Differenz
 
     // Finde MA mit OT > avgOT + tolerance
     const overtimeEmpIds = empIdsWithOT.filter(id => stats[id].ot > avgOT + fairnessTolerance);
@@ -2156,7 +2022,7 @@ async function rebalanceOvertimeAssignments(
               return getISOWeek(aDate) === wk && !a.absence_type_id;
             })
             .reduce((sum, a) => sum + (parseFloat(a.hours_credited) || 0), 0) || 0;
-          if (weeklyHours + (parseFloat(assignToMove.hours_credited) || 0) > 48) return false;
+          if (weeklyHours + (parseFloat(assignToMove.hours_credited) || 0) > MAX_WEEKLY_HOURS) return false;
 
           // 4. Rest period: 11h Ruhezeit (simplified check)
           const prevDate = new Date(dateStr);
@@ -2261,7 +2127,7 @@ function rebalanceWeekendAssignments(newAssignments, empParams, empParamMap, shi
       // Check weekly hours
       const wk = getISOWeek(a.date);
       const richWeekH = newAssignments.filter(a2=>a2.employee_id===richEmp&&getISOWeek(a2.date)===wk&&a2.shift_type_id&&!a2.absence_type_id).reduce((s,a2)=>s+parseFloat(a2.hours_credited||0),0);
-      if (richWeekH + parseFloat(st.duration_hours||0) > 48) continue;
+      if (richWeekH + parseFloat(st.duration_hours||0) > MAX_WEEKLY_HOURS) continue;
       if (!checkRestPeriod(newAssignments.filter(a2=>a2.employee_id===richEmp), {date:a.date,shiftType:st}, shiftTypes)) continue;
       // Move: reassign from poorEmp to richEmp
       a.employee_id = richEmp;
