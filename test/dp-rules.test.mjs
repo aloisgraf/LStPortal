@@ -204,3 +204,98 @@ describe('Zentrale Konstanten (AZG)', () => {
     expect(R.DOUBLE_NIGHT_MIN_GAP_DAYS).toBe(10);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('Rebalancing §11 — rebalanceOvertimeAssignments', () => {
+  const mkShift = (id, empId, date, st = DAY, opts = {}) => ({
+    id, employee_id: empId, date, shift_type_id: st.id, absence_type_id: null,
+    shiftType: st, hours_credited: st.duration_hours, is_locked: false, source: 'generated',
+    ...opts,
+  });
+
+  const setup = (aShifts, bShifts, aTarget, bTarget) => {
+    const assignments = [...aShifts, ...bShifts];
+    const empState = {
+      a: { monthlyTarget: aTarget, assignments: [...aShifts] },
+      b: { monthlyTarget: bTarget, assignments: [...bShifts] },
+    };
+    const empParamMap = { a: {can_do_nights: true}, b: {can_do_nights: true} };
+    const empQualMap = { a: new Set([DAY.id, NIGHT.id]), b: new Set([DAY.id, NIGHT.id]) };
+    return {assignments, empState, empParamMap, empQualMap};
+  };
+
+  const totalFor = (assignments, empId) => assignments
+    .filter(x => x.employee_id === empId && !x.absence_type_id)
+    .reduce((s, x) => s + x.hours_credited, 0);
+
+  it('Phase A: verschiebt Dienste von Überstunden-MA zu Deficit-MA', async () => {
+    // a: 120h bei Soll 100 (OT 20) · b: 24h bei Soll 100 (Deficit 76)
+    const aShifts = ['01','04','07','10','13','16','19','22','25','28'].map((d,i) =>
+      mkShift(`a${i}`, 'a', `2026-06-${d}`));
+    const bShifts = ['02','05'].map((d,i) => mkShift(`b${i}`, 'b', `2026-06-${d}`));
+    const {assignments, empState, empParamMap, empQualMap} = setup(aShifts, bShifts, 100, 100);
+
+    await R.rebalanceOvertimeAssignments(assignments, empState, empParamMap, empQualMap, SHIFT_TYPES, {}, {year:2026,month:6}, new Set());
+
+    expect(totalFor(assignments, 'a')).toBeLessThan(120);
+    expect(totalFor(assignments, 'b')).toBeGreaterThan(24);
+  });
+
+  it('Fall A (§11): gleicht reine Minusstunden-Ungleichheit an, obwohl niemand über Soll ist', async () => {
+    // a: 24h bei Soll 100 (rel −76%) · b: 84h bei Soll 100 (rel −16%) — kein OT!
+    const aShifts = ['02','20'].map((d,i) => mkShift(`a${i}`, 'a', `2026-06-${d}`));
+    const bShifts = ['01','05','09','13','17','21','25'].map((d,i) => mkShift(`b${i}`, 'b', `2026-06-${d}`));
+    const {assignments, empState, empParamMap, empQualMap} = setup(aShifts, bShifts, 100, 100);
+
+    await R.rebalanceOvertimeAssignments(assignments, empState, empParamMap, empQualMap, SHIFT_TYPES, {}, {year:2026,month:6}, new Set());
+
+    const aTotal = totalFor(assignments, 'a');
+    const bTotal = totalFor(assignments, 'b');
+    // Vorher: Spreizung 60h — nachher deutlich enger, Richtung stimmt
+    expect(aTotal).toBeGreaterThan(24);
+    expect(bTotal).toBeLessThan(84);
+    expect(Math.abs(aTotal - bTotal)).toBeLessThan(60);
+  });
+
+  it('Fall A: Teilzeit-fair — relative Salden zählen, nicht absolute', async () => {
+    // a (Teilzeit, Soll 50): 48h → rel −4% · b (Vollzeit, Soll 160): 96h → rel −40%
+    // Absolut hat b das größere Minus → Dienste müssen zu b wandern, NICHT zu a
+    const aShifts = ['02','10','18','26'].map((d,i) => mkShift(`a${i}`, 'a', `2026-06-${d}`));
+    const bShifts = ['01','05','09','13','17','21','25','29'].map((d,i) => mkShift(`b${i}`, 'b', `2026-06-${d}`));
+    const {assignments, empState, empParamMap, empQualMap} = setup(aShifts, bShifts, 50, 160);
+
+    await R.rebalanceOvertimeAssignments(assignments, empState, empParamMap, empQualMap, SHIFT_TYPES, {}, {year:2026,month:6}, new Set());
+
+    // Teilzeit-MA darf durch die Angleichung nicht ÜBER das eigene Soll rutschen
+    expect(totalFor(assignments, 'a')).toBeLessThanOrEqual(50 + DAY.duration_hours);
+  });
+
+  it('verschiebt niemals gesperrte oder manuelle Dienste', async () => {
+    const aShifts = [
+      mkShift('a0', 'a', '2026-06-01', DAY, {is_locked: true}),
+      mkShift('a1', 'a', '2026-06-04', DAY, {source: 'manual'}),
+      ...['07','10','13','16','19','22','25','28'].map((d,i) => mkShift(`am${i}`, 'a', `2026-06-${d}`)),
+    ];
+    const bShifts = [mkShift('b0', 'b', '2026-06-02')];
+    const {assignments, empState, empParamMap, empQualMap} = setup(aShifts, bShifts, 100, 100);
+
+    await R.rebalanceOvertimeAssignments(assignments, empState, empParamMap, empQualMap, SHIFT_TYPES, {}, {year:2026,month:6}, new Set());
+
+    expect(assignments.find(x => x.id === 'a0').employee_id).toBe('a');
+    expect(assignments.find(x => x.id === 'a1').employee_id).toBe('a');
+  });
+
+  it('respektiert Abwesenheiten des Empfängers (harte Regel)', async () => {
+    const aShifts = ['01','04','07','10','13','16','19','22','25','28'].map((d,i) =>
+      mkShift(`a${i}`, 'a', `2026-06-${d}`));
+    const bShifts = [mkShift('b0', 'b', '2026-06-02')];
+    const {assignments, empState, empParamMap, empQualMap} = setup(aShifts, bShifts, 100, 100);
+    // b ist an ALLEN Spender-Tagen abwesend → nichts darf verschoben werden
+    const absSet = new Set(['01','04','07','10','13','16','19','22','25','28'].map(d => `b_2026-06-${d}`));
+
+    await R.rebalanceOvertimeAssignments(assignments, empState, empParamMap, empQualMap, SHIFT_TYPES, {}, {year:2026,month:6}, absSet);
+
+    expect(totalFor(assignments, 'a')).toBe(120);
+    expect(totalFor(assignments, 'b')).toBe(12);
+  });
+});

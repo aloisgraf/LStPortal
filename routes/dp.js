@@ -13,6 +13,7 @@ const {
   checkRestPeriod, getConsecutiveDays, getConsecutiveNights,
   checkNightHardRules, checkNightGapSoft,
   fairnessStats, clusterRatio, localDensity,
+  rebalanceOvertimeAssignments, rebalanceWeekendAssignments,
 } = require('../lib/dp-rules');
 
 // In-Memory-Lock gegen parallele Generierungs-Läufe desselben Plans (K3).
@@ -1162,7 +1163,11 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
           const empRules = empRuleMap[empId] || [];
           const slotWD = new Date(slot.date).getDay();
           if (empRules.some(r => r.rule_type==='always_free' && r.day_of_week===slotWD)) { reasons[empId]='fixed_rule_free'; continue; }
-          // always_shift + if_shift_then: both block other shift types on this weekday
+          // Semantik der Fixregeln:
+          //  · always_shift  ("immer Dienst X am Wochentag Y"): fremde Diensttypen
+          //    gesperrt UND der passende Dienst wird aktiv bevorzugt (Scoring-Bonus unten).
+          //  · if_shift_then ("wenn Dienst, dann X"): fremde Diensttypen gesperrt,
+          //    aber KEINE aktive Bevorzugung — ein freier Tag bleibt gleichwertig möglich.
           const shiftConstraint = empRules.find(r => (r.rule_type==='always_shift'||r.rule_type==='if_shift_then') && r.day_of_week===slotWD);
           if (shiftConstraint && shiftConstraint.shift_type_id !== slot.shiftTypeId) { reasons[empId]='fixed_rule_other_shift'; continue; }
 
@@ -1269,14 +1274,33 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
             score -= Math.max(0, quota - state.fdSpringerShiftsAssigned) * 200;
           }
 
-          // Feature 8: Fair distribution: penalize if assigned too recently vs others
-          const dayNum = parseInt(slot.date.slice(8)); // day of month
-          const daysSinceLast = dayNum - (state.lastAssignedDay || 0);
-          const avgDaysSince = Object.values(empState).filter(es=>es.totalShiftsAssigned>0)
-            .reduce((sum,es)=>sum+(dayNum-(es.lastAssignedDay||0)),0) /
-            Math.max(1, Object.values(empState).filter(es=>es.totalShiftsAssigned>0).length);
-          // Bonus for employees who haven't been assigned in a while, penalty for recent
-          score += Math.min(15, Math.max(-15, (daysSinceLast - avgDaysSince) * 1.5));
+          // Fixregel always_shift: den vorgegebenen Dienst am Stichtag aktiv anziehen
+          // (if_shift_then bekommt bewusst KEINEN Bonus — nur restriktiv)
+          if (empRules.some(r => r.rule_type==='always_shift' && r.day_of_week===slotWD && r.shift_type_id===slot.shiftTypeId)) {
+            score -= 500;
+          }
+
+          // §11 Gleichverteilung: Cluster-Vermeidung über lokale Dienstdichte.
+          // Jeder eigene Dienst im ±3-Tage-Fenster um den Slot erhöht den Score
+          // spürbar — MA, deren Dienste bereits um dieses Datum clustern, werden
+          // nachrangig behandelt, damit Dienste über den Monat gestreut werden
+          // (gilt ausdrücklich auch für Teilzeit). Gewichtung: 18/Dienst, gedeckelt
+          // bei 54 — stark genug gegen die Fill-Ratio (0–100), ohne die
+          // Saldo-Fairness (primärer Score) zu überstimmen.
+          score += Math.min(54, localDensity(state.assignments, slot.date, 3) * 18);
+          // Zusätzlich: Monatshälften-Balance. Liegt der Slot in der Hälfte, in der
+          // der MA bereits überproportional viele Dienste hat, leichter Malus.
+          {
+            const ownDates = state.assignments.filter(a=>a.shift_type_id&&!a.absence_type_id).map(a=>a.date);
+            if (ownDates.length >= 2) {
+              const daysIM = new Date(plan.year, plan.month, 0).getDate();
+              const half = Math.ceil(daysIM / 2);
+              const slotInFirstHalf = parseInt(slot.date.slice(8)) <= half;
+              const inFirst = ownDates.filter(d => parseInt(d.slice(8)) <= half).length;
+              const shareInSlotHalf = (slotInFirstHalf ? inFirst : ownDates.length - inFirst) / ownDates.length;
+              if (shareInSlotHalf > 0.65) score += (shareInSlotHalf - 0.65) * 60; // max +21
+            }
+          }
 
           // ── Proportionale Dienst-Gewichtung (Stunden-basiert) ──
           // Gewichtungen definieren ANTEIL der Monats-Sollstunden pro Dienst.
@@ -1536,6 +1560,70 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
     // Feature 9: Weekend rebalancing
     rebalanceWeekendAssignments(rebalancedAssignments, empParams, empParamMap, shiftTypes, plan, absenceSet);
 
+    // ── §11: Finale Salden nach allen Rebalancing-Schritten neu berechnen ──
+    // (Moves ändern employee_id in-place; state.hoursAssigned wäre sonst veraltet)
+    for (const [empId, state] of Object.entries(empState)) {
+      const own = [
+        ...existingAssignments.filter(a => a.employee_id === empId),
+        ...rebalancedAssignments.filter(a => a.employee_id === empId),
+      ];
+      state.hoursAssigned = own.filter(a => !a.absence_type_id)
+        .reduce((s, a) => s + (parseFloat(a.hours_credited) || 0), 0);
+      state.finalShiftDates = own.filter(a => a.shift_type_id && !a.absence_type_id)
+        .map(a => toISODate(a.date)).sort();
+    }
+
+    // ── §11 Fall B: Zusatzdienst-Vorschläge (C3) bei Restkapazität ──
+    // MA mit Ist < Soll bekommen VORSCHLÄGE für Zusatzdienste — nur im Protokoll
+    // markiert, NICHT automatisch zugewiesen (Freigabe bleibt beim Planer).
+    const zusatzVorschlaege = [];
+    {
+      const c3St = shiftTypes.find(st => st.code === 'C3')
+        || shiftTypes.find(st => !st.is_night && !st.is_office && st.code !== 'FD');
+      if (c3St) {
+        const c3H = parseFloat(c3St.duration_hours) || 8;
+        for (const [empId, state] of Object.entries(empState)) {
+          const deficit = state.monthlyTarget - state.hoursAssigned;
+          if (deficit < c3H) continue; // Restkapazität kleiner als ein Dienst
+          const quals = empQualMap[empId];
+          if (quals && quals.size > 0 && !quals.has(c3St.id)) continue;
+
+          const ownAssigns = [
+            ...existingAssignments.filter(a => a.employee_id === empId),
+            ...rebalancedAssignments.filter(a => a.employee_id === empId),
+          ].map(a => ({...a, date: toISODate(a.date)}));
+          const takenDates = new Set(ownAssigns.map(a => a.date));
+
+          const wanted = Math.floor(deficit / c3H);
+          const freeDays = [];
+          for (let d = 1; d <= daysInMonth; d++) {
+            const ds = `${plan.year}-${String(plan.month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            if (takenDates.has(ds)) continue;
+            if (absenceSet.has(`${empId}_${ds}`)) continue;
+            if (!checkRestPeriod(ownAssigns, {date: ds, shiftType: c3St}, shiftTypes)) continue;
+            if (checkNightHardRules({assignments: ownAssigns, slotDate: ds, slotIsNight: !!c3St.is_night,
+              hasAbsenceOn: x => absenceSet.has(`${empId}_${x}`)})) continue;
+            const wk = getISOWeek(ds);
+            const wkH = ownAssigns.filter(a => !a.absence_type_id && getISOWeek(a.date) === wk)
+              .reduce((s,a)=>s+(parseFloat(a.hours_credited)||0),0);
+            if (wkH + c3H > MAX_WEEKLY_HOURS) continue;
+            freeDays.push(ds);
+          }
+          // Gleichmäßig über die freien Tage streuen (§11: keine Cluster)
+          const n = Math.min(wanted, freeDays.length);
+          for (let j = 0; j < n; j++) {
+            const ds = freeDays[Math.round(j * (freeDays.length - 1) / Math.max(n - 1, 1))];
+            zusatzVorschlaege.push({empId, date: ds, code: c3St.code, hours: c3H});
+            protocolEntries.push({
+              plan_id: plan.id, date: ds, shift_type_id: c3St.id,
+              reason: 'zusatzdienst_vorschlag', employee_id: empId,
+              details: {code: c3St.code, stunden: c3H, restkapazitaet: Math.round(deficit*10)/10},
+            });
+          }
+        }
+      }
+    }
+
     // Hard safety: never insert a generated shift on a day that already has a manual assignment
     const manualDates = new Set(
       existingAssignments.filter(a => a.source !== 'generated')
@@ -1592,6 +1680,57 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
         status: 'OK',
         details: 'Keine Überstunden.'
       });
+    }
+
+    // 1b. §11 Fairness-Check: Saldo-Streuung + Verteilungsgleichmäßigkeit
+    {
+      const saldos = {};
+      for (const [empId, state] of Object.entries(empState))
+        saldos[empId] = state.hoursAssigned - state.monthlyTarget;
+      const fstats = fairnessStats(saldos);
+      report.dienstplanRegeln.push({
+        regel: 'Stunden-Fairness (§11)',
+        status: fstats.spread <= FAIRNESS_SALDO_SPREAD_WARN_H ? 'OK' : 'WARNUNG',
+        details: `Saldo-Spreizung ${fstats.spread}h (Min ${fstats.min}h / Max ${fstats.max}h, Ø ${fstats.mean}h, σ ${fstats.stddev}h).`
+      });
+      if (fstats.spread > FAIRNESS_SALDO_SPREAD_WARN_H) {
+        report.warnungen.push({
+          kategorie: 'Fairness-Warnung',
+          details: `Stunden-Salden ungleich verteilt: Spreizung ${fstats.spread}h überschreitet die Toleranz von ${FAIRNESS_SALDO_SPREAD_WARN_H}h.`
+        });
+      }
+
+      const clusterWarnungen = [];
+      for (const [empId, state] of Object.entries(empState)) {
+        const dates = state.finalShiftDates || [];
+        if (dates.length < 4) continue; // zu wenige Dienste für eine Aussage
+        const ratio = clusterRatio(dates, plan.year, plan.month);
+        if (ratio > FAIRNESS_CLUSTER_WARN_RATIO)
+          clusterWarnungen.push({empId, anteilProzent: Math.round(ratio * 100)});
+      }
+      report.dienstplanRegeln.push({
+        regel: 'Gleichverteilung über den Monat (§11)',
+        status: clusterWarnungen.length === 0 ? 'OK' : 'WARNUNG',
+        details: clusterWarnungen.length === 0
+          ? 'Dienste sind über den Monat verteilt, keine Verplanungs-Cluster.'
+          : `${clusterWarnungen.length} MA mit Cluster-Bildung (>${Math.round(FAIRNESS_CLUSTER_WARN_RATIO*100)}% der Dienste in einer Monatshälfte).`
+      });
+      if (clusterWarnungen.length > 0) {
+        report.warnungen.push({
+          kategorie: 'Fairness-Warnung',
+          details: `Verplanungs-Cluster bei ${clusterWarnungen.length} MA — Dienste konzentrieren sich in einer Monatshälfte.`,
+          betroffene: clusterWarnungen
+        });
+      }
+
+      // Fall B: Zusatzdienst-Vorschläge ausweisen
+      if (zusatzVorschlaege.length > 0) {
+        report.dienstplanRegeln.push({
+          regel: 'Zusatzdienst-Vorschläge (§11 Fall B)',
+          status: 'OK',
+          details: `${zusatzVorschlaege.length} Vorschläge für MA mit Restkapazität — im Protokoll als 'zusatzdienst_vorschlag' markiert, nicht automatisch zugewiesen.`
+        });
+      }
     }
 
     // 2. Nachtdienst-Max
@@ -1739,7 +1878,8 @@ router.post('/plans/:id/generate', auth, async (req,res) => {
       skippedManualConflicts: rebalancedAssignments.length - toInsert.length,
       total: slots.length,
       violations: violatedWishDays.length,
-      unfilled: protocolEntries.length,
+      unfilled: unfilledCount,
+      zusatzVorschlaege: zusatzVorschlaege.length,
       weeklyCapWarnings: weeklyCapWarnings,
       report: report
     });
@@ -1934,208 +2074,6 @@ function getRequiredCount(requirements, shiftTypeId, dayInfo) {
 
 // checkRestPeriod, getConsecutiveDays, getConsecutiveNights → lib/dp-rules.js
 
-// ── POST-GENERATION REBALANCING ───────────────────────────────────────────────
-// Versuche nach der Generierung Dienste zwischen MA zu verschieben um Überstunden
-// fair auszugleichen und MA mit Deficit zu bevorzugen
-async function rebalanceOvertimeAssignments(
-  assignments, empState, empParamMap, empQualMap, shiftTypes,
-  AT_HOLIDAYS, plan, absenceSet
-) {
-  let improved = true;
-  let iteration = 0;
-  const maxIterations = 5;
-
-  while (improved && iteration < maxIterations) {
-    improved = false;
-    iteration++;
-
-    // Berechne OT und Deficit pro MA basierend auf AKTUELLEN Assignments
-    const stats = {};
-    for (const [empId, state] of Object.entries(empState)) {
-      const totalHours = state.assignments
-        .filter(a => !a.absence_type_id)
-        .reduce((sum, a) => sum + (parseFloat(a.hours_credited) || 0), 0);
-      const target = state.monthlyTarget;
-      stats[empId] = {
-        target,
-        totalHours,
-        ot: Math.max(0, totalHours - target),
-        deficit: Math.max(0, target - totalHours),
-      };
-    }
-
-    // Berechne Durchschnitt OT (für alle die OT haben)
-    const empIdsWithOT = Object.entries(stats)
-      .filter(([id, s]) => s.ot > 0)
-      .map(([id]) => id);
-
-    if (empIdsWithOT.length === 0) break; // Keine OT mehr – fertig!
-
-    const avgOT = empIdsWithOT.reduce((sum, id) => sum + stats[id].ot, 0) / empIdsWithOT.length;
-    const fairnessTolerance = FAIRNESS_OT_TOLERANCE_H; // tolerierte OT-Differenz
-
-    // Finde MA mit OT > avgOT + tolerance
-    const overtimeEmpIds = empIdsWithOT.filter(id => stats[id].ot > avgOT + fairnessTolerance);
-
-    for (const ovtEmpId of overtimeEmpIds) {
-      // Finde MA mit Deficit
-      const deficitEmpIds = Object.entries(stats)
-        .filter(([id, s]) => s.deficit > 2) // mindestens 2h Deficit
-        .map(([id]) => id);
-
-      if (deficitEmpIds.length === 0) continue;
-
-      // Finde Dienste von ovtEmpId die verschiebbar sind
-      // (kleine Dienste, nicht letzte in Reihe, etc.)
-      const ovtAssignments = assignments.filter(a =>
-        a.employee_id === ovtEmpId && a.shift_type_id && !a.absence_type_id
-      );
-
-      // Sortiere by Dauer (kleine first, einfacher zu verschieben)
-      ovtAssignments.sort((a, b) => (parseFloat(a.hours_credited) || 0) - (parseFloat(b.hours_credited) || 0));
-
-      for (const assignToMove of ovtAssignments) {
-        // Finde einen geeigneten Empfänger mit Deficit + Qualifikation
-        const deficitRecipients = deficitEmpIds.filter(recipId => {
-          const recipQuals = empQualMap[recipId];
-          if (!recipQuals?.has(assignToMove.shift_type_id)) return false;
-
-          // Hard-Rules checken für den neuen Empfänger:
-          // 1. Keine Abwesenheit an dem Tag
-          const dateStr = assignToMove.date instanceof Date
-            ? assignToMove.date.toISOString().slice(0, 10)
-            : String(assignToMove.date).slice(0, 10);
-          if (absenceSet.has(`${recipId}_${dateStr}`)) return false;
-
-          // 2. Keine andere Schicht an dem Tag
-          const hasOtherShift = empState[recipId]?.assignments.some(a => {
-            const aDate = a.date instanceof Date ? a.date.toISOString().slice(0, 10) : String(a.date).slice(0, 10);
-            return aDate === dateStr && a.shift_type_id && !a.absence_type_id && a.id !== assignToMove.id;
-          });
-          if (hasOtherShift) return false;
-
-          // 3. Weekly cap: würde die neue Schicht das Wochen-Limit sprengen?
-          const wk = getISOWeek(dateStr);
-          const weeklyHours = empState[recipId]?.assignments
-            .filter(a => {
-              const aDate = a.date instanceof Date ? a.date.toISOString().slice(0, 10) : String(a.date).slice(0, 10);
-              return getISOWeek(aDate) === wk && !a.absence_type_id;
-            })
-            .reduce((sum, a) => sum + (parseFloat(a.hours_credited) || 0), 0) || 0;
-          if (weeklyHours + (parseFloat(assignToMove.hours_credited) || 0) > MAX_WEEKLY_HOURS) return false;
-
-          // 4. Rest period: 11h Ruhezeit (simplified check)
-          const prevDate = new Date(dateStr);
-          prevDate.setDate(prevDate.getDate() - 1);
-          const nextDate = new Date(dateStr);
-          nextDate.setDate(nextDate.getDate() + 1);
-          const prevDateStr = prevDate.toISOString().slice(0, 10);
-          const nextDateStr = nextDate.toISOString().slice(0, 10);
-
-          const prevAssign = empState[recipId]?.assignments.find(a => {
-            const aDate = a.date instanceof Date ? a.date.toISOString().slice(0, 10) : String(a.date).slice(0, 10);
-            return aDate === prevDateStr && a.shift_type_id && !a.absence_type_id;
-          });
-          const nextAssign = empState[recipId]?.assignments.find(a => {
-            const aDate = a.date instanceof Date ? a.date.toISOString().slice(0, 10) : String(a.date).slice(0, 10);
-            return aDate === nextDateStr && a.shift_type_id && !a.absence_type_id;
-          });
-
-          // Wenn vorher/nachher Schicht: check ob Rest-Period OK wäre (simplified)
-          if (prevAssign && prevAssign.shift_type_id) {
-            const prevSt = shiftTypes.find(s => s.id === prevAssign.shift_type_id);
-            const currSt = shiftTypes.find(s => s.id === assignToMove.shift_type_id);
-            // Vereinfachte Prüfung: wenn beide lange Dienste, skip
-            if ((prevSt?.duration_hours || 0) >= 10 && (currSt?.duration_hours || 0) >= 10) return false;
-          }
-          if (nextAssign && nextAssign.shift_type_id) {
-            const nextSt = shiftTypes.find(s => s.id === nextAssign.shift_type_id);
-            const currSt = shiftTypes.find(s => s.id === assignToMove.shift_type_id);
-            // Vereinfachte Prüfung: wenn beide lange Dienste, skip
-            if ((nextSt?.duration_hours || 0) >= 10 && (currSt?.duration_hours || 0) >= 10) return false;
-          }
-
-          return true; // Alle Checks bestanden
-        });
-
-        if (deficitRecipients.length === 0) continue;
-
-        // Nimm den Empfänger mit MEISTEN Deficit (am meisten zu füllen)
-        const bestRecipId = deficitRecipients.reduce((bestId, currId) =>
-          stats[currId].deficit > stats[bestId].deficit ? currId : bestId
-        );
-
-        // Verschiebe den Dienst
-        const assignIdx = assignments.indexOf(assignToMove);
-        if (assignIdx !== -1) {
-          assignments[assignIdx].employee_id = bestRecipId;
-
-          // Update empState (für nächste Iteration)
-          empState[ovtEmpId].assignments = empState[ovtEmpId].assignments.filter(a => a.id !== assignToMove.id);
-          empState[bestRecipId].assignments.push(assignToMove);
-
-          improved = true;
-          break; // Gehe zurück zu nächster Iteration
-        }
-      }
-      if (improved) break;
-    }
-  }
-
-  return assignments;
-}
-
-// ── WEEKEND REBALANCING ───────────────────────────────────────────────────────
-function rebalanceWeekendAssignments(newAssignments, empParams, empParamMap, shiftTypes, plan, absenceSet) {
-  const daysInMonth = new Date(plan.year, plan.month, 0).getDate();
-  const AT_HOLIDAYS = getAustrianHolidays(plan.year);
-
-  for (let iter = 0; iter < 3; iter++) {
-    // Calculate free weekends per employee
-    const freeWE = {};
-    for (const p of empParams) {
-      const empId = p.employee_id;
-      freeWE[empId] = 0;
-      for (let d = 1; d <= daysInMonth; d++) {
-        const date = new Date(plan.year, plan.month-1, d);
-        if (date.getDay() !== 6) continue;
-        const satStr = date.toISOString().slice(0,10);
-        const sun = new Date(plan.year, plan.month-1, d+1);
-        const sunStr = sun.toISOString().slice(0,10);
-        const satWork = newAssignments.some(a=>a.employee_id===empId&&a.date===satStr&&a.shift_type_id&&!a.absence_type_id);
-        const sunWork = newAssignments.some(a=>a.employee_id===empId&&a.date===sunStr&&a.shift_type_id&&!a.absence_type_id);
-        if (!satWork && !sunWork) freeWE[empId]++;
-      }
-    }
-    const maxFree = Math.max(...Object.values(freeWE));
-    const minFree = Math.min(...Object.values(freeWE));
-    if (maxFree - minFree < 2) break;
-
-    const richEmp = Object.keys(freeWE).find(id => freeWE[id] === maxFree);
-    const poorEmp = Object.keys(freeWE).find(id => freeWE[id] === minFree);
-    if (!richEmp || !poorEmp) break;
-
-    let moved = false;
-
-    for (const a of newAssignments.filter(a=>a.employee_id===poorEmp&&a.shift_type_id&&!a.absence_type_id)) {
-      const wd = new Date(a.date).getDay();
-      if (wd !== 0 && wd !== 6) continue; // only weekends
-      if (absenceSet.has(`${richEmp}_${a.date}`)) continue;
-      if (newAssignments.some(a2=>a2.employee_id===richEmp&&a2.date===a.date&&a2.shift_type_id)) continue;
-      const st = shiftTypes.find(x=>x.id===a.shift_type_id);
-      if (!st) continue;
-      // Check weekly hours
-      const wk = getISOWeek(a.date);
-      const richWeekH = newAssignments.filter(a2=>a2.employee_id===richEmp&&getISOWeek(a2.date)===wk&&a2.shift_type_id&&!a2.absence_type_id).reduce((s,a2)=>s+parseFloat(a2.hours_credited||0),0);
-      if (richWeekH + parseFloat(st.duration_hours||0) > MAX_WEEKLY_HOURS) continue;
-      if (!checkRestPeriod(newAssignments.filter(a2=>a2.employee_id===richEmp), {date:a.date,shiftType:st}, shiftTypes)) continue;
-      // Move: reassign from poorEmp to richEmp
-      a.employee_id = richEmp;
-      moved = true;
-      break;
-    }
-    if (!moved) break;
-  }
-}
+// rebalanceOvertimeAssignments, rebalanceWeekendAssignments → lib/dp-rules.js
 
 module.exports = router;

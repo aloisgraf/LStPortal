@@ -5192,6 +5192,21 @@ function renderDPConfigRules() {
         </div>
       </div>
 
+      <div style="margin-bottom:14px;margin-left:4px">
+        <div style="font-weight:600;margin-bottom:3px">13. Stunden-Fairness &amp; Gleichverteilung (hohe Priorität)</div>
+        <div style="color:var(--mu);font-size:12px;margin-left:12px">
+          Am Planende sollen alle Mitarbeiter einen möglichst gleichen Über-/Minusstunden-Saldo
+          <strong>relativ zu ihrem individuellen Soll</strong> haben — Teilzeitkräfte werden nicht
+          überproportional belastet.<br>
+          <strong>Fall A (Unterbesetzung):</strong> Reichen die Dienste nicht für alle Sollstunden,
+          werden die Minusstunden gleichmäßig verteilt.<br>
+          <strong>Fall B (Restkapazität):</strong> Mitarbeiter unter Soll erhalten automatisch
+          Zusatzdienst-<em>Vorschläge</em> (C3) im Generierungs-Protokoll — keine automatische Zuweisung.<br>
+          <strong>Keine Cluster:</strong> Dienste werden über den ganzen Monat gestreut, nicht in einer
+          Monatshälfte gehäuft (gilt auch für Teilzeit). Verstöße erscheinen als „Fairness-Warnung" im Protokoll.
+        </div>
+      </div>
+
       <div style="padding:12px;background:#ef444410;border-left:3px solid #ef4444;border-radius:4px;margin-top:16px">
         <strong style="color:#ef4444">⚠️ Unbesetzte Slots & Regelverstöße:</strong><br>
         <div style="color:var(--tx);font-size:12px;margin-top:6px">
