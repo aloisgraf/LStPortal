@@ -1298,10 +1298,8 @@ function renderTickets(){
   };
   const wrapGroup=inner=>`<div style="background:var(--sf);border:1px solid var(--border);border-radius:var(--r);overflow:hidden">${inner}</div>`;
 
-  let listHtml;
-  if(useTable){
-    listHtml=sorted.length?`<div class="tw" style="overflow-x:auto"><table><thead><tr><th>#</th><th>Titel</th><th>Bereich</th><th>Prio</th><th>Status</th><th>Tags</th><th>Zuständig</th><th>Datum</th></tr></thead><tbody>
-      ${sorted.map(tk=>{
+  const tableHtml=tks2=>`<div class="tw" style="overflow-x:auto"><table><thead><tr><th>#</th><th>Titel</th><th>Bereich</th><th>Prio</th><th>Status</th><th>Tags</th><th>Zuständig</th><th>Datum</th></tr></thead><tbody>
+      ${tks2.map(tk=>{
         const asn=getU(tk.assigneeId);const par=tk.parentTicketId?getTk(tk.parentTicketId):null;
         const nc=tk.notes.filter(n=>n.noteType==='note').length;
         const isChild=!!tk.parentTicketId;const isNew=tkIsNew(tk);
@@ -1318,7 +1316,11 @@ function renderTickets(){
           <td style="font-size:11px;color:var(--mu);white-space:nowrap">${fd(tk.createdAt)}</td>
         </tr>`;
       }).join('')}
-    </tbody></table></div>`:`<div class="empty">&#128235; Keine Tickets</div>`;
+    </tbody></table></div>`;
+
+  let listHtml;
+  if(useTable){
+    listHtml=sorted.length?tableHtml(sorted):`<div class="empty">&#128235; Keine Tickets</div>`;
   } else {
     listHtml=sorted.length?wrapGroup(sorted.map(tk=>rowHtml(tk)).join('')):`<div class="empty">&#128235; Keine Tickets</div>`;
   }
@@ -1326,20 +1328,20 @@ function renderTickets(){
   // Gruppierung: nach Fachbereich (Standard) oder Unterkategorie
   const deptOrder=[...new Set(sorted.map(t=>t.department))].sort((a,b)=>(DEPT_LABELS[a]||a).localeCompare(DEPT_LABELS[b]||b,'de'));
   let groupedHtml='';
-  if(useTable){
-    groupedHtml=listHtml;
-  } else if(groupMode==='subcat'&&sorted.length){
+  if(groupMode==='subcat'&&sorted.length){
     const keys=[...new Set(sorted.map(t=>t.subcategory||''))].sort((a,b)=>(a||'￿').localeCompare(b||'￿','de'));
     keys.forEach(key=>{
       const g=sorted.filter(t=>(t.subcategory||'')===key);
       if(!g.length)return;
-      const label=key?`<span class="bdg" style="font-size:11px;background:rgba(124,58,237,.12);color:#7c3aed">${key}</span> ${key}`:'Ohne Unterkategorie';
+      const label=key?`<span class="bdg" style="font-size:11px;background:rgba(124,58,237,.12);color:#7c3aed">${key}</span>`:'Ohne Unterkategorie';
       groupedHtml+=`<div style="margin-bottom:14px">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--mu);letter-spacing:.5px;padding:6px 2px;margin-bottom:4px">${label} <span style="font-weight:400;color:var(--di)">(${g.length})</span></div>
-        ${wrapGroup(g.map(tk=>rowHtml(tk,{showSubcat:false})).join(''))}
+        ${useTable?tableHtml(g):wrapGroup(g.map(tk=>rowHtml(tk,{showSubcat:false})).join(''))}
       </div>`;
     });
     if(!groupedHtml)groupedHtml='<div class="empty">📫 Keine Tickets</div>';
+  } else if(useTable){
+    groupedHtml=listHtml;
   } else if(!S.tkFiltDept&&deptOrder.length>1){
     deptOrder.forEach(dept=>{
       const dtks=sorted.filter(t=>t.department===dept);
@@ -1378,7 +1380,7 @@ function renderTickets(){
       <select class="flt" onchange="S.tkFiltTag=this.value;renderMain()"><option value="">Alle Tags</option>${S.tags.map(t=>`<option value="${t.id}"${S.tkFiltTag===t.id?' selected':''}>${t.label}</option>`).join('')}</select>
       <select class="flt" onchange="S.tkFiltAssignee=this.value;renderMain()"><option value="">Alle Bearbeiter</option>${S.users.filter(isAssignable).map(u=>`<option value="${u.id}"${S.tkFiltAssignee===u.id?' selected':''}>${u.name}</option>`).join('')}</select>
       ${canSeeSubcat?`<select class="flt" onchange="S.tkFiltSubcat=this.value;renderMain()"><option value="">Alle Unterkategorien</option><option value="__none__"${S.tkFiltSubcat==='__none__'?' selected':''}>&mdash; ohne Unterkategorie &mdash;</option>${[...new Set(S.ticketSubcategories.map(s=>s.label))].map(l=>`<option value="${l}"${S.tkFiltSubcat===l?' selected':''}>${l}</option>`).join('')}</select>`:''}
-      ${canSeeSubcat&&!useTable?`<select class="flt" onchange="S.tkGroupBy=this.value;renderMain()" title="Gruppierung der Liste"><option value="dept"${groupMode==='dept'?' selected':''}>Gruppierung: Fachbereich</option><option value="subcat"${groupMode==='subcat'?' selected':''}>Gruppierung: Unterkategorie</option></select>`:''}
+      ${canSeeSubcat?`<select class="flt" onchange="S.tkGroupBy=this.value;renderMain()" title="Gruppierung der Liste"><option value="dept"${groupMode==='dept'?' selected':''}>Gruppierung: Fachbereich</option><option value="subcat"${groupMode==='subcat'?' selected':''}>Gruppierung: Unterkategorie</option></select>`:''}
     </div>
     ${groupedHtml}`;
 }
@@ -6000,11 +6002,15 @@ function renderTodos() {
   if (!el) return;
 
   const todos = S.todos;
+  // Abgeschlossen = alle Punkte erledigt (mind. 1 Punkt vorhanden)
+  const isTodoDone = t => t.items.length > 0 && t.items.every(i => i.is_done);
+  const openTodos = todos.filter(t => !isTodoDone(t));
+  const doneTodos = todos.filter(isTodoDone);
   const selId = S._selTodo;
-  const sel   = todos.find(t => t.id === selId) || todos[0] || null;
+  const sel   = todos.find(t => t.id === selId) || openTodos[0] || todos[0] || null;
   if (sel && !S._selTodo) S._selTodo = sel.id;
 
-  const sideItems = todos.map(t => {
+  const todoSideItem = t => {
     const done    = t.items.filter(i => i.is_done).length;
     const total   = t.items.length;
     const allDone = total > 0 && done === total;
@@ -6023,7 +6029,17 @@ function renderTodos() {
         ${total > 0 ? `<span style="margin-left:auto">${done}/${total}</span>` : ''}
       </div>
     </div>`;
-  }).join('') || '<div style="padding:16px;color:var(--mu);font-size:13px">Noch keine Todos</div>';
+  };
+
+  const showDone = !!S._showDoneTodos;
+  const sideItems =
+    (openTodos.map(todoSideItem).join('') || '<div style="padding:16px;color:var(--mu);font-size:13px">Keine offenen Todos</div>')
+    + (doneTodos.length ? `
+      <div style="display:flex;align-items:center;gap:6px;padding:10px 12px 6px;cursor:pointer;user-select:none;color:var(--mu);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-top:1px solid var(--border);margin-top:8px"
+           onclick="S._showDoneTodos=!S._showDoneTodos;renderTodos()">
+        <span>${showDone?'▼':'▶'}</span><span style="flex:1">✔ Abgeschlossene Todos</span><span style="font-weight:400">(${doneTodos.length})</span>
+      </div>
+      ${showDone?doneTodos.map(todoSideItem).join(''):''}` : '');
 
   el.innerHTML = `<div class="todos-layout">
     <div class="todos-sidebar">
