@@ -227,6 +227,7 @@ function openPwModal(){
   S.myColor=u?.color||pal()[0];
   buildCP('myCR',S.myColor,'pickMyColor');
   document.getElementById('cpw0').value='';document.getElementById('cpw1').value='';document.getElementById('cpw2').value='';
+  const dh=document.getElementById('setDueHeat');if(dh)dh.checked=getDueHeatPref();
   openModal('pwModal');
 }
 function pickMyColor(col,cid){S.myColor=col;document.querySelectorAll('#'+cid+' .cp').forEach(el=>el.classList.toggle('on',el.style.backgroundColor===h2r(col)));}
@@ -457,13 +458,13 @@ function renderHome(){
     if(beschwerden.length){
       var _pColors={high:'#ef4444',medium:'#f59e0b',low:'#94a3b8'};
       beschwerden.forEach(function(tk){
-        var isNew=tkIsNew(tk);var asn=getU(tk.assigneeId);
+        var isNew=!!tkBadge(tk);var asn=getU(tk.assigneeId);
         _beschwerdenHtml+='<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-top:1px solid var(--border)'+
           (isNew?';background:rgba(124,58,237,.04)':'')+';cursor:pointer" onclick="openTkDetail(\''+tk.id+'\')">';
         _beschwerdenHtml+='<div style="width:3px;align-self:stretch;background:#7c3aed;border-radius:2px;flex-shrink:0"></div>';
         _beschwerdenHtml+='<div style="flex:1;min-width:0">';
         _beschwerdenHtml+='<div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+
-          (isNew?'<span class="tk-new-badge">NEU</span> ':'')+
+          tkBadgeHtml(tk)+
           '<span style="font-family:monospace;font-size:11px;color:var(--mu)">'+tk.number+'</span> '+esc(tk.title)+
           ' <span class="bdg" style="font-size:10px;background:rgba(124,58,237,.12);color:#7c3aed">'+esc(tk.subcategory)+'</span></div>';
         _beschwerdenHtml+='<div style="font-size:10px;color:var(--mu)">'+deptBdg(tk.department)+(asn?' · '+asn.name:' · nicht zugewiesen')+' · '+fd(tk.createdAt)+'</div>';
@@ -479,13 +480,13 @@ function renderHome(){
   // Relevante Tickets
   var _ticketsHtml='';
   if(relevantTks.length){
-    var _hasNew=relevantTks.some(tkIsNew);
-    _ticketsHtml+=(_hasNew?'<div style="font-size:11px;color:var(--warn);font-weight:600;margin-bottom:4px">&#128276; '+relevantTks.filter(tkIsNew).length+' neue Eintr\u00e4ge</div>':'');
+    var _badgeCount=relevantTks.filter(function(tk){return tkBadge(tk);}).length;
+    _ticketsHtml+=(_badgeCount?'<div style="font-size:11px;color:var(--warn);font-weight:600;margin-bottom:4px">&#128276; '+_badgeCount+' neue Eintr\u00e4ge/\u00c4nderungen</div>':'');
     relevantTks.forEach(function(tk){
-      var n=tkIsNew(tk);
+      var _b=tkBadge(tk);var n=!!_b;
       _ticketsHtml+='<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);gap:8px;'+(n?'background:rgba(245,158,11,.04);margin:0 -8px;padding:5px 8px;border-left:3px solid var(--warn);':'')+'">';
       _ticketsHtml+='<div style="min-width:0;flex:1;cursor:pointer" onclick="openTkDetail(\''+tk.id+'\')">';
-      _ticketsHtml+='<div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(n?'<span class="tk-new-badge">NEU</span> ':'')+tk.number+': '+esc(tk.title)+'</div>';
+      _ticketsHtml+='<div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+tkBadgeHtml(tk)+tk.number+': '+esc(tk.title)+'</div>';
       _ticketsHtml+='<div style="font-size:10px;color:var(--mu)">'+(tk.assigneeId===S.currentUser?'&#128100; Dir zugewiesen':'&#128202; '+(DEPT_LABELS[tk.department]||tk.department))+'</div>';
       _ticketsHtml+='</div>';
       _ticketsHtml+='<div style="display:flex;gap:4px;align-items:center;flex-shrink:0">'+prioBdg(tk.priority);
@@ -1241,6 +1242,34 @@ function tkIsNew(tk) {
   return updated > viewed;
 }
 
+// Differenzierte Badge-Logik: eigene Aktionen zählen NIE als neu/geändert.
+// Priorität: Neue Markierung > Neu > Änderung. Verschwindet beim Öffnen des Tickets.
+function tkBadge(tk){
+  const me=S.currentUser;
+  const viewed=tk.lastViewedAt?new Date(tk.lastViewedAt):null;
+  const notes=tk.notes||[];
+  const mentionNew=notes.some(n=>n.authorId!==me&&(n.mentionedUsers||[]).includes(me)&&(!viewed||new Date(n.createdAt)>viewed));
+  if(mentionNew)return{label:'NEUE MARKIERUNG',cls:'tk-bdg-mention'};
+  if(!viewed&&tk.createdBy!==me)return{label:'NEU',cls:'tk-new-badge'};
+  if(viewed&&notes.some(n=>n.authorId!==me&&new Date(n.createdAt)>viewed))return{label:'ÄNDERUNG',cls:'tk-bdg-changed'};
+  return null;
+}
+function tkBadgeHtml(tk){const b=tkBadge(tk);return b?`<span class="${b.cls}">${b.label}</span> `:'';}
+
+// Fälligkeits-Färbung: ab 14 Tage vor Fälligkeit von dezentem Orange zu dezentem Rot
+function getDueHeatPref(){try{return localStorage.getItem('tkDueHeat')!=='off';}catch(e){return true;}}
+function toggleDueHeatPref(on){try{localStorage.setItem('tkDueHeat',on?'on':'off');}catch(e){}renderMain();toast(on?'Fälligkeits-Färbung aktiviert':'Fälligkeits-Färbung deaktiviert');}
+function dueHeatStyle(tk){
+  if(!getDueHeatPref()||!tk.dueDate||tk.status==='closed')return'';
+  const today=new Date();today.setHours(0,0,0,0);
+  const due=new Date(String(tk.dueDate).slice(0,10));
+  const days=Math.round((due-today)/86400000);
+  if(days>14)return'';
+  const t=Math.max(0,Math.min(1,(14-days)/14));
+  const r=Math.round(245+(239-245)*t),g=Math.round(158+(68-158)*t),b=Math.round(11+(68-11)*t);
+  return`background:rgba(${r},${g},${b},${(0.05+0.09*t).toFixed(3)});`;
+}
+
 function getTkViewPref(){try{return localStorage.getItem('tkViewPref')||'cards';}catch(e){return'cards';}}
 function saveTkViewPref(v){try{localStorage.setItem('tkViewPref',v);}catch(e){}if(S.view==='tickets'||S.view==='tickets_closed')renderTickets();}
 
@@ -1272,18 +1301,19 @@ function renderTickets(){
   const rowHtml=(tk,{showDept=true,showSubcat=true}={})=>{
     const asn=getU(tk.assigneeId);const par=tk.parentTicketId?getTk(tk.parentTicketId):null;
     const nc=tk.notes.filter(n=>n.noteType==='note').length;
-    const isChild=!!tk.parentTicketId;const isNew=tkIsNew(tk);
+    const isChild=!!tk.parentTicketId;const badge=tkBadge(tk);
     const accent=_tkPrioColor[tk.priority]||'#94a3b8';
     const childStyle=isChild?'margin-left:20px;border-left:2px solid var(--border);background:var(--sf2);':'';
     const isSel=S.tkBatchSel.has(tk.id);
     const preview=tkPreview(tk);
-    return`<div style="display:flex;align-items:center;gap:10px;padding:${isChild?'7px 12px 7px 10px':'10px 14px'};border-top:1px solid var(--border);${childStyle}${isSel?'background:rgba(59,109,212,.07);':isNew?'background:rgba(245,158,11,.04);':''}" onclick="${S.tkBatchMode?`batchToggleTk('${tk.id}')`:''}" class="clickable">
+    const heat=dueHeatStyle(tk);
+    return`<div style="display:flex;align-items:center;gap:10px;padding:${isChild?'7px 12px 7px 10px':'10px 14px'};border-top:1px solid var(--border);${childStyle}${isSel?'background:rgba(59,109,212,.07);':heat?heat:badge?'background:rgba(245,158,11,.04);':''}" onclick="${S.tkBatchMode?`batchToggleTk('${tk.id}')`:''}" class="clickable">
       ${S.tkBatchMode?`<input type="checkbox" ${isSel?'checked':''} onclick="event.stopPropagation();batchToggleTk('${tk.id}')" style="width:16px;height:16px;flex-shrink:0;cursor:pointer">`:''}
       ${isChild?`<span style="font-size:14px;color:var(--di);flex-shrink:0;margin-right:-4px">&#x21b3;</span>`:''}
       <div style="width:3px;align-self:stretch;background:${accent};border-radius:2px;flex-shrink:0"></div>
       <div style="flex:1;min-width:0" onclick="${S.tkBatchMode?'':'openTkDetail(\''+tk.id+'\')'}">
         <div style="font-size:${isChild?'12px':'13px'};font-weight:600;color:var(--tx);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-          ${isNew?'<span class="tk-new-badge">NEU</span> ':''}<span style="font-family:monospace;font-size:11px;color:var(--mu)">${tk.number}</span> ${esc(tk.title)}${showSubcat&&tk.subcategory?` <span class="bdg" style="font-size:10px;background:rgba(124,58,237,.12);color:#7c3aed">${tk.subcategory}</span>`:''}
+          ${tkBadgeHtml(tk)}<span style="font-family:monospace;font-size:11px;color:var(--mu)">${tk.number}</span> ${esc(tk.title)}${showSubcat&&tk.subcategory?` <span class="bdg" style="font-size:10px;background:rgba(124,58,237,.12);color:#7c3aed">${tk.subcategory}</span>`:''}
         </div>
         ${preview?`<div style="font-size:11px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px">${preview}</div>`:''}
         <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--mu);align-items:center">
@@ -1291,7 +1321,7 @@ function renderTickets(){
           ${asn?`<div style="display:flex;align-items:center;gap:3px">${avHtml(asn.initials,asn.color,14,6)}<span>${asn.name}</span></div>`:''}
           ${isChild&&par?`<span style="color:var(--di);font-size:10px">&#x2191; ${par.number}</span>`:''}
           ${nc?`<span>💬 ${nc}</span>`:''}
-          <span style="color:var(--di)">${fd(tk.createdAt)}</span>
+          <span style="color:var(--di)">Erstellt: ${fd(tk.createdAt)}${tk.updatedAt&&fd(tk.updatedAt)!==fd(tk.createdAt)?' · Letzte Änderung: '+fd(tk.updatedAt):''}${tk.dueDate?' · Fällig: '+fd(tk.dueDate):''}</span>
         </div>
       </div>
     </div>`;
@@ -1302,10 +1332,11 @@ function renderTickets(){
       ${tks2.map(tk=>{
         const asn=getU(tk.assigneeId);const par=tk.parentTicketId?getTk(tk.parentTicketId):null;
         const nc=tk.notes.filter(n=>n.noteType==='note').length;
-        const isChild=!!tk.parentTicketId;const isNew=tkIsNew(tk);
-        return`<tr class="clickable${isChild?' tk-child-row':''}${isNew?' tk-new-row':''}" onclick="openTkDetail('${tk.id}')">
+        const isChild=!!tk.parentTicketId;const badge=tkBadge(tk);
+        const heat=dueHeatStyle(tk);
+        return`<tr class="clickable${isChild?' tk-child-row':''}${badge&&!heat?' tk-new-row':''}" style="${heat}" onclick="openTkDetail('${tk.id}')">
           <td style="font-family:monospace;font-size:11px;color:var(--mu);white-space:nowrap${isChild?';padding-left:28px':''}">
-            ${isChild?'<span style="color:var(--di);margin-right:3px">↳</span>':''}${tk.number}${isNew?'<span class="tk-new-badge">NEU</span>':''}
+            ${isChild?'<span style="color:var(--di);margin-right:3px">↳</span>':''}${tk.number}${badge?`<span class="${badge.cls}">${badge.label}</span>`:''}
           </td>
           <td style="max-width:220px"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(tk.title)}</div>${nc?`<span style="font-size:10px;color:var(--mu)">💬 ${nc}</span>`:''}</td>
           <td>${deptBdg(tk.department)}${tk.subcategory?`<div><span class="bdg" style="font-size:10px;background:rgba(124,58,237,.12);color:#7c3aed">${tk.subcategory}</span></div>`:''}</td>
@@ -1313,7 +1344,7 @@ function renderTickets(){
           <td>${stBdg(tk.status)}</td>
           <td style="max-width:140px">${tagChips(tk.tags)}${dueBdg(tk)}</td>
           <td style="font-size:12px">${asn?`<div style="display:flex;align-items:center;gap:3px">${avHtml(asn.initials,asn.color,16,7)}<span>${asn.name}</span></div>`:'-'}</td>
-          <td style="font-size:11px;color:var(--mu);white-space:nowrap">${fd(tk.createdAt)}</td>
+          <td style="font-size:11px;color:var(--mu);white-space:nowrap">Erstellt: ${fd(tk.createdAt)}${tk.updatedAt&&fd(tk.updatedAt)!==fd(tk.createdAt)?`<br>Geändert: ${fd(tk.updatedAt)}`:''}${tk.dueDate?`<br>Fällig: ${fd(tk.dueDate)}`:''}</td>
         </tr>`;
       }).join('')}
     </tbody></table></div>`;

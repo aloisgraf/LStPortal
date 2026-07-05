@@ -258,6 +258,8 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
 .tk-child-row{background:rgba(59,109,212,.02)}.tk-child-row td:first-child{border-left:3px solid rgba(59,109,212,.25)}
 .tk-new-row{background:rgba(245,158,11,.04)}.tk-new-row td:first-child{border-left:3px solid var(--warn)!important}
 .tk-new-badge{display:inline-block;background:var(--warn);color:#fff;font-size:8px;font-weight:800;padding:1px 4px;border-radius:3px;margin-left:4px;vertical-align:middle;letter-spacing:.5px}
+.tk-bdg-changed{display:inline-block;background:#3b6dd4;color:#fff;font-size:8px;font-weight:800;padding:1px 4px;border-radius:3px;margin-left:4px;vertical-align:middle;letter-spacing:.5px}
+.tk-bdg-mention{display:inline-block;background:#7c3aed;color:#fff;font-size:8px;font-weight:800;padding:1px 4px;border-radius:3px;margin-left:4px;vertical-align:middle;letter-spacing:.5px}
 
 /* Kalenderansicht */
 .cal-table{width:100%;border-collapse:collapse;table-layout:fixed}
