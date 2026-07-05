@@ -15,6 +15,7 @@ const newId = () => crypto.randomUUID();
 const parseRoles = r => !r ? ['standard'] : Array.isArray(r) ? r : (()=>{ try{return JSON.parse(r);}catch{return ['standard'];} })();
 const parseTags  = t => !t ? [] : Array.isArray(t) ? t : (()=>{ try{return JSON.parse(t);}catch{return [];} })();
 const getUser    = id => q1('SELECT * FROM users WHERE id=$1', [id]);
+const getUserByUsername = username => q1('SELECT * FROM users WHERE LOWER(username)=LOWER($1)', [username]);
 const DEPTS = ['technik','leitung','dienstplanung','ausbildung','qm','frei'];
 
 async function getP(uid, userObj=null, overrides=[]) {
@@ -100,6 +101,6 @@ async function logAct(uid, name, action, details={}) {
   ).catch(()=>{});
 }
 
-module.exports = { pool, q, q1, newId, parseRoles, parseTags, getUser, DEPTS, logAct,
+module.exports = { pool, q, q1, newId, parseRoles, parseTags, getUser, getUserByUsername, DEPTS, logAct,
   getP, getTP, canSeeTk, canEditTk, nextTicketNumber, auditNote, createNotification,
   parseMentions };

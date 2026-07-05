@@ -125,6 +125,7 @@ async function initDB() {
   const migs = [
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT`,
     `ALTER TABLE ticket_subcategories ADD COLUMN IF NOT EXISTS is_complaint BOOLEAN NOT NULL DEFAULT false`,
     `ALTER TABLE checklist_template_items ADD COLUMN IF NOT EXISTS item_type TEXT NOT NULL DEFAULT 'check'`,
     `ALTER TABLE ticket_checklist_items ADD COLUMN IF NOT EXISTS item_type TEXT NOT NULL DEFAULT 'check'`,
@@ -562,14 +563,39 @@ async function initDB() {
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }
 
+  // ── Benutzername-Migration ──
+  // Login lief bisher über eine Namens-Auswahlliste (Sicherheits-/Datenschutzproblem:
+  // jeder Besucher sah alle Mitarbeiternamen). Bestehende Nutzer ohne Benutzername
+  // bekommen automatisch einen aus dem Namen generierten (vorname.nachname);
+  // Admins können ihn danach in der Benutzerverwaltung anpassen.
+  const slugify = s => (s||'')
+    .replace(/ä/gi,'ae').replace(/ö/gi,'oe').replace(/ü/gi,'ue').replace(/ß/gi,'ss')
+    .normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .toLowerCase().replace(/[^a-z0-9]+/g,'');
+  const usersNoUsername = await q("SELECT id,name FROM users WHERE username IS NULL OR username=''");
+  if (usersNoUsername.length) {
+    const existing = new Set((await q("SELECT LOWER(username) as u FROM users WHERE username IS NOT NULL AND username!=''")).map(r=>r.u));
+    for (const u of usersNoUsername) {
+      const parts = (u.name||'').trim().split(/\s+/).filter(Boolean).map(slugify).filter(Boolean);
+      const base = parts.length>1 ? parts[0]+'.'+parts[parts.length-1] : (parts[0]||'user');
+      let candidate = base, n = 1;
+      while (existing.has(candidate)) { n++; candidate = base+n; }
+      existing.add(candidate);
+      await pool.query('UPDATE users SET username=$1 WHERE id=$2', [candidate, u.id]);
+      console.log(`  → Benutzername vergeben: ${u.name} = ${candidate}`);
+    }
+  }
+  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower_idx ON users (LOWER(username)) WHERE username IS NOT NULL AND username != ''`)
+    .catch(e => console.error('[username-index]', e.message));
+
   const cnt = await q1('SELECT COUNT(*) as n FROM users');
   if (parseInt(cnt.n) === 0) {
     const hash = await bcrypt.hash('Passwort1', 10);
     const [u1,u2,u3] = [newId(),newId(),newId()];
-    await pool.query(`INSERT INTO users (id,name,initials,roles,color,pw_hash,must_change_pw) VALUES
-      ($1,'Administrator','AD','["admin"]','#3b6dd4',$4,false),
-      ($2,'Dienstplanung','DP','["dienstplanung"]','#10b981',$4,false),
-      ($3,'Beispiel Mitarbeiter','BM','["standard"]','#e87bb0',$4,true)`, [u1,u2,u3,hash]);
+    await pool.query(`INSERT INTO users (id,name,initials,roles,color,pw_hash,must_change_pw,username) VALUES
+      ($1,'Administrator','AD','["admin"]','#3b6dd4',$4,false,'admin'),
+      ($2,'Dienstplanung','DP','["dienstplanung"]','#10b981',$4,false,'dienstplanung'),
+      ($3,'Beispiel Mitarbeiter','BM','["standard"]','#e87bb0',$4,true,'mitarbeiter')`, [u1,u2,u3,hash]);
     const cats=[['📚','Ausbildung','#10b981',0],['🎓','Kurs','#3b6dd4',1],['🎂','Geburtstag','#e87bb0',2],
       ['📝','Dienstwunsch','#7c3aed',3],['🌴','Urlaub','#f59e0b',4],['🏥','Krankenstand','#ef4444',5],['📌','Sonstiges','#64748b',6]];
     for (const [e,l,c,i] of cats) await pool.query('INSERT INTO categories (id,label,emoji,color,sort_order) VALUES ($1,$2,$3,$4,$5)',[newId(),l,e,c,i]);

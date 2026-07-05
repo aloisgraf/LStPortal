@@ -156,15 +156,24 @@ router.put('/tags/:id', auth, adminOnly, async (req,res) => {
 router.delete('/tags/:id', auth, adminOnly, async (req,res) => {
   try { await pool.query('DELETE FROM tags WHERE id=$1',[req.params.id]); ok(res); } catch(e) { bad(res,'Serverfehler',500); }
 });
+// Benutzername: nur a-z0-9._- erlaubt, wird immer klein geschrieben gespeichert
+const normalizeUsername = u => (u||'').trim().toLowerCase();
+const isValidUsername = u => /^[a-z0-9._-]{3,40}$/.test(u);
+
 router.post('/users', auth, adminOnly, async (req,res) => {
   try {
-    const {name,initials,roles,color,category,email}=req.body;
+    const {name,initials,roles,color,category,email,username}=req.body;
     if (!name?.trim()||!initials?.trim()) return bad(res,'Name und Kürzel erforderlich');
+    const uname = normalizeUsername(username);
+    if (!isValidUsername(uname)) return bad(res,'Benutzername: min. 3 Zeichen, nur Buchstaben/Zahlen/._-');
     const id=newId(), hash=await bcrypt.hash('Passwort1',10);
-    await pool.query('INSERT INTO users (id,name,initials,roles,color,pw_hash,must_change_pw,category,email) VALUES ($1,$2,$3,$4,$5,$6,true,$7,$8)',
-      [id,name.trim(),initials.trim().toUpperCase(),JSON.stringify(roles||['standard']),color||'#64748b',hash,category||null,email?.trim()||null]);
+    await pool.query('INSERT INTO users (id,name,initials,roles,color,pw_hash,must_change_pw,category,email,username) VALUES ($1,$2,$3,$4,$5,$6,true,$7,$8,$9)',
+      [id,name.trim(),initials.trim().toUpperCase(),JSON.stringify(roles||['standard']),color||'#64748b',hash,category||null,email?.trim()||null,uname]);
     ok(res,{id});
-  } catch(e) { bad(res,'Serverfehler',500); }
+  } catch(e) {
+    if (e.code==='23505') return bad(res,'Benutzername bereits vergeben');
+    bad(res,'Serverfehler',500);
+  }
 });
 router.put('/users/:id', auth, async (req,res) => {
   const isSelf = req.params.id === req.uid;
@@ -175,14 +184,19 @@ router.put('/users/:id', auth, async (req,res) => {
       await pool.query('UPDATE users SET color=$1 WHERE id=$2',[req.body.color||'#64748b',req.params.id]);
       return ok(res);
     }
-    const {name,initials,roles,color,resetPassword,category,email}=req.body;
+    const {name,initials,roles,color,resetPassword,category,email,username}=req.body;
     if (!name?.trim()||!initials?.trim()) return bad(res,'Name und Kürzel erforderlich');
-    await pool.query('UPDATE users SET name=$1,initials=$2,roles=$3,color=$4,category=$5,email=$6 WHERE id=$7',
-      [name.trim(),initials.trim().toUpperCase(),JSON.stringify(roles||['standard']),color||'#64748b',category||null,email?.trim()||null,req.params.id]);
+    const uname = normalizeUsername(username);
+    if (!isValidUsername(uname)) return bad(res,'Benutzername: min. 3 Zeichen, nur Buchstaben/Zahlen/._-');
+    await pool.query('UPDATE users SET name=$1,initials=$2,roles=$3,color=$4,category=$5,email=$6,username=$7 WHERE id=$8',
+      [name.trim(),initials.trim().toUpperCase(),JSON.stringify(roles||['standard']),color||'#64748b',category||null,email?.trim()||null,uname,req.params.id]);
     if (resetPassword) await pool.query('UPDATE users SET pw_hash=$1,must_change_pw=true WHERE id=$2',
       [await bcrypt.hash('Passwort1',10),req.params.id]);
     ok(res);
-  } catch(e) { bad(res,'Serverfehler',500); }
+  } catch(e) {
+    if (e.code==='23505') return bad(res,'Benutzername bereits vergeben');
+    bad(res,'Serverfehler',500);
+  }
 });
 router.delete('/users/:id', auth, adminOnly, async (req,res) => {
   try {

@@ -153,33 +153,16 @@ function updateBadges(){
   const dtBdg=document.getElementById('dtBdg');if(dtBdg){dtBdg.style.display=pendingDt?'flex':'none';dtBdg.textContent=pendingDt;}
 }
 // AUTH
-let _loginUsers=[];
-async function loadLoginUsers(){
-  const sel=document.getElementById('lsel');if(!sel)return;
-  sel.innerHTML='<option value="">\u23F3 Lade...\u2026</option>';sel.disabled=true;
-  for(let i=1;i<=5;i++){
-    try{
-      _loginUsers=await api('GET','/auth/users');
-      if(Array.isArray(_loginUsers)&&_loginUsers.length>0){
-        sel.disabled=false;
-        sel.innerHTML='<option value="">\u2014 Benutzer w\u00e4hlen \u2014</option>'+_loginUsers.map(u=>`<option value="${u.id}">${u.name}</option>`).join('');
-        return;
-      }
-    }catch(e){console.warn('Login retry',i,e.message);}
-    if(i<5){sel.innerHTML=`<option value="">\u23F3 Verbinde\u2026 (${i}/5)</option>`;await new Promise(r=>setTimeout(r,i*2000));}
-  }
-  sel.disabled=false;
-  sel.innerHTML='<option value="">&#10060; Server nicht erreichbar &#8211; Seite neu laden</option>';
-  // Show error visibly
-  const lerr=document.getElementById('lerr');
-  if(lerr){lerr.textContent='Server nicht erreichbar. Bitte Seite neu laden oder Render-Logs prüfen.';lerr.style.display='block';}
-}
 async function doLogin(){
-  const userId=document.getElementById('lsel').value;
-  if(!userId){toast('\u26A0\uFE0F Bitte Benutzer ausw\u00e4hlen!');return;}
+  const username=document.getElementById('lsel').value.trim();
+  if(!username){toast('⚠️ Bitte Benutzernamen eingeben!');return;}
   loading(true);
+  const lerr=document.getElementById('lerr');
   try{
-    const res=await api('POST','/auth/login',{userId,password:document.getElementById('lpw').value}).catch(e=>{document.getElementById('lerr').style.display='block';document.getElementById('lpw').value='';loading(false);throw e;});
+    const res=await api('POST','/auth/login',{username,password:document.getElementById('lpw').value}).catch(e=>{
+      lerr.textContent=e.message||'Benutzername oder Passwort falsch.';lerr.style.display='block';document.getElementById('lpw').value='';loading(false);throw e;
+    });
+    lerr.style.display='none';
     S.currentUser=res.userId;
     if(res.mustChangePW){document.getElementById('LS').classList.remove('open');document.getElementById('np1').value='';document.getElementById('np2').value='';document.getElementById('CPWS').classList.add('open');}
     else{try{await fetchData();}catch(e2){toast('⚠️ Daten-Fehler: '+e2.message,'err');}loginOK();}
@@ -220,7 +203,7 @@ async function logout(){
   }catch(e){}finally{loading(false);}
   if(_refreshTimer)clearInterval(_refreshTimer);
   S.currentUser=null;document.getElementById('hdr').style.display='none';document.getElementById('APP').style.display='none';
-  await loadLoginUsers();document.getElementById('LS').classList.add('open');
+  document.getElementById('lsel').value='';document.getElementById('lpw').value='';document.getElementById('LS').classList.add('open');
 }
 function openPwModal(){
   const u=getU(S.currentUser);
@@ -2033,6 +2016,7 @@ function openUF(id){
   document.getElementById('ufId').value=u?.id||'';document.getElementById('ufNm').value=u?.name||'';document.getElementById('ufIn').value=u?.initials||'';
   document.getElementById('uffCategory').value=u?.category||'';
   document.getElementById('ufEmail').value=u?.email||'';
+  document.getElementById('ufUsername').value=u?.username||'';
   document.getElementById('ufPWRR').style.display=u?'block':'none';document.getElementById('ufPWRst').checked=false;
   document.getElementById('ufErr').textContent='';S.ufColor=u?.color||pal()[0];
   document.getElementById('ufRoles').innerHTML=ROLES.map(r=>`<label class="rck"><input type="checkbox" value="${r.id}" ${(u?.roles||['standard']).includes(r.id)?'checked':''}><span>${r.icon} ${r.label}</span></label>`).join('');
@@ -2042,18 +2026,20 @@ async function saveUser(){
   const name=document.getElementById('ufNm').value.trim(),initials=document.getElementById('ufIn').value.trim().toUpperCase();
   const category=document.getElementById('uffCategory').value.trim()||null;
   const email=document.getElementById('ufEmail').value.trim()||null;
+  const username=document.getElementById('ufUsername').value.trim().toLowerCase();
   const errEl=document.getElementById('ufErr');errEl.textContent='';
   if(!name||!initials){errEl.textContent='\u26A0\uFE0F Name und K\u00fcrzel erforderlich!';return;}
+  if(!/^[a-z0-9._-]{3,40}$/.test(username)){errEl.textContent='\u26A0\uFE0F Benutzername: min. 3 Zeichen, nur Buchstaben/Zahlen/._-!';return;}
   const roles=Array.from(document.querySelectorAll('#ufRoles input:checked')).map(cb=>cb.value);
   if(!roles.length){errEl.textContent='\u26A0\uFE0F Mindestens eine Rolle!';return;}
   const id=document.getElementById('ufId').value;loading(true);
   try{
-    if(id)await api('PUT','/users/'+id,{name,initials,roles,color:S.ufColor,resetPassword:document.getElementById('ufPWRst').checked,category,email});
-    else await api('POST','/users',{name,initials,roles,color:S.ufColor,category,email});
-    await fetchData();loadLoginUsers();backToAdmin('users');toast('\u2705 Benutzer gespeichert!');
+    if(id)await api('PUT','/users/'+id,{name,initials,roles,color:S.ufColor,resetPassword:document.getElementById('ufPWRst').checked,category,email,username});
+    else await api('POST','/users',{name,initials,roles,color:S.ufColor,category,email,username});
+    await fetchData();backToAdmin('users');toast('\u2705 Benutzer gespeichert!');
   }catch(e){errEl.textContent='\u26A0\uFE0F '+e.message;}finally{loading(false);}
 }
-async function delUser(id){if(!confirm('Benutzer l\u00f6schen?'))return;loading(true);try{await api('DELETE','/users/'+id);await fetchData();loadLoginUsers();backToAdmin('users');}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}finally{loading(false);}}
+async function delUser(id){if(!confirm('Benutzer l\u00f6schen?'))return;loading(true);try{await api('DELETE','/users/'+id);await fetchData();backToAdmin('users');}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}finally{loading(false);}}
 function openCF(id){const c=id?getCat(id):null;document.getElementById('cfT').textContent=c?'Kategorie bearbeiten':'Kategorie anlegen';document.getElementById('cfId').value=c?.id||'';document.getElementById('cfLb').value=c?.label||'';document.getElementById('cfEm').value=c?.emoji||'\uD83D\uDCCC';document.getElementById('cfErr').textContent='';S.cfColor=c?.color||pal()[2];buildCP('cfCR',S.cfColor,'pickC');closeModal('admOv');openModal('cfOv');}
 async function saveCategory(){const label=document.getElementById('cfLb').value.trim();const errEl=document.getElementById('cfErr');errEl.textContent='';if(!label){errEl.textContent='\u26A0\uFE0F Bezeichnung erforderlich!';return;}const id=document.getElementById('cfId').value;loading(true);try{if(id)await api('PUT','/categories/'+id,{label,emoji:document.getElementById('cfEm').value.trim()||'\uD83D\uDCCC',color:S.cfColor});else await api('POST','/categories',{label,emoji:document.getElementById('cfEm').value.trim()||'\uD83D\uDCCC',color:S.cfColor});await fetchData();backToAdmin('cats');toast('\u2705 Gespeichert!');}catch(e){errEl.textContent='\u26A0\uFE0F '+e.message;}finally{loading(false);}}
 async function delCat(id){if(!confirm('Kategorie l\u00f6schen?'))return;loading(true);try{await api('DELETE','/categories/'+id);await fetchData();backToAdmin('cats');}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}finally{loading(false);}}
@@ -2578,7 +2564,6 @@ function initPersistCards() {
   const theme=localStorage.getItem('lst_theme')||'light';
   document.documentElement.setAttribute('data-theme',theme);
   document.getElementById('thBtn').textContent=theme==='dark'?'\u2600\uFE0F':'\uD83C\uDF19';
-  await loadLoginUsers();
   try{const me=await api('GET','/auth/me');if(me?.userId){S.currentUser=me.userId;loading(true);await fetchData();loading(false);loginOK();}}
   catch(e){loading(false);}
 })();
@@ -6368,9 +6353,3 @@ async function toggleTodoItemAssignee(todoId, itemId, userId, assign) {
   } catch(e) { toast('Fehler: '+e.message,'err'); }
 }
 
-// Initialize login users on page load
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', loadLoginUsers);
-} else {
-  loadLoginUsers();
-}
