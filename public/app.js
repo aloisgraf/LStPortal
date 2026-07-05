@@ -49,7 +49,7 @@ let S={
   stationOutages:[],links:[],rolePermissions:[],_onBreak:false,
   docs:[],docCategories:[],_docFilter:'all',_docSearch:'',
   meetings:[], _selMeeting:null, _selInstance:null,
-  tkBatchMode:false,tkBatchSel:new Set(),_tkFeedFilter:'all',_tkTab:'details',
+  tkBatchMode:false,tkBatchSel:new Set(),_tkFeedFilter:'all',_tkTab:'details',tkGroupBy:'dept',tkFiltSubcat:'',
   checklists:[],messages:[],notifications:[],abrechnung:{einspringer:[],homeoffice:[]},dienstplaene:[],
   p:{canApproveEvents:false,canSendMessages:false,seeAllEntries:true,editAllPersonal:false,addForOthers:false,addGeneral:false,manageUsers:false,seeAllAllw:false,editAllw:false,seeAllAbrechnung:false},
   tp:{seeAll:false,editAll:false,myDepts:[],canSetPublic:false,canAssign:false,canSeeSubcat:false,canEditSubcat:false,roles:[]},
@@ -451,7 +451,9 @@ function renderHome(){
   // Beschwerden (subcategory tickets) für berechtigte Rollen
   var _beschwerdenHtml='';
   if(S.tp.canSeeSubcat){
-    var beschwerden=S.tickets.filter(function(tk){return tk.subcategory&&tk.status!=='closed';}).sort(function(a,b){return b.createdAt.localeCompare(a.createdAt);}).slice(0,15);
+    // Nur Unterkategorien, die als Beschwerde markiert sind (Admin → Unterkategorien)
+    var complaintLabels=new Set(S.ticketSubcategories.filter(function(s){return s.is_complaint;}).map(function(s){return s.label;}));
+    var beschwerden=S.tickets.filter(function(tk){return tk.subcategory&&complaintLabels.has(tk.subcategory)&&tk.status!=='closed';}).sort(function(a,b){return b.createdAt.localeCompare(a.createdAt);}).slice(0,15);
     if(beschwerden.length){
       var _pColors={high:'#ef4444',medium:'#f59e0b',low:'#94a3b8'};
       beschwerden.forEach(function(tk){
@@ -1225,6 +1227,7 @@ function getVisTks(closed=false,deleted=false){
     if(S.tkFiltTag&&!tk.tags.includes(S.tkFiltTag))return false;
     if(S.tkFiltAssignee&&tk.assigneeId!==S.tkFiltAssignee)return false;
     if(S.tkFiltStatus&&tk.status!==S.tkFiltStatus)return false;
+    if(S.tkFiltSubcat){if(S.tkFiltSubcat==='__none__'){if(tk.subcategory)return false;}else if(tk.subcategory!==S.tkFiltSubcat)return false;}
     if(S.tkSearch){const s=S.tkSearch.toLowerCase();if(!tk.title.toLowerCase().includes(s)&&!tk.number.toLowerCase().includes(s))return false;}
     return true;
   }).sort((a,b)=>{const po={high:0,medium:1,low:2};return(po[a.priority]||1)-(po[b.priority]||1)||b.createdAt.localeCompare(a.createdAt);});
@@ -1252,19 +1255,62 @@ function renderTickets(){
   parents.forEach(p=>{sorted.push(p);children.filter(c=>c.parentTicketId===p.id).forEach(c=>sorted.push(c));});
   children.filter(c=>!parents.find(p=>p.id===c.parentTicketId)).forEach(c=>sorted.push(c));
   const _tkPrioColor={high:'#ef4444',medium:'#f59e0b',low:'#94a3b8',urgent:'#7c3aed'};
+  const canSeeSubcat=!!S.tp.canSeeSubcat;
+  const groupMode=(canSeeSubcat&&S.tkGroupBy==='subcat')?'subcat':'dept';
+
+  // Vorschau: letzter Text-Eintrag, sonst Beschreibung (eine Zeile, gekürzt)
+  const tkPreview=tk=>{
+    const notes=(tk.notes||[]).filter(n=>n.noteType==='note').slice().sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+    const raw=notes.length?notes[0].text:(tk.description||'');
+    const txt=String(raw||'').replace(/\s+/g,' ').trim();
+    if(!txt)return'';
+    const pfx=notes.length?'💬 ':'📝 ';
+    return pfx+esc(txt.length>160?txt.slice(0,160)+'…':txt);
+  };
+
+  // Einheitlicher Zeilen-Renderer für die Card-Ansicht
+  const rowHtml=(tk,{showDept=true,showSubcat=true}={})=>{
+    const asn=getU(tk.assigneeId);const par=tk.parentTicketId?getTk(tk.parentTicketId):null;
+    const nc=tk.notes.filter(n=>n.noteType==='note').length;
+    const isChild=!!tk.parentTicketId;const isNew=tkIsNew(tk);
+    const accent=_tkPrioColor[tk.priority]||'#94a3b8';
+    const childStyle=isChild?'margin-left:20px;border-left:2px solid var(--border);background:var(--sf2);':'';
+    const isSel=S.tkBatchSel.has(tk.id);
+    const preview=tkPreview(tk);
+    return`<div style="display:flex;align-items:center;gap:10px;padding:${isChild?'7px 12px 7px 10px':'10px 14px'};border-top:1px solid var(--border);${childStyle}${isSel?'background:rgba(59,109,212,.07);':isNew?'background:rgba(245,158,11,.04);':''}" onclick="${S.tkBatchMode?`batchToggleTk('${tk.id}')`:''}" class="clickable">
+      ${S.tkBatchMode?`<input type="checkbox" ${isSel?'checked':''} onclick="event.stopPropagation();batchToggleTk('${tk.id}')" style="width:16px;height:16px;flex-shrink:0;cursor:pointer">`:''}
+      ${isChild?`<span style="font-size:14px;color:var(--di);flex-shrink:0;margin-right:-4px">&#x21b3;</span>`:''}
+      <div style="width:3px;align-self:stretch;background:${accent};border-radius:2px;flex-shrink:0"></div>
+      <div style="flex:1;min-width:0" onclick="${S.tkBatchMode?'':'openTkDetail(\''+tk.id+'\')'}">
+        <div style="font-size:${isChild?'12px':'13px'};font-weight:600;color:var(--tx);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+          ${isNew?'<span class="tk-new-badge">NEU</span> ':''}<span style="font-family:monospace;font-size:11px;color:var(--mu)">${tk.number}</span> ${tk.title}${showSubcat&&tk.subcategory?` <span class="bdg" style="font-size:10px;background:rgba(124,58,237,.12);color:#7c3aed">${tk.subcategory}</span>`:''}
+        </div>
+        ${preview?`<div style="font-size:11px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px">${preview}</div>`:''}
+        <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--mu);align-items:center">
+          ${showDept?deptBdg(tk.department):''}${prioBdg(tk.priority)}${stBdg(tk.status)}${dueBdg(tk)}${snoozeBdg(tk)}${tagChips(tk.tags)}
+          ${asn?`<div style="display:flex;align-items:center;gap:3px">${avHtml(asn.initials,asn.color,14,6)}<span>${asn.name}</span></div>`:''}
+          ${isChild&&par?`<span style="color:var(--di);font-size:10px">&#x2191; ${par.number}</span>`:''}
+          ${nc?`<span>💬 ${nc}</span>`:''}
+          <span style="color:var(--di)">${fd(tk.createdAt)}</span>
+        </div>
+      </div>
+    </div>`;
+  };
+  const wrapGroup=inner=>`<div style="background:var(--sf);border:1px solid var(--border);border-radius:var(--r);overflow:hidden">${inner}</div>`;
+
   let listHtml;
   if(useTable){
-    listHtml=sorted.length?`<div class="tw" style="overflow-x:auto"><table><thead><tr><th>#</th><th>Titel</th><th>Bereich</th><th>Prio</th><th>Status</th><th>Tags</th><th>Zust\u00e4ndig</th><th>Datum</th></tr></thead><tbody>
+    listHtml=sorted.length?`<div class="tw" style="overflow-x:auto"><table><thead><tr><th>#</th><th>Titel</th><th>Bereich</th><th>Prio</th><th>Status</th><th>Tags</th><th>Zuständig</th><th>Datum</th></tr></thead><tbody>
       ${sorted.map(tk=>{
         const asn=getU(tk.assigneeId);const par=tk.parentTicketId?getTk(tk.parentTicketId):null;
         const nc=tk.notes.filter(n=>n.noteType==='note').length;
         const isChild=!!tk.parentTicketId;const isNew=tkIsNew(tk);
         return`<tr class="clickable${isChild?' tk-child-row':''}${isNew?' tk-new-row':''}" onclick="openTkDetail('${tk.id}')">
           <td style="font-family:monospace;font-size:11px;color:var(--mu);white-space:nowrap${isChild?';padding-left:28px':''}">
-            ${isChild?'<span style="color:var(--di);margin-right:3px">\u21b3</span>':''}${tk.number}${isNew?'<span class="tk-new-badge">NEU</span>':''}
+            ${isChild?'<span style="color:var(--di);margin-right:3px">↳</span>':''}${tk.number}${isNew?'<span class="tk-new-badge">NEU</span>':''}
           </td>
-          <td style="max-width:220px"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${tk.title}</div>${nc?`<span style="font-size:10px;color:var(--mu)">\ud83d\udcac ${nc}</span>`:''}</td>
-          <td>${deptBdg(tk.department)}</td>
+          <td style="max-width:220px"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${tk.title}</div>${nc?`<span style="font-size:10px;color:var(--mu)">💬 ${nc}</span>`:''}</td>
+          <td>${deptBdg(tk.department)}${tk.subcategory?`<div><span class="bdg" style="font-size:10px;background:rgba(124,58,237,.12);color:#7c3aed">${tk.subcategory}</span></div>`:''}</td>
           <td>${prioBdg(tk.priority)}</td>
           <td>${stBdg(tk.status)}</td>
           <td style="max-width:140px">${tagChips(tk.tags)}${dueBdg(tk)}</td>
@@ -1274,72 +1320,36 @@ function renderTickets(){
       }).join('')}
     </tbody></table></div>`:`<div class="empty">&#128235; Keine Tickets</div>`;
   } else {
-    listHtml=sorted.length?`<div style="background:var(--sf);border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px;overflow:hidden">${sorted.map(tk=>{
-      const asn=getU(tk.assigneeId);const par=tk.parentTicketId?getTk(tk.parentTicketId):null;
-      const nc=tk.notes.filter(n=>n.noteType==='note').length;
-      const isChild=!!tk.parentTicketId;const isNew=tkIsNew(tk);
-      const accent=_tkPrioColor[tk.priority]||'#94a3b8';
-      const childStyle=isChild?'margin-left:20px;border-left:2px solid var(--border);background:var(--sf2);':'';
-      const isSel=S.tkBatchSel.has(tk.id);
-      return`<div style="display:flex;align-items:center;gap:10px;padding:${isChild?'7px 12px 7px 10px':'10px 14px'};border-top:1px solid var(--border);${childStyle}${isSel?'background:rgba(59,109,212,.07);':isNew?'background:rgba(245,158,11,.04);':''}" onclick="${S.tkBatchMode?`batchToggleTk('${tk.id}')`:''}" class="${S.tkBatchMode?'clickable':'clickable'}" ${S.tkBatchMode?'':''}>
-        ${S.tkBatchMode?`<input type="checkbox" ${isSel?'checked':''} onclick="event.stopPropagation();batchToggleTk('${tk.id}')" style="width:16px;height:16px;flex-shrink:0;cursor:pointer">`:''}
-        ${isChild?`<span style="font-size:14px;color:var(--di);flex-shrink:0;margin-right:-4px">&#x21b3;</span>`:''}
-        <div style="width:3px;align-self:stretch;background:${accent};border-radius:2px;flex-shrink:0"></div>
-        <div style="flex:1;min-width:0" ${S.tkBatchMode?'':''} onclick="${S.tkBatchMode?'':'openTkDetail(\''+tk.id+'\')'}">
-          <div style="font-size:${isChild?'12px':'13px'};font-weight:600;color:var(--tx);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-            ${isNew?'<span class="tk-new-badge">NEU</span> ':''}<span style="font-family:monospace;font-size:11px;color:var(--mu)">${tk.number}</span> ${tk.title}
-          </div>
-          <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--mu);align-items:center">
-            ${deptBdg(tk.department)}${prioBdg(tk.priority)}${stBdg(tk.status)}${dueBdg(tk)}${snoozeBdg(tk)}
-            ${tagChips(tk.tags)}
-            ${asn?`<div style="display:flex;align-items:center;gap:3px">${avHtml(asn.initials,asn.color,14,6)}<span>${asn.name}</span></div>`:''}
-            ${isChild&&par?`<span style="color:var(--di);font-size:10px">&#x2191; ${par.number}</span>`:''}
-            ${nc?`<span>&#128172; ${nc}</span>`:''}
-            <span style="color:var(--di)">${fd(tk.createdAt)}</span>
-          </div>
-        </div>
-      </div>`;
-    }).join('')}</div>`:`<div class="empty">&#128235; Keine Tickets</div>`;
+    listHtml=sorted.length?wrapGroup(sorted.map(tk=>rowHtml(tk)).join('')):`<div class="empty">&#128235; Keine Tickets</div>`;
   }
-  // Group by department
+
+  // Gruppierung: nach Fachbereich (Standard) oder Unterkategorie
   const deptOrder=[...new Set(sorted.map(t=>t.department))].sort((a,b)=>(DEPT_LABELS[a]||a).localeCompare(DEPT_LABELS[b]||b,'de'));
   let groupedHtml='';
   if(useTable){
     groupedHtml=listHtml;
+  } else if(groupMode==='subcat'&&sorted.length){
+    const keys=[...new Set(sorted.map(t=>t.subcategory||''))].sort((a,b)=>(a||'￿').localeCompare(b||'￿','de'));
+    keys.forEach(key=>{
+      const g=sorted.filter(t=>(t.subcategory||'')===key);
+      if(!g.length)return;
+      const label=key?`<span class="bdg" style="font-size:11px;background:rgba(124,58,237,.12);color:#7c3aed">${key}</span> ${key}`:'Ohne Unterkategorie';
+      groupedHtml+=`<div style="margin-bottom:14px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--mu);letter-spacing:.5px;padding:6px 2px;margin-bottom:4px">${label} <span style="font-weight:400;color:var(--di)">(${g.length})</span></div>
+        ${wrapGroup(g.map(tk=>rowHtml(tk,{showSubcat:false})).join(''))}
+      </div>`;
+    });
+    if(!groupedHtml)groupedHtml='<div class="empty">📫 Keine Tickets</div>';
   } else if(!S.tkFiltDept&&deptOrder.length>1){
     deptOrder.forEach(dept=>{
       const dtks=sorted.filter(t=>t.department===dept);
       if(!dtks.length)return;
       groupedHtml+=`<div style="margin-bottom:14px">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--mu);letter-spacing:.5px;padding:6px 2px;margin-bottom:4px">${deptBdg(dept)} ${DEPT_LABELS[dept]||dept} <span style="font-weight:400;color:var(--di)">(${dtks.length})</span></div>
-        <div style="background:var(--sf);border:1px solid var(--border);border-radius:var(--r);overflow:hidden">${dtks.map(tk=>{
-          const asn=getU(tk.assigneeId);const par=tk.parentTicketId?getTk(tk.parentTicketId):null;
-          const nc=tk.notes.filter(n=>n.noteType==='note').length;
-          const isChild=!!tk.parentTicketId;const isNew=tkIsNew(tk);
-          const accent=_tkPrioColor[tk.priority]||'#94a3b8';
-          const childStyle=isChild?'margin-left:20px;border-left:2px solid var(--border);background:var(--sf2);':'';
-          const isSel2=S.tkBatchSel.has(tk.id);
-          return`<div style="display:flex;align-items:center;gap:10px;padding:${isChild?'7px 12px 7px 10px':'10px 14px'};border-top:1px solid var(--border);${childStyle}${isSel2?'background:rgba(59,109,212,.07);':isNew?'background:rgba(245,158,11,.04);':''}" onclick="${S.tkBatchMode?`batchToggleTk('${tk.id}')`:''}" class="clickable">
-            ${S.tkBatchMode?`<input type="checkbox" ${isSel2?'checked':''} onclick="event.stopPropagation();batchToggleTk('${tk.id}')" style="width:16px;height:16px;flex-shrink:0;cursor:pointer">`:''}
-            ${isChild?`<span style="font-size:14px;color:var(--di);flex-shrink:0;margin-right:-4px">&#x21b3;</span>`:''}
-            <div style="width:3px;align-self:stretch;background:${accent};border-radius:2px;flex-shrink:0"></div>
-            <div style="flex:1;min-width:0" onclick="${S.tkBatchMode?'':'openTkDetail(\''+tk.id+'\')'}">
-              <div style="font-size:${isChild?'12px':'13px'};font-weight:600;color:var(--tx);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-                ${isNew?'<span class="tk-new-badge">NEU</span> ':''}<span style="font-family:monospace;font-size:11px;color:var(--mu)">${tk.number}</span> ${tk.title}${tk.subcategory?` <span class="bdg" style="font-size:10px;background:rgba(124,58,237,.12);color:#7c3aed">${tk.subcategory}</span>`:''}
-              </div>
-              <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--mu);align-items:center">
-                ${prioBdg(tk.priority)}${stBdg(tk.status)}${dueBdg(tk)}${snoozeBdg(tk)}${tagChips(tk.tags)}
-                ${asn?`<div style="display:flex;align-items:center;gap:3px">${avHtml(asn.initials,asn.color,14,6)}<span>${asn.name}</span></div>`:''}
-                ${isChild&&par?`<span style="color:var(--di);font-size:10px">&#x2191; ${par.number}</span>`:''}
-                ${nc?`<span>\ud83d\udcac ${nc}</span>`:''}
-                <span style="color:var(--di)">${fd(tk.createdAt)}</span>
-              </div>
-            </div>
-          </div>`;
-        }).join('')}</div>
+        ${wrapGroup(dtks.map(tk=>rowHtml(tk,{showDept:false})).join(''))}
       </div>`;
     });
-    if(!groupedHtml)groupedHtml='<div class="empty">\ud83d\udceb Keine Tickets</div>';
+    if(!groupedHtml)groupedHtml='<div class="empty">📫 Keine Tickets</div>';
   } else {
     groupedHtml=listHtml;
   }
@@ -1367,6 +1377,8 @@ function renderTickets(){
       <select class="flt" onchange="S.tkFiltPrio=this.value;renderMain()"><option value="">Alle Priorit\u00e4ten</option>${PRIORITIES.map(p2=>`<option value="${p2.id}"${S.tkFiltPrio===p2.id?' selected':''}>${p2.label}</option>`).join('')}</select>
       <select class="flt" onchange="S.tkFiltTag=this.value;renderMain()"><option value="">Alle Tags</option>${S.tags.map(t=>`<option value="${t.id}"${S.tkFiltTag===t.id?' selected':''}>${t.label}</option>`).join('')}</select>
       <select class="flt" onchange="S.tkFiltAssignee=this.value;renderMain()"><option value="">Alle Bearbeiter</option>${S.users.filter(isAssignable).map(u=>`<option value="${u.id}"${S.tkFiltAssignee===u.id?' selected':''}>${u.name}</option>`).join('')}</select>
+      ${canSeeSubcat?`<select class="flt" onchange="S.tkFiltSubcat=this.value;renderMain()"><option value="">Alle Unterkategorien</option><option value="__none__"${S.tkFiltSubcat==='__none__'?' selected':''}>&mdash; ohne Unterkategorie &mdash;</option>${[...new Set(S.ticketSubcategories.map(s=>s.label))].map(l=>`<option value="${l}"${S.tkFiltSubcat===l?' selected':''}>${l}</option>`).join('')}</select>`:''}
+      ${canSeeSubcat&&!useTable?`<select class="flt" onchange="S.tkGroupBy=this.value;renderMain()" title="Gruppierung der Liste"><option value="dept"${groupMode==='dept'?' selected':''}>Gruppierung: Fachbereich</option><option value="subcat"${groupMode==='subcat'?' selected':''}>Gruppierung: Unterkategorie</option></select>`:''}
     </div>
     ${groupedHtml}`;
 }
@@ -1555,6 +1567,7 @@ function renderTkDetail(){
     <div class="tkf"><label>Status</label><select onchange="updateTkField('${tk.id}','status',this.value)">${STATUSES.map(s=>`<option value="${s.id}"${tk.status===s.id?' selected':''}>${s.label}</option>`).join('')}</select></div>
     <div class="tkf"><label>Priorit\u00e4t</label><select onchange="updateTkField('${tk.id}','priority',this.value)">${PRIORITIES.map(p2=>`<option value="${p2.id}"${tk.priority===p2.id?' selected':''}>${p2.label}</option>`).join('')}</select></div>
     <div class="tkf"><label>Fachbereich</label><select onchange="updateTkField('${tk.id}','department',this.value)">${DEPTS.map(d=>`<option value="${d}"${tk.department===d?' selected':''}>${DEPT_LABELS[d]}</option>`).join('')}</select></div>
+    ${S.tp.canSeeSubcat?`<div class="tkf"><label>Unterkategorie</label><select onchange="updateTkField('${tk.id}','subcategory',this.value)"><option value="">— keine —</option>${(()=>{const opts=S.ticketSubcategories.filter(s=>s.department===tk.department).map(s=>s.label);if(tk.subcategory&&!opts.includes(tk.subcategory))opts.unshift(tk.subcategory);return opts.map(l=>`<option value="${l}"${tk.subcategory===l?' selected':''}>${l}</option>`).join('');})()}</select></div>`:''}
     <div class="tkf"><label>Bucket</label><select onchange="updateTkField('${tk.id}','bucket',this.value)"><option value="">\u2014</option>${BUCKETS.map(b=>`<option value="${b.id}"${tk.bucket===b.id?' selected':''}>${b.label}</option>`).join('')}</select></div>
     <div class="tkf"><label>Zust\u00e4ndig</label><div style="display:flex;gap:5px">
       <select onchange="updateTkField('${tk.id}','assigneeId',this.value||null)" style="flex:1"><option value="">\u2014</option>${S.users.filter(isAssignable).map(u=>`<option value="${u.id}"${tk.assigneeId===u.id?' selected':''}>${u.name}</option>`).join('')}</select>
@@ -1570,6 +1583,7 @@ function renderTkDetail(){
     :`<div class="tkf"><label>Status</label><div class="val">${stBdg(tk.status)}</div></div>
     <div class="tkf"><label>Priorit\u00e4t</label><div class="val">${prioBdg(tk.priority)}</div></div>
     <div class="tkf"><label>Fachbereich</label><div class="val">${deptBdg(tk.department)}</div></div>
+    ${S.tp.canSeeSubcat&&tk.subcategory?`<div class="tkf"><label>Unterkategorie</label><div class="val"><span class="bdg" style="font-size:11px;background:rgba(124,58,237,.12);color:#7c3aed">${tk.subcategory}</span></div></div>`:''}
     <div class="tkf"><label>Zust\u00e4ndig</label><div class="val">${getU(tk.assigneeId)?`<div style="display:flex;align-items:center;gap:5px">${avHtml(getU(tk.assigneeId).initials,getU(tk.assigneeId).color,18,8)}<span style="font-size:12px">${getU(tk.assigneeId).name}</span></div>`:'\u2014'}</div></div>`}
     <div class="tkdiv"></div>
     <div class="tkf"><label>Tags</label><div>${tagChips(tk.tags)||'<span style="color:var(--di);font-size:11px">\u2014</span>'}</div></div>
@@ -1985,6 +1999,7 @@ function openUF(id){
   document.getElementById('ufT').textContent=u?'Benutzer bearbeiten':'Benutzer anlegen';
   document.getElementById('ufId').value=u?.id||'';document.getElementById('ufNm').value=u?.name||'';document.getElementById('ufIn').value=u?.initials||'';
   document.getElementById('uffCategory').value=u?.category||'';
+  document.getElementById('ufEmail').value=u?.email||'';
   document.getElementById('ufPWRR').style.display=u?'block':'none';document.getElementById('ufPWRst').checked=false;
   document.getElementById('ufErr').textContent='';S.ufColor=u?.color||pal()[0];
   document.getElementById('ufRoles').innerHTML=ROLES.map(r=>`<label class="rck"><input type="checkbox" value="${r.id}" ${(u?.roles||['standard']).includes(r.id)?'checked':''}><span>${r.icon} ${r.label}</span></label>`).join('');
@@ -1993,14 +2008,15 @@ function openUF(id){
 async function saveUser(){
   const name=document.getElementById('ufNm').value.trim(),initials=document.getElementById('ufIn').value.trim().toUpperCase();
   const category=document.getElementById('uffCategory').value.trim()||null;
+  const email=document.getElementById('ufEmail').value.trim()||null;
   const errEl=document.getElementById('ufErr');errEl.textContent='';
   if(!name||!initials){errEl.textContent='\u26A0\uFE0F Name und K\u00fcrzel erforderlich!';return;}
   const roles=Array.from(document.querySelectorAll('#ufRoles input:checked')).map(cb=>cb.value);
   if(!roles.length){errEl.textContent='\u26A0\uFE0F Mindestens eine Rolle!';return;}
   const id=document.getElementById('ufId').value;loading(true);
   try{
-    if(id)await api('PUT','/users/'+id,{name,initials,roles,color:S.ufColor,resetPassword:document.getElementById('ufPWRst').checked,category});
-    else await api('POST','/users',{name,initials,roles,color:S.ufColor,category});
+    if(id)await api('PUT','/users/'+id,{name,initials,roles,color:S.ufColor,resetPassword:document.getElementById('ufPWRst').checked,category,email});
+    else await api('POST','/users',{name,initials,roles,color:S.ufColor,category,email});
     await fetchData();loadLoginUsers();backToAdmin('users');toast('\u2705 Benutzer gespeichert!');
   }catch(e){errEl.textContent='\u26A0\uFE0F '+e.message;}finally{loading(false);}
 }
@@ -2237,7 +2253,8 @@ function renderSubcatAdmin(){
     <div style="margin-bottom:10px">
       <div style="font-size:11px;font-weight:700;color:var(--mu);margin-bottom:4px">${DEPT_L[dept]||dept}</div>
       ${grouped[dept].map(s=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--sf);border-radius:6px;margin-bottom:4px;font-size:13px">
-        <span style="flex:1">${s.label}</span>
+        <span style="flex:1">${s.label}${s.is_complaint?' <span class="bdg" style="font-size:10px;background:rgba(239,68,68,.12);color:#ef4444">Beschwerde</span>':''}</span>
+        <label style="font-size:11px;color:var(--mu);display:flex;align-items:center;gap:4px;cursor:pointer" title="Erscheint in der Portal-Übersicht unter Beschwerden"><input type="checkbox" ${s.is_complaint?'checked':''} onchange="toggleSubcatComplaint('${s.id}',this.checked)"> Beschwerde</label>
         <button class="btn-s" style="color:#dc2626;padding:2px 8px" onclick="deleteSubcat('${s.id}')">&#10005;</button>
       </div>`).join('')}
     </div>`).join('');
@@ -2247,11 +2264,19 @@ async function addSubcat(){
   const label=(document.getElementById('scFLabel')?.value||'').trim();
   if(!dept||!label)return toast('⚠️ Fachbereich und Bezeichnung erforderlich','err');
   try{
-    await api('POST','/ticket-subcategories',{department:dept,label:label});
+    await api('POST','/ticket-subcategories',{department:dept,label:label,isComplaint:!!document.getElementById('scFComplaint')?.checked});
     await fetchData();
     document.getElementById('scFLabel').value='';
     renderSubcatAdmin();
     toast('✅ Unterkategorie gespeichert');
+  }catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function toggleSubcatComplaint(id,checked){
+  try{
+    await api('PUT','/ticket-subcategories/'+id,{isComplaint:checked});
+    await fetchData();
+    renderSubcatAdmin();
+    toast(checked?'✅ Als Beschwerde markiert':'✅ Beschwerde-Markierung entfernt');
   }catch(e){toast('⚠️ '+e.message,'err');}
 }
 async function deleteSubcat(id){

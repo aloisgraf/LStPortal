@@ -124,6 +124,8 @@ async function initDB() {
 
   const migs = [
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT`,
+    `ALTER TABLE ticket_subcategories ADD COLUMN IF NOT EXISTS is_complaint BOOLEAN NOT NULL DEFAULT false`,
     `ALTER TABLE checklist_template_items ADD COLUMN IF NOT EXISTS item_type TEXT NOT NULL DEFAULT 'check'`,
     `ALTER TABLE ticket_checklist_items ADD COLUMN IF NOT EXISTS item_type TEXT NOT NULL DEFAULT 'check'`,
     `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS event_id TEXT`,
@@ -626,6 +628,37 @@ app.use('/api',   require('./routes/todos'));
 
 app.get('*', (req,res) => res.sendFile(path.join(__dirname,'public','index.html')));
 
+// ── FÄLLIGKEITS-REMINDER (E-Mail) ──
+// Prüft alle 6h: Tickets überfällig oder in <48h fällig → Mail an Zuständigen.
+// Max. 1 Mail pro Ticket und Tag (In-Memory-Dedupe; Neustart → schlimmstenfalls
+// eine zusätzliche Mail). Ohne SMTP-Konfiguration passiert nichts.
+const _dueMailSent = new Map(); // ticketId -> YYYY-MM-DD der letzten Mail
+async function checkDueTickets() {
+  const { isConfigured, mailUser } = require('./lib/mailer');
+  if (!isConfigured()) return;
+  try {
+    const { q } = require('./db');
+    const rows = await q(
+      `SELECT id,number,title,due_date,assignee_id FROM tickets
+       WHERE status != 'closed' AND is_deleted IS NOT TRUE
+         AND assignee_id IS NOT NULL AND due_date IS NOT NULL
+         AND due_date <= (CURRENT_DATE + INTERVAL '2 days')`);
+    const today = new Date().toISOString().slice(0,10);
+    for (const tk of rows) {
+      if (_dueMailSent.get(tk.id) === today) continue;
+      const due = tk.due_date instanceof Date ? tk.due_date.toISOString().slice(0,10) : String(tk.due_date).slice(0,10);
+      const overdue = due < today;
+      const dueFmt = due.slice(8,10)+'.'+due.slice(5,7)+'.'+due.slice(0,4);
+      const sent = await mailUser(tk.assignee_id,
+        overdue ? `[${tk.number}] ÜBERFÄLLIG: ${tk.title}` : `[${tk.number}] Bald fällig: ${tk.title}`,
+        overdue
+          ? `das Ticket "${tk.title}" (${tk.number}) war am ${dueFmt} fällig und ist noch nicht abgeschlossen.`
+          : `das Ticket "${tk.title}" (${tk.number}) ist am ${dueFmt} fällig.`);
+      if (sent) _dueMailSent.set(tk.id, today);
+    }
+  } catch(e) { console.error('[due-reminder]', e.message); }
+}
+
 // ── START ──
 initDB().then(() => {
   app.listen(PORT, '0.0.0.0', () => {
@@ -633,4 +666,6 @@ initDB().then(() => {
     console.log(`  DB: ${process.env.DATABASE_URL?.slice(0,40)}...`);
     console.log(`  Env: ${process.env.NODE_ENV || 'development'}\n`);
   });
+  setTimeout(checkDueTickets, 60 * 1000);              // 1 min nach Start
+  setInterval(checkDueTickets, 6 * 60 * 60 * 1000);    // danach alle 6h
 }).catch(err => { console.error('❌ DB-Fehler:', err.message); process.exit(1); });

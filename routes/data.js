@@ -10,7 +10,7 @@ router.get('/', auth, async (req,res) => {
     const canManageDp = roles.some(r=>['admin','leitung','dienstplanung'].includes(r));
     const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
            tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw,dpQualificationsRaw,dpShiftPrefsRaw,dpProtocolRaw,todosRaw,todoItemsRaw,todoAssigneesRaw,myDpPlanIdsRaw,todoNotificationsRaw] = await Promise.all([
-      q('SELECT id,name,initials,roles,color,must_change_pw,last_seen,category FROM users ORDER BY name'),
+      q('SELECT id,name,initials,roles,color,must_change_pw,last_seen,category,email FROM users ORDER BY name'),
       q('SELECT * FROM categories ORDER BY sort_order,label'),
       q('SELECT * FROM tags ORDER BY label'),
       p.canApproveEvents

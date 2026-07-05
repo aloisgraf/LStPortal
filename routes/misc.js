@@ -158,11 +158,11 @@ router.delete('/tags/:id', auth, adminOnly, async (req,res) => {
 });
 router.post('/users', auth, adminOnly, async (req,res) => {
   try {
-    const {name,initials,roles,color,category}=req.body;
+    const {name,initials,roles,color,category,email}=req.body;
     if (!name?.trim()||!initials?.trim()) return bad(res,'Name und Kürzel erforderlich');
     const id=newId(), hash=await bcrypt.hash('Passwort1',10);
-    await pool.query('INSERT INTO users (id,name,initials,roles,color,pw_hash,must_change_pw,category) VALUES ($1,$2,$3,$4,$5,$6,true,$7)',
-      [id,name.trim(),initials.trim().toUpperCase(),JSON.stringify(roles||['standard']),color||'#64748b',hash,category||null]);
+    await pool.query('INSERT INTO users (id,name,initials,roles,color,pw_hash,must_change_pw,category,email) VALUES ($1,$2,$3,$4,$5,$6,true,$7,$8)',
+      [id,name.trim(),initials.trim().toUpperCase(),JSON.stringify(roles||['standard']),color||'#64748b',hash,category||null,email?.trim()||null]);
     ok(res,{id});
   } catch(e) { bad(res,'Serverfehler',500); }
 });
@@ -175,10 +175,10 @@ router.put('/users/:id', auth, async (req,res) => {
       await pool.query('UPDATE users SET color=$1 WHERE id=$2',[req.body.color||'#64748b',req.params.id]);
       return ok(res);
     }
-    const {name,initials,roles,color,resetPassword,category}=req.body;
+    const {name,initials,roles,color,resetPassword,category,email}=req.body;
     if (!name?.trim()||!initials?.trim()) return bad(res,'Name und Kürzel erforderlich');
-    await pool.query('UPDATE users SET name=$1,initials=$2,roles=$3,color=$4,category=$5 WHERE id=$6',
-      [name.trim(),initials.trim().toUpperCase(),JSON.stringify(roles||['standard']),color||'#64748b',category||null,req.params.id]);
+    await pool.query('UPDATE users SET name=$1,initials=$2,roles=$3,color=$4,category=$5,email=$6 WHERE id=$7',
+      [name.trim(),initials.trim().toUpperCase(),JSON.stringify(roles||['standard']),color||'#64748b',category||null,email?.trim()||null,req.params.id]);
     if (resetPassword) await pool.query('UPDATE users SET pw_hash=$1,must_change_pw=true WHERE id=$2',
       [await bcrypt.hash('Passwort1',10),req.params.id]);
     ok(res);
@@ -607,20 +607,26 @@ router.get('/ticket-subcategories', auth, async (req,res) => {
 router.post('/ticket-subcategories', auth, async (req,res) => {
   try {
     if(!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
-    const {department,label,sort_order} = req.body;
+    const {department,label,sort_order,isComplaint} = req.body;
     if(!department||!label) return bad(res,'department und label erforderlich');
     const id = newId();
-    await pool.query('INSERT INTO ticket_subcategories (id,department,label,sort_order,created_by) VALUES ($1,$2,$3,$4,$5)',
-      [id,department,label.trim(),parseInt(sort_order)||0,req.uid]);
+    await pool.query('INSERT INTO ticket_subcategories (id,department,label,sort_order,created_by,is_complaint) VALUES ($1,$2,$3,$4,$5,$6)',
+      [id,department,label.trim(),parseInt(sort_order)||0,req.uid,!!isComplaint]);
     ok(res,{id});
   } catch(e) { bad(res,'Serverfehler',500); }
 });
 router.put('/ticket-subcategories/:id', auth, async (req,res) => {
   try {
     if(!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
-    const {label,sort_order} = req.body;
-    await pool.query('UPDATE ticket_subcategories SET label=$1,sort_order=$2 WHERE id=$3',
-      [label.trim(),parseInt(sort_order)||0,req.params.id]);
+    const {label,sort_order,isComplaint} = req.body;
+    if (label !== undefined) {
+      await pool.query('UPDATE ticket_subcategories SET label=$1,sort_order=$2 WHERE id=$3',
+        [label.trim(),parseInt(sort_order)||0,req.params.id]);
+    }
+    if (isComplaint !== undefined) {
+      await pool.query('UPDATE ticket_subcategories SET is_complaint=$1 WHERE id=$2',
+        [!!isComplaint,req.params.id]);
+    }
     ok(res);
   } catch(e) { bad(res,'Serverfehler',500); }
 });

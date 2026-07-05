@@ -5,6 +5,7 @@ const router = require('express').Router();
 const { q, q1, newId, pool, getUser, logAct, canSeeTk, canEditTk, nextTicketNumber, auditNote, createNotification, parseMentions } = require('../db');
 const { auth, ok, bad } = require('../middleware');
 const { sanitizeFilename, validateMime, assertUnderDir } = require('../fileutil');
+const { mailUser } = require('../lib/mailer');
 
 const UPLOAD_DIR = path.resolve(__dirname, '..', 'uploads', 'ticket-files');
 try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch(e) {}
@@ -25,14 +26,22 @@ router.post('/', auth, async (req,res) => {
     for (const u of deptUsers)
       await createNotification(u.id,'new_ticket',`Neues Ticket in ${department}: ${title.trim()}`,id,null,req.uid);
     if (subcat) {
-      const subcatUsers = await q(
-        "SELECT DISTINCT id FROM users WHERE (roles::text LIKE '%schichtleiter%' OR roles::text LIKE '%leitung%' OR roles::text LIKE '%qm%') AND id != $1",
-        [req.uid]);
-      for (const u of subcatUsers)
-        await createNotification(u.id,'new_ticket',`Neue Beschwerde: ${title.trim()}`,id,null,req.uid);
+      // Nur echte Beschwerden (is_complaint) lösen die Beschwerde-Benachrichtigung aus
+      const scRow = await q1('SELECT is_complaint FROM ticket_subcategories WHERE label=$1 AND department=$2',
+        [subcat, department||'technik']);
+      if (scRow?.is_complaint) {
+        const subcatUsers = await q(
+          "SELECT DISTINCT id FROM users WHERE (roles::text LIKE '%schichtleiter%' OR roles::text LIKE '%leitung%' OR roles::text LIKE '%qm%') AND id != $1",
+          [req.uid]);
+        for (const u of subcatUsers)
+          await createNotification(u.id,'new_ticket',`Neue Beschwerde: ${title.trim()}`,id,null,req.uid);
+      }
     }
-    if (assigneeId && assigneeId!==req.uid)
+    if (assigneeId && assigneeId!==req.uid) {
       await createNotification(assigneeId,'assigned',`Dir wurde zugewiesen: ${title.trim()}`,id,null,req.uid);
+      mailUser(assigneeId, `[${number}] Dir wurde ein Ticket zugewiesen`,
+        `dir wurde das Ticket "${title.trim()}" (${number}) zugewiesen.`).catch(()=>{});
+    }
     await logAct(req.uid,req.user.name,'create_ticket',{number,title:title.trim()});
     // Eigene Tickets direkt als gesehen markieren
     await pool.query(`INSERT INTO ticket_views (ticket_id,user_id,viewed_at) VALUES ($1,$2,NOW()) ON CONFLICT (ticket_id,user_id) DO UPDATE SET viewed_at=NOW()`,
@@ -54,8 +63,12 @@ router.put('/:id', auth, async (req,res) => {
     const BL={urgent:'Dringend',week:'Diese Woche',sched:'Dienstplanung',wait:'Wartet',it:'IT',proj:'Projekte',org:'Organisation',ideas:'Ideen'};
     const fmtDate = d => d ? new Date(d).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
     // Audit: alle relevanten Feldänderungen protokollieren
-    if (b.status!==undefined&&b.status!==tk.status)
+    if (b.status!==undefined&&b.status!==tk.status) {
       await auditNote(tk.id,req.uid,`FIELD:status:${SL[tk.status]||tk.status}:${SL[b.status]||b.status}`);
+      if (tk.assignee_id && tk.assignee_id!==req.uid)
+        mailUser(tk.assignee_id, `[${tk.number}] Status geändert: ${SL[b.status]||b.status}`,
+          `beim Ticket "${tk.title}" (${tk.number}) wurde der Status von "${SL[tk.status]||tk.status}" auf "${SL[b.status]||b.status}" geändert.`).catch(()=>{});
+    }
     if (b.priority!==undefined&&b.priority!==tk.priority)
       await auditNote(tk.id,req.uid,`FIELD:priority:${PL[tk.priority]||tk.priority}:${PL[b.priority]||b.priority}`);
     if (b.department!==undefined&&b.department!==tk.department)
@@ -76,8 +89,11 @@ router.put('/:id', auth, async (req,res) => {
       const oldN=tk.assignee_id?(await getUser(tk.assignee_id))?.name||'?':'—';
       const newN=b.assigneeId?(await getUser(b.assigneeId))?.name||'?':'—';
       await auditNote(tk.id,req.uid,`FIELD:assignee:${oldN}:${newN}`);
-      if (b.assigneeId && b.assigneeId!==req.uid)
+      if (b.assigneeId && b.assigneeId!==req.uid) {
         await createNotification(b.assigneeId,'assigned',`Dir wurde zugewiesen: ${tk.title}`,tk.id,null,req.uid);
+        mailUser(b.assigneeId, `[${tk.number}] Dir wurde ein Ticket zugewiesen`,
+          `dir wurde das Ticket "${tk.title}" (${tk.number}) zugewiesen.`).catch(()=>{});
+      }
     }
     if (b.parentTicketId!==undefined&&(b.parentTicketId||null)!==(tk.parent_ticket_id||null)) {
       const oldP=tk.parent_ticket_id?(await q1('SELECT number FROM tickets WHERE id=$1',[tk.parent_ticket_id]))?.number||'?':'—';
@@ -154,6 +170,13 @@ router.post('/:id/notes', auth, async (req,res) => {
     for (const u of mentioned) {
       if (u.id === req.uid) continue;
       await createNotification(u.id,'mention',`${author?.name||'?'} erwähnte dich in ${tk.number}`,tk.id,id,req.uid);
+      mailUser(u.id, `[${tk.number}] Du wurdest erwähnt`,
+        `${author?.name||'?'} hat dich in einem Eintrag zum Ticket "${tk.title}" (${tk.number}) erwähnt:\n\n"${text}"`).catch(()=>{});
+    }
+    // Zuständigen informieren, wenn jemand anderes einen Eintrag hinzufügt
+    if (tk.assignee_id && tk.assignee_id!==req.uid && !mentionedIds.includes(tk.assignee_id)) {
+      mailUser(tk.assignee_id, `[${tk.number}] Neuer Eintrag in deinem Ticket`,
+        `${author?.name||'?'} hat einen neuen Eintrag zum Ticket "${tk.title}" (${tk.number}) hinzugefügt:\n\n"${text}"`).catch(()=>{});
     }
     ok(res,{id,createdAt:now});
   } catch(e) { bad(res,'Serverfehler',500); }
