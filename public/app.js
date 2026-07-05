@@ -1582,7 +1582,9 @@ function renderTkDetail(){
     ${canEdit?`
     <div class="tkf"><label>Status</label><select onchange="updateTkField('${tk.id}','status',this.value)">${STATUSES.map(s=>`<option value="${s.id}"${tk.status===s.id?' selected':''}>${s.label}</option>`).join('')}</select></div>
     <div class="tkf"><label>Priorit\u00e4t</label><select onchange="updateTkField('${tk.id}','priority',this.value)">${PRIORITIES.map(p2=>`<option value="${p2.id}"${tk.priority===p2.id?' selected':''}>${p2.label}</option>`).join('')}</select></div>
-    <div class="tkf"><label>Fachbereich</label><select onchange="updateTkField('${tk.id}','department',this.value)">${DEPTS.map(d=>`<option value="${d}"${tk.department===d?' selected':''}>${DEPT_LABELS[d]}</option>`).join('')}</select></div>
+    <div class="tkf"><label>Fachbereich</label>${tk.parentTicketId?
+      `<div class="val">${deptBdg(tk.department)} <span style="font-size:11px;color:var(--mu)">(vom Elternticket übernommen)</span></div>`
+      :`<select onchange="updateTkField('${tk.id}','department',this.value)">${DEPTS.map(d=>`<option value="${d}"${tk.department===d?' selected':''}>${DEPT_LABELS[d]}</option>`).join('')}</select>`}</div>
     ${S.tp.canSeeSubcat?`<div class="tkf"><label>Unterkategorie</label><select onchange="updateTkField('${tk.id}','subcategory',this.value)"><option value="">— keine —</option>${(()=>{const opts=S.ticketSubcategories.filter(s=>s.department===tk.department).map(s=>s.label);if(tk.subcategory&&!opts.includes(tk.subcategory))opts.unshift(tk.subcategory);return opts.map(l=>`<option value="${l}"${tk.subcategory===l?' selected':''}>${l}</option>`).join('');})()}</select></div>`:''}
     <div class="tkf"><label>Bucket</label><select onchange="updateTkField('${tk.id}','bucket',this.value)"><option value="">\u2014</option>${BUCKETS.map(b=>`<option value="${b.id}"${tk.bucket===b.id?' selected':''}>${b.label}</option>`).join('')}</select></div>
     <div class="tkf"><label>Zust\u00e4ndig</label><div style="display:flex;gap:5px">
@@ -1667,6 +1669,24 @@ function onTkDeptChange(){
     }
   }
 }
+// Fachbereich folgt immer dem gewählten Elternticket (Backend erzwingt das
+// ohnehin beim Speichern) — hier nur, damit die Auswahl schon vorher stimmt
+// und nicht überraschend beim Speichern "umspringt".
+function onTkParentChange(){
+  const parId=document.getElementById('tkFPar')?.value||'';
+  const deptSel=document.getElementById('tkFDept');
+  const hint=document.getElementById('tkFParHint');
+  if(!deptSel)return;
+  if(parId){
+    const parent=getTk(parId);
+    if(parent){deptSel.value=parent.department;onTkDeptChange();}
+    deptSel.disabled=true;
+    if(hint)hint.style.display='block';
+  } else {
+    deptSel.disabled=false;
+    if(hint)hint.style.display='none';
+  }
+}
 function openTkForm(id,parentId){
   const tk=id?getTk(id):null;
   document.getElementById('tkFT').textContent=tk?`Ticket bearbeiten: ${tk.number}`:'Neues Ticket';
@@ -1674,6 +1694,7 @@ function openTkForm(id,parentId){
   document.getElementById('tkFNm').value=tk?.title||'';
   document.getElementById('tkFDesc').value=tk?.description||'';
   document.getElementById('tkFDept').value=tk?.department||'frei';
+  document.getElementById('tkFDept').disabled=false;
   document.getElementById('tkFPrio').value=tk?.priority||'medium';
   onTkDeptChange();
   if(tk?.subcategory){const sel=document.getElementById('tkFSubcat');if(sel)sel.value=tk.subcategory||'';}
@@ -1688,6 +1709,7 @@ function openTkForm(id,parentId){
   document.getElementById('tkFAsgn').innerHTML='<option value="">\u2014 niemand \u2014</option>'+S.users.filter(isAssignable).map(u=>`<option value="${u.id}"${tk?.assigneeId===u.id?' selected':''}>${u.name}</option>`).join('');
   const pid=parentId||tk?.parentTicketId||'';
   document.getElementById('tkFPar').innerHTML='<option value="">\u2014</option>'+S.tickets.filter(t=>!id||t.id!==id).map(t=>`<option value="${t.id}"${t.id===pid?' selected':''}>${t.number}: ${t.title.slice(0,35)}</option>`).join('');
+  onTkParentChange();
   const dueFld=document.getElementById('tkFDue');if(dueFld)dueFld.value=tk?.dueDate||'';
   closeModal('tkDetOv');openModal('tkFormOv');
 }

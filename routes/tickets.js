@@ -13,8 +13,15 @@ try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch(e) {}
 
 router.post('/', auth, async (req,res) => {
   try {
-    const {title,description,department,subcategory,tags,priority,status,bucket,assigneeId,parentTicketId,dueDate} = req.body;
+    const {title,description,subcategory,tags,priority,status,bucket,assigneeId,parentTicketId,dueDate} = req.body;
+    let {department} = req.body;
     if (!title?.trim()) return bad(res,'Titel erforderlich');
+    // Kindticket übernimmt IMMER den Fachbereich des Elterntickets — verhindert
+    // inkonsistente Zuordnungen (Kind in Technik, Eltern in Leitung o.ä.)
+    if (parentTicketId) {
+      const parent = await q1('SELECT department FROM tickets WHERE id=$1',[parentTicketId]);
+      if (parent) department = parent.department;
+    }
     const id=newId(), number=await nextTicketNumber();
     const subcat = subcategory||'';
     await pool.query('INSERT INTO tickets (id,number,title,description,department,subcategory,tags,priority,status,bucket,assignee_id,parent_ticket_id,created_by,due_date) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)',
@@ -62,6 +69,21 @@ router.put('/:id', auth, async (req,res) => {
     const DL={frei:'Frei',technik:'Technik',leitung:'Leitung',dienstplanung:'Dienstplanung',ausbildung:'Ausbildung',qm:'QM'};
     const BL={urgent:'Dringend',week:'Diese Woche',sched:'Dienstplanung',wait:'Wartet',it:'IT',proj:'Projekte',org:'Organisation',ideas:'Ideen'};
     const fmtDate = d => d ? new Date(d).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
+
+    // Kindticket übernimmt IMMER den Fachbereich des Elterntickets. Greift beim
+    // Setzen/Wechseln eines Elterntickets, bei einem abweichenden manuellen
+    // Fachbereichs-Versuch, und heilt nebenbei bereits bestehende Inkonsistenzen
+    // (Kind ↔ Eltern in unterschiedlichen Fachbereichen), sobald das Ticket
+    // irgendwie bearbeitet wird.
+    const parentIdChanged = b.parentTicketId!==undefined && (b.parentTicketId||null)!==(tk.parent_ticket_id||null);
+    const effectiveParentId = b.parentTicketId!==undefined ? (b.parentTicketId||null) : (tk.parent_ticket_id||null);
+    if (effectiveParentId) {
+      const parent = await q1('SELECT department FROM tickets WHERE id=$1',[effectiveParentId]);
+      if (parent && (parentIdChanged || (b.department!==undefined&&b.department!==parent.department) || tk.department!==parent.department)) {
+        b.department = parent.department;
+      }
+    }
+
     // Audit: alle relevanten Feldänderungen protokollieren
     if (b.status!==undefined&&b.status!==tk.status) {
       await auditNote(tk.id,req.uid,`FIELD:status:${SL[tk.status]||tk.status}:${SL[b.status]||b.status}`);
@@ -125,6 +147,17 @@ router.put('/:id', auth, async (req,res) => {
     await pool.query(`UPDATE tickets SET ${setClauses.join(',')} WHERE id=$${vals.length}`,vals);
     await pool.query(`INSERT INTO ticket_views (ticket_id,user_id,viewed_at) VALUES ($1,$2,NOW()) ON CONFLICT (ticket_id,user_id) DO UPDATE SET viewed_at=NOW()`,
       [req.params.id,req.uid]).catch(()=>{});
+
+    // Fachbereich-Änderung an bestehende Kindtickets weiterreichen, damit die
+    // Zuordnung konsistent bleibt (Kind folgt immer dem Elternticket)
+    if (b.department!==undefined) {
+      const children = await q('SELECT id,department FROM tickets WHERE parent_ticket_id=$1',[req.params.id]);
+      for (const child of children) {
+        if (child.department===b.department) continue;
+        await pool.query('UPDATE tickets SET department=$1,updated_at=NOW() WHERE id=$2',[b.department,child.id]);
+        await auditNote(child.id,req.uid,`FIELD:department:${DL[child.department]||child.department}:${DL[b.department]||b.department}`);
+      }
+    }
     await logAct(req.uid,req.user.name,'update_ticket',{id:req.params.id});
     ok(res);
   } catch(e) { bad(res,'Serverfehler',500); }
