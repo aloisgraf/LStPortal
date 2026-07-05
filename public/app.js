@@ -442,7 +442,7 @@ function renderHome(){
       _dueFaelligHtml+='<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="openTkDetail(\''+tk.id+'\')">';
       _dueFaelligHtml+='<div style="width:3px;align-self:stretch;background:#ea580c;border-radius:2px;flex-shrink:0"></div>';
       _dueFaelligHtml+='<div style="flex:1;min-width:0">';
-      _dueFaelligHtml+='<div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+tk.number+': '+tk.title+'</div>';
+      _dueFaelligHtml+='<div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+tk.number+': '+esc(tk.title)+'</div>';
       _dueFaelligHtml+='<div style="font-size:10px;color:var(--mu)">'+dueBdg(tk)+(asn?' · '+asn.name:' · nicht zugewiesen')+'</div>';
       _dueFaelligHtml+='</div></div>';
     });
@@ -464,8 +464,8 @@ function renderHome(){
         _beschwerdenHtml+='<div style="flex:1;min-width:0">';
         _beschwerdenHtml+='<div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+
           (isNew?'<span class="tk-new-badge">NEU</span> ':'')+
-          '<span style="font-family:monospace;font-size:11px;color:var(--mu)">'+tk.number+'</span> '+tk.title+
-          ' <span class="bdg" style="font-size:10px;background:rgba(124,58,237,.12);color:#7c3aed">'+tk.subcategory+'</span></div>';
+          '<span style="font-family:monospace;font-size:11px;color:var(--mu)">'+tk.number+'</span> '+esc(tk.title)+
+          ' <span class="bdg" style="font-size:10px;background:rgba(124,58,237,.12);color:#7c3aed">'+esc(tk.subcategory)+'</span></div>';
         _beschwerdenHtml+='<div style="font-size:10px;color:var(--mu)">'+deptBdg(tk.department)+(asn?' · '+asn.name:' · nicht zugewiesen')+' · '+fd(tk.createdAt)+'</div>';
         _beschwerdenHtml+='</div>';
         _beschwerdenHtml+=prioBdg(tk.priority);
@@ -485,7 +485,7 @@ function renderHome(){
       var n=tkIsNew(tk);
       _ticketsHtml+='<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);gap:8px;'+(n?'background:rgba(245,158,11,.04);margin:0 -8px;padding:5px 8px;border-left:3px solid var(--warn);':'')+'">';
       _ticketsHtml+='<div style="min-width:0;flex:1;cursor:pointer" onclick="openTkDetail(\''+tk.id+'\')">';
-      _ticketsHtml+='<div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(n?'<span class="tk-new-badge">NEU</span> ':'')+tk.number+': '+tk.title+'</div>';
+      _ticketsHtml+='<div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(n?'<span class="tk-new-badge">NEU</span> ':'')+tk.number+': '+esc(tk.title)+'</div>';
       _ticketsHtml+='<div style="font-size:10px;color:var(--mu)">'+(tk.assigneeId===S.currentUser?'&#128100; Dir zugewiesen':'&#128202; '+(DEPT_LABELS[tk.department]||tk.department))+'</div>';
       _ticketsHtml+='</div>';
       _ticketsHtml+='<div style="display:flex;gap:4px;align-items:center;flex-shrink:0">'+prioBdg(tk.priority);
@@ -1283,7 +1283,7 @@ function renderTickets(){
       <div style="width:3px;align-self:stretch;background:${accent};border-radius:2px;flex-shrink:0"></div>
       <div style="flex:1;min-width:0" onclick="${S.tkBatchMode?'':'openTkDetail(\''+tk.id+'\')'}">
         <div style="font-size:${isChild?'12px':'13px'};font-weight:600;color:var(--tx);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-          ${isNew?'<span class="tk-new-badge">NEU</span> ':''}<span style="font-family:monospace;font-size:11px;color:var(--mu)">${tk.number}</span> ${tk.title}${showSubcat&&tk.subcategory?` <span class="bdg" style="font-size:10px;background:rgba(124,58,237,.12);color:#7c3aed">${tk.subcategory}</span>`:''}
+          ${isNew?'<span class="tk-new-badge">NEU</span> ':''}<span style="font-family:monospace;font-size:11px;color:var(--mu)">${tk.number}</span> ${esc(tk.title)}${showSubcat&&tk.subcategory?` <span class="bdg" style="font-size:10px;background:rgba(124,58,237,.12);color:#7c3aed">${tk.subcategory}</span>`:''}
         </div>
         ${preview?`<div style="font-size:11px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px">${preview}</div>`:''}
         <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--mu);align-items:center">
@@ -1307,7 +1307,7 @@ function renderTickets(){
           <td style="font-family:monospace;font-size:11px;color:var(--mu);white-space:nowrap${isChild?';padding-left:28px':''}">
             ${isChild?'<span style="color:var(--di);margin-right:3px">↳</span>':''}${tk.number}${isNew?'<span class="tk-new-badge">NEU</span>':''}
           </td>
-          <td style="max-width:220px"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${tk.title}</div>${nc?`<span style="font-size:10px;color:var(--mu)">💬 ${nc}</span>`:''}</td>
+          <td style="max-width:220px"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(tk.title)}</div>${nc?`<span style="font-size:10px;color:var(--mu)">💬 ${nc}</span>`:''}</td>
           <td>${deptBdg(tk.department)}${tk.subcategory?`<div><span class="bdg" style="font-size:10px;background:rgba(124,58,237,.12);color:#7c3aed">${tk.subcategory}</span></div>`:''}</td>
           <td>${prioBdg(tk.priority)}</td>
           <td>${stBdg(tk.status)}</td>
@@ -1397,7 +1397,7 @@ function openTkDetail(id){
   }
   api('PUT','/tickets/'+id+'/view').catch(()=>{});
 }
-function highlightMentions(text){return text.replace(/@(\S+)/g,(match,name)=>{const u=S.users.find(u=>u.name.toLowerCase()===name.toLowerCase());return u?`<span class="mention">@${u.name}</span>`:match;});}
+function highlightMentions(text){return esc(text).replace(/@(\S+)/g,(match,name)=>{const u=S.users.find(u=>u.name.toLowerCase()===name.toLowerCase());return u?`<span class="mention">@${esc(u.name)}</span>`:match;});}
 // ── Ticket Feed Renderer ──
 const _AUDIT_ICONS={
   status:'🔄',priority:'⚡',department:'🏢',title:'✏️',bucket:'📦',
@@ -1434,10 +1434,10 @@ function _renderFeed(notes,tkId,canEdit,filter){
         <div style="padding:2px 0 ${isLast?'0':'10px'} 0;flex:1;min-width:0">
           ${parsed?`<div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap">
             <span style="font-size:12px;font-weight:700;color:var(--tx)">${label}</span>
-            <span style="font-size:11px;color:var(--mu);text-decoration:line-through;word-break:break-word">${parsed.from}</span>
+            <span style="font-size:11px;color:var(--mu);text-decoration:line-through;word-break:break-word">${esc(parsed.from)}</span>
             <span style="font-size:11px;color:var(--mu)">→</span>
-            <span style="font-size:12px;font-weight:600;color:var(--acc);word-break:break-word">${parsed.to}</span>
-          </div>`:`<div style="font-size:12px;color:var(--mu)">${n.text}</div>`}
+            <span style="font-size:12px;font-weight:600;color:var(--acc);word-break:break-word">${esc(parsed.to)}</span>
+          </div>`:`<div style="font-size:12px;color:var(--mu)">${esc(n.text)}</div>`}
           <div style="font-size:10px;color:var(--di);margin-top:2px">
             ${a?`${avHtml(a.initials,a.color,12,5)} ${a.name} · `:''}${fdt(n.createdAt)}
           </div>

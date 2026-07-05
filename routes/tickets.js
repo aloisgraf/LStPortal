@@ -349,8 +349,10 @@ router.get('/:id/files/:fid', auth, async (req,res) => {
     const filePath = path.join(UPLOAD_DIR, file.filename);
     assertUnderDir(UPLOAD_DIR, filePath);
     if (!fs.existsSync(filePath)) return bad(res,'Datei nicht auf Datenträger',404);
-    res.setHeader('Content-Type', file.mime_type);
-    res.setHeader('Content-Disposition',`inline; filename*=UTF-8''${encodeURIComponent(file.original_name)}`);
+    const inlineSafe = /^(image\/(jpeg|png|gif|webp)|application\/pdf|text\/plain)$/.test(file.mime_type);
+    res.setHeader('Content-Type', inlineSafe ? file.mime_type : 'application/octet-stream');
+    res.setHeader('X-Content-Type-Options','nosniff');
+    res.setHeader('Content-Disposition',`${inlineSafe?'inline':'attachment'}; filename*=UTF-8''${encodeURIComponent(file.original_name)}`);
     res.sendFile(filePath);
   } catch(e) { bad(res,'Serverfehler',500); }
 });

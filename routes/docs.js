@@ -123,8 +123,10 @@ router.get('/docs/:id', auth, async (req, res) => {
     const filePath = path.join(DOCS_DIR, doc.filename);
     assertUnderDir(DOCS_DIR, filePath);
     if (!fs.existsSync(filePath)) return bad(res, 'Datei nicht gefunden', 404);
-    res.setHeader('Content-Type', doc.mime_type);
-    res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(doc.original_name)}`);
+    const inlineSafe = /^(image\/(jpeg|png|gif|webp)|application\/pdf|text\/plain)$/.test(doc.mime_type);
+    res.setHeader('Content-Type', inlineSafe ? doc.mime_type : 'application/octet-stream');
+    res.setHeader('X-Content-Type-Options','nosniff');
+    res.setHeader('Content-Disposition',`${inlineSafe?'inline':'attachment'}; filename*=UTF-8''${encodeURIComponent(doc.original_name)}`);
     res.sendFile(filePath);
   } catch(e) { bad(res, 'Serverfehler', 500); }
 });
@@ -211,8 +213,11 @@ router.get('/docs/:id/versions/:vid', auth, async (req, res) => {
     assertUnderDir(DOCS_DIR, filePath);
     if (!fs.existsSync(filePath)) return bad(res, 'Datei nicht gefunden', 404);
     const doc = await q1('SELECT mime_type FROM documents WHERE id=$1', [req.params.id]);
-    res.setHeader('Content-Type', doc?.mime_type || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(ver.original_name)}`);
+    const verMime = ver.mime_type || doc?.mime_type || 'application/octet-stream';
+    const inlineSafe = /^(image\/(jpeg|png|gif|webp)|application\/pdf|text\/plain)$/.test(verMime);
+    res.setHeader('Content-Type', inlineSafe ? verMime : 'application/octet-stream');
+    res.setHeader('X-Content-Type-Options','nosniff');
+    res.setHeader('Content-Disposition',`${inlineSafe?'inline':'attachment'}; filename*=UTF-8''${encodeURIComponent(ver.original_name)}`);
     res.sendFile(filePath);
   } catch(e) { bad(res, 'Serverfehler', 500); }
 });
