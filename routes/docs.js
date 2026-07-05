@@ -98,19 +98,20 @@ router.post('/docs', auth, async (req, res) => {
     const safeName = sanitizeFilename(originalName);
     const ext = extFromMime(mime, safeName);
     const filename = id + ext;
-    const destPath = path.join(DOCS_DIR, filename);
-    assertUnderDir(DOCS_DIR, destPath);
-    fs.writeFileSync(destPath, buf);
+    // Dateiinhalt in der DB gespeichert (nicht auf der lokalen Festplatte),
+    // da Render-Deploys das Dateisystem zurücksetzen und Uploads sonst
+    // beim nächsten Deploy verloren gehen.
+    const b64 = buf.toString('base64');
     const doc = await q1(
-      `INSERT INTO documents (id,category_id,title,description,filename,original_name,mime_type,size_bytes,current_version,uploaded_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,1,$9) RETURNING *`,
-      [id, categoryId||null, title, description||'', filename, safeName, mime, buf.length, req.uid]
+      `INSERT INTO documents (id,category_id,title,description,filename,original_name,mime_type,size_bytes,current_version,uploaded_by,file_data)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,1,$9,$10) RETURNING *`,
+      [id, categoryId||null, title, description||'', filename, safeName, mime, buf.length, req.uid, b64]
     );
     const vId = newId();
     await q(
-      `INSERT INTO document_versions (id,document_id,version,filename,original_name,size_bytes,uploaded_by)
-       VALUES ($1,$2,1,$3,$4,$5,$6)`,
-      [vId, id, filename, safeName, buf.length, req.uid]
+      `INSERT INTO document_versions (id,document_id,version,filename,original_name,size_bytes,uploaded_by,file_data)
+       VALUES ($1,$2,1,$3,$4,$5,$6,$7)`,
+      [vId, id, filename, safeName, buf.length, req.uid, b64]
     );
     ok(res, doc);
   } catch(e) { bad(res, 'Serverfehler', 500); }
@@ -122,11 +123,13 @@ router.get('/docs/:id', auth, async (req, res) => {
     if (!doc) return bad(res, 'Nicht gefunden', 404);
     const filePath = path.join(DOCS_DIR, doc.filename);
     assertUnderDir(DOCS_DIR, filePath);
-    if (!fs.existsSync(filePath)) return bad(res, 'Datei nicht gefunden', 404);
+    if (!doc.file_data && !fs.existsSync(filePath))
+      return bad(res, 'Datei nicht mehr verfügbar (vor Umstellung auf DB-Speicherung hochgeladen) — bitte erneut hochladen', 404);
     const inlineSafe = /^(image\/(jpeg|png|gif|webp)|application\/pdf|text\/plain)$/.test(doc.mime_type);
     res.setHeader('Content-Type', inlineSafe ? doc.mime_type : 'application/octet-stream');
     res.setHeader('X-Content-Type-Options','nosniff');
     res.setHeader('Content-Disposition',`${inlineSafe?'inline':'attachment'}; filename*=UTF-8''${encodeURIComponent(doc.original_name)}`);
+    if (doc.file_data) return res.send(Buffer.from(doc.file_data,'base64'));
     res.sendFile(filePath);
   } catch(e) { bad(res, 'Serverfehler', 500); }
 });
@@ -181,18 +184,16 @@ router.post('/docs/:id/version', auth, async (req, res) => {
     const newVersion = (doc.current_version || 1) + 1;
     const ext = extFromMime(mime, safeName);
     const newFilename = doc.id + '_v' + newVersion + ext;
-    const destPath = path.join(DOCS_DIR, newFilename);
-    assertUnderDir(DOCS_DIR, destPath);
-    fs.writeFileSync(destPath, buf);
     const vId = newId();
+    // Bisherige Version (inkl. ihres Dateiinhalts) archivieren, bevor überschrieben wird
     await q(
-      `INSERT INTO document_versions (id,document_id,version,filename,original_name,size_bytes,uploaded_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-      [vId, doc.id, doc.current_version, doc.filename, doc.original_name, doc.size_bytes, doc.uploaded_by]
+      `INSERT INTO document_versions (id,document_id,version,filename,original_name,size_bytes,uploaded_by,file_data)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [vId, doc.id, doc.current_version, doc.filename, doc.original_name, doc.size_bytes, doc.uploaded_by, doc.file_data||null]
     );
     const updated = await q1(
-      `UPDATE documents SET filename=$1,original_name=$2,mime_type=$3,size_bytes=$4,current_version=$5,updated_at=NOW() WHERE id=$6 RETURNING *`,
-      [newFilename, safeName, mime, buf.length, newVersion, doc.id]
+      `UPDATE documents SET filename=$1,original_name=$2,mime_type=$3,size_bytes=$4,current_version=$5,updated_at=NOW(),file_data=$6 WHERE id=$7 RETURNING *`,
+      [newFilename, safeName, mime, buf.length, newVersion, buf.toString('base64'), doc.id]
     );
     ok(res, updated);
   } catch(e) { bad(res, 'Serverfehler', 500); }
@@ -211,13 +212,15 @@ router.get('/docs/:id/versions/:vid', auth, async (req, res) => {
     if (!ver) return bad(res, 'Nicht gefunden', 404);
     const filePath = path.join(DOCS_DIR, ver.filename);
     assertUnderDir(DOCS_DIR, filePath);
-    if (!fs.existsSync(filePath)) return bad(res, 'Datei nicht gefunden', 404);
+    if (!ver.file_data && !fs.existsSync(filePath))
+      return bad(res, 'Datei nicht mehr verfügbar (vor Umstellung auf DB-Speicherung hochgeladen)', 404);
     const doc = await q1('SELECT mime_type FROM documents WHERE id=$1', [req.params.id]);
     const verMime = ver.mime_type || doc?.mime_type || 'application/octet-stream';
     const inlineSafe = /^(image\/(jpeg|png|gif|webp)|application\/pdf|text\/plain)$/.test(verMime);
     res.setHeader('Content-Type', inlineSafe ? verMime : 'application/octet-stream');
     res.setHeader('X-Content-Type-Options','nosniff');
     res.setHeader('Content-Disposition',`${inlineSafe?'inline':'attachment'}; filename*=UTF-8''${encodeURIComponent(ver.original_name)}`);
+    if (ver.file_data) return res.send(Buffer.from(ver.file_data,'base64'));
     res.sendFile(filePath);
   } catch(e) { bad(res, 'Serverfehler', 500); }
 });

@@ -327,12 +327,11 @@ router.post('/:id/files', auth, async (req,res) => {
     const safeName = sanitizeFilename(name.trim());
     const ext = (safeName.split('.').pop()||'bin').toLowerCase().replace(/[^a-z0-9]/g,'');
     const filename = `${id}.${ext}`;
-    const destPath = path.join(UPLOAD_DIR, filename);
-    assertUnderDir(UPLOAD_DIR, destPath);
-    fs.mkdirSync(UPLOAD_DIR,{recursive:true});
-    fs.writeFileSync(destPath, buf);
-    await pool.query('INSERT INTO ticket_files (id,ticket_id,filename,original_name,mime_type,size_bytes,uploaded_by) VALUES ($1,$2,$3,$4,$5,$6,$7)',
-      [id,req.params.id,filename,safeName,mime,buf.length,req.uid]);
+    // Dateiinhalt wird in der DB gespeichert (nicht auf der lokalen Festplatte),
+    // da Render-Deploys das lokale Dateisystem zurücksetzen und hochgeladene
+    // Dateien sonst beim nächsten Deploy verloren gehen.
+    await pool.query('INSERT INTO ticket_files (id,ticket_id,filename,original_name,mime_type,size_bytes,uploaded_by,file_data) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+      [id,req.params.id,filename,safeName,mime,buf.length,req.uid,buf.toString('base64')]);
     const uname=(await getUser(req.uid))?.name||'?';
     await auditNote(req.params.id,req.uid,`📎 Datei hochgeladen: ${safeName} von ${uname}`);
     ok(res,{id});
@@ -346,13 +345,18 @@ router.get('/:id/files/:fid', auth, async (req,res) => {
     if (!canSeeTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
     const file = await q1('SELECT * FROM ticket_files WHERE id=$1 AND ticket_id=$2',[req.params.fid,req.params.id]);
     if (!file) return bad(res,'Datei nicht gefunden',404);
+    // Alt-Dateien (vor der Umstellung auf DB-Speicherung hochgeladen) liegen
+    // ggf. noch auf der lokalen Festplatte, sind aber nach jedem Deploy weg.
     const filePath = path.join(UPLOAD_DIR, file.filename);
     assertUnderDir(UPLOAD_DIR, filePath);
-    if (!fs.existsSync(filePath)) return bad(res,'Datei nicht auf Datenträger',404);
+    const onDisk = !file.file_data && fs.existsSync(filePath);
+    if (!file.file_data && !onDisk)
+      return bad(res,'Datei nicht mehr verfügbar (vor Umstellung auf DB-Speicherung hochgeladen) — bitte erneut hochladen',404);
     const inlineSafe = /^(image\/(jpeg|png|gif|webp)|application\/pdf|text\/plain)$/.test(file.mime_type);
     res.setHeader('Content-Type', inlineSafe ? file.mime_type : 'application/octet-stream');
     res.setHeader('X-Content-Type-Options','nosniff');
     res.setHeader('Content-Disposition',`${inlineSafe?'inline':'attachment'}; filename*=UTF-8''${encodeURIComponent(file.original_name)}`);
+    if (file.file_data) return res.send(Buffer.from(file.file_data,'base64'));
     res.sendFile(filePath);
   } catch(e) { bad(res,'Serverfehler',500); }
 });

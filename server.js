@@ -250,6 +250,7 @@ async function initDB() {
       size_bytes INTEGER NOT NULL DEFAULT 0,
       uploaded_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
     )`,
+    `ALTER TABLE ticket_files ADD COLUMN IF NOT EXISTS file_data TEXT`,
     `CREATE TABLE IF NOT EXISTS doc_categories (
       id TEXT PRIMARY KEY, name TEXT NOT NULL,
       icon TEXT DEFAULT '📁', color TEXT DEFAULT '#3b6dd4',
@@ -273,6 +274,8 @@ async function initDB() {
       size_bytes INTEGER NOT NULL DEFAULT 0,
       uploaded_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
     )`,
+    `ALTER TABLE documents ADD COLUMN IF NOT EXISTS file_data TEXT`,
+    `ALTER TABLE document_versions ADD COLUMN IF NOT EXISTS file_data TEXT`,
     `ALTER TABLE station_shifts ADD COLUMN IF NOT EXISTS service_start TEXT DEFAULT ''`,
     `ALTER TABLE station_shifts ADD COLUMN IF NOT EXISTS service_end TEXT DEFAULT ''`,
     `ALTER TABLE station_shifts ADD COLUMN IF NOT EXISTS has_break BOOLEAN DEFAULT true`,
