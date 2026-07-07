@@ -1469,7 +1469,7 @@ function _renderFeed(notes,tkId,canEdit,filter){
             <span style="font-size:10px;color:var(--di)">${fdt(n.createdAt)}</span>
             ${canEdit&&n.authorId===S.currentUser?`<button class="btn-d" style="padding:1px 6px;font-size:10px;margin-left:auto" onclick="deleteNote('${tkId}','${n.id}')">✕</button>`:''}
           </div>
-          <div style="font-size:13px;line-height:1.5">${highlightMentions(n.text)}</div>
+          <div style="font-size:13px;line-height:1.5;color:var(--mu)">${highlightMentions(n.text)}</div>
         </div>
       </div>`;
     }
