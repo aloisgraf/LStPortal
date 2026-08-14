@@ -6051,12 +6051,29 @@ async function deleteDpRequirement(id) {
 // ═══════════════════════════════════════════════════════════════════════════
 // DIENSTPLAN — WEIHNACHTSDIENST-ROTATION
 // ═══════════════════════════════════════════════════════════════════════════
-const XMAS_DAY_KEYS = ['24.12-T','24.12-N','25.12-T','25.12-N','26.12-T','26.12-N','31.12-T','31.12-N','01.01-T','01.01-N'];
-const XMAS_DAY_SHORT = Object.fromEntries(XMAS_DAY_KEYS.map(k => [k, k.replace('-T','T').replace('-N','N')]));
-// Historien-Erfassung: EINE Spalte je Kalendertag (Schichtart steckt im
-// Zellwert TD/ND/UR/–, siehe cycleXmasCell) — Score/Wunsch bleiben bei den
-// bestehenden 10 Tag/Nacht-Dimensionen (XMAS_DAY_KEYS).
+// EIN Datensatz je Kalendertag für Historie, Score UND Wunsch — die Schichtart
+// steckt jeweils im Zellwert (TD/ND bzw. Wunsch TD/ND), nicht mehr in der Spalte.
 const XMAS_CALENDAR_DAY_KEYS = ['24.12','25.12','26.12','31.12','01.01'];
+const XMAS_CALENDAR_DAY_LABEL = {'24.12':'24. Dezember','25.12':'25. Dezember','26.12':'26. Dezember','31.12':'31. Dezember','01.01':'1. Jänner'};
+// Für die "gesperrte Zellen"-Logik (Jahre/Tage außerhalb des Dienstverhältnisses)
+// — spiegelt CHRISTMAS_CALENDAR_DAYS aus lib/dp-rules.js (Backend hat keinen
+// direkten Zugriff auf diese Client-Datei, daher bewusst dupliziert).
+const XMAS_CALENDAR_DAY_META = {
+  '24.12': {month:12, day:24, yearOffset:0}, '25.12': {month:12, day:25, yearOffset:0},
+  '26.12': {month:12, day:26, yearOffset:0}, '31.12': {month:12, day:31, yearOffset:0},
+  '01.01': {month:1,  day:1,  yearOffset:1},
+};
+function xmasCalendarDateFor(year, calDayKey) {
+  const m = XMAS_CALENDAR_DAY_META[calDayKey]; if (!m) return null;
+  return `${year+m.yearOffset}-${String(m.month).padStart(2,'0')}-${String(m.day).padStart(2,'0')}`;
+}
+// Zelle gesperrt = liegt vor Eintritt oder nach Austritt des Mitarbeiters.
+function xmasCellLocked(emp, year, calDayKey) {
+  const d = xmasCalendarDateFor(year, calDayKey);
+  if (emp.hireDate && d < emp.hireDate) return true;
+  if (emp.terminationDate && d > emp.terminationDate) return true;
+  return false;
+}
 
 function xmasFmtScore(s) {
   if (!s) return '0';
@@ -6102,8 +6119,8 @@ async function renderDPChristmas() {
     </div>
     <div style="flex:1;overflow:auto;padding:16px">
       <div style="margin-bottom:12px;font-size:12px;color:var(--mu)">
-        Historie: eine Zelle je Kalendertag mit den Werten <strong>TD</strong> (Tagdienst gearbeitet), <strong>ND</strong> (Nachtdienst gearbeitet), <strong>UR</strong> (Urlaub) oder <strong>–</strong> (regulär frei). Score je Mitarbeiter, Tag <strong>und Schichtart</strong> (Tag-/Nachtdienst getrennt): TD/ND → <strong>+1</strong> auf die jeweilige Schichtart, UR → <strong>−1</strong> auf beide Schichtarten (die Urlaubs-Zelle sagt nicht aus, welche Schichtart sonst gefragt gewesen wäre) — Nachtdienst an 24.12. und 31.12. zählt mit Faktor <strong>1,5</strong>. „–" trägt nichts bei.
-        Von den Mitarbeitern mit Urlaubswunsch für ${year} bekommen die mit dem <strong>höchsten Score</strong> (hat in der Vergangenheit am meisten gearbeitet) den Vorschlag „Urlaub empfohlen", begrenzt durch die freien Kapazitäts-Slots. Wiederholt sich sonst eine Vorjahres-Zuteilung, wird nach Möglichkeit auf einen anderen Tag getauscht — sonst als ⚠ markiert.
+        Historie: eine Zelle je Kalendertag mit den Werten <strong>TD</strong> (Tagdienst gearbeitet), <strong>ND</strong> (Nachtdienst gearbeitet), <strong>UR</strong> (Urlaub) oder <strong>–</strong> (regulär frei). Score je Mitarbeiter und Tag (eine Dimension, nicht mehr nach Schichtart getrennt): TD/ND → <strong>+1</strong>, ND an 24.12./31.12. mit Faktor <strong>1,5</strong> (höhere Belastung), UR → <strong>−1</strong>, „–" trägt nichts bei.
+        Wunsch ${year} je Tag: <strong>U</strong> (möchte frei/Urlaub), <strong>TD</strong>/<strong>ND</strong> (möchte gern arbeiten) oder kein Eintrag. Freiwillige decken den Schichtbedarf zuerst, erst danach werden fehlende Plätze nach dem <strong>niedrigsten Score</strong> aufgefüllt (hat am wenigsten gearbeitet). Wer danach übrig bleibt und Wunsch U hat, bekommt nach <strong>höchstem Score</strong> sortiert „Urlaub empfohlen" — begrenzt durch die freien Kapazitäts-Slots. Der Wunsch selbst fließt nicht in den Score ein, erst der später eingetragene finale Historienwert.
         Ausgenommene (Mitarbeiterverwaltung → Rotation) und inaktive Mitarbeiter (kein aktuelles Dienstverhältnis) fließen nicht in Score, Kapazität oder Vorschlag ein.
         Reine Empfehlung — der Dienstplan wird dadurch <strong>nicht</strong> automatisch verändert.
       </div>
@@ -6119,16 +6136,17 @@ async function renderDPChristmas() {
       </div>
       <div style="font-size:11px;color:var(--mu);margin-bottom:8px">
         <span style="color:#f59e0b">■</span> Historie (${canEditHistory?'Zelle klicken: — / TD / ND / UR / –':'nur Planungsberechtigte können bearbeiten'})
-        &nbsp;·&nbsp; <span style="color:#3b82f6">■</span> Score (berechnet, alle Jahre, T=Tag/N=Nacht)
-        &nbsp;·&nbsp; <span style="color:#8b5cf6">■</span> Urlaubswunsch ${year} (Checkbox)
+        &nbsp;·&nbsp; <span style="color:#3b82f6">■</span> Score (berechnet, alle Jahre)
+        &nbsp;·&nbsp; <span style="color:#8b5cf6">■</span> Wunsch ${year} (Zelle klicken: — / U / TD / ND)
         &nbsp;·&nbsp; <span style="opacity:.5">grau = von der Rotation ausgenommen oder inaktiv</span>
+        &nbsp;·&nbsp; <span style="opacity:.5">schraffiert = gesperrt (außerhalb Dienstverhältnis)</span>
       </div>
       <div id="xmasMatrixBox">${renderXmasMatrix(employees, histYears, history, scores, wishes, year, canEditHistory)}</div>
     </div>
   </div>`;
 }
 
-// Nach einer Zell-/Checkbox-Änderung nur die Matrix + Vorschlags-Karten neu laden
+// Nach einer Zellen-Änderung nur die Matrix + Vorschlags-Karten neu laden
 // (statt der ganzen Seite) — Scrollposition bleibt erhalten.
 async function refreshXmasBoxes() {
   const year = S._xmasYear, histCount = S._xmasHistYearsCount;
@@ -6150,29 +6168,38 @@ async function refreshXmasBoxes() {
   const matrixEl = document.getElementById('xmasMatrixBox'); if (matrixEl) matrixEl.innerHTML = renderXmasMatrix(employees, histYears, history, scores, wishes, year, canEditHistory);
 }
 
+const XMAS_REC_LABEL = {
+  work_suggested: {text: '→ Arbeit (Freiwillig)', bg:'rgba(16,185,129,.15)', fg:'#10b981'},
+  off_recommended: {text: '✓ Urlaub empfohlen', bg:'rgba(16,185,129,.15)', fg:'#10b981'},
+  off_available: {text: 'regulär frei', bg:'rgba(148,163,184,.15)', fg:'#64748b'},
+};
+function xmasRecBadge(e, sk) {
+  if (e.recommendation === 'work_suggested' && e.wish !== (sk==='day'?'TD':'ND'))
+    return {text:'⚠ Arbeit trotz Urlaubswunsch (Score)', bg:'rgba(239,68,68,.12)', fg:'#ef4444'};
+  return XMAS_REC_LABEL[e.recommendation] || XMAS_REC_LABEL.off_available;
+}
+
 function renderXmasProposalCards(proposal) {
   if (!proposal) return '';
   return `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-bottom:8px">
     ${proposal.days.map(d => {
       const dateFmt = d.date.slice(8,10)+'.'+d.date.slice(5,7)+'.'+d.date.slice(0,4);
-      const wishers = d.employees.filter(e => e.wishedOff);
-      const repeats = d.employees.filter(e => e.recommendation==='work_suggested' && e.repeatedLastYear);
+      const withWish = d.employees.filter(e => e.wish);
       return `<div style="background:var(--sf);border:1px solid var(--border);border-radius:var(--r);padding:12px">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
           <strong style="font-size:13px">${esc(d.label)}</strong>
           <span style="font-size:11px;color:var(--mu)">${dateFmt}</span>
         </div>
         <div style="font-size:11px;color:var(--mu);margin-bottom:8px">
-          Bedarf: <strong>${d.requiredCount}</strong> · Frei-Slots: <strong>${d.freeSlots}</strong> · Wünsche: <strong>${d.wishCount}</strong> · Empfohlen frei: <strong style="color:#10b981">${d.offRecommendedCount}</strong>
+          Bedarf: <strong>${d.requiredCount}</strong> · Frei-Slots: <strong>${d.freeSlots}</strong> · Freiwillige: <strong>${d.volunteerCount}</strong> · Empfohlen frei: <strong style="color:#10b981">${d.offRecommendedCount}</strong>
         </div>
-        ${repeats.length?`<div style="font-size:11px;color:#f59e0b;margin-bottom:6px">⚠ ${repeats.length} Wiederholung${repeats.length>1?'en':''} zum Vorjahr nicht auflösbar: ${repeats.map(e=>esc(lastNameFirst(e.name))).join(', ')}</div>`:''}
         <div style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:3px">
-          ${!wishers.length?'<div style="font-size:11px;color:var(--di)">Keine Urlaubswünsche angemeldet</div>':''}
-          ${wishers.map(e => `<div style="display:flex;align-items:center;gap:6px;font-size:11px;padding:3px 6px;border-radius:4px;background:${e.recommendation==='off_recommended'?'rgba(16,185,129,.08)':'rgba(148,163,184,.08)'}">
-            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(e.name)}">${esc(lastNameFirst(e.name))}${e.repeatedLastYear?' ⚠':''}${e.swappedFromDayKey?' 🔀':''}</span>
+          ${!withWish.length?'<div style="font-size:11px;color:var(--di)">Keine Wünsche angemeldet</div>':''}
+          ${withWish.map(e => { const b = xmasRecBadge(e, d.shiftKind); return `<div style="display:flex;align-items:center;gap:6px;font-size:11px;padding:3px 6px;border-radius:4px;background:${b.bg}">
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(e.name)}">${esc(lastNameFirst(e.name))} <span style="opacity:.6">(Wunsch ${e.wish})</span></span>
             <span style="color:var(--mu);font-variant-numeric:tabular-nums" title="Score für diesen Tag">${xmasFmtScore(e.score)}</span>
-            <span class="bdg" style="font-size:10px;background:${e.recommendation==='off_recommended'?'rgba(16,185,129,.15)':'rgba(148,163,184,.15)'};color:${e.recommendation==='off_recommended'?'#10b981':'#64748b'}">${e.recommendation==='off_recommended'?'✓ Urlaub empfohlen':'Arbeit vorgeschlagen'}</span>
-          </div>`).join('')}
+            <span class="bdg" style="font-size:10px;background:${b.bg};color:${b.fg}">${b.text}</span>
+          </div>`; }).join('')}
         </div>
       </div>`;
     }).join('')}
@@ -6180,43 +6207,48 @@ function renderXmasProposalCards(proposal) {
 }
 
 const XMAS_NAME_CELL = 'text-align:left;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px;position:sticky;left:0;background:var(--sf)';
+const XMAS_LOCKED_STYLE = 'background-image:repeating-linear-gradient(45deg,var(--sf2) 0px,var(--sf2) 4px,transparent 4px,transparent 8px);cursor:not-allowed;color:var(--di)';
 
 // Eine gemeinsame Tabelle statt dreier breiter Einzeltabellen: Historie
-// (editierbar) | Score (berechnet) | Urlaubswunsch aktuelles Jahr (Checkbox) —
-// je Kalendertag zusätzlich nach Tag-/Nachtdienst aufgeschlüsselt (10 Spalten
-// je Gruppe). Ausgenommene Mitarbeiter werden ausgegraut und sind über die
-// Checkbox "Ausgenommene Mitarbeiter anzeigen" ein-/ausblendbar.
+// (editierbar) | Score (berechnet) | Urlaubswunsch aktuelles Jahr (editierbar)
+// — je EINE Spalte pro Kalendertag (5), da Score seit der Neufassung nicht
+// mehr nach Schichtart getrennt geführt wird. Ausgenommene/inaktive
+// Mitarbeiter werden ausgegraut (ganze Zeile); Zellen außerhalb des
+// Dienstverhältnis-Fensters (vor Eintritt/nach Austritt) werden zusätzlich
+// UNABHÄNGIG davon je Zelle gesperrt/schraffiert dargestellt.
 function renderXmasMatrix(employees, histYears, history, scores, wishes, year, canEditHistory) {
   const visible = S._xmasShowExcluded===false ? employees.filter(e => e.xmasParticipant && e.isActive) : employees;
   if (!visible.length) return '<div class="empty">Keine Mitarbeiter mit Dienstplan-Parametern vorhanden.</div>';
   const histMap = {};
   history.forEach(h => { histMap[`${h.employee_id}|${h.year}|${h.day_key}`] = h.status; });
   const wishMap = {};
-  wishes.forEach(w => { if (w.wants_off) wishMap[`${w.employee_id}|${w.day_key}`] = true; });
+  wishes.forEach(w => { if (w.wish) wishMap[`${w.employee_id}|${w.day_key}`] = w.wish; });
 
   const dayCell = 'text-align:center;font-size:11px;padding:3px 4px;min-width:24px';
   const statusStyle = { '': 'color:var(--di)', 'TD': 'color:#10b981;font-weight:700', 'ND': 'color:#0ea5e9;font-weight:700', 'UR': 'color:#f59e0b;font-weight:700', '–': 'color:var(--di);font-weight:600' };
+  const wishStyle = { '': 'color:var(--di)', 'U': 'color:#f59e0b;font-weight:700', 'TD': 'color:#10b981;font-weight:700', 'ND': 'color:#0ea5e9;font-weight:700' };
   const scoreColor = s => s>0?'#10b981':s<0?'#ef4444':'var(--mu)';
 
   const groupBorder = 'border-left:2px solid var(--border)';
   const scoreBorder = 'border-left:2px solid #3b82f6';
   const wishBorder  = 'border-left:2px solid #8b5cf6';
 
+  const dayHeadCells = (border) => XMAS_CALENDAR_DAY_KEYS.map((dk,i) => `<th style="${dayCell}${i===0?';'+border:''}" title="${XMAS_CALENDAR_DAY_LABEL[dk]}">${dk}</th>`).join('');
   const headYear1 = histYears.map(y => `<th colspan="5" style="text-align:center;${groupBorder}">${y}</th>`).join('');
-  const headYear2 = histYears.map(() => XMAS_CALENDAR_DAY_KEYS.map((dk,i) => `<th style="${dayCell}${i===0?';'+groupBorder:''}" title="${dk}">${dk}</th>`).join('')).join('');
+  const headYear2 = histYears.map(() => dayHeadCells(groupBorder)).join('');
 
   return `<div class="tw" style="overflow-x:auto"><table class="rm-table" style="font-size:11px">
     <thead>
       <tr>
         <th rowspan="2" style="text-align:left;vertical-align:bottom;position:sticky;left:0;background:var(--sf2);z-index:1">Mitarbeiter</th>
         ${headYear1}
-        <th colspan="10" style="text-align:center;${scoreBorder};color:#3b82f6">Score</th>
-        <th colspan="10" style="text-align:center;${wishBorder};color:#8b5cf6">Wunsch ${year}</th>
+        <th colspan="5" style="text-align:center;${scoreBorder};color:#3b82f6">Score</th>
+        <th colspan="5" style="text-align:center;${wishBorder};color:#8b5cf6">Wunsch ${year}</th>
       </tr>
       <tr>
         ${headYear2}
-        ${XMAS_DAY_KEYS.map((dk,i) => `<th style="${dayCell}${i===0?';'+scoreBorder:''}" title="${XMAS_DAY_SHORT[dk]}">${dk.slice(0,5)}<br>${dk.slice(-1)}</th>`).join('')}
-        ${XMAS_DAY_KEYS.map((dk,i) => `<th style="${dayCell}${i===0?';'+wishBorder:''}" title="${XMAS_DAY_SHORT[dk]}">${dk.slice(0,5)}<br>${dk.slice(-1)}</th>`).join('')}
+        ${dayHeadCells(scoreBorder)}
+        ${dayHeadCells(wishBorder)}
       </tr>
     </thead>
     <tbody>
@@ -6228,17 +6260,25 @@ function renderXmasMatrix(employees, histYears, history, scores, wishes, year, c
         return `<tr style="${rowStyle}" title="${titleParts.join(' · ')}">
         <td style="${XMAS_NAME_CELL}${(excluded||inactive)?';background:var(--sf2)':''}" title="${esc(emp.name)}">${esc(lastNameFirst(emp.name))}${excluded?' 🚫':''}${inactive?' ⏸':''}</td>
         ${histYears.map(y => XMAS_CALENDAR_DAY_KEYS.map((dk,i) => {
+          const locked = xmasCellLocked(emp, y, dk);
           const st = histMap[`${emp.id}|${y}|${dk}`] || '';
-          const onclick = canEditHistory ? `onclick="cycleXmasCell('${emp.id}',${y},'${dk}')"` : '';
-          return `<td style="${dayCell}${i===0?';'+groupBorder:''};${canEditHistory?'cursor:pointer':''};${statusStyle[st]||statusStyle['']}" ${onclick} title="${canEditHistory?'Klicken zum Ändern (—/TD/ND/UR/–)':''}">${st||'—'}</td>`;
+          const onclick = (canEditHistory && !locked) ? `onclick="cycleXmasCell('${emp.id}',${y},'${dk}')"` : '';
+          const style = locked ? XMAS_LOCKED_STYLE : `${canEditHistory?'cursor:pointer':''};${statusStyle[st]||statusStyle['']}`;
+          const title = locked ? 'Gesperrt – außerhalb des Dienstverhältnisses' : (canEditHistory?'Klicken zum Ändern (—/TD/ND/UR/–)':'');
+          return `<td style="${dayCell}${i===0?';'+groupBorder:''};${style}" ${onclick} title="${title}">${locked?'':(st||'—')}</td>`;
         }).join('')).join('')}
-        ${XMAS_DAY_KEYS.map((dk,i) => {
+        ${XMAS_CALENDAR_DAY_KEYS.map((dk,i) => {
           const s = scores[emp.id]?.[dk] ?? 0;
           return `<td style="${dayCell}${i===0?';'+scoreBorder:''};color:${scoreColor(s)};font-weight:700">${xmasFmtScore(s)}</td>`;
         }).join('')}
-        ${XMAS_DAY_KEYS.map((dk,i) => {
-          const checked = !!wishMap[`${emp.id}|${dk}`];
-          return `<td style="${dayCell}${i===0?';'+wishBorder:''}"><input type="checkbox" ${checked?'checked':''} onchange="toggleXmasWish('${emp.id}',${year},'${dk}',this.checked)" style="cursor:pointer"></td>`;
+        ${XMAS_CALENDAR_DAY_KEYS.map((dk,i) => {
+          const locked = xmasCellLocked(emp, year, dk);
+          const canEditWish = S.p.manageUsers || emp.id===S.currentUser;
+          const w = wishMap[`${emp.id}|${dk}`] || '';
+          const onclick = (canEditWish && !locked) ? `onclick="cycleXmasWish('${emp.id}',${year},'${dk}')"` : '';
+          const style = locked ? XMAS_LOCKED_STYLE : `${canEditWish?'cursor:pointer':''};${wishStyle[w]||wishStyle['']}`;
+          const title = locked ? 'Gesperrt – außerhalb des Dienstverhältnisses' : (canEditWish?'Klicken zum Ändern (—/U/TD/ND)':'');
+          return `<td style="${dayCell}${i===0?';'+wishBorder:''};${style}" ${onclick} title="${title}">${locked?'':(w||'—')}</td>`;
         }).join('')}
       </tr>`;
       }).join('')}
@@ -6246,9 +6286,12 @@ function renderXmasMatrix(employees, histYears, history, scores, wishes, year, c
   </table></div>`;
 }
 
-async function toggleXmasWish(employeeId, year, dayKey, checked) {
+// Zyklus: — (kein Wunsch) → U (Urlaub) → TD (Tagdienst) → ND (Nachtdienst) → —
+async function cycleXmasWish(employeeId, year, dayKey) {
+  const cur = S._xmasWishes.find(w => w.employee_id===employeeId && w.day_key===dayKey);
+  const next = {'':'U', 'U':'TD', 'TD':'ND', 'ND':''}[cur?.wish || ''];
   try {
-    await api('PUT', '/dp/christmas/wishes', {employeeId, year, dayKey, wantsOff: checked});
+    await api('PUT', '/dp/christmas/wishes', {employeeId, year, dayKey, wish: next||null});
     await refreshXmasBoxes();
   } catch(e) { toast('⚠️ '+e.message,'err'); }
 }

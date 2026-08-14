@@ -4,21 +4,24 @@
 //
 // Reine Vorschlags-Funktion (lib/dp-rules.js: buildChristmasProposal): liefert
 // für die fünf Weihnachts-/Neujahrs-Tage einen fairness-basierten Score je
-// Mitarbeiter (+1 pro Jahr Tag-/Nachtdienst gearbeitet, −1 pro Jahr Urlaub —
-// je Tag-Typ separat, über beliebig viele erfasste Jahre) und darauf aufbauend
-// einen Freistellungsvorschlag für die Mitarbeiter, die für das aktuelle Jahr
-// einen Urlaubswunsch hinterlegt haben. Schreibt NIE in dp_plans/dp_assignments
-// — nur Lesevorschlag, keine automatische Übernahme in den Dienstplan.
+// Mitarbeiter (+1 pro Jahr Tag-/Nachtdienst gearbeitet — Nachtdienst an 24.12./
+// 31.12. mit Faktor 1,5 —, −1 pro Jahr Urlaub, EINE Dimension je Kalendertag,
+// über beliebig viele erfasste Jahre) und darauf aufbauend einen Vorschlag:
+// Freiwillige (Wunsch TD/ND) decken den Schichtbedarf zuerst, fehlende Plätze
+// werden score-basiert (niedrigster Score zuerst) aufgefüllt, der Rest mit
+// Wunsch U erhält "Urlaub empfohlen" nach höchstem Score. Schreibt NIE in
+// dp_plans/dp_assignments — nur Lesevorschlag, keine automatische Übernahme.
 //
 // Mitarbeiter- und Schichtbedarfs-Daten werden aus den bestehenden DP-Tabellen
 // referenziert (dp_employee_params, dp_shift_types, dp_shift_requirements) —
 // keine Datenduplikate. Neu sind nur die Historieneinträge (eine Spalte je
-// Kalendertag, Zellwert TD/ND/UR/–) und die Urlaubswünsche fürs aktuelle Jahr.
+// Kalendertag, Zellwert TD/ND/UR/–) und die Urlaubswünsche fürs aktuelle Jahr
+// (eine Spalte je Kalendertag, Wert U/TD/ND).
 // ─────────────────────────────────────────────────────────────────────────────
 const router = require('express').Router();
 const { q, q1, newId, pool } = require('../db');
 const { auth, ok, bad } = require('../middleware');
-const { CHRISTMAS_DAY_KEYS, CHRISTMAS_CALENDAR_DAY_KEYS, buildChristmasProposal, computeChristmasScores } = require('../lib/dp-rules');
+const { CHRISTMAS_CALENDAR_DAY_KEYS, buildChristmasProposal, computeChristmasScores } = require('../lib/dp-rules');
 const { isUserActive } = require('../db');
 
 // Liefert ALLE Mitarbeiter mit DP-Parametern inkl. Rotations-Teilnahme-Flag
@@ -43,6 +46,10 @@ async function getEmployees() {
         name: u ? u.name : null,
         xmasParticipant: e.xmas_rotation_participant !== false,
         isActive: u ? isUserActive(u) : false,
+        // Für die "gesperrte Zellen"-Darstellung im Matrix-UI (Zellen außerhalb
+        // des Dienstverhältnisses) — rohe Daten, Ableitung liegt beim Frontend.
+        hireDate: u?.hire_date ? new Date(u.hire_date).toISOString().slice(0,10) : null,
+        terminationDate: u?.termination_date ? new Date(u.termination_date).toISOString().slice(0,10) : null,
       };
     })
     .filter(e => e.name) // nur (noch) existierende Mitarbeiter
@@ -104,12 +111,16 @@ router.get('/christmas/scores', auth, async (req,res) => {
 });
 
 // ── URLAUBSWÜNSCHE (aktuelles Jahr) ───────────────────────────────────────────
+// EIN Wunsch je Kalendertag (nicht je Schichtart): 'U' (möchte frei/Urlaub),
+// 'TD' (möchte gern Tagdienst), 'ND' (möchte gern Nachtdienst), oder kein
+// Eintrag = kein besonderer Wunsch. Fließt NICHT direkt in den Score ein —
+// erst der später eingetragene, finale Historien-Wert wirkt auf den Score.
 
 router.get('/christmas/wishes', auth, async (req,res) => {
   try {
     const year = parseInt(req.query.year) || new Date().getFullYear();
     const rows = await q(
-      'SELECT employee_id,day_key,wants_off FROM dp_christmas_wishes WHERE year=$1',
+      'SELECT employee_id,day_key,wish FROM dp_christmas_wishes WHERE year=$1',
       [year]
     );
     ok(res, rows);
@@ -118,13 +129,15 @@ router.get('/christmas/wishes', auth, async (req,res) => {
 
 router.put('/christmas/wishes', auth, async (req,res) => {
   try {
-    const {employeeId, year, dayKey, wantsOff} = req.body;
-    if (!employeeId || !year || !CHRISTMAS_DAY_KEYS.includes(dayKey))
+    const {employeeId, year, dayKey, wish} = req.body;
+    if (!employeeId || !year || !CHRISTMAS_CALENDAR_DAY_KEYS.includes(dayKey))
       return bad(res,'employeeId, year und dayKey (24.12/25.12/26.12/31.12/01.01) erforderlich');
+    if (wish && wish!=='U' && wish!=='TD' && wish!=='ND')
+      return bad(res,'wish muss U, TD, ND oder leer sein');
     // Mitarbeiter dürfen ihren eigenen Wunsch eintragen, Planer (manageUsers) für alle
     if (!req.p.manageUsers && employeeId!==req.uid) return bad(res,'Keine Berechtigung',403);
 
-    if (!wantsOff) {
+    if (!wish) {
       await pool.query(
         'DELETE FROM dp_christmas_wishes WHERE employee_id=$1 AND year=$2 AND day_key=$3',
         [employeeId, year, dayKey]
@@ -132,11 +145,13 @@ router.put('/christmas/wishes', auth, async (req,res) => {
       return ok(res, {deleted:true});
     }
     const row = await q1(
-      `INSERT INTO dp_christmas_wishes (id,employee_id,year,day_key,wants_off,created_by)
-       VALUES ($1,$2,$3,$4,true,$5)
-       ON CONFLICT (employee_id,year,day_key) DO UPDATE SET wants_off=true,updated_at=NOW()
+      `INSERT INTO dp_christmas_wishes (id,employee_id,year,day_key,wants_off,wish,created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
+       ON CONFLICT (employee_id,year,day_key) DO UPDATE SET wants_off=$5,wish=$6,updated_at=NOW()
        RETURNING *`,
-      [newId(), employeeId, year, dayKey, req.uid]
+      [newId(), employeeId, year, dayKey, wish==='U', wish, req.uid]
+      // wants_off wird nur noch als Alt-Spalte mitgeschrieben (nicht mehr
+      // gelesen) — vermeidet einen NOT-NULL-Konflikt für Bestandszeilen.
     );
     ok(res, row);
   } catch(e) { bad(res,'Serverfehler',500); }
@@ -154,7 +169,7 @@ router.get('/christmas/proposal', auth, async (req,res) => {
       q('SELECT * FROM dp_shift_requirements'),
       // Score fließt aus ALLEN erfassten Jahren ein, kein Lookback-Fenster
       q('SELECT employee_id,year,day_key,status FROM dp_christmas_history'),
-      q('SELECT employee_id,day_key,wants_off FROM dp_christmas_wishes WHERE year=$1', [year]),
+      q('SELECT employee_id,day_key,wish FROM dp_christmas_wishes WHERE year=$1', [year]),
     ]);
 
     // Ausgenommene (xmasParticipant=false) UND inaktive Mitarbeiter (isActive=false,

@@ -593,6 +593,11 @@ async function initDB() {
     // diesen beiden Daten abgeleitet (db.isUserActive), kein separates Flag.
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS hire_date DATE`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS termination_date DATE`,
+    // Wunsch-Modell umgestellt: ein Wunsch je Kalendertag (U/TD/ND) statt
+    // "wants_off" je Tag/Schichtart-Kombination. day_key-Domäne schrumpft von
+    // 10 auf 5 Werte (UNIQUE-Constraint bleibt gültig). wants_off bleibt als
+    // Altspalte bestehen (nicht mehr geschrieben/gelesen) — additive Migration.
+    `ALTER TABLE dp_christmas_wishes ADD COLUMN IF NOT EXISTS wish TEXT`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }
