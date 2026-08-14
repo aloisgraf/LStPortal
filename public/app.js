@@ -107,6 +107,10 @@ async function fetchData(){
   }finally{loading(false);}
 }
 const getU=id=>S.users.find(u=>u.id===id);
+// "Vorname Nachname" -> "Nachname Vorname" (letztes Wort = Nachname); für Auswahllisten im Dienstplan
+const lastNameOf=name=>{const p=(name||'').trim().split(/\s+/);return p.length>1?p[p.length-1]:(p[0]||'');};
+const lastNameFirst=name=>{const p=(name||'').trim().split(/\s+/);return p.length>1?`${p[p.length-1]} ${p.slice(0,-1).join(' ')}`:(name||'');};
+const byLastName=(a,b)=>lastNameOf(a.name).localeCompare(lastNameOf(b.name),'de');
 const getCat=id=>S.categories.find(c=>c.id===id);
 const getTag=id=>S.tags.find(t=>t.id===id);
 const getTk=id=>S.tickets.find(t=>t.id===id);
@@ -624,7 +628,7 @@ function renderSchedule(){
         <button class="mb ${S.month===null?'on':''}" onclick="S.month=null;renderMain()" style="padding:4px 8px;font-size:12px">Alle</button>
         ${MONTHS.map((m,i)=>`<button class="mb ${S.month===i?'on':''}" onclick="S.month=${i};renderMain()" style="padding:4px 8px;font-size:12px">${m.slice(0,3)}</button>`).join('')}
       </div>
-      ${S.p.seeAllEntries?`<select class="flt" style="width:auto;min-width:140px" onchange="S.filterUser=this.value||null;renderMain()"><option value="">Alle Mitarbeiter</option>${S.users.filter(u=>!(u.roles||[]).includes('admin')).map(u=>`<option value="${u.id}"${S.filterUser===u.id?'selected':''}>${u.name}</option>`).join('')}</select>`:''}
+      ${S.p.seeAllEntries?`<select class="flt" style="width:auto;min-width:140px" onchange="S.filterUser=this.value||null;renderMain()"><option value="">Alle Mitarbeiter</option>${S.users.filter(u=>!(u.roles||[]).includes('admin')).slice().sort(byLastName).map(u=>`<option value="${u.id}"${S.filterUser===u.id?'selected':''}>${lastNameFirst(u.name)}</option>`).join('')}</select>`:''}
       ${filterU?`<span class="filter-hint">&#128100; ${filterU.name}</span>`:''}
     </div>
     ${mode==='calendar'?calHtml:mode==='list'?listHtml:calHtml+'<div style="margin-top:24px">'+listHtml+'</div>'}`;
@@ -671,8 +675,12 @@ function _buildCalHtml(){
           var cat=S.categories.find(function(c2){return c2.id===ev.category;});
           var u=ev.isGeneral?null:S.users.find(function(u2){return u2.id===ev.userId;});
           var color=ev.isGeneral?'#10b981':cat?cat.color:'#3b6dd4';
-          var label=(ev.isGeneral?'\ud83c\udf10 ':u?u.initials+' ':'')+ev.reason.slice(0,20);
-          evsHtml+='<div class="cal-ev" style="background:'+color+'22;border-left:2px solid '+color+';color:'+color+'" title="'+ev.reason.replace(/"/g,'&quot;')+'">'+label+'</div>';
+          // Kategorie ist immer sichtbar (Emoji); Beschreibung ist optional und erg\u00e4nzt nur, falls vorhanden
+          var catTag=cat?cat.emoji+' ':'';
+          var textPart=ev.reason?ev.reason.slice(0,18):(cat?cat.label.slice(0,18):'');
+          var label=(ev.isGeneral?'\ud83c\udf10 ':u?lastNameFirst(u.name)+': ':'')+catTag+textPart;
+          var titleAttr=((u?lastNameFirst(u.name)+' \u2014 ':'')+(cat?cat.label:'')+(ev.reason?' \u2014 '+ev.reason:'')).replace(/"/g,'&quot;');
+          evsHtml+='<div class="cal-ev" style="background:'+color+'22;border-left:2px solid '+color+';color:'+color+'" title="'+titleAttr+'">'+label+'</div>';
         });
         if(devs.length>4)evsHtml+='<div class="cal-ev-more">+'+(devs.length-4)+' weitere</div>';
         cells+='<td class="'+cls+'">'+dnHtml+'<div class="cal-evs">'+evsHtml+'</div></td>';
@@ -705,21 +713,21 @@ function buildEvCards(evs){
       const canDel=(ev.isGeneral&&S.p.addGeneral)||ev._canEdit||S.p.canApproveEvents||S.p.manageUsers;
       const empChip=ev.isGeneral?`<span class="bdg" style="background:rgba(16,185,129,.12);color:var(--ok)">&#127760; Allgemein</span>`
         :anon?`<span class="bdg" style="background:var(--sf2);color:var(--di)">&#128274; Anonym</span>`
-        :`<span>${avHtml(emp.initials,emp.color,16,7)}</span><span>${emp.name}</span>`;
+        :`<span>${avHtml(emp.initials,emp.color,16,7)}</span><span>${lastNameFirst(emp.name)}</span>`;
       const catChip=anon?`<span style="color:var(--di)">\u2014</span>`:`<span class="bdg" style="background:${cat.color}1a;color:${cat.color}">${cat.emoji} ${cat.label}</span>`;
       const apActions=(!ev.isGeneral&&S.p.canApproveEvents&&!anon&&ev.approvalStatus!=='approved'&&ev.approvalStatus!=='rejected')?
         `<button class="btn-ok" onclick="approveEvt('${ev.id}','approved')">\u2713</button><button class="btn-d" onclick="approveEvt('${ev.id}','rejected')">\u2717</button>`:'';
       return`<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--border)${anon?';opacity:.7':''}">
         <div style="width:3px;align-self:stretch;background:${accentColor};border-radius:2px;flex-shrink:0"></div>
         <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:2px">${anon?'<span style="color:var(--di);font-style:italic">Anonymisiert</span>':(ev.reason||'\u2014').slice(0,80)}</div>
+          <div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:2px">${anon?'<span style="color:var(--di);font-style:italic">Anonymisiert</span>':(ev.reason||cat.label||'\u2014').slice(0,80)}</div>
           <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--mu);align-items:center">
             <span>&#128197; ${ds}</span>${ts!=='\u2014'?`<span>&#128336; ${ts}</span>`:''}
             ${empChip}${catChip}
             ${ev.isGeneral?'':apBdg(ev.approvalStatus||'pending')}
           </div>
         </div>
-        <div style="display:flex;gap:4px;flex-shrink:0">${apActions}${ev._canEdit?`<button class="btn-e" onclick="openEditEvt('${ev.id}')">\u270e</button>`:''}${canDel?`<button class="btn-d" onclick="deleteEvt('${ev.id}')">\u2715</button>`:''}</div>
+        <div style="display:flex;gap:4px;flex-shrink:0">${apActions}${ev._canEdit?`<button class="btn-e" onclick="openEditEvt('${ev.id}')">\u270e</button>`:''}${canDel?`<button class="btn-d" onclick="deleteEvt('${ev.id}')" title="L\u00f6schen">\ud83d\uddd1\ufe0f</button>`:''}</div>
       </div>`;
     }).join('');
     html+=`</div>`;
@@ -743,8 +751,8 @@ function openEvtModal(){
   document.getElementById('genRow').style.display=S.p.addGeneral?'block':'none';
   document.getElementById('fGen').checked=false;document.getElementById('empRow').style.display='block';
   const empSel=document.getElementById('fEmp');empSel.innerHTML='';
-  const addable=S.p.addForOthers?S.users:[u].filter(Boolean);
-  addable.forEach(u2=>{const opt=document.createElement('option');opt.value=u2.id;opt.textContent=u2.name;empSel.appendChild(opt);});
+  const addable=(S.p.addForOthers?S.users:[u].filter(Boolean)).slice().sort(byLastName);
+  addable.forEach(u2=>{const opt=document.createElement('option');opt.value=u2.id;opt.textContent=lastNameFirst(u2.name);empSel.appendChild(opt);});
   empSel.value=u?.id||'';
   document.getElementById('fCat').innerHTML='<option value="">\u2014 w\u00e4hlen \u2014</option>'+S.categories.map(c=>`<option value="${c.id}">${c.emoji} ${c.label}</option>`).join('');
   ['fD1','fD2','fT1','fT2','fRsn'].forEach(id=>document.getElementById(id).value='');
@@ -764,9 +772,9 @@ function onGenToggle(){document.getElementById('empRow').style.display=document.
 async function saveEvent(){
   const editId=document.getElementById('fEvId').value;
   const isGeneral=!editId&&document.getElementById('fGen').checked;
-  const d1=document.getElementById('fD1').value,rsn=document.getElementById('fRsn').value.trim();
-  if(!d1){toast('\u26A0\uFE0F Datum erforderlich!');return;}if(!rsn){toast('\u26A0\uFE0F Beschreibung erforderlich!');return;}
-  const body={dateFrom:d1,dateTo:document.getElementById('fD2').value||d1,timeFrom:document.getElementById('fT1').value,timeTo:document.getElementById('fT2').value,category:document.getElementById('fCat').value,reason:rsn};
+  const d1=document.getElementById('fD1').value,rsn=document.getElementById('fRsn').value.trim(),cat=document.getElementById('fCat').value;
+  if(!d1){toast('\u26A0\uFE0F Datum erforderlich!');return;}if(!cat){toast('\u26A0\uFE0F Kategorie erforderlich!');return;}
+  const body={dateFrom:d1,dateTo:document.getElementById('fD2').value||d1,timeFrom:document.getElementById('fT1').value,timeTo:document.getElementById('fT2').value,category:cat,reason:rsn};
   try{
     if(editId)await api('PUT','/events/'+editId,body);
     else await api('POST','/events',{...body,isGeneral,userId:isGeneral?null:document.getElementById('fEmp').value});

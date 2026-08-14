@@ -7,13 +7,20 @@ const { auth, ok, bad } = require('../middleware');
 router.post('/', auth, async (req,res) => {
   try {
     const {isGeneral,dateFrom,dateTo,timeFrom,timeTo,userId,category,reason} = req.body;
-    if (!dateFrom||!reason?.trim()) return bad(res,'Datum und Beschreibung erforderlich');
+    if (!dateFrom||!category) return bad(res,'Datum und Kategorie erforderlich');
     if (!isGeneral&&!userId) return bad(res,'Mitarbeiter erforderlich');
     if (isGeneral&&!req.p.addGeneral) return bad(res,'Keine Berechtigung',403);
     if (!isGeneral&&userId!==req.uid&&!req.p.addForOthers) return bad(res,'Keine Berechtigung',403);
     const id=newId();
+    // Wer selbst Dienstplanrechte hat (Events genehmigen darf) und einen Urlaub
+    // einträgt, muss ihn nicht erst sich selbst genehmigen — direkt bestätigt.
+    let approvalStatus = isGeneral ? 'approved' : null;
+    if (!isGeneral && req.p.canApproveEvents) {
+      const cat = await q1('SELECT label FROM categories WHERE id=$1',[category]);
+      if (cat?.label?.toLowerCase().includes('urlaub')) approvalStatus = 'approved';
+    }
     await pool.query('INSERT INTO events (id,is_general,date_from,date_to,time_from,time_to,user_id,category,reason,approval_status,created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
-      [id,!!isGeneral,dateFrom,dateTo||dateFrom,timeFrom||'',timeTo||'',isGeneral?null:userId,category||'',reason.trim(),isGeneral?'approved':null,req.uid]);
+      [id,!!isGeneral,dateFrom,dateTo||dateFrom,timeFrom||'',timeTo||'',isGeneral?null:userId,category||'',(reason||'').trim(),approvalStatus,req.uid]);
     // Notify target user if someone else added an event for them
     if (!isGeneral && userId && userId !== req.uid) {
       const author = await getUser(req.uid);
@@ -29,8 +36,9 @@ router.put('/:id', auth, async (req,res) => {
     if (!ev) return bad(res,'Nicht gefunden',404);
     if (ev.created_by!==req.uid) return bad(res,'Nur Ersteller kann bearbeiten',403);
     const {dateFrom,dateTo,timeFrom,timeTo,category,reason} = req.body;
+    if (!dateFrom||!category) return bad(res,'Datum und Kategorie erforderlich');
     await pool.query('UPDATE events SET date_from=$1,date_to=$2,time_from=$3,time_to=$4,category=$5,reason=$6 WHERE id=$7',
-      [dateFrom,dateTo||dateFrom,timeFrom||'',timeTo||'',category||'',reason.trim(),req.params.id]);
+      [dateFrom,dateTo||dateFrom,timeFrom||'',timeTo||'',category||'',(reason||'').trim(),req.params.id]);
     // Notify target if someone else edited their event
     if (ev.user_id && ev.user_id !== req.uid) {
       const author = await getUser(req.uid);
