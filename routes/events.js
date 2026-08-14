@@ -12,13 +12,11 @@ router.post('/', auth, async (req,res) => {
     if (isGeneral&&!req.p.addGeneral) return bad(res,'Keine Berechtigung',403);
     if (!isGeneral&&userId!==req.uid&&!req.p.addForOthers) return bad(res,'Keine Berechtigung',403);
     const id=newId();
-    // Wer selbst Dienstplanrechte hat (Events genehmigen darf) und einen Urlaub
-    // einträgt, muss ihn nicht erst sich selbst genehmigen — direkt bestätigt.
-    let approvalStatus = isGeneral ? 'approved' : null;
-    if (!isGeneral && req.p.canApproveEvents) {
-      const cat = await q1('SELECT label FROM categories WHERE id=$1',[category]);
-      if (cat?.label?.toLowerCase().includes('urlaub')) approvalStatus = 'approved';
-    }
+    // Wer selbst Dienstplanrechte hat (Events genehmigen darf), braucht für
+    // Einträge — egal welcher Kategorie (Urlaub, Krankenstand, Abwesenheit …)
+    // und egal ob für sich selbst oder für andere Mitarbeiter — keine separate
+    // Genehmigung: die Berechtigung besteht ja bereits.
+    const approvalStatus = (isGeneral || req.p.canApproveEvents) ? 'approved' : null;
     await pool.query('INSERT INTO events (id,is_general,date_from,date_to,time_from,time_to,user_id,category,reason,approval_status,created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
       [id,!!isGeneral,dateFrom,dateTo||dateFrom,timeFrom||'',timeTo||'',isGeneral?null:userId,category||'',(reason||'').trim(),approvalStatus,req.uid]);
     // Notify target user if someone else added an event for them
