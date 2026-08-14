@@ -6199,22 +6199,33 @@ async function refreshXmasBoxes() {
 }
 
 const XMAS_REC_LABEL = {
-  work_suggested: {text: '→ Arbeit (Freiwillig)', bg:'rgba(16,185,129,.15)', fg:'#10b981'},
   off_recommended: {text: '✓ Urlaub empfohlen', bg:'rgba(16,185,129,.15)', fg:'#10b981'},
   off_available: {text: 'regulär frei', bg:'rgba(148,163,184,.15)', fg:'#64748b'},
 };
+// Liefert Badge-Text/Farbe für JEDEN Mitarbeiter an diesem Tag/dieser
+// Schichtart — unabhängig davon, ob ein Wunsch hinterlegt wurde. Nur wer
+// Wunsch U hatte und trotzdem arbeiten muss, bekommt die Warnung; alle
+// anderen Arbeit-Einteilungen (freiwillig oder score-basiert ohne Wunsch)
+// werden neutral/positiv dargestellt.
 function xmasRecBadge(e, sk) {
-  if (e.recommendation === 'work_suggested' && e.wish !== (sk==='day'?'TD':'ND'))
-    return {text:'⚠ Arbeit trotz Urlaubswunsch (Score)', bg:'rgba(239,68,68,.12)', fg:'#ef4444'};
+  if (e.recommendation === 'work_suggested') {
+    const wantsThisKind = e.wish === (sk==='day'?'TD':'ND');
+    if (wantsThisKind) return {text:'→ Arbeit (Freiwillig)', bg:'rgba(16,185,129,.15)', fg:'#10b981'};
+    if (e.wish === 'U') return {text:'⚠ Arbeit trotz Urlaubswunsch (Score)', bg:'rgba(239,68,68,.12)', fg:'#ef4444'};
+    return {text:'Arbeit (Score)', bg:'rgba(148,163,184,.15)', fg:'#64748b'};
+  }
   return XMAS_REC_LABEL[e.recommendation] || XMAS_REC_LABEL.off_available;
 }
 
+// Zeigt IMMER alle Mitarbeiter dieser Rotation mit ihrer Empfehlung — nicht
+// nur die, die für das aktuelle Jahr einen Wunsch angemeldet haben. So bleibt
+// auch dann sichtbar, wer arbeiten soll, wenn (noch) niemand einen
+// Urlaubswunsch eingetragen hat.
 function renderXmasProposalCards(proposal) {
   if (!proposal) return '';
   return `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-bottom:8px">
     ${proposal.days.map(d => {
       const dateFmt = d.date.slice(8,10)+'.'+d.date.slice(5,7)+'.'+d.date.slice(0,4);
-      const withWish = d.employees.filter(e => e.wish);
       return `<div style="background:var(--sf);border:1px solid var(--border);border-radius:var(--r);padding:12px">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
           <strong style="font-size:13px">${esc(d.label)}</strong>
@@ -6224,9 +6235,9 @@ function renderXmasProposalCards(proposal) {
           Bedarf: <strong>${d.requiredCount}</strong> · Frei-Slots: <strong>${d.freeSlots}</strong> · Freiwillige: <strong>${d.volunteerCount}</strong> · Empfohlen frei: <strong style="color:#10b981">${d.offRecommendedCount}</strong>
         </div>
         <div style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:3px">
-          ${!withWish.length?'<div style="font-size:11px;color:var(--di)">Keine Wünsche angemeldet</div>':''}
-          ${withWish.map(e => { const b = xmasRecBadge(e, d.shiftKind); return `<div style="display:flex;align-items:center;gap:6px;font-size:11px;padding:3px 6px;border-radius:4px;background:${b.bg}">
-            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(e.name)}">${esc(lastNameFirst(e.name))} <span style="opacity:.6">(Wunsch ${e.wish})</span></span>
+          ${!d.employees.length?'<div style="font-size:11px;color:var(--di)">Keine Mitarbeiter in der Rotation</div>':''}
+          ${d.employees.map(e => { const b = xmasRecBadge(e, d.shiftKind); return `<div style="display:flex;align-items:center;gap:6px;font-size:11px;padding:3px 6px;border-radius:4px;background:${b.bg}">
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(e.name)}">${esc(lastNameFirst(e.name))}${e.wish?` <span style="opacity:.6">(Wunsch ${e.wish})</span>`:''}</span>
             <span style="color:var(--mu);font-variant-numeric:tabular-nums" title="Score für diesen Tag">${xmasFmtScore(e.score)}</span>
             <span class="bdg" style="font-size:10px;background:${b.bg};color:${b.fg}">${b.text}</span>
           </div>`; }).join('')}
