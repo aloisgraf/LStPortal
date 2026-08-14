@@ -1342,9 +1342,10 @@ function renderTickets(){
   const todoRowsHtml=tk=>{
     const openNotes=(tk.notes||[]).filter(n=>n.todoStatus==='open');
     if(!openNotes.length)return'';
+    const indent=tk.parentTicketId?52:32;
     return openNotes.map(n=>{
       const txt=String(n.text||'').replace(/\s+/g,' ').trim();
-      return`<div style="display:flex;align-items:center;gap:8px;padding:4px 14px 4px 42px;border-top:1px solid var(--border);background:rgba(239,68,68,.04);cursor:pointer" onclick="openTkDetail('${tk.id}')" class="clickable">
+      return`<div style="display:flex;align-items:center;gap:8px;padding:4px 14px;margin-left:${indent}px;border-top:1px solid var(--border);border-radius:4px 0 0 4px;background:rgba(239,68,68,.05);cursor:pointer" onclick="openTkDetail('${tk.id}')" class="clickable">
         <span style="width:3px;align-self:stretch;background:#ef4444;border-radius:2px;flex-shrink:0"></span>
         <span style="font-size:11px;color:#ef4444;font-weight:600;flex-shrink:0;white-space:nowrap">📌 Noch offen:</span>
         <span style="font-size:11px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1">${esc(txt.length>100?txt.slice(0,100)+'…':txt)}</span>
