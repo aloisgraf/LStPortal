@@ -562,6 +562,15 @@ async function initDB() {
   valid_from DATE DEFAULT NULL,
   created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
 )`,
+    `CREATE TABLE IF NOT EXISTS dp_christmas_history (
+  id TEXT PRIMARY KEY,
+  employee_id TEXT NOT NULL,
+  year INTEGER NOT NULL,
+  day_key TEXT NOT NULL,
+  status TEXT NOT NULL,
+  created_by TEXT NOT NULL, updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(employee_id, year, day_key)
+)`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }
@@ -653,6 +662,7 @@ app.use('/api',          require('./routes/docs'));
 app.use('/api',          require('./routes/misc'));
 app.use('/api',          require('./routes/meetings'));
 app.use('/api/dp', require('./routes/dp'));
+app.use('/api/dp', require('./routes/dp-christmas'));
 app.use('/api',   require('./routes/todos'));
 
 app.get('*', (req,res) => res.sendFile(path.join(__dirname,'public','index.html')));

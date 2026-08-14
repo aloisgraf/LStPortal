@@ -14,6 +14,7 @@ const {
   checkNightHardRules, checkNightGapSoft,
   fairnessStats, clusterRatio, localDensity,
   rebalanceOvertimeAssignments, rebalanceWeekendAssignments,
+  getRequiredCount,
 } = require('../lib/dp-rules');
 
 // In-Memory-Lock gegen parallele Generierungs-Läufe desselben Plans (K3).
@@ -2036,39 +2037,7 @@ async function recalcShiftTypeAssignments(st) {
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 
-function getRequiredCount(requirements, shiftTypeId, dayInfo) {
-  // Filter to requirements valid on dayInfo.date
-  const date = dayInfo.date; // 'YYYY-MM-DD'
-  const toISO = toISODate;
-  const validReqs = requirements.filter(r => {
-    const from = toISO(r.valid_from);
-    const until = toISO(r.valid_until);
-    if (from && from > date) return false;
-    if (until && until < date) return false;
-    return true;
-  });
-  // Check specific date first
-  const specific = validReqs.find(r=>r.shift_type_id===shiftTypeId && r.applies_to==='date' && r.specific_date?.toString().slice(0,10)===dayInfo.date);
-  if (specific) return specific.slot_count;
-  // Daily (every day incl. holidays)
-  const daily = validReqs.find(r=>r.shift_type_id===shiftTypeId && r.applies_to==='daily');
-  if (daily) return daily.slot_count;
-  // Holiday: only 'holiday' rule applies — weekday/weekend rules do NOT fall through to holidays
-  if (dayInfo.isHoliday) {
-    const hol = validReqs.find(r=>r.shift_type_id===shiftTypeId && r.applies_to==='holiday');
-    return hol ? hol.slot_count : 0;
-  }
-  // Weekend: only 'weekend' rule applies — weekday rules do NOT fall through to weekends
-  if (dayInfo.isWeekend) {
-    const we = validReqs.find(r=>r.shift_type_id===shiftTypeId && r.applies_to==='weekend');
-    return we ? we.slot_count : 0;
-  }
-  // Weekday (Mon–Fri, non-holiday): specific weekday first, then general Mo–Fr
-  const wdReq = validReqs.find(r=>r.shift_type_id===shiftTypeId && r.applies_to==='weekday' && r.weekday===dayInfo.weekday);
-  if (wdReq) return wdReq.slot_count;
-  const general = validReqs.find(r=>r.shift_type_id===shiftTypeId && r.applies_to==='weekday' && r.weekday===null);
-  return general ? general.slot_count : 0;
-}
+// getRequiredCount → lib/dp-rules.js
 
 // getWorkDaysInMonth, getAustrianHolidays, getEasterDate, getISOWeek(Start),
 // getShiftStartHour/EndHour → lib/dp-rules.js

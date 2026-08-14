@@ -305,6 +305,7 @@ function renderMain(){
   else if(S.view==='meetings')renderMeetings();
   else if(S.view==='dp')renderDP();
   else if(S.view==='dp-config')renderDPConfig();
+  else if(S.view==='dp-christmas')renderDPChristmas();
   else if(S.view==='dp-mine')renderDPMine();
   else if(S.view==='todos')renderTodos();
 }
@@ -5899,6 +5900,131 @@ async function deleteDpRequirement(id) {
     renderDPConfig();
     toast('Gelöscht');
   } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DIENSTPLAN — WEIHNACHTSDIENST-ROTATION
+// ═══════════════════════════════════════════════════════════════════════════
+const XMAS_DAY_KEYS = ['24.12','25.12','26.12','31.12','01.01'];
+const XMAS_DAY_SHORT = {'24.12':'24.12.','25.12':'25.12.','26.12':'26.12.','31.12':'31.12.','01.01':'01.01.'};
+const XMAS_COVERAGE_META = {
+  ok:    {label:'✓ Gedeckt',    color:'#10b981', bg:'rgba(16,185,129,.1)'},
+  under: {label:'⚠ Unterdeckt', color:'#ef4444', bg:'rgba(239,68,68,.1)'},
+  over:  {label:'ℹ Überdeckt',  color:'#3b82f6', bg:'rgba(59,109,212,.1)'},
+};
+
+async function renderDPChristmas() {
+  const el = document.getElementById('main');
+  if (!el) return;
+  if (!S.p.canManageDp) { el.innerHTML = '<div style="padding:20px;color:var(--mu)">Kein Zugriff</div>'; return; }
+
+  const canEdit = S.p.manageUsers;
+  const year = S._xmasYear || (S._xmasYear = new Date().getFullYear());
+  const histYears = [year-3, year-2, year-1];
+
+  el.innerHTML = '<div style="padding:20px;color:var(--mu)">Lade Weihnachtsdienst-Rotation…</div>';
+
+  let empParams = [];
+  try { empParams = await api('GET', '/dp/employee-params'); S.dpEmpParams = empParams; } catch(e) {}
+  const empIds = [...new Set(empParams.map(p => p.employee_id))];
+  const employees = empIds.map(id => getU(id)).filter(Boolean).sort(byLastName);
+
+  let history = [], proposal = null;
+  try {
+    [history, proposal] = await Promise.all([
+      api('GET', '/dp/christmas/history?years=' + histYears.join(',')),
+      api('GET', '/dp/christmas/proposal?year=' + year + '&lookback=2'),
+    ]);
+  } catch(e) { el.innerHTML = `<div style="padding:20px;color:#ef4444">Fehler beim Laden: ${esc(e.message)}</div>`; return; }
+  S._xmasHistory = history; S._xmasProposal = proposal;
+
+  const histMap = {}; // empId|year|dayKey -> status
+  history.forEach(h => { histMap[`${h.employee_id}|${h.year}|${h.day_key}`] = h.status; });
+
+  el.innerHTML = `<div class="dp-wrap">
+    <div class="dp-toolbar">
+      <h2>🎄 Weihnachtsdienst-Rotation</h2>
+      <div class="yr-row" style="margin:0"><button class="yb" onclick="S._xmasYear=${year-1};renderDPChristmas()">‹</button><span class="yv">${year}</span><button class="yb" onclick="S._xmasYear=${year+1};renderDPChristmas()">›</button></div>
+      <div style="flex:1"></div>
+      <span style="font-size:11px;color:var(--mu)">${employees.length} Mitarbeiter · Historie ${histYears[0]}–${histYears[2]}</span>
+    </div>
+    <div style="flex:1;overflow:auto;padding:16px">
+      <div style="margin-bottom:8px;font-size:12px;color:var(--mu)">
+        Vorschlag: Mitarbeiter, die in den letzten 2 Jahren an einem Tag Urlaub hatten, gelten heuer an genau diesem Tag als "muss arbeiten".
+        Reine Empfehlung — der Dienstplan wird dadurch <strong>nicht</strong> automatisch verändert.
+      </div>
+      ${renderXmasProposalCards(proposal)}
+      <div style="margin:24px 0 8px;font-weight:700;font-size:14px">📊 Historische Erfassung (letzte 3 Jahre)</div>
+      <div style="font-size:11px;color:var(--mu);margin-bottom:8px">${canEdit?'Klick auf eine Zelle wechselt zwischen — / U (Urlaub) / A (Arbeit).':'Nur Planungsberechtigte können die Historie bearbeiten.'}</div>
+      ${renderXmasHistoryTable(employees, histYears, histMap, canEdit)}
+    </div>
+  </div>`;
+}
+
+function renderXmasProposalCards(proposal) {
+  if (!proposal) return '';
+  return `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:8px">
+    ${proposal.days.map(d => {
+      const meta = XMAS_COVERAGE_META[d.coverage];
+      const dateFmt = d.date.slice(8,10)+'.'+d.date.slice(5,7)+'.'+d.date.slice(0,4);
+      return `<div style="background:var(--sf);border:1px solid var(--border);border-left:3px solid ${meta.color};border-radius:var(--r);padding:12px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+          <strong style="font-size:13px">${esc(d.label)}</strong>
+          <span style="font-size:11px;color:var(--mu)">${dateFmt}</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+          <span class="bdg" style="background:${meta.bg};color:${meta.color};font-weight:600">${meta.label}</span>
+          <span style="font-size:11px;color:var(--mu)">${d.obligatedCount} verpflichtet / ${d.requiredCount} benötigt${d.gap!==0?` (${d.gap>0?'+'+d.gap+' fehlen':d.gap+' zu viel'})`:''}</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px">
+          ${d.obligated.length ? d.obligated.map(e => `<span class="bdg" style="background:var(--sf2);font-size:11px">${esc(lastNameFirst(e.name))}</span>`).join('')
+            : '<span style="font-size:11px;color:var(--di)">Niemand verpflichtet</span>'}
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function renderXmasHistoryTable(employees, histYears, histMap, canEdit) {
+  if (!employees.length) return '<div class="empty">Keine Mitarbeiter mit Dienstplan-Parametern vorhanden.</div>';
+  const cellStyle = 'text-align:center;font-size:11px;padding:3px 4px;min-width:26px';
+  const statusStyle = {
+    '':  'color:var(--di)',
+    'U': 'color:#f59e0b;font-weight:700',
+    'A': 'color:#10b981;font-weight:700',
+  };
+  return `<div class="tw" style="overflow-x:auto"><table class="rm-table" style="font-size:11px">
+    <thead>
+      <tr>
+        <th rowspan="2" style="text-align:left;vertical-align:bottom">Mitarbeiter</th>
+        ${histYears.map(y => `<th colspan="5" style="text-align:center;border-left:2px solid var(--border)">${y}</th>`).join('')}
+      </tr>
+      <tr>
+        ${histYears.map(() => XMAS_DAY_KEYS.map((dk,i) => `<th style="${cellStyle}${i===0?';border-left:2px solid var(--border)':''}">${XMAS_DAY_SHORT[dk]}</th>`).join('')).join('')}
+      </tr>
+    </thead>
+    <tbody>
+      ${employees.map(emp => `<tr>
+        <td style="text-align:left;font-weight:600;white-space:nowrap">${esc(lastNameFirst(emp.name))}</td>
+        ${histYears.map(y => XMAS_DAY_KEYS.map((dk,i) => {
+          const st = histMap[`${emp.id}|${y}|${dk}`] || '';
+          const onclick = canEdit ? `onclick="cycleXmasCell('${emp.id}',${y},'${dk}')"` : '';
+          return `<td style="${cellStyle}${i===0?';border-left:2px solid var(--border)':''};${canEdit?'cursor:pointer':''};${statusStyle[st]}" ${onclick} title="${canEdit?'Klicken zum Ändern':''}">${st||'—'}</td>`;
+        }).join('')).join('')}
+      </tr>`).join('')}
+    </tbody>
+  </table></div>`;
+}
+
+async function cycleXmasCell(employeeId, year, dayKey) {
+  const cur = S._xmasHistory.find(h => h.employee_id===employeeId && h.year===year && h.day_key===dayKey);
+  const next = {'':'U', 'U':'A', 'A':''}[cur?.status || ''];
+  try {
+    await api('PUT', '/dp/christmas/history', {employeeId, year, dayKey, status: next||null});
+    if (cur) { if (next) cur.status = next; else S._xmasHistory.splice(S._xmasHistory.indexOf(cur),1); }
+    else if (next) S._xmasHistory.push({employee_id: employeeId, year, day_key: dayKey, status: next});
+    renderDPChristmas();
+  } catch(e) { toast('⚠️ '+e.message,'err'); }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

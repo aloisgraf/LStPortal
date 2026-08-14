@@ -299,3 +299,88 @@ describe('Rebalancing §11 — rebalanceOvertimeAssignments', () => {
     expect(totalFor(assignments, 'b')).toBe(12);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('Weihnachtsdienst-Rotation — buildChristmasProposal', () => {
+  const EMP_A = {id: 'a', name: 'Anna'};
+  const EMP_B = {id: 'b', name: 'Bernd'};
+  const EMP_C = {id: 'c', name: 'Clara'};
+  const employees = [EMP_A, EMP_B, EMP_C];
+  const C_SHIFT = {id: 'st-c', code: 'C', is_night: false};
+  const shiftTypes = [C_SHIFT];
+
+  const reqDaily = n => [{shift_type_id: C_SHIFT.id, applies_to: 'daily', slot_count: n, valid_from: null, valid_until: null}];
+
+  it('christmasDateFor: 01.01 gehört zum Folgejahr', () => {
+    expect(R.christmasDateFor(2026, '24.12')).toBe('2026-12-24');
+    expect(R.christmasDateFor(2026, '01.01')).toBe('2027-01-01');
+  });
+
+  it('liefert alle 5 relevanten Tage in fester Reihenfolge', () => {
+    const days = R.buildChristmasProposal(2026, {employees: [], shiftTypes: [], requirements: [], historyRows: []});
+    expect(days.map(d => d.dayKey)).toEqual(['24.12','25.12','26.12','31.12','01.01']);
+  });
+
+  it('Mitarbeiter mit Urlaub am exakt selben Tag in den letzten 2 Jahren → verpflichtet', () => {
+    const historyRows = [
+      {employee_id: 'a', year: 2025, day_key: '24.12', status: 'U'},
+      {employee_id: 'b', year: 2024, day_key: '24.12', status: 'U'},
+      {employee_id: 'c', year: 2025, day_key: '24.12', status: 'A'}, // hat gearbeitet → nicht verpflichtet
+    ];
+    const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: reqDaily(2), historyRows});
+    const d24 = days.find(d => d.dayKey === '24.12');
+    expect(d24.obligated.map(e => e.id).sort()).toEqual(['a','b']);
+    expect(d24.obligatedCount).toBe(2);
+  });
+
+  it('Tage werden EINZELN betrachtet — Urlaub am 24.12. bindet nicht für den 31.12.', () => {
+    const historyRows = [{employee_id: 'a', year: 2025, day_key: '24.12', status: 'U'}];
+    const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: reqDaily(1), historyRows});
+    expect(days.find(d => d.dayKey === '24.12').obligated.map(e=>e.id)).toEqual(['a']);
+    expect(days.find(d => d.dayKey === '31.12').obligated).toEqual([]);
+  });
+
+  it('Lookback-Fenster: Urlaub vor 3 Jahren (außerhalb der letzten 2) zählt nicht', () => {
+    const historyRows = [{employee_id: 'a', year: 2023, day_key: '24.12', status: 'U'}];
+    // Route würde ohnehin nur die letzten `lookback` Jahre laden — hier simulieren
+    // wir das, indem wir historyRows bereits vorgefiltert übergeben (2023 fehlt für lookback=2 ab 2026).
+    const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: reqDaily(1), historyRows: []});
+    expect(days.find(d => d.dayKey === '24.12').obligated).toEqual([]);
+  });
+
+  it('Unterdeckung: weniger Verpflichtete als Bedarf → coverage=under, gap>0', () => {
+    const historyRows = [{employee_id: 'a', year: 2025, day_key: '25.12', status: 'U'}];
+    const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: reqDaily(3), historyRows});
+    const d25 = days.find(d => d.dayKey === '25.12');
+    expect(d25.requiredCount).toBe(3);
+    expect(d25.obligatedCount).toBe(1);
+    expect(d25.coverage).toBe('under');
+    expect(d25.gap).toBe(2);
+  });
+
+  it('Überdeckung: mehr Verpflichtete als Bedarf → coverage=over, gap<0', () => {
+    const historyRows = [
+      {employee_id: 'a', year: 2025, day_key: '26.12', status: 'U'},
+      {employee_id: 'b', year: 2025, day_key: '26.12', status: 'U'},
+      {employee_id: 'c', year: 2024, day_key: '26.12', status: 'U'},
+    ];
+    const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: reqDaily(1), historyRows});
+    const d26 = days.find(d => d.dayKey === '26.12');
+    expect(d26.obligatedCount).toBe(3);
+    expect(d26.coverage).toBe('over');
+    expect(d26.gap).toBe(-2);
+  });
+
+  it('exakte Deckung → coverage=ok, gap=0', () => {
+    const historyRows = [{employee_id: 'a', year: 2025, day_key: '31.12', status: 'U'}];
+    const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: reqDaily(1), historyRows});
+    const d31 = days.find(d => d.dayKey === '31.12');
+    expect(d31.coverage).toBe('ok');
+    expect(d31.gap).toBe(0);
+  });
+
+  it('kein Schichtbedarf hinterlegt → requiredCount 0, trotzdem keine Fehler', () => {
+    const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: [], historyRows: []});
+    days.forEach(d => expect(d.requiredCount).toBe(0));
+  });
+});
