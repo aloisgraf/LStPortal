@@ -6050,7 +6050,6 @@ async function renderDPChristmas() {
   const year = S._xmasYear || (S._xmasYear = new Date().getFullYear());
   const histCount = S._xmasHistYearsCount || (S._xmasHistYearsCount = 3);
   const histYears = Array.from({length: histCount}, (_,i) => year - histCount + i);
-  if (!S._xmasOpen) S._xmasOpen = {wishes:false, scores:false, history:false};
 
   el.innerHTML = '<div style="padding:20px;color:var(--mu)">Lade Weihnachtsdienst-Rotation…</div>';
 
@@ -6071,11 +6070,6 @@ async function renderDPChristmas() {
   } catch(e) { el.innerHTML = `<div style="padding:20px;color:#ef4444">Fehler beim Laden: ${esc(e.message)}</div>`; return; }
   S._xmasHistory = history; S._xmasProposal = proposal; S._xmasWishes = wishes; S._xmasScores = scores;
 
-  const histMap = {}; // empId|year|dayKey -> status
-  history.forEach(h => { histMap[`${h.employee_id}|${h.year}|${h.day_key}`] = h.status; });
-  const wishMap = {}; // empId|dayKey -> true
-  wishes.forEach(w => { if (w.wants_off) wishMap[`${w.employee_id}|${w.day_key}`] = true; });
-
   el.innerHTML = `<div class="dp-wrap">
     <div class="dp-toolbar">
       <h2>🎄 Weihnachtsdienst-Rotation</h2>
@@ -6091,56 +6085,28 @@ async function renderDPChristmas() {
       </div>
       <div id="xmasProposalBox">${renderXmasProposalCards(proposal)}</div>
 
-      ${xmasSectionHeader('wishes', '🙋', 'Urlaubswünsche ' + year, wishes.length + ' Wünsche')}
-      <div id="xmas-body-wishes" style="display:${S._xmasOpen.wishes?'':'none'}">
-        <div style="font-size:11px;color:var(--mu);margin:8px 0">Häkchen = Mitarbeiter möchte an diesem Tag frei haben. Nur wer hier einen Wunsch anmeldet, kommt für „Urlaub empfohlen" in Frage.</div>
-        <div id="xmasWishBox">${renderXmasWishTable(employees, wishMap, year)}</div>
+      <div style="margin:20px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-weight:700;font-size:14px">📋 Historie, Score &amp; Urlaubswunsch ${year}</span>
+        <button class="btn-s" style="font-size:11px;padding:2px 8px" onclick="S._xmasHistYearsCount=${histCount+1};renderDPChristmas()">+ weiteres Jahr</button>
+        ${histCount>1?`<button class="btn-s" style="font-size:11px;padding:2px 8px" onclick="S._xmasHistYearsCount=${histCount-1};renderDPChristmas()">− Jahr entfernen</button>`:''}
       </div>
-
-      ${xmasSectionHeader('scores', '📈', 'Score-Übersicht (alle erfassten Jahre)')}
-      <div id="xmas-body-scores" style="display:${S._xmasOpen.scores?'':'none'}">
-        <div style="font-size:11px;color:var(--mu);margin:8px 0">Grün = in Summe öfter gearbeitet, Rot = in Summe öfter frei — unabhängig davon, wie viele Jahre unten in der Historie angezeigt werden.</div>
-        <div id="xmasScoreBox">${renderXmasScoreTable(employees, scores)}</div>
+      <div style="font-size:11px;color:var(--mu);margin-bottom:8px">
+        <span style="color:#f59e0b">■</span> Historie (${canEditHistory?'Zelle klicken: — / U / A':'nur Planungsberechtigte können bearbeiten'})
+        &nbsp;·&nbsp; <span style="color:#3b82f6">■</span> Score (berechnet, alle Jahre)
+        &nbsp;·&nbsp; <span style="color:#8b5cf6">■</span> Urlaubswunsch ${year} (Checkbox)
       </div>
-
-      ${xmasSectionHeader('history', '📊', 'Historische Erfassung', histYears[0]+'–'+histYears[histYears.length-1])}
-      <div id="xmas-body-history" style="display:${S._xmasOpen.history?'':'none'}">
-        <div style="font-size:11px;color:var(--mu);margin:8px 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <span>${canEditHistory?'Klick auf eine Zelle wechselt zwischen — / U (Urlaub) / A (Arbeit).':'Nur Planungsberechtigte können die Historie bearbeiten.'}</span>
-          <button class="btn-s" style="font-size:11px;padding:2px 8px" onclick="S._xmasHistYearsCount=${histCount+1};renderDPChristmas()">+ weiteres Jahr</button>
-          ${histCount>1?`<button class="btn-s" style="font-size:11px;padding:2px 8px" onclick="S._xmasHistYearsCount=${histCount-1};renderDPChristmas()">− Jahr entfernen</button>`:''}
-        </div>
-        <div id="xmasHistoryBox">${renderXmasHistoryTable(employees, histYears, histMap, canEditHistory)}</div>
-      </div>
+      <div id="xmasMatrixBox">${renderXmasMatrix(employees, histYears, history, scores, wishes, year, canEditHistory)}</div>
     </div>
   </div>`;
 }
 
-// Eingeklappter Abschnitts-Header: reines Ein-/Ausblenden per DOM, kein Re-Render,
-// damit Scrollposition und der Rest der Seite beim Auf-/Zuklappen unangetastet bleiben.
-function xmasSectionHeader(id, icon, title, hint) {
-  const open = !!S._xmasOpen?.[id];
-  return `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;user-select:none;background:var(--sf2);border:1px solid var(--border);border-radius:var(--r);margin-top:14px" onclick="toggleXmasSection('${id}')">
-    <span style="font-weight:700;font-size:14px;flex:1">${icon} ${esc(title)}</span>
-    ${hint?`<span style="font-size:11px;color:var(--mu)">${esc(hint)}</span>`:''}
-    <span id="xmas-arrow-${id}">${open?'▲':'▼'}</span>
-  </div>`;
-}
-function toggleXmasSection(id) {
-  if (!S._xmasOpen) S._xmasOpen = {};
-  S._xmasOpen[id] = !S._xmasOpen[id];
-  const body = document.getElementById('xmas-body-'+id);
-  const arrow = document.getElementById('xmas-arrow-'+id);
-  if (body) body.style.display = S._xmasOpen[id] ? '' : 'none';
-  if (arrow) arrow.textContent = S._xmasOpen[id] ? '▲' : '▼';
-}
-
-// Nach einer Zell-/Checkbox-Änderung nur die betroffenen Teilbereiche neu laden
-// (statt der ganzen Seite) — Scrollposition und aufgeklappte Abschnitte bleiben erhalten.
+// Nach einer Zell-/Checkbox-Änderung nur die Matrix + Vorschlags-Karten neu laden
+// (statt der ganzen Seite) — Scrollposition bleibt erhalten.
 async function refreshXmasBoxes() {
   const year = S._xmasYear, histCount = S._xmasHistYearsCount;
   const histYears = Array.from({length: histCount}, (_,i) => year - histCount + i);
   const employees = S._xmasEmployees || [];
+  const canEditHistory = S.p.manageUsers;
   let history = [], proposal = null, wishes = [], scores = {};
   try {
     [history, proposal, wishes, scores] = await Promise.all([
@@ -6152,15 +6118,8 @@ async function refreshXmasBoxes() {
   } catch(e) { toast('⚠️ '+e.message,'err'); return; }
   S._xmasHistory = history; S._xmasProposal = proposal; S._xmasWishes = wishes; S._xmasScores = scores;
 
-  const histMap = {};
-  history.forEach(h => { histMap[`${h.employee_id}|${h.year}|${h.day_key}`] = h.status; });
-  const wishMap = {};
-  wishes.forEach(w => { if (w.wants_off) wishMap[`${w.employee_id}|${w.day_key}`] = true; });
-
   const propEl = document.getElementById('xmasProposalBox'); if (propEl) propEl.innerHTML = renderXmasProposalCards(proposal);
-  const wishEl = document.getElementById('xmasWishBox'); if (wishEl) wishEl.innerHTML = renderXmasWishTable(employees, wishMap, year);
-  const scoreEl = document.getElementById('xmasScoreBox'); if (scoreEl) scoreEl.innerHTML = renderXmasScoreTable(employees, scores);
-  const histEl = document.getElementById('xmasHistoryBox'); if (histEl) histEl.innerHTML = renderXmasHistoryTable(employees, histYears, histMap, S.p.manageUsers);
+  const matrixEl = document.getElementById('xmasMatrixBox'); if (matrixEl) matrixEl.innerHTML = renderXmasMatrix(employees, histYears, history, scores, wishes, year, canEditHistory);
 }
 
 function renderXmasProposalCards(proposal) {
@@ -6190,22 +6149,58 @@ function renderXmasProposalCards(proposal) {
   </div>`;
 }
 
-const XMAS_NAME_CELL = 'text-align:left;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px';
+const XMAS_NAME_CELL = 'text-align:left;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px;position:sticky;left:0;background:var(--sf)';
 
-function renderXmasWishTable(employees, wishMap, year) {
+// Eine gemeinsame Tabelle statt dreier breiter Einzeltabellen: Historie
+// (editierbar) | Score (berechnet) | Urlaubswunsch aktuelles Jahr (Checkbox) —
+// dadurch viele schmale Spalten statt weniger sehr breiter.
+function renderXmasMatrix(employees, histYears, history, scores, wishes, year, canEditHistory) {
   if (!employees.length) return '<div class="empty">Keine Mitarbeiter mit Dienstplan-Parametern vorhanden.</div>';
-  const cellStyle = 'text-align:center;font-size:11px;padding:4px';
+  const histMap = {};
+  history.forEach(h => { histMap[`${h.employee_id}|${h.year}|${h.day_key}`] = h.status; });
+  const wishMap = {};
+  wishes.forEach(w => { if (w.wants_off) wishMap[`${w.employee_id}|${w.day_key}`] = true; });
+
+  const dayCell = 'text-align:center;font-size:11px;padding:3px 4px;min-width:24px';
+  const statusStyle = { '': 'color:var(--di)', 'U': 'color:#f59e0b;font-weight:700', 'A': 'color:#10b981;font-weight:700' };
+  const scoreColor = s => s>0?'#10b981':s<0?'#ef4444':'var(--mu)';
+
+  const groupBorder = 'border-left:2px solid var(--border)';
+  const scoreBorder = 'border-left:2px solid #3b82f6';
+  const wishBorder  = 'border-left:2px solid #8b5cf6';
+
+  const headYear1 = histYears.map((y,gi) => `<th colspan="5" style="text-align:center;${gi===0?groupBorder:groupBorder}">${y}</th>`).join('');
+  const headYear2 = histYears.map((y,gi) => XMAS_DAY_KEYS.map((dk,i) => `<th style="${dayCell}${i===0?';'+groupBorder:''}">${XMAS_DAY_SHORT[dk]}</th>`).join('')).join('');
+
   return `<div class="tw" style="overflow-x:auto"><table class="rm-table" style="font-size:11px">
-    <thead><tr>
-      <th style="text-align:left">Mitarbeiter</th>
-      ${XMAS_DAY_KEYS.map(dk => `<th style="${cellStyle}">${XMAS_DAY_SHORT[dk]}</th>`).join('')}
-    </tr></thead>
+    <thead>
+      <tr>
+        <th rowspan="2" style="text-align:left;vertical-align:bottom;position:sticky;left:0;background:var(--sf2);z-index:1">Mitarbeiter</th>
+        ${headYear1}
+        <th colspan="5" style="text-align:center;${scoreBorder};color:#3b82f6">Score</th>
+        <th colspan="5" style="text-align:center;${wishBorder};color:#8b5cf6">Wunsch ${year}</th>
+      </tr>
+      <tr>
+        ${headYear2}
+        ${XMAS_DAY_KEYS.map((dk,i) => `<th style="${dayCell}${i===0?';'+scoreBorder:''}">${XMAS_DAY_SHORT[dk]}</th>`).join('')}
+        ${XMAS_DAY_KEYS.map((dk,i) => `<th style="${dayCell}${i===0?';'+wishBorder:''}">${XMAS_DAY_SHORT[dk]}</th>`).join('')}
+      </tr>
+    </thead>
     <tbody>
       ${employees.map(emp => `<tr>
         <td style="${XMAS_NAME_CELL}" title="${esc(emp.name)}">${esc(lastNameFirst(emp.name))}</td>
-        ${XMAS_DAY_KEYS.map(dk => {
+        ${histYears.map(y => XMAS_DAY_KEYS.map((dk,i) => {
+          const st = histMap[`${emp.id}|${y}|${dk}`] || '';
+          const onclick = canEditHistory ? `onclick="cycleXmasCell('${emp.id}',${y},'${dk}')"` : '';
+          return `<td style="${dayCell}${i===0?';'+groupBorder:''};${canEditHistory?'cursor:pointer':''};${statusStyle[st]}" ${onclick} title="${canEditHistory?'Klicken zum Ändern':''}">${st||'—'}</td>`;
+        }).join('')).join('')}
+        ${XMAS_DAY_KEYS.map((dk,i) => {
+          const s = scores[emp.id]?.[dk] ?? 0;
+          return `<td style="${dayCell}${i===0?';'+scoreBorder:''};color:${scoreColor(s)};font-weight:700">${s>0?'+':''}${s}</td>`;
+        }).join('')}
+        ${XMAS_DAY_KEYS.map((dk,i) => {
           const checked = !!wishMap[`${emp.id}|${dk}`];
-          return `<td style="${cellStyle}"><input type="checkbox" ${checked?'checked':''} onchange="toggleXmasWish('${emp.id}',${year},'${dk}',this.checked)" style="cursor:pointer"></td>`;
+          return `<td style="${dayCell}${i===0?';'+wishBorder:''}"><input type="checkbox" ${checked?'checked':''} onchange="toggleXmasWish('${emp.id}',${year},'${dk}',this.checked)" style="cursor:pointer"></td>`;
         }).join('')}
       </tr>`).join('')}
     </tbody>
@@ -6215,54 +6210,8 @@ function renderXmasWishTable(employees, wishMap, year) {
 async function toggleXmasWish(employeeId, year, dayKey, checked) {
   try {
     await api('PUT', '/dp/christmas/wishes', {employeeId, year, dayKey, wantsOff: checked});
-    await refreshXmasBoxes(); // nur betroffene Teilbereiche neu laden, Seite bleibt an Ort und Stelle
+    await refreshXmasBoxes();
   } catch(e) { toast('⚠️ '+e.message,'err'); }
-}
-
-function renderXmasScoreTable(employees, scores) {
-  if (!employees.length) return '';
-  const cellStyle = 'text-align:center;font-size:11px;padding:4px 6px;font-weight:700;font-variant-numeric:tabular-nums';
-  const colorFor = s => s>0?'#10b981':s<0?'#ef4444':'var(--mu)';
-  return `<div class="tw" style="overflow-x:auto"><table class="rm-table" style="font-size:11px">
-    <thead><tr><th style="text-align:left">Mitarbeiter</th>${XMAS_DAY_KEYS.map(dk=>`<th style="${cellStyle}">${XMAS_DAY_SHORT[dk]}</th>`).join('')}</tr></thead>
-    <tbody>
-      ${employees.map(emp => `<tr>
-        <td style="${XMAS_NAME_CELL}" title="${esc(emp.name)}">${esc(lastNameFirst(emp.name))}</td>
-        ${XMAS_DAY_KEYS.map(dk => { const s = scores[emp.id]?.[dk] ?? 0; return `<td style="${cellStyle};color:${colorFor(s)}">${s>0?'+':''}${s}</td>`; }).join('')}
-      </tr>`).join('')}
-    </tbody>
-  </table></div>`;
-}
-
-function renderXmasHistoryTable(employees, histYears, histMap, canEdit) {
-  if (!employees.length) return '<div class="empty">Keine Mitarbeiter mit Dienstplan-Parametern vorhanden.</div>';
-  const cellStyle = 'text-align:center;font-size:11px;padding:3px 4px;min-width:26px';
-  const statusStyle = {
-    '':  'color:var(--di)',
-    'U': 'color:#f59e0b;font-weight:700',
-    'A': 'color:#10b981;font-weight:700',
-  };
-  return `<div class="tw" style="overflow-x:auto"><table class="rm-table" style="font-size:11px">
-    <thead>
-      <tr>
-        <th rowspan="2" style="text-align:left;vertical-align:bottom">Mitarbeiter</th>
-        ${histYears.map(y => `<th colspan="5" style="text-align:center;border-left:2px solid var(--border)">${y}</th>`).join('')}
-      </tr>
-      <tr>
-        ${histYears.map(() => XMAS_DAY_KEYS.map((dk,i) => `<th style="${cellStyle}${i===0?';border-left:2px solid var(--border)':''}">${XMAS_DAY_SHORT[dk]}</th>`).join('')).join('')}
-      </tr>
-    </thead>
-    <tbody>
-      ${employees.map(emp => `<tr>
-        <td style="${XMAS_NAME_CELL}" title="${esc(emp.name)}">${esc(lastNameFirst(emp.name))}</td>
-        ${histYears.map(y => XMAS_DAY_KEYS.map((dk,i) => {
-          const st = histMap[`${emp.id}|${y}|${dk}`] || '';
-          const onclick = canEdit ? `onclick="cycleXmasCell('${emp.id}',${y},'${dk}')"` : '';
-          return `<td style="${cellStyle}${i===0?';border-left:2px solid var(--border)':''};${canEdit?'cursor:pointer':''};${statusStyle[st]}" ${onclick} title="${canEdit?'Klicken zum Ändern':''}">${st||'—'}</td>`;
-        }).join('')).join('')}
-      </tr>`).join('')}
-    </tbody>
-  </table></div>`;
 }
 
 async function cycleXmasCell(employeeId, year, dayKey) {
@@ -6270,7 +6219,7 @@ async function cycleXmasCell(employeeId, year, dayKey) {
   const next = {'':'U', 'U':'A', 'A':''}[cur?.status || ''];
   try {
     await api('PUT', '/dp/christmas/history', {employeeId, year, dayKey, status: next||null});
-    await refreshXmasBoxes(); // nur betroffene Teilbereiche neu laden, Seite bleibt an Ort und Stelle
+    await refreshXmasBoxes();
   } catch(e) { toast('⚠️ '+e.message,'err'); }
 }
 
