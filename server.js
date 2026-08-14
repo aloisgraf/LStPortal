@@ -598,6 +598,10 @@ async function initDB() {
     // 10 auf 5 Werte (UNIQUE-Constraint bleibt gültig). wants_off bleibt als
     // Altspalte bestehen (nicht mehr geschrieben/gelesen) — additive Migration.
     `ALTER TABLE dp_christmas_wishes ADD COLUMN IF NOT EXISTS wish TEXT`,
+    // Für die Ticket-Historie: bearbeitete Text-Einträge werden markiert
+    // (Zeitpunkt der letzten Bearbeitung), die eigentliche Änderung wird
+    // zusätzlich als eigener Protokoll-Eintrag (note_type='audit') erfasst.
+    `ALTER TABLE ticket_notes ADD COLUMN IF NOT EXISTS edited_at TIMESTAMPTZ`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }

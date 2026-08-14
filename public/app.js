@@ -1515,6 +1515,17 @@ function _renderFeed(notes,tkId,canEdit,filter){
       const todoCheckbox=(n.todoStatus==='open'||n.todoStatus==='done')&&canEdit
         ?`<label style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--mu);cursor:pointer"><input type="checkbox" ${n.todoStatus==='done'?'checked':''} onchange="toggleNoteTodo('${tkId}','${n.id}',this.checked)" style="width:13px;height:13px;cursor:pointer">Erledigt</label>`
         :'';
+      const canEditNote=canEdit&&(n.authorId===S.currentUser||S.p.manageUsers);
+      const isEditing=S._editingNoteId===n.id;
+      const bodyHtml=isEditing
+        ?`<div style="display:flex;flex-direction:column;gap:6px">
+            <textarea id="noteEditInput-${n.id}" rows="3" style="font-size:13px;width:100%;box-sizing:border-box">${esc(n.text)}</textarea>
+            <div style="display:flex;gap:6px">
+              <button class="btn-p" style="font-size:11px;padding:3px 10px" onclick="saveEditNote('${tkId}','${n.id}')">Speichern</button>
+              <button class="btn-s" style="font-size:11px;padding:3px 10px" onclick="cancelEditNote()">Abbrechen</button>
+            </div>
+          </div>`
+        :`<div style="font-size:13px;line-height:1.5;color:var(--mu);white-space:pre-wrap">${highlightMentions(n.text)}${n.editedAt?'<span style="font-size:10px;color:var(--di);margin-left:4px">(bearbeitet)</span>':''}</div>`;
       return`<div style="display:flex;gap:10px;position:relative">
         <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0">
           <div style="width:28px;height:28px;border-radius:50%;flex-shrink:0;z-index:1;overflow:hidden;border:2px solid var(--border)">${a?avHtml(a.initials,a.color,24,10):`<div style="width:28px;height:28px;background:var(--sf2);display:flex;align-items:center;justify-content:center;font-size:14px">💬</div>`}</div>
@@ -1527,14 +1538,25 @@ function _renderFeed(notes,tkId,canEdit,filter){
             ${todoLabel}
             <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
               ${todoCheckbox}
-              ${canEdit&&n.authorId===S.currentUser?`<button class="btn-d" style="padding:1px 6px;font-size:10px" onclick="deleteNote('${tkId}','${n.id}')">✕</button>`:''}
+              ${canEditNote&&!isEditing?`<button class="btn-s" style="padding:1px 6px;font-size:10px" onclick="startEditNote('${n.id}')">✎</button>`:''}
+              ${canEditNote?`<button class="btn-d" style="padding:1px 6px;font-size:10px" onclick="deleteNote('${tkId}','${n.id}')">✕</button>`:''}
             </div>
           </div>
-          <div style="font-size:13px;line-height:1.5;color:var(--mu);white-space:pre-wrap">${highlightMentions(n.text)}</div>
+          ${bodyHtml}
         </div>
       </div>`;
     }
   }).join('');
+}
+function startEditNote(noteId){S._editingNoteId=noteId;renderTkDetail();const ta=document.getElementById('noteEditInput-'+noteId);if(ta){ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);}}
+function cancelEditNote(){S._editingNoteId=null;renderTkDetail();}
+async function saveEditNote(tkId,noteId){
+  const ta=document.getElementById('noteEditInput-'+noteId);if(!ta)return;
+  const text=ta.value.trim();if(!text)return;
+  try{
+    await api('PUT','/tickets/'+tkId+'/notes/'+noteId,{text});
+    S._editingNoteId=null;await fetchData();renderTkDetail();toast('✅ Eintrag aktualisiert');
+  }catch(e){toast('⚠️ '+e.message,'err');}
 }
 function renderTkDetail(){
   const tk=getTk(S.currentTicketId);if(!tk)return;
@@ -1596,17 +1618,14 @@ function renderTkDetail(){
       </div>`).join('')}
     </div>`:''}
     <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
-      <div style="display:flex;gap:2px;background:var(--sf2);border:1px solid var(--border);border-radius:6px;padding:2px;margin-bottom:12px;width:fit-content">
-        ${['all','audit','note'].map(f=>`<button onclick="S._tkFeedFilter='${f}';renderTkDetail()" style="font-size:11px;padding:3px 10px;border:none;border-radius:4px;cursor:pointer;font-family:inherit;transition:.15s;background:${(S._tkFeedFilter||'all')===f?'var(--acc)':'transparent'};color:${(S._tkFeedFilter||'all')===f?'var(--act)':'var(--mu)'}">${f==='all'?'Alle':f==='audit'?'\u00c4nderungen':'Text'}</button>`).join('')}
-      </div>
-      <div class="nfeed">${_renderFeed(notes,tk.id,canEdit,S._tkFeedFilter||'all')}</div>
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di);margin-bottom:8px">EINTR\u00c4GE</div>
+      <div class="nfeed">${_renderFeed(notes,tk.id,canEdit,'note')}</div>
     </div>
     ${noteInputHtml}`;
-  const protocolHtml=`
-    <div style="display:flex;gap:2px;background:var(--sf2);border:1px solid var(--border);border-radius:6px;padding:2px;margin-bottom:12px;width:fit-content">
-      ${['all','audit','note'].map(f=>`<button onclick="S._tkFeedFilter='${f}';renderTkDetail()" style="font-size:11px;padding:3px 10px;border:none;border-radius:4px;cursor:pointer;font-family:inherit;transition:.15s;background:${(S._tkFeedFilter||'all')===f?'var(--acc)':'transparent'};color:${(S._tkFeedFilter||'all')===f?'var(--act)':'var(--mu)'}">${f==='all'?'Alle':f==='audit'?'\u00c4nderungen':'Text'}</button>`).join('')}
-    </div>
-    <div class="nfeed">${_renderFeed(notes,tk.id,canEdit,S._tkFeedFilter||'all')}</div>`;
+  // Historie: reine, schreibgesch\u00fctzte Chronik aller Ticket\u00e4nderungen
+  // (Protokoll-Eintr\u00e4ge inkl. Bearbeitungen/L\u00f6schungen von Text-Eintr\u00e4gen) \u2014
+  // getrennt von der Details-Ansicht, die nur die Konversation zeigt.
+  const historyHtml=`<div class="nfeed">${_renderFeed(notes,tk.id,false,'audit')}</div>`;
   const files=tk.files||[];
   const fmtBytes=b=>b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB';
   const fileIcon=m=>{if(m.startsWith('image/'))return'\ud83d\uddbc\ufe0f';if(m==='application/pdf')return'\ud83d\udcc4';if(m.includes('word')||m.includes('document'))return'\ud83d\udcdd';if(m.includes('excel')||m.includes('spreadsheet')||m.includes('csv'))return'\ud83d\udcca';if(m.includes('zip')||m.includes('compressed')||m.includes('archive'))return'\ud83d\udddc\ufe0f';if(m.startsWith('video/'))return'\ud83c\udfac';if(m.startsWith('audio/'))return'\ud83c\udfb5';return'\ud83d\udcce';};
@@ -1642,8 +1661,9 @@ function renderTkDetail(){
     <div style="border-bottom:1px solid var(--border);margin:-18px -18px 14px;padding:0 18px;display:flex;gap:0">
       ${tabBtn('details','\ud83d\udccb Details')}
       ${tabBtn('files','\ud83d\udcce Dateien'+(files.length?` (${files.length})`:''))}
+      ${tabBtn('history','\ud83d\udd52 Historie')}
     </div>
-    ${tab==='details'?detailsHtml:filesHtml}`;
+    ${tab==='details'?detailsHtml:tab==='files'?filesHtml:historyHtml}`;
   document.getElementById('tkDetSB').innerHTML=`
     ${canEdit?`
     <div class="tkf"><label>Status</label><select onchange="updateTkField('${tk.id}','status',this.value)">${STATUSES.map(s=>`<option value="${s.id}"${tk.status===s.id?' selected':''}>${s.label}</option>`).join('')}</select></div>

@@ -219,7 +219,10 @@ router.post('/:id/notes', auth, async (req,res) => {
   } catch(e) { bad(res,'Serverfehler',500); }
 });
 
-// Todo-Checkbox: "Noch offen" <-> "Erledigt" umschalten
+// Todo-Checkbox umschalten UND/ODER Text bearbeiten. Text-Bearbeitung nur
+// durch den Autor selbst oder manageUsers, Protokolleinträge (audit) sind
+// grundsätzlich unveränderlich. Jede Textänderung wird zusätzlich als eigener
+// Protokoll-Eintrag in der Historie festgehalten (alt → neu, gekürzt).
 router.put('/:id/notes/:noteId', auth, async (req,res) => {
   try {
     const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
@@ -227,12 +230,31 @@ router.put('/:id/notes/:noteId', auth, async (req,res) => {
     if (!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
     const note = await q1('SELECT * FROM ticket_notes WHERE id=$1 AND ticket_id=$2',[req.params.noteId,req.params.id]);
     if (!note) return bad(res,'Nicht gefunden',404);
-    if (note.todo_status!=='open' && note.todo_status!=='done')
-      return bad(res,'Nur Noch-offen-Einträge können umgeschaltet werden');
-    const {todoStatus} = req.body;
-    if (todoStatus!=='open' && todoStatus!=='done') return bad(res,'todoStatus muss open oder done sein');
-    await pool.query('UPDATE ticket_notes SET todo_status=$1 WHERE id=$2',[todoStatus,req.params.noteId]);
-    ok(res,{todoStatus});
+    const {todoStatus, text} = req.body;
+
+    if (todoStatus !== undefined) {
+      if (note.todo_status!=='open' && note.todo_status!=='done')
+        return bad(res,'Nur Noch-offen-Einträge können umgeschaltet werden');
+      if (todoStatus!=='open' && todoStatus!=='done') return bad(res,'todoStatus muss open oder done sein');
+      await pool.query('UPDATE ticket_notes SET todo_status=$1 WHERE id=$2',[todoStatus,req.params.noteId]);
+      return ok(res,{todoStatus});
+    }
+
+    if (text !== undefined) {
+      if (note.note_type==='audit') return bad(res,'Protokolleinträge können nicht bearbeitet werden',403);
+      if (note.author_id!==req.uid && !req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+      const newText = text.trim();
+      if (!newText) return bad(res,'Text erforderlich');
+      if (newText===note.text) return ok(res,{text:newText});
+      const now = new Date().toISOString();
+      await pool.query('UPDATE ticket_notes SET text=$1,edited_at=$2 WHERE id=$3',[newText,now,req.params.noteId]);
+      const uname=(await getUser(req.uid))?.name||'?';
+      const snippet = s => s.length>60 ? s.slice(0,60)+'…' : s;
+      await auditNote(tk.id,req.uid,`✏️ Eintrag von ${uname} bearbeitet: "${snippet(note.text)}" → "${snippet(newText)}"`);
+      return ok(res,{text:newText,editedAt:now});
+    }
+
+    return bad(res,'Keine Änderung angegeben');
   } catch(e) { bad(res,'Serverfehler',500); }
 });
 
@@ -242,7 +264,10 @@ router.delete('/:id/notes/:noteId', auth, async (req,res) => {
     if (!note) return bad(res,'Nicht gefunden',404);
     if (note.author_id!==req.uid && !req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
     if (note.note_type==='audit') return bad(res,'Protokolleinträge können nicht gelöscht werden',403);
+    const uname=(await getUser(req.uid))?.name||'?';
+    const snippet = (note.text||'').length>60 ? note.text.slice(0,60)+'…' : (note.text||'');
     await pool.query('DELETE FROM ticket_notes WHERE id=$1',[req.params.noteId]);
+    await auditNote(req.params.id,req.uid,`🗑️ Eintrag von ${uname} gelöscht: "${snippet}"`);
     ok(res);
   } catch(e) { bad(res,'Serverfehler',500); }
 });
