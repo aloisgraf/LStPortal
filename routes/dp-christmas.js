@@ -6,11 +6,15 @@
 // für die fünf Weihnachts-/Neujahrs-Tage einen fairness-basierten Score je
 // Mitarbeiter (+1 pro Jahr Tag-/Nachtdienst gearbeitet — Nachtdienst an 24.12./
 // 31.12. mit Faktor 1,5 —, −1 pro Jahr Urlaub, EINE Dimension je Kalendertag,
-// über beliebig viele erfasste Jahre) und darauf aufbauend einen Vorschlag:
-// Freiwillige (Wunsch TD/ND) decken den Schichtbedarf zuerst, fehlende Plätze
-// werden score-basiert (niedrigster Score zuerst) aufgefüllt, der Rest mit
-// Wunsch U erhält "Urlaub empfohlen" nach höchstem Score. Schreibt NIE in
-// dp_plans/dp_assignments — nur Lesevorschlag, keine automatische Übernahme.
+// über beliebig viele erfasste Jahre) und darauf aufbauend einen Vorschlag PRO
+// TAG (nicht mehr getrennt nach Tag-/Nachtdienst, da Mitarbeiter flexibel
+// eingeteilt werden): Frei-Slots = Gesamt-MA − Gesamtbedarf (Tag+Nacht), die
+// MA mit Wunsch U mit dem höchsten Score bis zur Frei-Slot-Anzahl erhalten
+// "Urlaub empfohlen", alle übrigen "Arbeit vorgeschlagen". Die konkrete
+// Zuteilung zu Tag-/Nachtdienst bleibt Aufgabe des Dienstplan-Moduls; Wunsch
+// TD/ND ist dafür nur noch ein Präferenz-Hinweis ohne Einfluss auf diesen
+// Vorschlag. Schreibt NIE in dp_plans/dp_assignments — nur Lesevorschlag,
+// keine automatische Übernahme.
 //
 // Mitarbeiter- und Schichtbedarfs-Daten werden aus den bestehenden DP-Tabellen
 // referenziert (dp_employee_params, dp_shift_types, dp_shift_requirements) —

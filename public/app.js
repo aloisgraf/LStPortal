@@ -6149,8 +6149,8 @@ async function renderDPChristmas() {
     </div>
     <div style="flex:1;overflow:auto;padding:16px">
       <div style="margin-bottom:12px;font-size:12px;color:var(--mu)">
-        Historie: eine Zelle je Kalendertag mit den Werten <strong>TD</strong> (Tagdienst gearbeitet), <strong>ND</strong> (Nachtdienst gearbeitet), <strong>UR</strong> (Urlaub) oder <strong>–</strong> (regulär frei). Score je Mitarbeiter und Tag (eine Dimension, nicht mehr nach Schichtart getrennt): TD/ND → <strong>+1</strong>, ND an 24.12./31.12. mit Faktor <strong>1,5</strong> (höhere Belastung), UR → <strong>−1</strong>, „–" trägt nichts bei.
-        Wunsch ${year} je Tag: <strong>U</strong> (möchte frei/Urlaub), <strong>TD</strong>/<strong>ND</strong> (möchte gern arbeiten) oder kein Eintrag. Freiwillige decken den Schichtbedarf zuerst, erst danach werden fehlende Plätze nach dem <strong>niedrigsten Score</strong> aufgefüllt (hat am wenigsten gearbeitet). Wer danach übrig bleibt und Wunsch U hat, bekommt nach <strong>höchstem Score</strong> sortiert „Urlaub empfohlen" — begrenzt durch die freien Kapazitäts-Slots. Der Wunsch selbst fließt nicht in den Score ein, erst der später eingetragene finale Historienwert.
+        Historie: eine Zelle je Kalendertag mit den Werten <strong>TD</strong> (Tagdienst gearbeitet), <strong>ND</strong> (Nachtdienst gearbeitet), <strong>UR</strong> (Urlaub) oder <strong>–</strong> (regulär frei). Score je Mitarbeiter und Tag (eine Dimension, nicht nach Schichtart getrennt): TD/ND → <strong>+1</strong>, ND an 24.12./31.12. mit Faktor <strong>1,5</strong> (höhere Belastung), UR → <strong>−1</strong>, „–" trägt nichts bei.
+        Vorschlag ${year} je Tag (nicht mehr getrennt nach Tag-/Nachtdienst, da Mitarbeiter flexibel eingeteilt werden): Frei-Slots = Gesamt-Mitarbeiterzahl − Gesamtbedarf (Tag- + Nachtdienst zusammen). Von den Mitarbeitern mit Wunsch U bekommen die mit dem <strong>höchsten Score</strong> (hat in der Vergangenheit am meisten gearbeitet) bis zur Frei-Slot-Anzahl „Urlaub empfohlen", alle übrigen „Arbeit vorgeschlagen". Wunsch <strong>TD</strong>/<strong>ND</strong> ist dabei nur ein Präferenz-Hinweis für die spätere Schichtzuteilung im Dienstplan-Modul und beeinflusst diesen Vorschlag nicht. Der Wunsch selbst fließt nicht in den Score ein, erst der später eingetragene finale Historienwert.
         Ausgenommene (Mitarbeiterverwaltung → Rotation) und inaktive Mitarbeiter (kein aktuelles Dienstverhältnis) fließen nicht in Score, Kapazität oder Vorschlag ein.
         Reine Empfehlung — der Dienstplan wird dadurch <strong>nicht</strong> automatisch verändert.
       </div>
@@ -6200,27 +6200,26 @@ async function refreshXmasBoxes() {
 
 const XMAS_REC_LABEL = {
   off_recommended: {text: '✓ Urlaub empfohlen', bg:'rgba(16,185,129,.15)', fg:'#10b981'},
-  off_available: {text: 'regulär frei', bg:'rgba(148,163,184,.15)', fg:'#64748b'},
+  work_suggested: {text: 'Arbeit vorgeschlagen', bg:'rgba(148,163,184,.15)', fg:'#64748b'},
 };
-// Liefert Badge-Text/Farbe für JEDEN Mitarbeiter an diesem Tag/dieser
-// Schichtart — unabhängig davon, ob ein Wunsch hinterlegt wurde. Nur wer
-// Wunsch U hatte und trotzdem arbeiten muss, bekommt die Warnung; alle
-// anderen Arbeit-Einteilungen (freiwillig oder score-basiert ohne Wunsch)
-// werden neutral/positiv dargestellt.
-function xmasRecBadge(e, sk) {
-  if (e.recommendation === 'work_suggested') {
-    const wantsThisKind = e.wish === (sk==='day'?'TD':'ND');
-    if (wantsThisKind) return {text:'→ Arbeit (Freiwillig)', bg:'rgba(16,185,129,.15)', fg:'#10b981'};
-    if (e.wish === 'U') return {text:'⚠ Arbeit trotz Urlaubswunsch (Score)', bg:'rgba(239,68,68,.12)', fg:'#ef4444'};
-    return {text:'Arbeit (Score)', bg:'rgba(148,163,184,.15)', fg:'#64748b'};
-  }
-  return XMAS_REC_LABEL[e.recommendation] || XMAS_REC_LABEL.off_available;
+// Liefert Badge-Text/Farbe für JEDEN Mitarbeiter an diesem Tag — unabhängig
+// davon, ob ein Wunsch hinterlegt wurde. Die Empfehlung gilt pro TAG (nicht
+// mehr getrennt nach Tag-/Nachtdienst) — nur wer Wunsch U hatte und trotzdem
+// arbeiten muss, bekommt die Warnung. Wunsch TD/ND ist reiner Präferenz-
+// Hinweis für die spätere Schichtzuteilung im Dienstplan und beeinflusst
+// diese Empfehlung nicht.
+function xmasRecBadge(e) {
+  if (e.recommendation === 'work_suggested' && e.wish === 'U')
+    return {text:'⚠ Arbeit trotz Urlaubswunsch (Score)', bg:'rgba(239,68,68,.12)', fg:'#ef4444'};
+  return XMAS_REC_LABEL[e.recommendation] || XMAS_REC_LABEL.work_suggested;
 }
 
-// Zeigt IMMER alle Mitarbeiter dieser Rotation mit ihrer Empfehlung — nicht
-// nur die, die für das aktuelle Jahr einen Wunsch angemeldet haben. So bleibt
-// auch dann sichtbar, wer arbeiten soll, wenn (noch) niemand einen
-// Urlaubswunsch eingetragen hat.
+// Zeigt IMMER alle Mitarbeiter dieser Rotation mit ihrer Tages-Empfehlung —
+// nicht nur die, die für das aktuelle Jahr einen Wunsch angemeldet haben. So
+// bleibt auch dann sichtbar, wer arbeiten soll, wenn (noch) niemand einen
+// Urlaubswunsch eingetragen hat. Eine Karte je Kalendertag (nicht mehr je
+// Tag/Nachtdienst-Kombination) — die Zuteilung zu Tag-/Nachtdienst erfolgt
+// im Dienstplan-Modul.
 function renderXmasProposalCards(proposal) {
   if (!proposal) return '';
   return `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-bottom:8px">
@@ -6232,11 +6231,11 @@ function renderXmasProposalCards(proposal) {
           <span style="font-size:11px;color:var(--mu)">${dateFmt}</span>
         </div>
         <div style="font-size:11px;color:var(--mu);margin-bottom:8px">
-          Bedarf: <strong>${d.requiredCount}</strong> · Frei-Slots: <strong>${d.freeSlots}</strong> · Freiwillige: <strong>${d.volunteerCount}</strong> · Empfohlen frei: <strong style="color:#10b981">${d.offRecommendedCount}</strong>
+          Bedarf: <strong>${d.requiredCount}</strong> <span style="opacity:.7">(Tag ${d.dayRequired} / Nacht ${d.nightRequired})</span> · Frei-Slots: <strong>${d.freeSlots}</strong> · Empfohlen frei: <strong style="color:#10b981">${d.offRecommendedCount}</strong>
         </div>
         <div style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:3px">
           ${!d.employees.length?'<div style="font-size:11px;color:var(--di)">Keine Mitarbeiter in der Rotation</div>':''}
-          ${d.employees.map(e => { const b = xmasRecBadge(e, d.shiftKind); return `<div style="display:flex;align-items:center;gap:6px;font-size:11px;padding:3px 6px;border-radius:4px;background:${b.bg}">
+          ${d.employees.map(e => { const b = xmasRecBadge(e); return `<div style="display:flex;align-items:center;gap:6px;font-size:11px;padding:3px 6px;border-radius:4px;background:${b.bg}">
             <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(e.name)}">${esc(lastNameFirst(e.name))}${e.wish?` <span style="opacity:.6">(Wunsch ${e.wish})</span>`:''}</span>
             <span style="color:var(--mu);font-variant-numeric:tabular-nums" title="Score für diesen Tag">${xmasFmtScore(e.score)}</span>
             <span class="bdg" style="font-size:10px;background:${b.bg};color:${b.fg}">${b.text}</span>
