@@ -18,6 +18,10 @@ const getUser    = id => q1('SELECT * FROM users WHERE id=$1', [id]);
 const getUserByUsername = username => q1('SELECT * FROM users WHERE LOWER(username)=LOWER($1)', [username]);
 const DEPTS = ['technik','leitung','dienstplanung','ausbildung','qm','frei'];
 
+// Re-export der zentralen, reinen (DB-freien) Aktiv-Ableitung aus lib/dp-rules.js
+// — dort liegt sie, damit sie ohne DB-Verbindung testbar ist (Vitest).
+const { isUserActive } = require('./lib/dp-rules');
+
 async function getP(uid, userObj=null, overrides=[]) {
   const u = userObj || await getUser(uid);
   const roles = parseRoles(u?.roles);
@@ -103,4 +107,4 @@ async function logAct(uid, name, action, details={}) {
 
 module.exports = { pool, q, q1, newId, parseRoles, parseTags, getUser, getUserByUsername, DEPTS, logAct,
   getP, getTP, canSeeTk, canEditTk, nextTicketNumber, auditNote, createNotification,
-  parseMentions };
+  parseMentions, isUserActive };

@@ -588,6 +588,11 @@ async function initDB() {
   created_by TEXT NOT NULL, updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(employee_id, year, day_key)
 )`,
+    // Nullable, damit bestehende Nutzer nicht brechen — "Pflichtfeld" wird nur
+    // im Formular für NEUE Mitarbeiter erzwungen. Aktiv-Status wird zentral aus
+    // diesen beiden Daten abgeleitet (db.isUserActive), kein separates Flag.
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS hire_date DATE`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS termination_date DATE`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }

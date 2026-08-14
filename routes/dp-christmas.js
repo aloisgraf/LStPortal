@@ -4,41 +4,47 @@
 //
 // Reine Vorschlags-Funktion (lib/dp-rules.js: buildChristmasProposal): liefert
 // für die fünf Weihnachts-/Neujahrs-Tage einen fairness-basierten Score je
-// Mitarbeiter (+1 pro Jahr gearbeitet, −1 pro Jahr Urlaub — je Tag-Typ separat,
-// über beliebig viele erfasste Jahre) und darauf aufbauend einen Freistellungs-
-// vorschlag für die Mitarbeiter, die für das aktuelle Jahr einen Urlaubswunsch
-// hinterlegt haben. Schreibt NIE in dp_plans/dp_assignments — nur Lesevorschlag,
-// keine automatische Übernahme in den Dienstplan.
+// Mitarbeiter (+1 pro Jahr Tag-/Nachtdienst gearbeitet, −1 pro Jahr Urlaub —
+// je Tag-Typ separat, über beliebig viele erfasste Jahre) und darauf aufbauend
+// einen Freistellungsvorschlag für die Mitarbeiter, die für das aktuelle Jahr
+// einen Urlaubswunsch hinterlegt haben. Schreibt NIE in dp_plans/dp_assignments
+// — nur Lesevorschlag, keine automatische Übernahme in den Dienstplan.
 //
 // Mitarbeiter- und Schichtbedarfs-Daten werden aus den bestehenden DP-Tabellen
 // referenziert (dp_employee_params, dp_shift_types, dp_shift_requirements) —
-// keine Datenduplikate. Neu sind nur die reinen U/A-Historieneinträge und die
-// Urlaubswünsche fürs aktuelle Jahr.
+// keine Datenduplikate. Neu sind nur die Historieneinträge (eine Spalte je
+// Kalendertag, Zellwert TD/ND/UR/–) und die Urlaubswünsche fürs aktuelle Jahr.
 // ─────────────────────────────────────────────────────────────────────────────
 const router = require('express').Router();
 const { q, q1, newId, pool } = require('../db');
 const { auth, ok, bad } = require('../middleware');
-const { CHRISTMAS_DAY_KEYS, buildChristmasProposal, computeChristmasScores } = require('../lib/dp-rules');
+const { CHRISTMAS_DAY_KEYS, CHRISTMAS_CALENDAR_DAY_KEYS, buildChristmasProposal, computeChristmasScores } = require('../lib/dp-rules');
+const { isUserActive } = require('../db');
 
 // Liefert ALLE Mitarbeiter mit DP-Parametern inkl. Rotations-Teilnahme-Flag
-// (xmasParticipant). Ausgenommene Mitarbeiter (xmasParticipant=false) werden
-// hier NICHT herausgefiltert — das erledigt der jeweilige Aufrufer, je nachdem
-// ob er die volle Liste (Matrix-Anzeige) oder nur Teilnehmer (Score/Vorschlag/
-// Kapazität) braucht.
+// (xmasParticipant) und abgeleitetem Aktiv-Status (isActive, aus Ein-/Austritts-
+// datum — siehe db.isUserActive). Weder ausgenommene (xmasParticipant=false)
+// noch inaktive Mitarbeiter werden hier herausgefiltert — das erledigt der
+// jeweilige Aufrufer, je nachdem ob er die volle Liste (Matrix-Anzeige, ausgegraut)
+// oder nur aktive Teilnehmer (Score/Vorschlag/Kapazität) braucht.
 async function getEmployees() {
   const [empParams, users] = await Promise.all([
     q(`SELECT DISTINCT ON (employee_id) employee_id, xmas_rotation_participant
        FROM dp_employee_params ORDER BY employee_id, valid_from DESC NULLS LAST`),
-    q('SELECT id,name FROM users'),
+    q('SELECT id,name,hire_date,termination_date FROM users'),
   ]);
   const userMap = {};
-  for (const u of users) userMap[u.id] = u.name;
+  for (const u of users) userMap[u.id] = u;
   return empParams
-    .map(e => ({
-      id: e.employee_id,
-      name: userMap[e.employee_id] || null,
-      xmasParticipant: e.xmas_rotation_participant !== false,
-    }))
+    .map(e => {
+      const u = userMap[e.employee_id];
+      return {
+        id: e.employee_id,
+        name: u ? u.name : null,
+        xmasParticipant: e.xmas_rotation_participant !== false,
+        isActive: u ? isUserActive(u) : false,
+      };
+    })
     .filter(e => e.name) // nur (noch) existierende Mitarbeiter
     .sort((a,b) => a.name.localeCompare(b.name,'de'));
 }
@@ -61,12 +67,13 @@ router.put('/christmas/history', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
   try {
     const {employeeId, year, dayKey, status} = req.body;
-    if (!employeeId || !year || !CHRISTMAS_DAY_KEYS.includes(dayKey))
-      return bad(res,'employeeId, year und dayKey erforderlich (z.B. 24.12-T/24.12-N)');
-    // '–' = explizit "regulär frei" (dokumentiert, trägt aber wie ein leerer
-    // Eintrag 0 zum Score bei) — Zyklus im UI: — (leer) → U → A → '–' → …
-    if (status && status!=='U' && status!=='A' && status!=='–')
-      return bad(res,'status muss U, A, "–" oder leer sein');
+    if (!employeeId || !year || !CHRISTMAS_CALENDAR_DAY_KEYS.includes(dayKey))
+      return bad(res,'employeeId, year und dayKey erforderlich (z.B. 24.12/31.12/01.01)');
+    // Eine Spalte je Kalendertag, Schichtart steckt im Zellwert:
+    // TD (Tagdienst), ND (Nachtdienst), UR (Urlaub), '–' (regulär frei, neutral).
+    // Zyklus im UI: — (leer) → TD → ND → UR → '–' → …
+    if (status && status!=='TD' && status!=='ND' && status!=='UR' && status!=='–')
+      return bad(res,'status muss TD, ND, UR, "–" oder leer sein');
 
     if (!status) {
       // Leerer Status = Zelle löschen (kein Eintrag = "keine Angabe", trägt 0 zum Score bei)
@@ -150,11 +157,12 @@ router.get('/christmas/proposal', auth, async (req,res) => {
       q('SELECT employee_id,day_key,wants_off FROM dp_christmas_wishes WHERE year=$1', [year]),
     ]);
 
-    // Ausgenommene Mitarbeiter (xmasParticipant=false) fließen weder in Score
-    // noch Kapazität noch Vorschlag ein — werden hier vor der Berechnung
+    // Ausgenommene (xmasParticipant=false) UND inaktive Mitarbeiter (isActive=false,
+    // z.B. noch nicht eingetreten oder bereits ausgetreten) fließen weder in
+    // Score noch Kapazität noch Vorschlag ein — werden hier vor der Berechnung
     // herausgefiltert, tauchen aber weiterhin in der Mitarbeiterverwaltung und
-    // im Matrix-Endpoint (getEmployees) auf.
-    const employees = allEmployees.filter(e => e.xmasParticipant);
+    // im Matrix-Endpoint (getEmployees) auf (dort ausgegraut).
+    const employees = allEmployees.filter(e => e.xmasParticipant && e.isActive);
     const days = buildChristmasProposal(year, {employees, shiftTypes, requirements, historyRows, wishRows});
     ok(res, {year, employeeCount: employees.length, excludedCount: allEmployees.length - employees.length, days});
   } catch(e) { console.error('[christmas/proposal]', e.message); bad(res,'Serverfehler',500); }

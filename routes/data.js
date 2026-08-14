@@ -1,6 +1,6 @@
 'use strict';
 const router = require('express').Router();
-const { q, q1, parseRoles, parseTags, canSeeTk, canEditTk, canSeeMsg, pool } = require('../db');
+const { q, q1, parseRoles, parseTags, canSeeTk, canEditTk, canSeeMsg, pool, isUserActive } = require('../db');
 const { auth, ok, bad } = require('../middleware');
 
 // DATA
@@ -10,7 +10,7 @@ router.get('/', auth, async (req,res) => {
     const canManageDp = roles.some(r=>['admin','leitung','dienstplanung'].includes(r));
     const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
            tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw,dpQualificationsRaw,dpShiftPrefsRaw,dpProtocolRaw,todosRaw,todoItemsRaw,todoAssigneesRaw,myDpPlanIdsRaw,todoNotificationsRaw] = await Promise.all([
-      q('SELECT id,name,initials,roles,color,must_change_pw,last_seen,category,email,username FROM users ORDER BY name'),
+      q('SELECT id,name,initials,roles,color,must_change_pw,last_seen,category,email,username,hire_date,termination_date FROM users ORDER BY name'),
       q('SELECT * FROM categories ORDER BY sort_order,label'),
       q('SELECT * FROM tags ORDER BY label'),
       p.canApproveEvents
@@ -131,6 +131,11 @@ router.get('/', auth, async (req,res) => {
         color:u.color, mustChangePW:u.must_change_pw,
         category:u.category||'',
         isOnline: !!(u.last_seen && new Date(u.last_seen) > fiveMinAgo),
+        hireDate: u.hire_date ? new Date(u.hire_date).toISOString().slice(0,10) : null,
+        terminationDate: u.termination_date ? new Date(u.termination_date).toISOString().slice(0,10) : null,
+        // Zentral aus hire_date/termination_date abgeleitet (db.isUserActive) —
+        // KEIN gespeichertes Flag, damit es überall im Portal einheitlich ist.
+        isActive: isUserActive(u),
       })),
       categories: cats,
       tags: tagsRaw,
