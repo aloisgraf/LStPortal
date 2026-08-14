@@ -6050,6 +6050,7 @@ async function renderDPChristmas() {
   const year = S._xmasYear || (S._xmasYear = new Date().getFullYear());
   const histCount = S._xmasHistYearsCount || (S._xmasHistYearsCount = 3);
   const histYears = Array.from({length: histCount}, (_,i) => year - histCount + i);
+  if (!S._xmasOpen) S._xmasOpen = {wishes:false, scores:false, history:false};
 
   el.innerHTML = '<div style="padding:20px;color:var(--mu)">Lade Weihnachtsdienst-Rotation…</div>';
 
@@ -6057,6 +6058,7 @@ async function renderDPChristmas() {
   try { empParams = await api('GET', '/dp/employee-params'); S.dpEmpParams = empParams; } catch(e) {}
   const empIds = [...new Set(empParams.map(p => p.employee_id))];
   const employees = empIds.map(id => getU(id)).filter(Boolean).sort(byLastName);
+  S._xmasEmployees = employees;
 
   let history = [], proposal = null, wishes = [], scores = {};
   try {
@@ -6087,25 +6089,78 @@ async function renderDPChristmas() {
         Von den Mitarbeitern mit Urlaubswunsch für ${year} bekommen die mit dem <strong>niedrigsten Score</strong> (am längsten nicht frei gehabt) den Vorschlag „Urlaub empfohlen", begrenzt durch die freien Kapazitäts-Slots.
         Reine Empfehlung — der Dienstplan wird dadurch <strong>nicht</strong> automatisch verändert.
       </div>
-      ${renderXmasProposalCards(proposal)}
+      <div id="xmasProposalBox">${renderXmasProposalCards(proposal)}</div>
 
-      <div style="margin:24px 0 8px;font-weight:700;font-size:14px">🙋 Urlaubswünsche ${year}</div>
-      <div style="font-size:11px;color:var(--mu);margin-bottom:8px">Häkchen = Mitarbeiter möchte an diesem Tag frei haben. Nur wer hier einen Wunsch anmeldet, kommt für „Urlaub empfohlen" in Frage.</div>
-      ${renderXmasWishTable(employees, wishMap, year)}
-
-      <div style="margin:24px 0 8px;font-weight:700;font-size:14px">📈 Score-Übersicht (alle erfassten Jahre)</div>
-      <div style="font-size:11px;color:var(--mu);margin-bottom:8px">Grün = in Summe öfter gearbeitet, Rot = in Summe öfter frei — unabhängig davon, wie viele Jahre unten in der Historie angezeigt werden.</div>
-      ${renderXmasScoreTable(employees, scores)}
-
-      <div style="margin:24px 0 8px;font-weight:700;font-size:14px">📊 Historische Erfassung</div>
-      <div style="font-size:11px;color:var(--mu);margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <span>${canEditHistory?'Klick auf eine Zelle wechselt zwischen — / U (Urlaub) / A (Arbeit).':'Nur Planungsberechtigte können die Historie bearbeiten.'}</span>
-        <button class="btn-s" style="font-size:11px;padding:2px 8px" onclick="S._xmasHistYearsCount=${histCount+1};renderDPChristmas()">+ weiteres Jahr</button>
-        ${histCount>1?`<button class="btn-s" style="font-size:11px;padding:2px 8px" onclick="S._xmasHistYearsCount=${histCount-1};renderDPChristmas()">− Jahr entfernen</button>`:''}
+      ${xmasSectionHeader('wishes', '🙋', 'Urlaubswünsche ' + year, wishes.length + ' Wünsche')}
+      <div id="xmas-body-wishes" style="display:${S._xmasOpen.wishes?'':'none'}">
+        <div style="font-size:11px;color:var(--mu);margin:8px 0">Häkchen = Mitarbeiter möchte an diesem Tag frei haben. Nur wer hier einen Wunsch anmeldet, kommt für „Urlaub empfohlen" in Frage.</div>
+        <div id="xmasWishBox">${renderXmasWishTable(employees, wishMap, year)}</div>
       </div>
-      ${renderXmasHistoryTable(employees, histYears, histMap, canEditHistory)}
+
+      ${xmasSectionHeader('scores', '📈', 'Score-Übersicht (alle erfassten Jahre)')}
+      <div id="xmas-body-scores" style="display:${S._xmasOpen.scores?'':'none'}">
+        <div style="font-size:11px;color:var(--mu);margin:8px 0">Grün = in Summe öfter gearbeitet, Rot = in Summe öfter frei — unabhängig davon, wie viele Jahre unten in der Historie angezeigt werden.</div>
+        <div id="xmasScoreBox">${renderXmasScoreTable(employees, scores)}</div>
+      </div>
+
+      ${xmasSectionHeader('history', '📊', 'Historische Erfassung', histYears[0]+'–'+histYears[histYears.length-1])}
+      <div id="xmas-body-history" style="display:${S._xmasOpen.history?'':'none'}">
+        <div style="font-size:11px;color:var(--mu);margin:8px 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span>${canEditHistory?'Klick auf eine Zelle wechselt zwischen — / U (Urlaub) / A (Arbeit).':'Nur Planungsberechtigte können die Historie bearbeiten.'}</span>
+          <button class="btn-s" style="font-size:11px;padding:2px 8px" onclick="S._xmasHistYearsCount=${histCount+1};renderDPChristmas()">+ weiteres Jahr</button>
+          ${histCount>1?`<button class="btn-s" style="font-size:11px;padding:2px 8px" onclick="S._xmasHistYearsCount=${histCount-1};renderDPChristmas()">− Jahr entfernen</button>`:''}
+        </div>
+        <div id="xmasHistoryBox">${renderXmasHistoryTable(employees, histYears, histMap, canEditHistory)}</div>
+      </div>
     </div>
   </div>`;
+}
+
+// Eingeklappter Abschnitts-Header: reines Ein-/Ausblenden per DOM, kein Re-Render,
+// damit Scrollposition und der Rest der Seite beim Auf-/Zuklappen unangetastet bleiben.
+function xmasSectionHeader(id, icon, title, hint) {
+  const open = !!S._xmasOpen?.[id];
+  return `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;user-select:none;background:var(--sf2);border:1px solid var(--border);border-radius:var(--r);margin-top:14px" onclick="toggleXmasSection('${id}')">
+    <span style="font-weight:700;font-size:14px;flex:1">${icon} ${esc(title)}</span>
+    ${hint?`<span style="font-size:11px;color:var(--mu)">${esc(hint)}</span>`:''}
+    <span id="xmas-arrow-${id}">${open?'▲':'▼'}</span>
+  </div>`;
+}
+function toggleXmasSection(id) {
+  if (!S._xmasOpen) S._xmasOpen = {};
+  S._xmasOpen[id] = !S._xmasOpen[id];
+  const body = document.getElementById('xmas-body-'+id);
+  const arrow = document.getElementById('xmas-arrow-'+id);
+  if (body) body.style.display = S._xmasOpen[id] ? '' : 'none';
+  if (arrow) arrow.textContent = S._xmasOpen[id] ? '▲' : '▼';
+}
+
+// Nach einer Zell-/Checkbox-Änderung nur die betroffenen Teilbereiche neu laden
+// (statt der ganzen Seite) — Scrollposition und aufgeklappte Abschnitte bleiben erhalten.
+async function refreshXmasBoxes() {
+  const year = S._xmasYear, histCount = S._xmasHistYearsCount;
+  const histYears = Array.from({length: histCount}, (_,i) => year - histCount + i);
+  const employees = S._xmasEmployees || [];
+  let history = [], proposal = null, wishes = [], scores = {};
+  try {
+    [history, proposal, wishes, scores] = await Promise.all([
+      api('GET', '/dp/christmas/history?years=' + histYears.join(',')),
+      api('GET', '/dp/christmas/proposal?year=' + year),
+      api('GET', '/dp/christmas/wishes?year=' + year),
+      api('GET', '/dp/christmas/scores'),
+    ]);
+  } catch(e) { toast('⚠️ '+e.message,'err'); return; }
+  S._xmasHistory = history; S._xmasProposal = proposal; S._xmasWishes = wishes; S._xmasScores = scores;
+
+  const histMap = {};
+  history.forEach(h => { histMap[`${h.employee_id}|${h.year}|${h.day_key}`] = h.status; });
+  const wishMap = {};
+  wishes.forEach(w => { if (w.wants_off) wishMap[`${w.employee_id}|${w.day_key}`] = true; });
+
+  const propEl = document.getElementById('xmasProposalBox'); if (propEl) propEl.innerHTML = renderXmasProposalCards(proposal);
+  const wishEl = document.getElementById('xmasWishBox'); if (wishEl) wishEl.innerHTML = renderXmasWishTable(employees, wishMap, year);
+  const scoreEl = document.getElementById('xmasScoreBox'); if (scoreEl) scoreEl.innerHTML = renderXmasScoreTable(employees, scores);
+  const histEl = document.getElementById('xmasHistoryBox'); if (histEl) histEl.innerHTML = renderXmasHistoryTable(employees, histYears, histMap, S.p.manageUsers);
 }
 
 function renderXmasProposalCards(proposal) {
@@ -6125,7 +6180,7 @@ function renderXmasProposalCards(proposal) {
         <div style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:3px">
           ${!wishers.length?'<div style="font-size:11px;color:var(--di)">Keine Urlaubswünsche angemeldet</div>':''}
           ${wishers.map(e => `<div style="display:flex;align-items:center;gap:6px;font-size:11px;padding:3px 6px;border-radius:4px;background:${e.recommendation==='off_recommended'?'rgba(16,185,129,.08)':'rgba(148,163,184,.08)'}">
-            <span style="flex:1">${esc(lastNameFirst(e.name))}</span>
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(e.name)}">${esc(lastNameFirst(e.name))}</span>
             <span style="color:var(--mu);font-variant-numeric:tabular-nums" title="Score für diesen Tag">${e.score>0?'+':''}${e.score}</span>
             <span class="bdg" style="font-size:10px;background:${e.recommendation==='off_recommended'?'rgba(16,185,129,.15)':'rgba(148,163,184,.15)'};color:${e.recommendation==='off_recommended'?'#10b981':'#64748b'}">${e.recommendation==='off_recommended'?'✓ Urlaub empfohlen':'Arbeit vorgeschlagen'}</span>
           </div>`).join('')}
@@ -6134,6 +6189,8 @@ function renderXmasProposalCards(proposal) {
     }).join('')}
   </div>`;
 }
+
+const XMAS_NAME_CELL = 'text-align:left;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px';
 
 function renderXmasWishTable(employees, wishMap, year) {
   if (!employees.length) return '<div class="empty">Keine Mitarbeiter mit Dienstplan-Parametern vorhanden.</div>';
@@ -6145,7 +6202,7 @@ function renderXmasWishTable(employees, wishMap, year) {
     </tr></thead>
     <tbody>
       ${employees.map(emp => `<tr>
-        <td style="text-align:left;font-weight:600;white-space:nowrap">${esc(lastNameFirst(emp.name))}</td>
+        <td style="${XMAS_NAME_CELL}" title="${esc(emp.name)}">${esc(lastNameFirst(emp.name))}</td>
         ${XMAS_DAY_KEYS.map(dk => {
           const checked = !!wishMap[`${emp.id}|${dk}`];
           return `<td style="${cellStyle}"><input type="checkbox" ${checked?'checked':''} onchange="toggleXmasWish('${emp.id}',${year},'${dk}',this.checked)" style="cursor:pointer"></td>`;
@@ -6158,7 +6215,7 @@ function renderXmasWishTable(employees, wishMap, year) {
 async function toggleXmasWish(employeeId, year, dayKey, checked) {
   try {
     await api('PUT', '/dp/christmas/wishes', {employeeId, year, dayKey, wantsOff: checked});
-    renderDPChristmas(); // Wunsch ändert auch den Vorschlag → komplett neu laden
+    await refreshXmasBoxes(); // nur betroffene Teilbereiche neu laden, Seite bleibt an Ort und Stelle
   } catch(e) { toast('⚠️ '+e.message,'err'); }
 }
 
@@ -6170,7 +6227,7 @@ function renderXmasScoreTable(employees, scores) {
     <thead><tr><th style="text-align:left">Mitarbeiter</th>${XMAS_DAY_KEYS.map(dk=>`<th style="${cellStyle}">${XMAS_DAY_SHORT[dk]}</th>`).join('')}</tr></thead>
     <tbody>
       ${employees.map(emp => `<tr>
-        <td style="text-align:left;font-weight:600;white-space:nowrap">${esc(lastNameFirst(emp.name))}</td>
+        <td style="${XMAS_NAME_CELL}" title="${esc(emp.name)}">${esc(lastNameFirst(emp.name))}</td>
         ${XMAS_DAY_KEYS.map(dk => { const s = scores[emp.id]?.[dk] ?? 0; return `<td style="${cellStyle};color:${colorFor(s)}">${s>0?'+':''}${s}</td>`; }).join('')}
       </tr>`).join('')}
     </tbody>
@@ -6197,7 +6254,7 @@ function renderXmasHistoryTable(employees, histYears, histMap, canEdit) {
     </thead>
     <tbody>
       ${employees.map(emp => `<tr>
-        <td style="text-align:left;font-weight:600;white-space:nowrap">${esc(lastNameFirst(emp.name))}</td>
+        <td style="${XMAS_NAME_CELL}" title="${esc(emp.name)}">${esc(lastNameFirst(emp.name))}</td>
         ${histYears.map(y => XMAS_DAY_KEYS.map((dk,i) => {
           const st = histMap[`${emp.id}|${y}|${dk}`] || '';
           const onclick = canEdit ? `onclick="cycleXmasCell('${emp.id}',${y},'${dk}')"` : '';
@@ -6213,7 +6270,7 @@ async function cycleXmasCell(employeeId, year, dayKey) {
   const next = {'':'U', 'U':'A', 'A':''}[cur?.status || ''];
   try {
     await api('PUT', '/dp/christmas/history', {employeeId, year, dayKey, status: next||null});
-    renderDPChristmas(); // Score-Übersicht hängt von der Historie ab → komplett neu laden
+    await refreshXmasBoxes(); // nur betroffene Teilbereiche neu laden, Seite bleibt an Ort und Stelle
   } catch(e) { toast('⚠️ '+e.message,'err'); }
 }
 
