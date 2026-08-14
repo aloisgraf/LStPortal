@@ -1519,7 +1519,7 @@ function renderTkDetail(){
           <div class="mention-suggestions" id="mentionSug"></div>
           <textarea id="noteInput" rows="2" placeholder="Text \u2026 @Name f\u00fcr Erw\u00e4hnung" style="font-size:13px;width:100%" onkeyup="onNoteKey(event,'${tk.id}')"></textarea>
         </div>
-        <select id="noteTodoType" style="font-size:12px;padding:8px 6px;flex-shrink:0" title="Art des Eintrags">
+        <select id="noteTodoType" style="font-size:12px;padding:8px 6px;width:auto;flex-shrink:0" title="Art des Eintrags">
           <option value="">Info</option>
           <option value="open">Noch offen</option>
         </select>
@@ -3766,6 +3766,7 @@ function openItemForm(instanceId, id=null) {
       if(e.type==='copied_from') return `<div style="margin-bottom:2px">📋 ${ts} · <b>${uName}</b>: Kopiert aus anderer Besprechung</div>`;
       if(e.type==='content_synced') return `<div style="margin-bottom:2px">🔄 ${ts} · Inhalt aktualisiert aus <i>${esc(e.fromMeeting)}</i></div>`;
       if(e.type==='unlinked') return `<div style="margin-bottom:2px">🔓 ${ts} · <b>${uName}</b>: Verknüpfung aufgehoben</div>`;
+      if(e.type==='converted_to_ticket') return `<div style="margin-bottom:2px">🎫 ${ts} · <b>${uName}</b>: In Ticket <b>${esc(e.ticketNumber||'?')}</b> umgewandelt</div>`;
       return '';
     }).join('');
   } else { protoSection.style.display='none'; }
@@ -3775,6 +3776,18 @@ function openItemForm(instanceId, id=null) {
   document.getElementById('itMoveBtn').style.display = (item && canMng) ? '' : 'none';
   document.getElementById('itCopyBtn').style.display = (item && canMng) ? '' : 'none';
   document.getElementById('itUnlinkBtn').style.display = (item && item.groupId && canMng) ? '' : 'none';
+  const convertBtn = document.getElementById('itConvertBtn');
+  convertBtn.style.display = (item && canMng && !item.convertedTicketId) ? '' : 'none';
+  if (item) convertBtn.onclick = () => openConvertMeetingItem(item.id);
+  const convertedInfo = document.getElementById('itConvertedInfo');
+  if (item && item.convertedTicketId) {
+    const tk = getTk(item.convertedTicketId);
+    const byUser = item.convertedBy ? getU(item.convertedBy) : null;
+    convertedInfo.style.display = '';
+    convertedInfo.innerHTML = `🎫 Umgewandelt in Ticket ${tk?`<a href="javascript:void(0)" onclick="openTkDetail('${item.convertedTicketId}')" style="font-weight:600">${tk.number}</a>`:'(nicht einsehbar)'}${byUser?` von ${esc(byUser.name)}`:''}${item.convertedAt?' · '+String(item.convertedAt).slice(0,16).replace('T',' '):''}`;
+  } else {
+    convertedInfo.style.display = 'none';
+  }
   document.getElementById('itPartUser').innerHTML = S.users.map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('');
   renderItemParticipants(item?.participants||[]);
   const fbtn = document.getElementById('itFollowupBtn');
@@ -6459,32 +6472,45 @@ async function submitTodoItemForm() {
   } catch(e) { toast('Fehler: '+e.message,'err'); }
 }
 
+// Gemeinsames Modal für "In Ticket umwandeln" — wird sowohl von Todo-Punkten
+// als auch von Besprechungspunkten genutzt (kind: 'todo' | 'meeting').
 function openConvertTodoItem(todoId, itemId) {
   const t = S.todos.find(x => x.id === todoId); if (!t) return;
   const item = t.items.find(x => x.id === itemId); if (!item) return;
   if (item.converted_ticket_id) { toast('Punkt wurde bereits umgewandelt','err'); return; }
-  document.getElementById('ctiTodoId').value = todoId;
-  document.getElementById('ctiItemId').value = itemId;
-  document.getElementById('ctiTitlePreview').textContent = item.title;
-  document.getElementById('ctiErr').textContent = '';
   const prioMap = {low:'low', medium:'medium', high:'high', urgent:'high'};
-  document.getElementById('ctiPrio').value = prioMap[t.priority] || 'medium';
+  openConvertItemModal({kind:'todo', ids:{todoId, itemId}, title:item.title, priority: prioMap[t.priority] || 'medium'});
+}
+function openConvertMeetingItem(itemId) {
+  const item = S.meetings.flatMap(m => m.instances.flatMap(i => i.items)).find(x => x.id === itemId);
+  if (!item) return;
+  if (item.convertedTicketId) { toast('Punkt wurde bereits umgewandelt','err'); return; }
+  openConvertItemModal({kind:'meeting', ids:{itemId}, title:item.title, priority:'medium'});
+}
+function openConvertItemModal({kind, ids, title, priority}) {
+  S._convertCtx = {kind, ids};
+  document.getElementById('ctiTitlePreview').textContent = title;
+  document.getElementById('ctiErr').textContent = '';
+  document.getElementById('ctiPrio').value = priority || 'medium';
   document.getElementById('ctiAssignee').innerHTML = '<option value="">— niemand —</option>' +
     S.users.filter(isAssignable).map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join('');
   openModal('convertTodoOv');
 }
 async function submitConvertTodoItem() {
-  const todoId = document.getElementById('ctiTodoId').value;
-  const itemId = document.getElementById('ctiItemId').value;
+  const ctx = S._convertCtx; if (!ctx) return;
   const department = document.getElementById('ctiDept').value;
   const priority = document.getElementById('ctiPrio').value;
   const assigneeId = document.getElementById('ctiAssignee').value || null;
   const errEl = document.getElementById('ctiErr'); errEl.textContent = '';
+  const url = ctx.kind === 'todo'
+    ? `/todos/${ctx.ids.todoId}/items/${ctx.ids.itemId}/convert-to-ticket`
+    : `/discussion-items/${ctx.ids.itemId}/convert-to-ticket`;
   try {
-    const res = await api('POST', `/todos/${todoId}/items/${itemId}/convert-to-ticket`, {department, priority, assigneeId});
+    const res = await api('POST', url, {department, priority, assigneeId});
     closeModal('convertTodoOv');
     await fetchData();
-    renderTodos();
+    if (ctx.kind === 'todo') { renderTodos(); }
+    else { renderMeetings(); openItemForm(document.getElementById('itInstanceId').value, ctx.ids.itemId); }
     toast(`✅ Ticket ${res.number} erstellt`);
   } catch(e) { errEl.textContent = '⚠️ ' + e.message; }
 }

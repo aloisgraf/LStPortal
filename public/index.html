@@ -1499,12 +1499,14 @@
         <div style="font-size:12px;font-weight:600;color:var(--mu);margin-bottom:4px">Protokoll</div>
         <div id="itProtokoll" style="font-size:11px;color:var(--mu);background:var(--bg2);border-radius:6px;padding:8px;max-height:120px;overflow-y:auto"></div>
       </div>
+      <div id="itConvertedInfo" style="display:none;font-size:12px;color:var(--mu);background:var(--bg2);border-radius:6px;padding:8px;margin-top:8px"></div>
     <div class="mf" style="justify-content:space-between;flex-wrap:wrap;gap:6px">
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn-s" id="itFollowupBtn" onclick="openFollowupForm()" style="display:none">&#128257; Folgebesprechung</button>
         <button class="btn-s" id="itMoveBtn" onclick="openMoveItemModal()" style="display:none">&#10145; Verschieben</button>
         <button class="btn-s" id="itCopyBtn" onclick="openCopyItemModal()" style="display:none">&#128203; In andere Besprechung</button>
         <button class="btn-s" id="itUnlinkBtn" onclick="unlinkItem()" style="display:none">&#10005; Verknüpfung aufheben</button>
+        <button class="btn-s" id="itConvertBtn" style="display:none">&#127917; In Ticket umwandeln</button>
       </div>
       <button class="btn" onclick="submitItemForm()">&#10003; Speichern</button>
     </div>
