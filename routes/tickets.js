@@ -84,33 +84,40 @@ router.put('/:id', auth, async (req,res) => {
       }
     }
 
+    // Feldänderungen protokollieren. Trenner ist NICHT ':', da alt/neu freier
+    // Nutzertext sind (z.B. Ticket-Titel enthalten häufig selbst einen
+    // Doppelpunkt) — ein reiner ':'-Trenner würde den Wert dahinter beim
+    // Anzeigen (_parseAudit im Frontend) abschneiden.
+    const AUDIT_SEP = '\u0001';
+    const auditField = (field, from, to) => auditNote(tk.id, req.uid, `FIELD${AUDIT_SEP}${field}${AUDIT_SEP}${from}${AUDIT_SEP}${to}`);
+
     // Audit: alle relevanten Feldänderungen protokollieren
     if (b.status!==undefined&&b.status!==tk.status) {
-      await auditNote(tk.id,req.uid,`FIELD:status:${SL[tk.status]||tk.status}:${SL[b.status]||b.status}`);
+      await auditField('status', SL[tk.status]||tk.status, SL[b.status]||b.status);
       if (tk.assignee_id && tk.assignee_id!==req.uid)
         mailUser(tk.assignee_id, `[${tk.number}] Status geändert: ${SL[b.status]||b.status}`,
           `beim Ticket "${tk.title}" (${tk.number}) wurde der Status von "${SL[tk.status]||tk.status}" auf "${SL[b.status]||b.status}" geändert.`).catch(()=>{});
     }
     if (b.priority!==undefined&&b.priority!==tk.priority)
-      await auditNote(tk.id,req.uid,`FIELD:priority:${PL[tk.priority]||tk.priority}:${PL[b.priority]||b.priority}`);
+      await auditField('priority', PL[tk.priority]||tk.priority, PL[b.priority]||b.priority);
     if (b.department!==undefined&&b.department!==tk.department)
-      await auditNote(tk.id,req.uid,`FIELD:department:${DL[tk.department]||tk.department}:${DL[b.department]||b.department}`);
+      await auditField('department', DL[tk.department]||tk.department, DL[b.department]||b.department);
     if (b.title!==undefined&&b.title!==tk.title)
-      await auditNote(tk.id,req.uid,`FIELD:title:${tk.title}:${b.title}`);
+      await auditField('title', tk.title, b.title);
     if (b.bucket!==undefined&&(b.bucket||'')!==(tk.bucket||''))
-      await auditNote(tk.id,req.uid,`FIELD:bucket:${BL[tk.bucket]||tk.bucket||'—'}:${BL[b.bucket]||b.bucket||'—'}`);
+      await auditField('bucket', BL[tk.bucket]||tk.bucket||'—', BL[b.bucket]||b.bucket||'—');
     if (b.isPublic!==undefined&&!!b.isPublic!==!!tk.is_public)
-      await auditNote(tk.id,req.uid,`FIELD:visibility:${tk.is_public?'Öffentlich':'Privat'}:${b.isPublic?'Öffentlich':'Privat'}`);
+      await auditField('visibility', tk.is_public?'Öffentlich':'Privat', b.isPublic?'Öffentlich':'Privat');
     if (b.subcategory!==undefined&&(b.subcategory||'')!==(tk.subcategory||''))
-      await auditNote(tk.id,req.uid,`FIELD:subcategory:${tk.subcategory||'—'}:${b.subcategory||'—'}`);
+      await auditField('subcategory', tk.subcategory||'—', b.subcategory||'—');
     if (b.dueDate!==undefined&&(b.dueDate||null)!==(tk.due_date?tk.due_date.toISOString?.().slice(0,10)||String(tk.due_date).slice(0,10):null))
-      await auditNote(tk.id,req.uid,`FIELD:due_date:${fmtDate(tk.due_date)}:${fmtDate(b.dueDate)}`);
+      await auditField('due_date', fmtDate(tk.due_date), fmtDate(b.dueDate));
     if (b.snoozedUntil!==undefined&&(b.snoozedUntil||null)!==(tk.snoozed_until?String(tk.snoozed_until).slice(0,10):null))
-      await auditNote(tk.id,req.uid,`FIELD:snoozed_until:${fmtDate(tk.snoozed_until)}:${fmtDate(b.snoozedUntil)}`);
+      await auditField('snoozed_until', fmtDate(tk.snoozed_until), fmtDate(b.snoozedUntil));
     if (b.assigneeId!==undefined&&(b.assigneeId||null)!==(tk.assignee_id||null)) {
       const oldN=tk.assignee_id?(await getUser(tk.assignee_id))?.name||'?':'—';
       const newN=b.assigneeId?(await getUser(b.assigneeId))?.name||'?':'—';
-      await auditNote(tk.id,req.uid,`FIELD:assignee:${oldN}:${newN}`);
+      await auditField('assignee', oldN, newN);
       if (b.assigneeId && b.assigneeId!==req.uid) {
         await createNotification(b.assigneeId,'assigned',`Dir wurde zugewiesen: ${tk.title}`,tk.id,null,req.uid);
         mailUser(b.assigneeId, `[${tk.number}] Dir wurde ein Ticket zugewiesen`,
@@ -120,13 +127,13 @@ router.put('/:id', auth, async (req,res) => {
     if (b.parentTicketId!==undefined&&(b.parentTicketId||null)!==(tk.parent_ticket_id||null)) {
       const oldP=tk.parent_ticket_id?(await q1('SELECT number FROM tickets WHERE id=$1',[tk.parent_ticket_id]))?.number||'?':'—';
       const newP=b.parentTicketId?(await q1('SELECT number FROM tickets WHERE id=$1',[b.parentTicketId]))?.number||'?':'—';
-      await auditNote(tk.id,req.uid,`FIELD:parent:${oldP}:${newP}`);
+      await auditField('parent', oldP, newP);
     }
     if (b.tags!==undefined) {
       const oldTags=(()=>{try{return JSON.parse(tk.tags||'[]');}catch{return[];}})();
       const newTags=b.tags||[];
       if (JSON.stringify([...oldTags].sort())!==JSON.stringify([...newTags].sort()))
-        await auditNote(tk.id,req.uid,`FIELD:tags:${oldTags.length}:${newTags.length}`);
+        await auditField('tags', String(oldTags.length), String(newTags.length));
     }
     if (b.title!==undefined) add('title',b.title);
     if (b.description!==undefined) add('description',b.description);

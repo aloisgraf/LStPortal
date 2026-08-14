@@ -1474,6 +1474,16 @@ const _AUDIT_LABELS={
   parent:'Elternticket',tags:'Tags'
 };
 function _parseAudit(text){
+  // Neues Format: FIELD + -getrennt (kollisionsfrei, da alt/neu freier
+  // Nutzertext sind und selbst Doppelpunkte enthalten können, z.B. Titel).
+  const SEP='\u0001';
+  if(text.startsWith('FIELD'+SEP)){
+    const [,field,from,...rest]=text.split(SEP);
+    return{field,from,to:rest.join(SEP)};
+  }
+  // Alt-Format (vor der Umstellung): ':'-getrennt — bei Werten mit Doppelpunkt
+  // (z.B. älteren Titel-Änderungen) wurde der Rest damals bereits abgeschnitten
+  // gespeichert und lässt sich nachträglich nicht mehr rekonstruieren.
   if(!text.startsWith('FIELD:'))return null;
   const [,field,from,to]=text.split(':');
   return{field,from,to};
