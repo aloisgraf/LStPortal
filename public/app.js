@@ -598,7 +598,18 @@ function getVisEvts(){
   if(S.filterUser)evs=evs.filter(ev=>!ev.isGeneral&&ev.userId===S.filterUser);
   if(S.month!==null)evs=evs.filter(ev=>{const d=new Date(ev.dateFrom);return d.getFullYear()===S.year&&d.getMonth()===S.month;});
   else evs=evs.filter(ev=>new Date(ev.dateFrom).getFullYear()===S.year);
+  if(S._calSelectedDate){
+    const sel=S._calSelectedDate;
+    evs=evs.filter(ev=>ev.dateFrom<=sel&&(ev.dateTo||ev.dateFrom)>=sel);
+  }
   return evs.sort((a,b)=>a.dateFrom.localeCompare(b.dateFrom));
+}
+function toggleCalDay(iso){
+  S._calSelectedDate=(S._calSelectedDate===iso)?null:iso;
+  renderSchedule();
+}
+function clearCalDay(){
+  if(S._calSelectedDate){S._calSelectedDate=null;renderSchedule();}
 }
 function getDpMode(){return localStorage.getItem('dpViewMode')||'both';}
 function setDpMode(m){localStorage.setItem('dpViewMode',m);renderSchedule();}
@@ -612,7 +623,7 @@ function renderSchedule(){
   const calHtml=_buildCalHtml();
   const listHtml=`
     <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">
-      <h2 style="margin:0;font-size:15px">Eintr\u00e4ge (${evs.length}) <span style="font-size:13px;font-weight:400;color:var(--mu)">${ml} ${S.year}</span></h2>
+      <h2 style="margin:0;font-size:15px">Eintr\u00e4ge (${evs.length}) <span style="font-size:13px;font-weight:400;color:var(--mu)">${S._calSelectedDate?fd(S._calSelectedDate):ml+' '+S.year}</span>${S._calSelectedDate?` <button class="btn-s" style="font-size:11px;padding:2px 8px" onclick="clearCalDay()">\u2715 ${ml} ${S.year} anzeigen</button>`:''}</h2>
       <input class="srch" type="text" placeholder="Suchen \u2026" oninput="filtSched(this.value)" style="margin-left:auto">
       <select class="flt" onchange="filtSched(undefined,this.value)" id="scFlt"><option value="">Alle Kategorien</option>${S.categories.map(c=>`<option value="${c.id}">${c.emoji} ${c.label}</option>`).join('')}</select>
       <select class="flt" onchange="_scApFilt=this.value;filtSched()"><option value="">Alle Status</option><option value="pending">\u23f3 Ausstehend</option><option value="approved">\u2713 Genehmigt</option><option value="rejected">\u2717 Abgelehnt</option></select>
@@ -629,10 +640,10 @@ function renderSchedule(){
       </div>
     </div>
     <div class="fbar" style="flex-wrap:wrap;gap:6px">
-      <div class="yr-row" style="margin:0"><button class="yb" onclick="S.year--;renderSBF();renderMain()">&lsaquo;</button><span class="yv">${S.year}</span><button class="yb" onclick="S.year++;renderSBF();renderMain()">&rsaquo;</button></div>
+      <div class="yr-row" style="margin:0"><button class="yb" onclick="S._calSelectedDate=null;S.year--;renderSBF();renderMain()">&lsaquo;</button><span class="yv">${S.year}</span><button class="yb" onclick="S._calSelectedDate=null;S.year++;renderSBF();renderMain()">&rsaquo;</button></div>
       <div style="display:flex;gap:4px;flex-wrap:wrap">
-        <button class="mb ${S.month===null?'on':''}" onclick="S.month=null;renderMain()" style="padding:4px 8px;font-size:12px">Alle</button>
-        ${MONTHS.map((m,i)=>`<button class="mb ${S.month===i?'on':''}" onclick="S.month=${i};renderMain()" style="padding:4px 8px;font-size:12px">${m.slice(0,3)}</button>`).join('')}
+        <button class="mb ${S.month===null?'on':''}" onclick="S._calSelectedDate=null;S.month=null;renderMain()" style="padding:4px 8px;font-size:12px">Alle</button>
+        ${MONTHS.map((m,i)=>`<button class="mb ${S.month===i?'on':''}" onclick="S._calSelectedDate=null;S.month=${i};renderMain()" style="padding:4px 8px;font-size:12px">${m.slice(0,3)}</button>`).join('')}
       </div>
       ${S.p.seeAllEntries?`<select class="flt" style="width:auto;min-width:140px" onchange="S.filterUser=this.value||null;renderMain()"><option value="">Alle Mitarbeiter</option>${S.users.filter(u=>!(u.roles||[]).includes('admin')).slice().sort(byLastName).map(u=>`<option value="${u.id}"${S.filterUser===u.id?'selected':''}>${lastNameFirst(u.name)}</option>`).join('')}</select>`:''}
       ${filterU?`<span class="filter-hint">&#128100; ${filterU.name}</span>`:''}
@@ -669,11 +680,13 @@ function _buildCalHtml(){
     for(var c=0;c<7;c++){
       var ci=r*7+c;
       if(ci<startOffset||dayNum>lastDay.getDate()){
-        cells+='<td class="cal-empty"></td>';
+        cells+='<td class="cal-empty" onclick="clearCalDay()"></td>';
       } else {
         var devs=evByDate[dayNum]||[];
+        var isoDate=yr+'-'+String(mo+1).padStart(2,'0')+'-'+String(dayNum).padStart(2,'0');
         var isToday=today.getFullYear()===yr&&today.getMonth()===mo&&today.getDate()===dayNum;
-        var cls='cal-day'+(isToday?' cal-today':'')+(c>=5?' cal-we':'');
+        var isSel=S._calSelectedDate===isoDate;
+        var cls='cal-day'+(isToday?' cal-today':'')+(c>=5?' cal-we':'')+(isSel?' cal-selected':'');
         var dnHtml=isToday?'<div class="cal-daynum cal-daynum-today">'+dayNum+'</div>':'<div class="cal-daynum">'+dayNum+'</div>';
         var evsHtml='';
         devs.slice(0,4).forEach(function(ev){
@@ -689,7 +702,7 @@ function _buildCalHtml(){
           evsHtml+='<div class="cal-ev" style="background:'+color+'22;border-left:2px solid '+color+';color:'+color+'" title="'+titleAttr+'">'+label+'</div>';
         });
         if(devs.length>4)evsHtml+='<div class="cal-ev-more">+'+(devs.length-4)+' weitere</div>';
-        cells+='<td class="'+cls+'">'+dnHtml+'<div class="cal-evs">'+evsHtml+'</div></td>';
+        cells+='<td class="'+cls+'" onclick="toggleCalDay(\''+isoDate+'\')" style="cursor:pointer">'+dnHtml+'<div class="cal-evs">'+evsHtml+'</div></td>';
         dayNum++;
       }
     }

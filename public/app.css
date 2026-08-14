@@ -270,6 +270,7 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
 .cal-empty{border:1px solid var(--border);background:rgba(0,0,0,.02);height:120px}
 .cal-we{background:rgba(59,109,212,.03)}
 .cal-today{background:rgba(59,109,212,.06)}
+.cal-selected{outline:2px solid var(--acc);outline-offset:-2px;background:rgba(59,109,212,.1)}
 .cal-daynum{font-size:12px;font-weight:700;color:var(--mu);margin-bottom:3px}
 .cal-daynum-today{background:var(--acc);color:var(--act);border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center}
 .cal-ev{font-size:10px;font-weight:500;padding:2px 5px;border-radius:3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
