@@ -1,6 +1,6 @@
 'use strict';
 const router = require('express').Router();
-const { q, q1, newId } = require('../db');
+const { q, q1, newId, pool, getUser, auditNote, nextTicketNumber } = require('../db');
 const { auth, ok, bad } = require('../middleware');
 
 // ── TODOS ─────────────────────────────────────────────────────────────────────
@@ -136,6 +136,45 @@ router.put('/todos/:todoId/items/:id', auth, async (req,res) => {
     // Update parent todo updated_at
     await q('UPDATE todos SET updated_at=NOW() WHERE id=$1', [req.params.todoId]).catch(()=>{});
     ok(res, row);
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+// Todo-Punkt in ein Ticket umwandeln. Wird automatisch am Punkt (converted_ticket_id/
+// converted_by/converted_at) sowie im Todo-Protokoll vermerkt — der Punkt selbst
+// bleibt bestehen, wird aber als "umgewandelt" markiert und nicht mehr erneut umwandelbar.
+router.post('/todos/:todoId/items/:id/convert-to-ticket', auth, async (req,res) => {
+  try {
+    const todo = await q1('SELECT * FROM todos WHERE id=$1',[req.params.todoId]);
+    if (!todo) return bad(res,'Todo nicht gefunden',404);
+    const item = await q1('SELECT * FROM todo_items WHERE id=$1 AND todo_id=$2',[req.params.id,req.params.todoId]);
+    if (!item) return bad(res,'Punkt nicht gefunden',404);
+    if (item.converted_ticket_id) return bad(res,'Punkt wurde bereits in ein Ticket umgewandelt',400);
+    const isAssignee = await q1('SELECT id FROM todo_item_assignees WHERE item_id=$1 AND user_id=$2',[req.params.id,req.uid]);
+    if (!req.p.manageUsers && todo.created_by!==req.uid && !isAssignee) return bad(res,'Keine Berechtigung',403);
+
+    const {department, priority} = req.body;
+    let {assigneeId} = req.body;
+    if (!department) return bad(res,'Fachbereich erforderlich',400);
+
+    const ticketId = newId(), number = await nextTicketNumber();
+    await pool.query(
+      `INSERT INTO tickets (id,number,title,description,department,tags,priority,status,bucket,assignee_id,created_by)
+       VALUES ($1,$2,$3,$4,$5,'[]',$6,'open','',$7,$8)`,
+      [ticketId, number, item.title, item.comment||'', department, priority||'medium', assigneeId||null, req.uid]
+    );
+    const uname = (await getUser(req.uid))?.name||'?';
+    await auditNote(ticketId, req.uid, `✅ Ticket erstellt von ${uname} (aus Todo-Punkt „${item.title}“, Todo „${todo.title}“)`);
+
+    await pool.query(
+      `UPDATE todo_items SET converted_ticket_id=$1, converted_at=NOW(), converted_by=$2 WHERE id=$3`,
+      [ticketId, req.uid, item.id]
+    );
+    const now = new Date().toISOString();
+    const protokoll = (()=>{try{return JSON.parse(todo.protokoll||'[]');}catch{return [];}})();
+    protokoll.push({ts:now, by:req.uid, type:'converted_to_ticket', itemId:item.id, itemTitle:item.title, ticketId, ticketNumber:number});
+    await q('UPDATE todos SET protokoll=$1,updated_at=NOW() WHERE id=$2',[JSON.stringify(protokoll), req.params.todoId]);
+
+    ok(res, {ticketId, number});
   } catch(e) { bad(res,'Serverfehler',500); }
 });
 

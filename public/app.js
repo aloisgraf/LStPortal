@@ -6280,6 +6280,11 @@ function renderTodoDetail(t) {
     }).join(', ');
     const canEditItem = item._canEdit || false;
     const itemDeadlineColor = getDeadlineColor(item.due_date);
+    const convertedTk = item.converted_ticket_id ? getTk(item.converted_ticket_id) : null;
+    const convertedBy = item.converted_by ? getU(item.converted_by) : null;
+    const convertedHtml = item.converted_ticket_id
+      ? `<div class="todo-ci-meta">🎫 Umgewandelt in Ticket ${convertedTk?`<a href="javascript:void(0)" onclick="openTkDetail('${item.converted_ticket_id}')" style="font-weight:600">${convertedTk.number}</a>`:'(nicht einsehbar)'}${convertedBy?` von ${esc(convertedBy.name)}`:''}${item.converted_at?' · '+String(item.converted_at).slice(0,16).replace('T',' '):''}</div>`
+      : '';
     return `<div class="todo-ci${item.is_done?' done-item':''}" id="todo-ci-${item.id}"${itemDeadlineColor?` style="border-left:4px solid ${itemDeadlineColor}"`:''}>
       <input type="checkbox" ${item.is_done?'checked':''} ${canEditItem?'':'disabled'} onchange="toggleTodoItem('${t.id}','${item.id}',this.checked)">
       <div class="todo-ci-body">
@@ -6290,12 +6295,14 @@ function renderTodoDetail(t) {
         <textarea id="todo-comment-${item.id}" class="todo-ci-textarea" rows="1" placeholder="Kommentar…" ${canEditItem?`onblur="saveTodoItemComment('${t.id}','${item.id}')"`:''} ${canEditItem?'':'readonly'}>${esc(item.comment||'')}</textarea>
         ${assigneeNames ? `<div class="todo-ci-meta">👤 ${assigneeNames}</div>` : ''}
         ${item.is_done && doneUser ? `<div class="todo-ci-meta">Erledigt von ${esc(doneUser.name)} · ${item.done_at?String(item.done_at).slice(0,16).replace('T',' '):''}</div>` : ''}
+        ${convertedHtml}
       </div>
       <div class="todo-ci-actions">
         ${canManageTodo&&t.items.indexOf(item)>0 ? `<button class="btn-s" style="padding:5px 9px;font-size:14px" title="Nach oben" onclick="moveTodoItem('${t.id}','${item.id}','up')">⬆</button>` : ''}
         ${canManageTodo&&t.items.indexOf(item)<t.items.length-1 ? `<button class="btn-s" style="padding:5px 9px;font-size:14px" title="Nach unten" onclick="moveTodoItem('${t.id}','${item.id}','down')">⬇</button>` : ''}
         ${canEditItem ? `<button class="btn-s" style="padding:5px 9px;font-size:14px" title="Bearbeiten" onclick="openTodoItemForm('${t.id}','${item.id}')">✏️</button>` : ''}
         ${canEditItem ? `<button class="btn-s" style="padding:5px 9px;font-size:14px" title="Zuweisungen" onclick="openTodoItemAssignees('${t.id}','${item.id}')">👥</button>` : ''}
+        ${canEditItem&&!item.converted_ticket_id ? `<button class="btn-s" style="padding:5px 9px;font-size:14px" title="In Ticket umwandeln" onclick="openConvertTodoItem('${t.id}','${item.id}')">🎫</button>` : ''}
         ${canEditItem ? `<button class="btn-d" style="padding:5px 9px;font-size:14px" title="Löschen" onclick="deleteTodoItem('${t.id}','${item.id}')">✕</button>` : ''}
       </div>
     </div>`;
@@ -6314,6 +6321,9 @@ function renderTodoDetail(t) {
     } else if(e.type==='assignee_removed') {
       const aUser = getU(e.userId);
       html += `<div style="font-weight:600">👤 ${ts} · ${uName}</div><div style="margin-left:8px;color:var(--mu)">Zuordnung von <b>${esc(aUser?.name||'?')}</b> entfernt</div></div>`;
+    } else if(e.type==='converted_to_ticket') {
+      const tk=getTk(e.ticketId);
+      html += `<div style="font-weight:600">🎫 ${ts} · ${uName}</div><div style="margin-left:8px;color:var(--mu)">Punkt „<b>${esc(e.itemTitle||'?')}</b>“ in Ticket ${tk?`<a href="javascript:void(0)" onclick="openTkDetail('${e.ticketId}')" style="font-weight:600">${tk.number}</a>`:esc(e.ticketNumber||'?')} umgewandelt</div></div>`;
     } else {
       html += `${ts} · ${uName} (${e.type})</div>`;
     }
@@ -6447,6 +6457,36 @@ async function submitTodoItemForm() {
     renderTodos();
     toast('Gespeichert');
   } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+function openConvertTodoItem(todoId, itemId) {
+  const t = S.todos.find(x => x.id === todoId); if (!t) return;
+  const item = t.items.find(x => x.id === itemId); if (!item) return;
+  if (item.converted_ticket_id) { toast('Punkt wurde bereits umgewandelt','err'); return; }
+  document.getElementById('ctiTodoId').value = todoId;
+  document.getElementById('ctiItemId').value = itemId;
+  document.getElementById('ctiTitlePreview').textContent = item.title;
+  document.getElementById('ctiErr').textContent = '';
+  const prioMap = {low:'low', medium:'medium', high:'high', urgent:'high'};
+  document.getElementById('ctiPrio').value = prioMap[t.priority] || 'medium';
+  document.getElementById('ctiAssignee').innerHTML = '<option value="">— niemand —</option>' +
+    S.users.filter(isAssignable).map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join('');
+  openModal('convertTodoOv');
+}
+async function submitConvertTodoItem() {
+  const todoId = document.getElementById('ctiTodoId').value;
+  const itemId = document.getElementById('ctiItemId').value;
+  const department = document.getElementById('ctiDept').value;
+  const priority = document.getElementById('ctiPrio').value;
+  const assigneeId = document.getElementById('ctiAssignee').value || null;
+  const errEl = document.getElementById('ctiErr'); errEl.textContent = '';
+  try {
+    const res = await api('POST', `/todos/${todoId}/items/${itemId}/convert-to-ticket`, {department, priority, assigneeId});
+    closeModal('convertTodoOv');
+    await fetchData();
+    renderTodos();
+    toast(`✅ Ticket ${res.number} erstellt`);
+  } catch(e) { errEl.textContent = '⚠️ ' + e.message; }
 }
 
 async function toggleTodoItem(todoId, itemId, isDone) {

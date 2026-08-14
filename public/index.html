@@ -1849,6 +1849,29 @@
   </div>
 </div>
 
+<!-- TODOS: Punkt in Ticket umwandeln -->
+<div class="ov" id="convertTodoOv">
+  <div class="modal sm">
+    <div class="mh"><h2>&#127917; In Ticket umwandeln</h2><button class="mc" onclick="closeModal('convertTodoOv')">&#10005;</button></div>
+    <div class="mb2">
+      <input type="hidden" id="ctiTodoId"><input type="hidden" id="ctiItemId">
+      <div class="fg"><label>Titel</label><div id="ctiTitlePreview" style="font-size:13px;font-weight:600;padding:6px 0"></div></div>
+      <div class="fg"><label>Fachbereich *</label><select id="ctiDept">
+        <option value="frei">&#127760; Frei (für alle sichtbar)</option>
+        <option value="technik">&#128295; Technik</option><option value="leitung">&#11088; Leitung</option>
+        <option value="dienstplanung">&#128203; Dienstplanung</option><option value="ausbildung">&#127891; Ausbildung</option>
+        <option value="qm">&#9989; QM</option>
+      </select></div>
+      <div class="fg"><label>Priorität</label><select id="ctiPrio">
+        <option value="low">&#128994; Gering</option><option value="medium" selected>&#128993; Mittel</option><option value="high">&#128308; Hoch</option>
+      </select></div>
+      <div class="fg"><label>Zuständig</label><select id="ctiAssignee"><option value="">— niemand —</option></select></div>
+      <div id="ctiErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div>
+    </div>
+    <div class="mf"><button class="btn-s" onclick="closeModal('convertTodoOv')">Abbrechen</button><button class="btn-p" onclick="submitConvertTodoItem()">&#127917; Ticket erstellen</button></div>
+  </div>
+</div>
+
 <script src="/app.js"></script>
 
 <!-- DOC UPLOAD/EDIT MODAL -->
