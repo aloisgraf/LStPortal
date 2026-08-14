@@ -1336,7 +1336,20 @@ function renderTickets(){
           <span style="color:var(--di)">Erstellt: ${fd(tk.createdAt)}${tk.updatedAt&&fd(tk.updatedAt)!==fd(tk.createdAt)?' · Letzte Änderung: '+fd(tk.updatedAt):''}${tk.dueDate?' · Fällig: '+fd(tk.dueDate):''}</span>
         </div>
       </div>
-    </div>`;
+    </div>${todoRowsHtml(tk)}`;
+  };
+  // Schmale, eingerückte Unterzeile je "Noch offen"-Eintrag direkt unter dem Ticket
+  const todoRowsHtml=tk=>{
+    const openNotes=(tk.notes||[]).filter(n=>n.todoStatus==='open');
+    if(!openNotes.length)return'';
+    return openNotes.map(n=>{
+      const txt=String(n.text||'').replace(/\s+/g,' ').trim();
+      return`<div style="display:flex;align-items:center;gap:8px;padding:4px 14px 4px 42px;border-top:1px solid var(--border);background:rgba(239,68,68,.04);cursor:pointer" onclick="openTkDetail('${tk.id}')" class="clickable">
+        <span style="width:3px;align-self:stretch;background:#ef4444;border-radius:2px;flex-shrink:0"></span>
+        <span style="font-size:11px;color:#ef4444;font-weight:600;flex-shrink:0;white-space:nowrap">📌 Noch offen:</span>
+        <span style="font-size:11px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1">${esc(txt.length>100?txt.slice(0,100)+'…':txt)}</span>
+      </div>`;
+    }).join('');
   };
   const wrapGroup=inner=>`<div style="background:var(--sf);border:1px solid var(--border);border-radius:var(--r);overflow:hidden">${inner}</div>`;
 
@@ -1416,7 +1429,7 @@ function renderTickets(){
       <button class="btn-s" style="font-size:12px" onclick="S.tkBatchSel.clear();renderTickets()">Auswahl aufheben</button>
     </div>`:''}
     <div class="fbar" style="flex-wrap:wrap;gap:6px">
-      <input class="srch" type="text" placeholder="Suchen \u2026" value="${S.tkSearch}" oninput="S.tkSearch=this.value;renderMain()" style="width:160px">
+      <input class="srch" type="text" placeholder="Suchen \u2026" value="${S.tkSearch}" oninput="S.tkSearch=this.value;S._tkSearchCursor=this.selectionStart;renderMain()" style="width:160px">
       <select class="flt" onchange="S.tkFiltStatus=this.value;renderMain()"><option value="">Alle Status</option>${STATUSES.filter(s=>closed?(s.id==='closed'):(s.id!=='closed')).map(s=>`<option value="${s.id}"${S.tkFiltStatus===s.id?' selected':''}>${s.label}</option>`).join('')}</select>
       <select class="flt" onchange="S.tkFiltDept=this.value;renderMain()"><option value="">Alle Bereiche</option>${myD.map(d=>`<option value="${d}"${S.tkFiltDept===d?' selected':''}>${DEPT_LABELS[d]}</option>`).join('')}</select>
       <select class="flt" onchange="S.tkFiltPrio=this.value;renderMain()"><option value="">Alle Priorit\u00e4ten</option>${PRIORITIES.map(p2=>`<option value="${p2.id}"${S.tkFiltPrio===p2.id?' selected':''}>${p2.label}</option>`).join('')}</select>
@@ -1426,6 +1439,10 @@ function renderTickets(){
       ${canSeeSubcat?`<select class="flt" onchange="S.tkGroupBy=this.value;renderMain()" title="Gruppierung der Liste"><option value="dept"${groupMode==='dept'?' selected':''}>Gruppierung: Fachbereich</option><option value="subcat"${groupMode==='subcat'?' selected':''}>Gruppierung: Unterkategorie</option></select>`:''}
     </div>
     ${groupedHtml}`;
+  if(S._tkSearchCursor!=null){
+    const se=document.querySelector('#main .srch');
+    if(se){se.focus();se.setSelectionRange(S._tkSearchCursor,S._tkSearchCursor);}
+  }
 }
 function openTkDetail(id){
   S.currentTicketId=id;
