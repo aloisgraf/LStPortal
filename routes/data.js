@@ -71,7 +71,7 @@ router.get('/', auth, async (req,res) => {
     const tkFileMap = {};
     (tkFilesRaw||[]).forEach(f=>{ if(!tkFileMap[f.ticket_id]) tkFileMap[f.ticket_id]=[]; tkFileMap[f.ticket_id].push({id:f.id,originalName:f.original_name,mimeType:f.mime_type,sizeBytes:f.size_bytes,uploadedBy:f.uploaded_by,createdAt:f.created_at}); });
     const noteMap={}, clItemMap={}, tkClItemMap={}, tkClMap={};
-    notesRaw.forEach(n=>{ if(!noteMap[n.ticket_id]) noteMap[n.ticket_id]=[]; noteMap[n.ticket_id].push({id:n.id,text:n.text,authorId:n.author_id,noteType:n.note_type,createdAt:n.created_at,mentionedUsers:(()=>{try{return JSON.parse(n.mentioned_users||'[]');}catch{return [];}})()}); });
+    notesRaw.forEach(n=>{ if(!noteMap[n.ticket_id]) noteMap[n.ticket_id]=[]; noteMap[n.ticket_id].push({id:n.id,text:n.text,authorId:n.author_id,noteType:n.note_type,createdAt:n.created_at,todoStatus:n.todo_status||null,mentionedUsers:(()=>{try{return JSON.parse(n.mentioned_users||'[]');}catch{return [];}})()}); });
     clItems.forEach(i=>{ if(!clItemMap[i.template_id]) clItemMap[i.template_id]=[]; clItemMap[i.template_id].push({id:i.id,text:i.text,itemType:i.item_type||'check',sortOrder:i.sort_order}); });
     tkClItemsRaw.forEach(i=>{ if(!tkClItemMap[i.checklist_id]) tkClItemMap[i.checklist_id]=[]; tkClItemMap[i.checklist_id].push({id:i.id,text:i.text,itemType:i.item_type||'check',sortOrder:i.sort_order,completedBy:i.completed_by,completedAt:i.completed_at,userNote:i.user_note||''}); });
     tkClRaw.forEach(c=>{ if(!tkClMap[c.ticket_id]) tkClMap[c.ticket_id]=[]; tkClMap[c.ticket_id].push({id:c.id,templateId:c.template_id,name:c.name,createdBy:c.created_by,items:tkClItemMap[c.id]||[]}); });

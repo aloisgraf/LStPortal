@@ -1247,6 +1247,8 @@ function tkBadge(tk){
   return null;
 }
 function tkBadgeHtml(tk){const b=tkBadge(tk);return b?`<span class="${b.cls}">${b.label}</span> `:'';}
+const tkOpenTodoCount=tk=>(tk.notes||[]).filter(n=>n.todoStatus==='open').length;
+const tkOpenTodoHtml=tk=>{const n=tkOpenTodoCount(tk);return n?`<span style="color:#ef4444;font-weight:600">Noch offen: ${n}</span>`:'';};
 
 // Fälligkeits-Färbung: ab 14 Tage vor Fälligkeit von dezentem Orange zu dezentem Rot
 function getDueHeatPref(){try{return localStorage.getItem('tkDueHeat')!=='off';}catch(e){return true;}}
@@ -1312,7 +1314,7 @@ function renderTickets(){
           ${showDept?deptBdg(tk.department):''}${prioBdg(tk.priority)}${stBdg(tk.status)}${dueBdg(tk)}${snoozeBdg(tk)}${tagChips(tk.tags)}
           ${asn?`<div style="display:flex;align-items:center;gap:3px">${avHtml(asn.initials,asn.color,14,6)}<span>${asn.name}</span></div>`:''}
           ${isChild&&par?`<span style="color:var(--di);font-size:10px">&#x2191; ${par.number}</span>`:''}
-          ${nc?`<span>💬 ${nc}</span>`:''}
+          ${nc?`<span>💬 ${nc}</span>`:''}${tkOpenTodoHtml(tk)}
           <span style="color:var(--di)">Erstellt: ${fd(tk.createdAt)}${tk.updatedAt&&fd(tk.updatedAt)!==fd(tk.createdAt)?' · Letzte Änderung: '+fd(tk.updatedAt):''}${tk.dueDate?' · Fällig: '+fd(tk.dueDate):''}</span>
         </div>
       </div>
@@ -1330,7 +1332,7 @@ function renderTickets(){
           <td style="font-family:monospace;font-size:11px;color:var(--mu);white-space:nowrap${isChild?';padding-left:28px':''}">
             ${isChild?'<span style="color:var(--di);margin-right:3px">↳</span>':''}${tk.number}${badge?`<span class="${badge.cls}">${badge.label}</span>`:''}
           </td>
-          <td style="max-width:220px"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(tk.title)}</div>${nc?`<span style="font-size:10px;color:var(--mu)">💬 ${nc}</span>`:''}</td>
+          <td style="max-width:220px"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(tk.title)}</div>${nc?`<span style="font-size:10px;color:var(--mu)">💬 ${nc}</span>`:''}${tkOpenTodoCount(tk)?`<span style="font-size:10px;color:#ef4444;font-weight:600;margin-left:6px">Noch offen: ${tkOpenTodoCount(tk)}</span>`:''}</td>
           <td>${deptBdg(tk.department)}${tk.subcategory?`<div><span class="bdg" style="font-size:10px;background:rgba(124,58,237,.12);color:#7c3aed">${tk.subcategory}</span></div>`:''}</td>
           <td>${prioBdg(tk.priority)}</td>
           <td>${stBdg(tk.status)}</td>
@@ -1467,16 +1469,27 @@ function _renderFeed(notes,tkId,canEdit,filter){
         </div>
       </div>`;
     } else {
+      const todoBg=n.todoStatus==='open'?'rgba(239,68,68,.07)':n.todoStatus==='done'?'rgba(16,185,129,.07)':'var(--sf)';
+      const todoBorder=n.todoStatus==='open'?'rgba(239,68,68,.25)':n.todoStatus==='done'?'rgba(16,185,129,.25)':'var(--border)';
+      const todoLabel=n.todoStatus==='open'?'<span class="bdg" style="font-size:10px;background:rgba(239,68,68,.12);color:#ef4444">Noch offen</span>'
+        :n.todoStatus==='done'?'<span class="bdg" style="font-size:10px;background:rgba(16,185,129,.12);color:#10b981">Erledigt</span>':'';
+      const todoCheckbox=(n.todoStatus==='open'||n.todoStatus==='done')&&canEdit
+        ?`<label style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--mu);cursor:pointer"><input type="checkbox" ${n.todoStatus==='done'?'checked':''} onchange="toggleNoteTodo('${tkId}','${n.id}',this.checked)" style="width:13px;height:13px;cursor:pointer">Erledigt</label>`
+        :'';
       return`<div style="display:flex;gap:10px;position:relative">
         <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0">
           <div style="width:28px;height:28px;border-radius:50%;flex-shrink:0;z-index:1;overflow:hidden;border:2px solid var(--border)">${a?avHtml(a.initials,a.color,24,10):`<div style="width:28px;height:28px;background:var(--sf2);display:flex;align-items:center;justify-content:center;font-size:14px">💬</div>`}</div>
           ${!isLast?`<div style="width:2px;flex:1;background:var(--border);margin:2px 0;min-height:12px"></div>`:''}
         </div>
-        <div style="background:var(--sf);border:1px solid var(--border);border-radius:8px;padding:9px 12px;flex:1;min-width:0;margin-bottom:${isLast?'0':'10px'}">
+        <div style="background:${todoBg};border:1px solid ${todoBorder};border-radius:8px;padding:9px 12px;flex:1;min-width:0;margin-bottom:${isLast?'0':'10px'}">
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
             <span style="font-size:12px;font-weight:700">${a?.name||'?'}</span>
             <span style="font-size:10px;color:var(--di)">${fdt(n.createdAt)}</span>
-            ${canEdit&&n.authorId===S.currentUser?`<button class="btn-d" style="padding:1px 6px;font-size:10px;margin-left:auto" onclick="deleteNote('${tkId}','${n.id}')">✕</button>`:''}
+            ${todoLabel}
+            <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
+              ${todoCheckbox}
+              ${canEdit&&n.authorId===S.currentUser?`<button class="btn-d" style="padding:1px 6px;font-size:10px" onclick="deleteNote('${tkId}','${n.id}')">✕</button>`:''}
+            </div>
           </div>
           <div style="font-size:13px;line-height:1.5;color:var(--mu)">${highlightMentions(n.text)}</div>
         </div>
@@ -1506,6 +1519,10 @@ function renderTkDetail(){
           <div class="mention-suggestions" id="mentionSug"></div>
           <textarea id="noteInput" rows="2" placeholder="Text \u2026 @Name f\u00fcr Erw\u00e4hnung" style="font-size:13px;width:100%" onkeyup="onNoteKey(event,'${tk.id}')"></textarea>
         </div>
+        <select id="noteTodoType" style="font-size:12px;padding:8px 6px;flex-shrink:0" title="Art des Eintrags">
+          <option value="">Info</option>
+          <option value="open">Noch offen</option>
+        </select>
         <button class="btn-p" onclick="addNote('${tk.id}')" style="padding:8px 12px;flex-shrink:0">Senden</button>
       </div>
     </div>`:'';
@@ -1655,7 +1672,19 @@ async function updateTkField(id,field,value){
 function applyNoteTpl(body){const inp=document.getElementById('noteInput');if(inp){inp.value=body;inp.focus();inp.setSelectionRange(body.length,body.length);}}
 async function addNote(tkId){
   const inp=document.getElementById('noteInput');if(!inp?.value.trim())return;
-  try{await api('POST','/tickets/'+tkId+'/notes',{text:inp.value.trim()});inp.value='';await fetchData();renderTkDetail();}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
+  const todoSel=document.getElementById('noteTodoType');
+  const todoStatus=todoSel&&todoSel.value==='open'?'open':undefined;
+  try{
+    await api('POST','/tickets/'+tkId+'/notes',{text:inp.value.trim(),todoStatus});
+    inp.value='';if(todoSel)todoSel.value='';
+    await fetchData();renderTkDetail();
+  }catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
+}
+async function toggleNoteTodo(tkId,noteId,checked){
+  try{
+    await api('PUT','/tickets/'+tkId+'/notes/'+noteId,{todoStatus:checked?'done':'open'});
+    await fetchData();renderTkDetail();
+  }catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
 }
 async function deleteNote(tkId,noteId){
   if(!confirm('Notiz l\u00F6schen?'))return;

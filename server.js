@@ -139,6 +139,7 @@ async function initDB() {
     `ALTER TABLE messages ADD COLUMN IF NOT EXISTS body TEXT`,
     `ALTER TABLE events ADD COLUMN IF NOT EXISTS approved TEXT DEFAULT 'pending'`,
     `ALTER TABLE ticket_notes ADD COLUMN IF NOT EXISTS is_system BOOLEAN DEFAULT false`,
+    `ALTER TABLE ticket_notes ADD COLUMN IF NOT EXISTS todo_status TEXT DEFAULT NULL`,
     `ALTER TABLE ticket_notes ALTER COLUMN author_id DROP NOT NULL`,
     `CREATE TABLE IF NOT EXISTS message_reads (id TEXT PRIMARY KEY, message_id TEXT NOT NULL, user_id TEXT NOT NULL, read_at TIMESTAMPTZ DEFAULT NOW(), UNIQUE(message_id, user_id))`,
     `CREATE TABLE IF NOT EXISTS activity_log (id TEXT PRIMARY KEY, user_id TEXT, user_name TEXT, action TEXT NOT NULL, details JSONB DEFAULT '{}', ip TEXT, created_at TIMESTAMPTZ DEFAULT NOW())`,

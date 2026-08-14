@@ -180,12 +180,14 @@ router.post('/:id/notes', auth, async (req,res) => {
     if (!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
     const text=req.body?.text?.trim();
     if (!text) return bad(res,'Text erforderlich');
+    // Todo-Kennzeichnung: Standard "Info" (kein Status), optional "Noch offen"
+    const todoStatus = req.body?.todoStatus==='open' ? 'open' : null;
     const id=newId(), now=new Date().toISOString();
     const allUsers = await q('SELECT id,name FROM users');
     const mentioned = parseMentions(text, allUsers);
     const mentionedIds = mentioned.map(u=>u.id);
-    await pool.query('INSERT INTO ticket_notes (id,ticket_id,text,author_id,note_type,created_at,mentioned_users) VALUES ($1,$2,$3,$4,$5,$6,$7)',
-      [id,req.params.id,text,req.uid,'note',now,JSON.stringify(mentionedIds)]);
+    await pool.query('INSERT INTO ticket_notes (id,ticket_id,text,author_id,note_type,created_at,mentioned_users,todo_status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+      [id,req.params.id,text,req.uid,'note',now,JSON.stringify(mentionedIds),todoStatus]);
     // Add mentioned users to ticket so they can see it
     try {
       if(mentionedIds.length){
@@ -211,7 +213,24 @@ router.post('/:id/notes', auth, async (req,res) => {
       mailUser(tk.assignee_id, `[${tk.number}] Neuer Eintrag in deinem Ticket`,
         `${author?.name||'?'} hat einen neuen Eintrag zum Ticket "${tk.title}" (${tk.number}) hinzugefügt:\n\n"${text}"`).catch(()=>{});
     }
-    ok(res,{id,createdAt:now});
+    ok(res,{id,createdAt:now,todoStatus});
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+// Todo-Checkbox: "Noch offen" <-> "Erledigt" umschalten
+router.put('/:id/notes/:noteId', auth, async (req,res) => {
+  try {
+    const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
+    if (!tk) return bad(res,'Nicht gefunden',404);
+    if (!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
+    const note = await q1('SELECT * FROM ticket_notes WHERE id=$1 AND ticket_id=$2',[req.params.noteId,req.params.id]);
+    if (!note) return bad(res,'Nicht gefunden',404);
+    if (note.todo_status!=='open' && note.todo_status!=='done')
+      return bad(res,'Nur Noch-offen-Einträge können umgeschaltet werden');
+    const {todoStatus} = req.body;
+    if (todoStatus!=='open' && todoStatus!=='done') return bad(res,'todoStatus muss open oder done sein');
+    await pool.query('UPDATE ticket_notes SET todo_status=$1 WHERE id=$2',[todoStatus,req.params.noteId]);
+    ok(res,{todoStatus});
   } catch(e) { bad(res,'Serverfehler',500); }
 });
 
