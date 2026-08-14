@@ -53,7 +53,15 @@ async function getEmployees() {
       };
     })
     .filter(e => e.name) // nur (noch) existierende Mitarbeiter
-    .sort((a,b) => a.name.localeCompare(b.name,'de'));
+    .sort((a,b) => lastNameOf(a.name).localeCompare(lastNameOf(b.name),'de'));
+}
+
+// name liegt als "Vorname Nachname" vor — für die Sortierung nach Nachname
+// (Portal-Konvention, siehe public/app.js lastNameOf/byLastName) wird das
+// letzte Wort herangezogen.
+function lastNameOf(name) {
+  const parts = (name||'').trim().split(/\s+/);
+  return parts.length > 1 ? parts[parts.length-1] : (parts[0]||'');
 }
 
 // ── HISTORIE (manuelle Erfassung U/A, beliebig viele Jahre) ──────────────────
