@@ -3642,6 +3642,13 @@ function renderMeetingItemsGrid(inst, canManage, search) {
   const matches=it=>!s||[it.title,it.description,it.result,getU(it.delegatedTo)?.name].some(v=>(v||'').toLowerCase().includes(s));
   const groups={open:[],done:[],redo:[],delegate:[]};
   (inst.items||[]).filter(matches).forEach(it=>{if(groups[it.status])groups[it.status].push(it);else groups.open.push(it);});
+  // Besprochene Punkte: nach Datum sortieren (zuletzt besprochen zuerst), ohne Datum ans Ende
+  groups.done.sort((a,b)=>{
+    if(!a.meetingDate&&!b.meetingDate)return 0;
+    if(!a.meetingDate)return 1;
+    if(!b.meetingDate)return -1;
+    return String(b.meetingDate).localeCompare(String(a.meetingDate));
+  });
   return`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
       ${Object.entries(groups).map(([st,items])=>`
         <div class="meetings-col">
@@ -3649,6 +3656,7 @@ function renderMeetingItemsGrid(inst, canManage, search) {
           ${items.length===0?`<div style="font-size:12px;color:var(--mu);padding:8px;text-align:center">${s?'Keine Treffer':'—'}</div>`:''}
           ${items.map(it=>{const deadlineColor=getDeadlineColor(it.dueDate);return`<div class="meetings-card"${it._canEdit?` onclick="openItemForm('${inst.id}','${it.id}')"`:''} style="${it._canEdit?'':'cursor:default'}${deadlineColor?';border-left:4px solid '+deadlineColor:''}">
             <div style="font-weight:600;font-size:13px;margin-bottom:4px">${esc(it.title)}</div>
+            ${st==='done'?`<div style="font-size:11px;color:var(--mu);margin-bottom:4px">&#128197; Besprochen am: ${it.meetingDate?fmtDate(it.meetingDate):'ohne Datum'}</div>`:''}
             ${it.description?`<div style="font-size:12px;color:var(--mu);margin-bottom:4px">${esc(it.description.slice(0,80))}${it.description.length>80?'…':''}</div>`:''}
             <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
               ${it.dueDate?`<span style="font-size:11px;color:${deadlineColor||'#64748b'};font-weight:${deadlineColor?'600':'400'}">&#128197; ${fmtDate(it.dueDate)}</span>`:''}
