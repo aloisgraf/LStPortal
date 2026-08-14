@@ -578,6 +578,15 @@ async function initDB() {
   created_by TEXT NOT NULL, updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(employee_id, year, day_key)
 )`,
+    `CREATE TABLE IF NOT EXISTS dp_christmas_wishes (
+  id TEXT PRIMARY KEY,
+  employee_id TEXT NOT NULL,
+  year INTEGER NOT NULL,
+  day_key TEXT NOT NULL,
+  wants_off BOOLEAN NOT NULL DEFAULT true,
+  created_by TEXT NOT NULL, updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(employee_id, year, day_key)
+)`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }

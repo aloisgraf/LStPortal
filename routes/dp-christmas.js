@@ -1,24 +1,39 @@
 'use strict';
 // ─────────────────────────────────────────────────────────────────────────────
-// WEIHNACHTSDIENST-ROTATION
+// WEIHNACHTSDIENST-ROTATION — Score-Modell
 //
 // Reine Vorschlags-Funktion (lib/dp-rules.js: buildChristmasProposal): liefert
-// für die fünf Weihnachts-/Neujahrs-Tage je einen Bedarfs- vs.
-// Verpflichtungs-Abgleich, basierend auf einer manuell erfassten Historie
-// (U=Urlaub / A=Arbeit) der letzten Jahre. Schreibt NIE in dp_plans/
-// dp_assignments — nur Lesevorschlag, keine automatische Übernahme in den
-// Dienstplan (siehe Anforderung).
+// für die fünf Weihnachts-/Neujahrs-Tage einen fairness-basierten Score je
+// Mitarbeiter (+1 pro Jahr gearbeitet, −1 pro Jahr Urlaub — je Tag-Typ separat,
+// über beliebig viele erfasste Jahre) und darauf aufbauend einen Freistellungs-
+// vorschlag für die Mitarbeiter, die für das aktuelle Jahr einen Urlaubswunsch
+// hinterlegt haben. Schreibt NIE in dp_plans/dp_assignments — nur Lesevorschlag,
+// keine automatische Übernahme in den Dienstplan.
 //
 // Mitarbeiter- und Schichtbedarfs-Daten werden aus den bestehenden DP-Tabellen
 // referenziert (dp_employee_params, dp_shift_types, dp_shift_requirements) —
-// keine Datenduplikate, nur die reinen U/A-Historieneinträge sind neu.
+// keine Datenduplikate. Neu sind nur die reinen U/A-Historieneinträge und die
+// Urlaubswünsche fürs aktuelle Jahr.
 // ─────────────────────────────────────────────────────────────────────────────
 const router = require('express').Router();
 const { q, q1, newId, pool } = require('../db');
 const { auth, ok, bad } = require('../middleware');
-const { CHRISTMAS_DAY_KEYS, buildChristmasProposal } = require('../lib/dp-rules');
+const { CHRISTMAS_DAY_KEYS, buildChristmasProposal, computeChristmasScores } = require('../lib/dp-rules');
 
-// ── HISTORIE (manuelle Erfassung U/A) ─────────────────────────────────────────
+async function getEmployees() {
+  const [empParams, users] = await Promise.all([
+    q('SELECT DISTINCT ON (employee_id) employee_id FROM dp_employee_params ORDER BY employee_id'),
+    q('SELECT id,name FROM users'),
+  ]);
+  const userMap = {};
+  for (const u of users) userMap[u.id] = u.name;
+  return empParams
+    .map(e => ({id: e.employee_id, name: userMap[e.employee_id] || null}))
+    .filter(e => e.name) // nur (noch) existierende Mitarbeiter
+    .sort((a,b) => a.name.localeCompare(b.name,'de'));
+}
+
+// ── HISTORIE (manuelle Erfassung U/A, beliebig viele Jahre) ──────────────────
 
 router.get('/christmas/history', auth, async (req,res) => {
   try {
@@ -42,7 +57,7 @@ router.put('/christmas/history', auth, async (req,res) => {
       return bad(res,'status muss U, A oder leer sein');
 
     if (!status) {
-      // Leerer Status = Zelle löschen (kein Eintrag = "keine Angabe")
+      // Leerer Status = Zelle löschen (kein Eintrag = "keine Angabe", trägt 0 zum Score bei)
       await pool.query(
         'DELETE FROM dp_christmas_history WHERE employee_id=$1 AND year=$2 AND day_key=$3',
         [employeeId, year, dayKey]
@@ -60,31 +75,71 @@ router.put('/christmas/history', auth, async (req,res) => {
   } catch(e) { bad(res,'Serverfehler',500); }
 });
 
+// Score-Übersicht: aggregiert ALLE erfassten Jahre (nicht auf ein Fenster
+// beschränkt) — für die Matrix-Ansicht und zur Transparenz für Mitarbeiter.
+router.get('/christmas/scores', auth, async (req,res) => {
+  try {
+    const historyRows = await q('SELECT employee_id,year,day_key,status FROM dp_christmas_history');
+    ok(res, computeChristmasScores(historyRows));
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+// ── URLAUBSWÜNSCHE (aktuelles Jahr) ───────────────────────────────────────────
+
+router.get('/christmas/wishes', auth, async (req,res) => {
+  try {
+    const year = parseInt(req.query.year) || new Date().getFullYear();
+    const rows = await q(
+      'SELECT employee_id,day_key,wants_off FROM dp_christmas_wishes WHERE year=$1',
+      [year]
+    );
+    ok(res, rows);
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+router.put('/christmas/wishes', auth, async (req,res) => {
+  try {
+    const {employeeId, year, dayKey, wantsOff} = req.body;
+    if (!employeeId || !year || !CHRISTMAS_DAY_KEYS.includes(dayKey))
+      return bad(res,'employeeId, year und dayKey (24.12/25.12/26.12/31.12/01.01) erforderlich');
+    // Mitarbeiter dürfen ihren eigenen Wunsch eintragen, Planer (manageUsers) für alle
+    if (!req.p.manageUsers && employeeId!==req.uid) return bad(res,'Keine Berechtigung',403);
+
+    if (!wantsOff) {
+      await pool.query(
+        'DELETE FROM dp_christmas_wishes WHERE employee_id=$1 AND year=$2 AND day_key=$3',
+        [employeeId, year, dayKey]
+      );
+      return ok(res, {deleted:true});
+    }
+    const row = await q1(
+      `INSERT INTO dp_christmas_wishes (id,employee_id,year,day_key,wants_off,created_by)
+       VALUES ($1,$2,$3,$4,true,$5)
+       ON CONFLICT (employee_id,year,day_key) DO UPDATE SET wants_off=true,updated_at=NOW()
+       RETURNING *`,
+      [newId(), employeeId, year, dayKey, req.uid]
+    );
+    ok(res, row);
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
 // ── VORSCHLAG (aktuelles Rotationsjahr) ───────────────────────────────────────
 
 router.get('/christmas/proposal', auth, async (req,res) => {
   try {
     const year = parseInt(req.query.year) || new Date().getFullYear();
-    const lookback = Math.max(1, parseInt(req.query.lookback) || 2);
 
-    const [empParams, users, shiftTypes, requirements, historyRows] = await Promise.all([
-      q('SELECT DISTINCT ON (employee_id) employee_id FROM dp_employee_params ORDER BY employee_id'),
-      q('SELECT id,name FROM users'),
+    const [employees, shiftTypes, requirements, historyRows, wishRows] = await Promise.all([
+      getEmployees(),
       q('SELECT * FROM dp_shift_types'),
       q('SELECT * FROM dp_shift_requirements'),
-      q('SELECT employee_id,year,day_key,status FROM dp_christmas_history WHERE year=ANY($1::int[])',
-        [Array.from({length: lookback}, (_,i) => year - 1 - i)]),
+      // Score fließt aus ALLEN erfassten Jahren ein, kein Lookback-Fenster
+      q('SELECT employee_id,year,day_key,status FROM dp_christmas_history'),
+      q('SELECT employee_id,day_key,wants_off FROM dp_christmas_wishes WHERE year=$1', [year]),
     ]);
 
-    const userMap = {};
-    for (const u of users) userMap[u.id] = u.name;
-    const employees = empParams
-      .map(e => ({id: e.employee_id, name: userMap[e.employee_id] || null}))
-      .filter(e => e.name) // nur (noch) existierende Mitarbeiter
-      .sort((a,b) => a.name.localeCompare(b.name,'de'));
-
-    const days = buildChristmasProposal(year, {employees, shiftTypes, requirements, historyRows});
-    ok(res, {year, lookback, employeeCount: employees.length, days});
+    const days = buildChristmasProposal(year, {employees, shiftTypes, requirements, historyRows, wishRows});
+    ok(res, {year, employeeCount: employees.length, days});
   } catch(e) { console.error('[christmas/proposal]', e.message); bad(res,'Serverfehler',500); }
 });
 

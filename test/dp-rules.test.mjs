@@ -301,7 +301,7 @@ describe('Rebalancing §11 — rebalanceOvertimeAssignments', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe('Weihnachtsdienst-Rotation — buildChristmasProposal', () => {
+describe('Weihnachtsdienst-Rotation — Score-Modell', () => {
   const EMP_A = {id: 'a', name: 'Anna'};
   const EMP_B = {id: 'b', name: 'Bernd'};
   const EMP_C = {id: 'c', name: 'Clara'};
@@ -317,70 +317,114 @@ describe('Weihnachtsdienst-Rotation — buildChristmasProposal', () => {
   });
 
   it('liefert alle 5 relevanten Tage in fester Reihenfolge', () => {
-    const days = R.buildChristmasProposal(2026, {employees: [], shiftTypes: [], requirements: [], historyRows: []});
+    const days = R.buildChristmasProposal(2026, {employees: [], shiftTypes: [], requirements: [], historyRows: [], wishRows: []});
     expect(days.map(d => d.dayKey)).toEqual(['24.12','25.12','26.12','31.12','01.01']);
   });
 
-  it('Mitarbeiter mit Urlaub am exakt selben Tag in den letzten 2 Jahren → verpflichtet', () => {
-    const historyRows = [
-      {employee_id: 'a', year: 2025, day_key: '24.12', status: 'U'},
-      {employee_id: 'b', year: 2024, day_key: '24.12', status: 'U'},
-      {employee_id: 'c', year: 2025, day_key: '24.12', status: 'A'}, // hat gearbeitet → nicht verpflichtet
-    ];
-    const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: reqDaily(2), historyRows});
-    const d24 = days.find(d => d.dayKey === '24.12');
-    expect(d24.obligated.map(e => e.id).sort()).toEqual(['a','b']);
-    expect(d24.obligatedCount).toBe(2);
+  describe('computeChristmasScores', () => {
+    it('+1 pro Arbeitsjahr, −1 pro Urlaubsjahr, je Tag-Typ separat', () => {
+      const scores = R.computeChristmasScores([
+        {employee_id: 'a', year: 2023, day_key: '24.12', status: 'A'},
+        {employee_id: 'a', year: 2024, day_key: '24.12', status: 'A'},
+        {employee_id: 'a', year: 2025, day_key: '24.12', status: 'U'},
+        {employee_id: 'a', year: 2025, day_key: '31.12', status: 'U'},
+      ]);
+      expect(scores.a['24.12']).toBe(1); // +1+1-1
+      expect(scores.a['31.12']).toBe(-1); // eigener, unabhängiger Score
+    });
+
+    it('berücksichtigt beliebig viele Jahre zurück, nicht nur ein festes Fenster', () => {
+      const scores = R.computeChristmasScores([
+        {employee_id: 'a', year: 2015, day_key: '25.12', status: 'A'},
+        {employee_id: 'a', year: 2016, day_key: '25.12', status: 'A'},
+        {employee_id: 'a', year: 2020, day_key: '25.12', status: 'A'},
+      ]);
+      expect(scores.a['25.12']).toBe(3);
+    });
+
+    it('Mitarbeiter/Tag ohne Historie → kein Eintrag (Score effektiv 0)', () => {
+      const scores = R.computeChristmasScores([{employee_id: 'a', year: 2025, day_key: '24.12', status: 'A'}]);
+      expect(scores.b).toBeUndefined();
+    });
   });
 
-  it('Tage werden EINZELN betrachtet — Urlaub am 24.12. bindet nicht für den 31.12.', () => {
-    const historyRows = [{employee_id: 'a', year: 2025, day_key: '24.12', status: 'U'}];
-    const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: reqDaily(1), historyRows});
-    expect(days.find(d => d.dayKey === '24.12').obligated.map(e=>e.id)).toEqual(['a']);
-    expect(days.find(d => d.dayKey === '31.12').obligated).toEqual([]);
-  });
+  describe('buildChristmasProposal', () => {
+    it('Frei-Slots = Gesamt-MA − Schichtbedarf', () => {
+      const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: reqDaily(1), historyRows: [], wishRows: []});
+      expect(days[0].totalEmployees).toBe(3);
+      expect(days[0].requiredCount).toBe(1);
+      expect(days[0].freeSlots).toBe(2);
+    });
 
-  it('Lookback-Fenster: Urlaub vor 3 Jahren (außerhalb der letzten 2) zählt nicht', () => {
-    const historyRows = [{employee_id: 'a', year: 2023, day_key: '24.12', status: 'U'}];
-    // Route würde ohnehin nur die letzten `lookback` Jahre laden — hier simulieren
-    // wir das, indem wir historyRows bereits vorgefiltert übergeben (2023 fehlt für lookback=2 ab 2026).
-    const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: reqDaily(1), historyRows: []});
-    expect(days.find(d => d.dayKey === '24.12').obligated).toEqual([]);
-  });
+    it('freeSlots nie negativ, wenn Bedarf über Mitarbeiterzahl liegt', () => {
+      const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: reqDaily(10), historyRows: [], wishRows: []});
+      expect(days[0].freeSlots).toBe(0);
+    });
 
-  it('Unterdeckung: weniger Verpflichtete als Bedarf → coverage=under, gap>0', () => {
-    const historyRows = [{employee_id: 'a', year: 2025, day_key: '25.12', status: 'U'}];
-    const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: reqDaily(3), historyRows});
-    const d25 = days.find(d => d.dayKey === '25.12');
-    expect(d25.requiredCount).toBe(3);
-    expect(d25.obligatedCount).toBe(1);
-    expect(d25.coverage).toBe('under');
-    expect(d25.gap).toBe(2);
-  });
+    it('nur MA mit Urlaubswunsch können "Urlaub empfohlen" erhalten', () => {
+      const wishRows = [{employee_id: 'a', day_key: '24.12', wants_off: true}];
+      // b hat den niedrigsten Score, aber keinen Wunsch angemeldet → bleibt "Arbeit vorgeschlagen"
+      const historyRows = [{employee_id: 'b', year: 2025, day_key: '24.12', status: 'U'}];
+      const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: reqDaily(2), historyRows, wishRows});
+      const d24 = days.find(d => d.dayKey === '24.12');
+      const a = d24.employees.find(e => e.id === 'a');
+      const b = d24.employees.find(e => e.id === 'b');
+      expect(a.recommendation).toBe('off_recommended');
+      expect(b.recommendation).toBe('work_suggested');
+    });
 
-  it('Überdeckung: mehr Verpflichtete als Bedarf → coverage=over, gap<0', () => {
-    const historyRows = [
-      {employee_id: 'a', year: 2025, day_key: '26.12', status: 'U'},
-      {employee_id: 'b', year: 2025, day_key: '26.12', status: 'U'},
-      {employee_id: 'c', year: 2024, day_key: '26.12', status: 'U'},
-    ];
-    const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: reqDaily(1), historyRows});
-    const d26 = days.find(d => d.dayKey === '26.12');
-    expect(d26.obligatedCount).toBe(3);
-    expect(d26.coverage).toBe('over');
-    expect(d26.gap).toBe(-2);
-  });
+    it('von den Wünschenden bekommt der niedrigste Score Vorrang bis Frei-Slots erreicht sind', () => {
+      const wishRows = [
+        {employee_id: 'a', day_key: '24.12', wants_off: true},
+        {employee_id: 'b', day_key: '24.12', wants_off: true},
+        {employee_id: 'c', day_key: '24.12', wants_off: true},
+      ];
+      const historyRows = [
+        {employee_id: 'a', year: 2025, day_key: '24.12', status: 'A'}, // Score +1 (arbeitete zuletzt)
+        {employee_id: 'b', year: 2025, day_key: '24.12', status: 'U'}, // Score -1 (am längsten nicht frei... hatte frei, aber am niedrigsten)
+        // c: kein Eintrag → Score 0
+      ];
+      // Nur 1 Frei-Slot bei 3 Mitarbeitern → requiredCount = 2
+      const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: reqDaily(2), historyRows, wishRows});
+      const d24 = days.find(d => d.dayKey === '24.12');
+      expect(d24.freeSlots).toBe(1);
+      // niedrigster Score gewinnt: b (-1) < c (0) < a (+1)
+      const b = d24.employees.find(e => e.id === 'b');
+      expect(b.recommendation).toBe('off_recommended');
+      expect(d24.offRecommendedCount).toBe(1);
+    });
 
-  it('exakte Deckung → coverage=ok, gap=0', () => {
-    const historyRows = [{employee_id: 'a', year: 2025, day_key: '31.12', status: 'U'}];
-    const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: reqDaily(1), historyRows});
-    const d31 = days.find(d => d.dayKey === '31.12');
-    expect(d31.coverage).toBe('ok');
-    expect(d31.gap).toBe(0);
-  });
+    it('Tage werden EINZELN betrachtet — Score/Wunsch am 24.12. wirkt nicht auf den 31.12.', () => {
+      const wishRows = [{employee_id: 'a', day_key: '24.12', wants_off: true}];
+      const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: reqDaily(2), historyRows: [], wishRows});
+      const d31 = days.find(d => d.dayKey === '31.12');
+      expect(d31.wishCount).toBe(0);
+      expect(d31.employees.find(e => e.id === 'a').wishedOff).toBe(false);
+    });
 
-  it('kein Schichtbedarf hinterlegt → requiredCount 0, trotzdem keine Fehler', () => {
-    const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: [], historyRows: []});
-    days.forEach(d => expect(d.requiredCount).toBe(0));
+    it('Score-Gleichstand: alphabetisch nach Name als transparentes Tie-Breaking', () => {
+      const wishRows = [
+        {employee_id: 'b', day_key: '24.12', wants_off: true}, // Bernd
+        {employee_id: 'a', day_key: '24.12', wants_off: true}, // Anna
+      ];
+      // Beide Score 0 (keine Historie) → alphabetisch: Anna vor Bernd
+      const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: reqDaily(2), historyRows: [], wishRows});
+      const d24 = days.find(d => d.dayKey === '24.12');
+      expect(d24.freeSlots).toBe(1);
+      expect(d24.employees.find(e => e.id === 'a').recommendation).toBe('off_recommended');
+      expect(d24.employees.find(e => e.id === 'b').recommendation).toBe('work_suggested');
+    });
+
+    it('kein Schichtbedarf hinterlegt → requiredCount 0, freeSlots = Gesamt-MA, keine Fehler', () => {
+      const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: [], historyRows: [], wishRows: []});
+      days.forEach(d => { expect(d.requiredCount).toBe(0); expect(d.freeSlots).toBe(3); });
+    });
+
+    it('Mitarbeiter ohne Historie startet bei Score 0', () => {
+      const wishRows = [{employee_id: 'c', day_key: '25.12', wants_off: true}];
+      const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: reqDaily(2), historyRows: [], wishRows});
+      const c = days.find(d => d.dayKey === '25.12').employees.find(e => e.id === 'c');
+      expect(c.score).toBe(0);
+    });
   });
 });
