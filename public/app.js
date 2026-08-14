@@ -192,7 +192,12 @@ function loginOK(){
   const ab=document.getElementById('adminBtn');if(ab)ab.style.display=S.p.manageUsers?'flex':'none';
   const dpNavEl=document.getElementById('ni-dp');if(dpNavEl)dpNavEl.style.display=S.p.canManageDp?'flex':'none';
   restoreNavSectionState();
-  loadNews().then(function(){setView('home');});startAutoRefresh();
+  const docLinkId=new URLSearchParams(location.search).get('doc');
+  if(docLinkId){try{history.replaceState(null,'',location.pathname);}catch(e){}}
+  loadNews().then(function(){
+    if(docLinkId&&(S.docs||[]).some(d=>d.id===docLinkId)){S._docHighlight=docLinkId;setView('docs');}
+    else setView('home');
+  });startAutoRefresh();
   // archivNav for all users
   const archivNav=document.getElementById('ni-news_archiv');
   if(archivNav)archivNav.style.display='block';
@@ -3373,7 +3378,7 @@ function renderDocs(){
         <input type="text" placeholder="&#128269; Suchen…" value="${(S._docSearch||'').replace(/"/g,'&quot;')}" oninput="S._docSearch=this.value;renderDocs()" style="width:100%;padding:8px 12px;font-size:13px;border:1px solid var(--border);border-radius:var(--r);background:var(--sf);color:var(--tx);box-sizing:border-box;margin-bottom:14px">
         ${filtered.length===0?`<div style="text-align:center;padding:48px 20px;color:var(--di);font-size:14px">Keine Dokumente gefunden.</div>`:`
         <div class="docs-list">
-          ${filtered.map(d=>`<div class="doc-row">
+          ${filtered.map(d=>`<div class="doc-row"${d.id===S._docHighlight?' id="doc-hl-target" style="outline:2px solid var(--acc);outline-offset:-2px;border-radius:var(--r)"':''}>
             <div class="doc-icon">${fileIcon(d.mimeType)}</div>
             <div class="doc-info">
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -3385,6 +3390,7 @@ function renderDocs(){
               <div class="doc-meta">${d.originalName} &bull; ${fmtBytes(d.sizeBytes||0)} &bull; ${getU(d.uploadedBy)?.name||'?'} &bull; ${fdt(d.createdAt)}${d.currentVersion>1?` &bull; <a href="#" onclick="showDocHistory('${d.id}');return false" style="color:var(--acc)">${d.currentVersion} Versionen &#9660;</a>`:''}</div>
             </div>
             <div class="doc-actions">
+              <button class="btn-s" style="font-size:11px;padding:4px 9px" onclick="copyDocLink('${d.id}')" title="Link für andere Portal-Nutzer kopieren">&#128279;</button>
               ${canManage(d)?`
               <button class="btn-s" style="font-size:11px;padding:4px 9px" onclick="openDocForm('${d.id}')" title="Bearbeiten">&#9998;</button>
               <button class="btn-s" style="font-size:11px;padding:4px 9px" onclick="openDocVersion('${d.id}')" title="Neue Version">&#128260;</button>
@@ -3394,6 +3400,19 @@ function renderDocs(){
         </div>`}
       </div>
     </div>`;
+  if(S._docHighlight){
+    const hl=document.getElementById('doc-hl-target');
+    if(hl)hl.scrollIntoView({behavior:'smooth',block:'center'});
+    setTimeout(()=>{S._docHighlight=null;if(S.view==='docs')renderDocs();},3000);
+  }
+}
+// Kopiert einen Direktlink auf ein Dokument — funktioniert nur für Personen,
+// die sich im Portal einloggen können (kein öffentlicher/unauthentifizierter Zugriff).
+function copyDocLink(docId){
+  const url=location.origin+location.pathname+'?doc='+docId;
+  const done=()=>toast('🔗 Link kopiert — öffnet sich nur für eingeloggte Portal-Nutzer');
+  if(navigator.clipboard?.writeText){navigator.clipboard.writeText(url).then(done).catch(()=>toast('⚠️ Kopieren fehlgeschlagen: '+url,'err'));}
+  else toast('Link: '+url);
 }
 function openDocForm(docId){
   S._editDocId=docId||null;
