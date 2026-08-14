@@ -310,7 +310,8 @@ router.get('/employee-params', auth, async (req,res) => {
 router.post('/employee-params', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
   const {employeeId,validFrom,monthlyHours,canDoNights,maxNightsPerMonth,doubleNightsAllowed,isSpringer,
-         officePct,fdSpringerType,fdSpringerLocation,fdSpringerShiftsPerMonth,dailyHours,profileId,noWeekends} = req.body;
+         officePct,fdSpringerType,fdSpringerLocation,fdSpringerShiftsPerMonth,dailyHours,profileId,noWeekends,
+         xmasRotationParticipant} = req.body;
   if (!employeeId) return bad(res,'Mitarbeiter erforderlich',400);
 
   // Wenn Profil ausgewählt: Stunden aus Profil ableiten
@@ -339,13 +340,15 @@ router.post('/employee-params', auth, async (req,res) => {
       existing = await q1('SELECT id FROM dp_employee_params WHERE employee_id=$1 AND valid_from=$2::date',[employeeId,vf]);
     }
     const noWE = !!noWeekends;
+    const xmasPart = xmasRotationParticipant !== false; // Default: true (nimmt teil)
     if (existing) {
       const row = await q1(
         `UPDATE dp_employee_params SET monthly_hours=$1,weekly_hours=$2,can_do_nights=$3,
          max_nights_per_month=$4,double_nights_allowed=$5,is_springer=$6,office_pct=$7,
          fd_springer_type=$8,fd_springer_location=$9,fd_springer_shifts_per_month=$10,
-         valid_from=$11,updated_at=NOW(),daily_hours=$13,profile_id=$14,no_weekends=$15 WHERE id=$12 RETURNING *`,
-        [mh,wh,canDoNights!==false,maxNightsPerMonth||null,doubleNightsAllowed!==false,!!isSpringer,opct,fdType,fdLoc,fdSpm,vf,existing.id,dh,pid,noWE]
+         valid_from=$11,updated_at=NOW(),daily_hours=$13,profile_id=$14,no_weekends=$15,
+         xmas_rotation_participant=$16 WHERE id=$12 RETURNING *`,
+        [mh,wh,canDoNights!==false,maxNightsPerMonth||null,doubleNightsAllowed!==false,!!isSpringer,opct,fdType,fdLoc,fdSpm,vf,existing.id,dh,pid,noWE,xmasPart]
       );
       return ok(res,row);
     }
@@ -354,10 +357,11 @@ router.post('/employee-params', auth, async (req,res) => {
          (id,employee_id,monthly_hours,weekly_hours,work_days_per_week,can_do_nights,
           max_nights_per_month,double_nights_allowed,is_springer,office_pct,
           fd_springer_type,fd_springer_location,fd_springer_shifts_per_month,
-          valid_from,springer_config,locations,created_by,daily_hours,profile_id,no_weekends)
-       VALUES ($1,$2,$3,$4,5,$5,$6,$7,$8,$9,$10,$11,$12,$13,'{}','[]',$14,$15,$16,$17) RETURNING *`,
+          valid_from,springer_config,locations,created_by,daily_hours,profile_id,no_weekends,
+          xmas_rotation_participant)
+       VALUES ($1,$2,$3,$4,5,$5,$6,$7,$8,$9,$10,$11,$12,$13,'{}','[]',$14,$15,$16,$17,$18) RETURNING *`,
       [newId(),employeeId,mh,wh,canDoNights!==false,maxNightsPerMonth||null,
-       doubleNightsAllowed!==false,!!isSpringer,opct,fdType,fdLoc,fdSpm,vf,req.uid,dh,pid,noWE]
+       doubleNightsAllowed!==false,!!isSpringer,opct,fdType,fdLoc,fdSpm,vf,req.uid,dh,pid,noWE,xmasPart]
     );
     ok(res,row);
   } catch(e) { console.error(e); bad(res,'Serverfehler',500); }

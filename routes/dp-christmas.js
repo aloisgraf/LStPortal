@@ -20,15 +20,25 @@ const { q, q1, newId, pool } = require('../db');
 const { auth, ok, bad } = require('../middleware');
 const { CHRISTMAS_DAY_KEYS, buildChristmasProposal, computeChristmasScores } = require('../lib/dp-rules');
 
+// Liefert ALLE Mitarbeiter mit DP-Parametern inkl. Rotations-Teilnahme-Flag
+// (xmasParticipant). Ausgenommene Mitarbeiter (xmasParticipant=false) werden
+// hier NICHT herausgefiltert — das erledigt der jeweilige Aufrufer, je nachdem
+// ob er die volle Liste (Matrix-Anzeige) oder nur Teilnehmer (Score/Vorschlag/
+// Kapazität) braucht.
 async function getEmployees() {
   const [empParams, users] = await Promise.all([
-    q('SELECT DISTINCT ON (employee_id) employee_id FROM dp_employee_params ORDER BY employee_id'),
+    q(`SELECT DISTINCT ON (employee_id) employee_id, xmas_rotation_participant
+       FROM dp_employee_params ORDER BY employee_id, valid_from DESC NULLS LAST`),
     q('SELECT id,name FROM users'),
   ]);
   const userMap = {};
   for (const u of users) userMap[u.id] = u.name;
   return empParams
-    .map(e => ({id: e.employee_id, name: userMap[e.employee_id] || null}))
+    .map(e => ({
+      id: e.employee_id,
+      name: userMap[e.employee_id] || null,
+      xmasParticipant: e.xmas_rotation_participant !== false,
+    }))
     .filter(e => e.name) // nur (noch) existierende Mitarbeiter
     .sort((a,b) => a.name.localeCompare(b.name,'de'));
 }
@@ -52,9 +62,11 @@ router.put('/christmas/history', auth, async (req,res) => {
   try {
     const {employeeId, year, dayKey, status} = req.body;
     if (!employeeId || !year || !CHRISTMAS_DAY_KEYS.includes(dayKey))
-      return bad(res,'employeeId, year und dayKey (24.12/25.12/26.12/31.12/01.01) erforderlich');
-    if (status && status!=='U' && status!=='A')
-      return bad(res,'status muss U, A oder leer sein');
+      return bad(res,'employeeId, year und dayKey erforderlich (z.B. 24.12-T/24.12-N)');
+    // '–' = explizit "regulär frei" (dokumentiert, trägt aber wie ein leerer
+    // Eintrag 0 zum Score bei) — Zyklus im UI: — (leer) → U → A → '–' → …
+    if (status && status!=='U' && status!=='A' && status!=='–')
+      return bad(res,'status muss U, A, "–" oder leer sein');
 
     if (!status) {
       // Leerer Status = Zelle löschen (kein Eintrag = "keine Angabe", trägt 0 zum Score bei)
@@ -129,7 +141,7 @@ router.get('/christmas/proposal', auth, async (req,res) => {
   try {
     const year = parseInt(req.query.year) || new Date().getFullYear();
 
-    const [employees, shiftTypes, requirements, historyRows, wishRows] = await Promise.all([
+    const [allEmployees, shiftTypes, requirements, historyRows, wishRows] = await Promise.all([
       getEmployees(),
       q('SELECT * FROM dp_shift_types'),
       q('SELECT * FROM dp_shift_requirements'),
@@ -138,9 +150,21 @@ router.get('/christmas/proposal', auth, async (req,res) => {
       q('SELECT employee_id,day_key,wants_off FROM dp_christmas_wishes WHERE year=$1', [year]),
     ]);
 
+    // Ausgenommene Mitarbeiter (xmasParticipant=false) fließen weder in Score
+    // noch Kapazität noch Vorschlag ein — werden hier vor der Berechnung
+    // herausgefiltert, tauchen aber weiterhin in der Mitarbeiterverwaltung und
+    // im Matrix-Endpoint (getEmployees) auf.
+    const employees = allEmployees.filter(e => e.xmasParticipant);
     const days = buildChristmasProposal(year, {employees, shiftTypes, requirements, historyRows, wishRows});
-    ok(res, {year, employeeCount: employees.length, days});
+    ok(res, {year, employeeCount: employees.length, excludedCount: allEmployees.length - employees.length, days});
   } catch(e) { console.error('[christmas/proposal]', e.message); bad(res,'Serverfehler',500); }
+});
+
+// Vollständige Mitarbeiterliste inkl. Rotations-Teilnahme-Flag — für die
+// Matrix-Ansicht (zeigt auch ausgenommene MA, aber ausgegraut/filterbar).
+router.get('/christmas/employees', auth, async (req,res) => {
+  try { ok(res, await getEmployees()); }
+  catch(e) { bad(res,'Serverfehler',500); }
 });
 
 module.exports = router;

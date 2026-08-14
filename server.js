@@ -553,6 +553,7 @@ async function initDB() {
   created_at TIMESTAMPTZ DEFAULT NOW()
 )`,
     `ALTER TABLE dp_employee_params ADD COLUMN IF NOT EXISTS no_weekends BOOLEAN NOT NULL DEFAULT false`,
+    `ALTER TABLE dp_employee_params ADD COLUMN IF NOT EXISTS xmas_rotation_participant BOOLEAN NOT NULL DEFAULT true`,
     `ALTER TABLE dp_absence_types ADD COLUMN IF NOT EXISTS zero_on_free_days BOOLEAN NOT NULL DEFAULT false`,
     `CREATE TABLE IF NOT EXISTS dp_plan_versions (
   id TEXT PRIMARY KEY, plan_id TEXT NOT NULL,

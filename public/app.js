@@ -5867,6 +5867,8 @@ function openDpEmpParamForm(paramId) {
   document.getElementById('dpEpfFdDetails').style.display = hasFdSpringer ? '' : 'none';
   const noWEEl = document.getElementById('dpEpfNoWeekends');
   if (noWEEl) noWEEl.checked = !!p?.no_weekends;
+  const xmasEl = document.getElementById('dpEpfXmasRotation');
+  if (xmasEl) xmasEl.checked = p?.xmas_rotation_participant !== false;
   openModal('dpEmpParamFormOv');
 }
 
@@ -5900,6 +5902,8 @@ function openDpEmpParamFormNew(empId) {
   document.getElementById('dpEpfFdDetails').style.display = hasFdSpringer ? '' : 'none';
   const noWEElNew = document.getElementById('dpEpfNoWeekends');
   if (noWEElNew) noWEElNew.checked = !!latest?.no_weekends;
+  const xmasElNew = document.getElementById('dpEpfXmasRotation');
+  if (xmasElNew) xmasElNew.checked = latest?.xmas_rotation_participant !== false;
   openModal('dpEmpParamFormOv');
 }
 
@@ -5923,6 +5927,7 @@ async function submitDpEmpParamForm() {
     dailyHours: document.getElementById('dpEpfDailyHours').value ? parseFloat(document.getElementById('dpEpfDailyHours').value) : null,
     profileId: document.getElementById('dpEpfProfileId').value || null,
     noWeekends: document.getElementById('dpEpfNoWeekends') ? document.getElementById('dpEpfNoWeekends').checked : false,
+    xmasRotationParticipant: document.getElementById('dpEpfXmasRotation') ? document.getElementById('dpEpfXmasRotation').checked : true,
   };
   try {
     await api('POST', '/dp/employee-params', body);
