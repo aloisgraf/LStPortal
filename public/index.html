@@ -1858,6 +1858,9 @@
     <div class="mb2">
       <input type="hidden" id="ctiTodoId"><input type="hidden" id="ctiItemId">
       <div class="fg"><label>Titel</label><div id="ctiTitlePreview" style="font-size:13px;font-weight:600;padding:6px 0"></div></div>
+      <div class="fg" id="ctiDescRow"><label>Beschreibung</label><textarea id="ctiDesc" rows="3" placeholder="Wird als Ticket-Beschreibung übernommen…"></textarea>
+        <div id="ctiDescHint" style="display:none;font-size:11px;color:var(--mu);margin-top:3px">Wird zusätzlich beim Punkt als „Ergebnis / Notiz“ vermerkt.</div>
+      </div>
       <div class="fg"><label>Fachbereich *</label><select id="ctiDept">
         <option value="frei">&#127760; Frei (für alle sichtbar)</option>
         <option value="technik">&#128295; Technik</option><option value="leitung">&#11088; Leitung</option>

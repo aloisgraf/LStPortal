@@ -152,15 +152,16 @@ router.post('/todos/:todoId/items/:id/convert-to-ticket', auth, async (req,res) 
     const isAssignee = await q1('SELECT id FROM todo_item_assignees WHERE item_id=$1 AND user_id=$2',[req.params.id,req.uid]);
     if (!req.p.manageUsers && todo.created_by!==req.uid && !isAssignee) return bad(res,'Keine Berechtigung',403);
 
-    const {department, priority} = req.body;
+    const {department, priority, description} = req.body;
     let {assigneeId} = req.body;
     if (!department) return bad(res,'Fachbereich erforderlich',400);
+    const desc = description!==undefined ? description : (item.comment||'');
 
     const ticketId = newId(), number = await nextTicketNumber();
     await pool.query(
       `INSERT INTO tickets (id,number,title,description,department,tags,priority,status,bucket,assignee_id,created_by)
        VALUES ($1,$2,$3,$4,$5,'[]',$6,'open','',$7,$8)`,
-      [ticketId, number, item.title, item.comment||'', department, priority||'medium', assigneeId||null, req.uid]
+      [ticketId, number, item.title, desc, department, priority||'medium', assigneeId||null, req.uid]
     );
     const uname = (await getUser(req.uid))?.name||'?';
     await auditNote(ticketId, req.uid, `✅ Ticket erstellt von ${uname} (aus Todo-Punkt „${item.title}“, Todo „${todo.title}“)`);

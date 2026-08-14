@@ -259,23 +259,25 @@ router.post('/discussion-items/:id/convert-to-ticket', auth, async (req, res) =>
     const isParticipant = await q1('SELECT id FROM discussion_participants WHERE item_id=$1 AND user_id=$2',[req.params.id,req.uid]);
     if (!req.p.manageUsers && item.created_by!==req.uid && !isParticipant && meetingOwner?.created_by!==req.uid) return bad(res,'Keine Berechtigung',403);
 
-    const {department, priority} = req.body;
+    const {department, priority, description} = req.body;
     let {assigneeId} = req.body;
     if (!department) return bad(res,'Fachbereich erforderlich',400);
+    const desc = description!==undefined ? description : (item.description||'');
 
     const meeting = await q1('SELECT title FROM meetings WHERE id=$1',[item.meeting_id]);
     const ticketId = newId(), number = await nextTicketNumber();
     await pool.query(
       `INSERT INTO tickets (id,number,title,description,department,tags,priority,status,bucket,assignee_id,created_by)
        VALUES ($1,$2,$3,$4,$5,'[]',$6,'open','',$7,$8)`,
-      [ticketId, number, item.title, item.description||'', department, priority||'medium', assigneeId||null, req.uid]
+      [ticketId, number, item.title, desc, department, priority||'medium', assigneeId||null, req.uid]
     );
     const uname = (await getUser(req.uid))?.name||'?';
     await auditNote(ticketId, req.uid, `✅ Ticket erstellt von ${uname} (aus Besprechungspunkt „${item.title}“, Besprechung „${meeting?.title||'?'}“)`);
 
+    // Beschreibung wird auch als "Ergebnis / Notiz" beim Punkt selbst vermerkt
     await pool.query(
-      `UPDATE discussion_items SET converted_ticket_id=$1, converted_at=NOW(), converted_by=$2 WHERE id=$3`,
-      [ticketId, req.uid, item.id]
+      `UPDATE discussion_items SET converted_ticket_id=$1, converted_at=NOW(), converted_by=$2, result=$3 WHERE id=$4`,
+      [ticketId, req.uid, desc, item.id]
     );
     const now = new Date().toISOString();
     await addProtokoll(item.id, {ts:now, by:req.uid, type:'converted_to_ticket', ticketId, ticketNumber:number});

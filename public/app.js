@@ -6544,17 +6544,19 @@ function openConvertTodoItem(todoId, itemId) {
   const item = t.items.find(x => x.id === itemId); if (!item) return;
   if (item.converted_ticket_id) { toast('Punkt wurde bereits umgewandelt','err'); return; }
   const prioMap = {low:'low', medium:'medium', high:'high', urgent:'high'};
-  openConvertItemModal({kind:'todo', ids:{todoId, itemId}, title:item.title, priority: prioMap[t.priority] || 'medium'});
+  openConvertItemModal({kind:'todo', ids:{todoId, itemId}, title:item.title, priority: prioMap[t.priority] || 'medium', description: item.comment||''});
 }
 function openConvertMeetingItem(itemId) {
   const item = S.meetings.flatMap(m => m.instances.flatMap(i => i.items)).find(x => x.id === itemId);
   if (!item) return;
   if (item.convertedTicketId) { toast('Punkt wurde bereits umgewandelt','err'); return; }
-  openConvertItemModal({kind:'meeting', ids:{itemId}, title:item.title, priority:'medium'});
+  openConvertItemModal({kind:'meeting', ids:{itemId}, title:item.title, priority:'medium', description: item.description||item.result||''});
 }
-function openConvertItemModal({kind, ids, title, priority}) {
+function openConvertItemModal({kind, ids, title, priority, description}) {
   S._convertCtx = {kind, ids};
   document.getElementById('ctiTitlePreview').textContent = title;
+  document.getElementById('ctiDesc').value = description || '';
+  document.getElementById('ctiDescHint').style.display = kind==='meeting' ? '' : 'none';
   document.getElementById('ctiErr').textContent = '';
   document.getElementById('ctiPrio').value = priority || 'medium';
   document.getElementById('ctiAssignee').innerHTML = '<option value="">— niemand —</option>' +
@@ -6565,13 +6567,14 @@ async function submitConvertTodoItem() {
   const ctx = S._convertCtx; if (!ctx) return;
   const department = document.getElementById('ctiDept').value;
   const priority = document.getElementById('ctiPrio').value;
+  const description = document.getElementById('ctiDesc').value.trim();
   const assigneeId = document.getElementById('ctiAssignee').value || null;
   const errEl = document.getElementById('ctiErr'); errEl.textContent = '';
   const url = ctx.kind === 'todo'
     ? `/todos/${ctx.ids.todoId}/items/${ctx.ids.itemId}/convert-to-ticket`
     : `/discussion-items/${ctx.ids.itemId}/convert-to-ticket`;
   try {
-    const res = await api('POST', url, {department, priority, assigneeId});
+    const res = await api('POST', url, {department, priority, assigneeId, description});
     closeModal('convertTodoOv');
     await fetchData();
     if (ctx.kind === 'todo') { renderTodos(); }
