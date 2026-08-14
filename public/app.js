@@ -1469,10 +1469,11 @@ function _renderFeed(notes,tkId,canEdit,filter){
         </div>
       </div>`;
     } else {
-      const todoBg=n.todoStatus==='open'?'rgba(239,68,68,.07)':n.todoStatus==='done'?'rgba(16,185,129,.07)':'var(--sf)';
-      const todoBorder=n.todoStatus==='open'?'rgba(239,68,68,.25)':n.todoStatus==='done'?'rgba(16,185,129,.25)':'var(--border)';
+      const todoBg=n.todoStatus==='open'?'rgba(239,68,68,.07)':n.todoStatus==='done'?'rgba(16,185,129,.07)':n.todoStatus==='closing'?'rgba(59,109,212,.07)':'var(--sf)';
+      const todoBorder=n.todoStatus==='open'?'rgba(239,68,68,.25)':n.todoStatus==='done'?'rgba(16,185,129,.25)':n.todoStatus==='closing'?'rgba(59,109,212,.25)':'var(--border)';
       const todoLabel=n.todoStatus==='open'?'<span class="bdg" style="font-size:10px;background:rgba(239,68,68,.12);color:#ef4444">Noch offen</span>'
-        :n.todoStatus==='done'?'<span class="bdg" style="font-size:10px;background:rgba(16,185,129,.12);color:#10b981">Erledigt</span>':'';
+        :n.todoStatus==='done'?'<span class="bdg" style="font-size:10px;background:rgba(16,185,129,.12);color:#10b981">Erledigt</span>'
+        :n.todoStatus==='closing'?'<span class="bdg" style="font-size:10px;background:rgba(59,109,212,.12);color:var(--acc)">🔒 Ticket-Abschluss</span>':'';
       const todoCheckbox=(n.todoStatus==='open'||n.todoStatus==='done')&&canEdit
         ?`<label style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--mu);cursor:pointer"><input type="checkbox" ${n.todoStatus==='done'?'checked':''} onchange="toggleNoteTodo('${tkId}','${n.id}',this.checked)" style="width:13px;height:13px;cursor:pointer">Erledigt</label>`
         :'';
@@ -1522,6 +1523,7 @@ function renderTkDetail(){
         <select id="noteTodoType" style="font-size:12px;padding:8px 6px;width:auto;flex-shrink:0" title="Art des Eintrags">
           <option value="">Info</option>
           <option value="open">Noch offen</option>
+          <option value="closing">Ticket-Abschluss</option>
         </select>
         <button class="btn-p" onclick="addNote('${tk.id}')" style="padding:8px 12px;flex-shrink:0">Senden</button>
       </div>
@@ -1673,11 +1675,16 @@ function applyNoteTpl(body){const inp=document.getElementById('noteInput');if(in
 async function addNote(tkId){
   const inp=document.getElementById('noteInput');if(!inp?.value.trim())return;
   const todoSel=document.getElementById('noteTodoType');
-  const todoStatus=todoSel&&todoSel.value==='open'?'open':undefined;
+  const kind=todoSel?todoSel.value:'';
+  const isClosing=kind==='closing';
+  if(isClosing&&!confirm('Ticket nach dem Senden dieser Abschlussnachricht als abgeschlossen markieren?'))return;
+  const todoStatus=kind==='open'?'open':kind==='closing'?'closing':undefined;
   try{
     await api('POST','/tickets/'+tkId+'/notes',{text:inp.value.trim(),todoStatus});
+    if(isClosing)await api('PUT','/tickets/'+tkId,{status:'closed'});
     inp.value='';if(todoSel)todoSel.value='';
     await fetchData();renderTkDetail();
+    if(isClosing)toast('\u2705 Ticket abgeschlossen');
   }catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
 }
 async function toggleNoteTodo(tkId,noteId,checked){

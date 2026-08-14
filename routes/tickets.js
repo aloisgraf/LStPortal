@@ -181,7 +181,9 @@ router.post('/:id/notes', auth, async (req,res) => {
     const text=req.body?.text?.trim();
     if (!text) return bad(res,'Text erforderlich');
     // Todo-Kennzeichnung: Standard "Info" (kein Status), optional "Noch offen"
-    const todoStatus = req.body?.todoStatus==='open' ? 'open' : null;
+    // oder "closing" (Abschlussnachricht — Status-Schließen erfolgt separat per PUT)
+    const reqTodoStatus = req.body?.todoStatus;
+    const todoStatus = reqTodoStatus==='open' ? 'open' : reqTodoStatus==='closing' ? 'closing' : null;
     const id=newId(), now=new Date().toISOString();
     const allUsers = await q('SELECT id,name FROM users');
     const mentioned = parseMentions(text, allUsers);
