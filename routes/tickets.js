@@ -222,7 +222,7 @@ router.post('/:id/notes', auth, async (req,res) => {
 // Todo-Checkbox umschalten UND/ODER Text bearbeiten. Text-Bearbeitung nur
 // durch den Autor selbst oder manageUsers, Protokolleinträge (audit) sind
 // grundsätzlich unveränderlich. Jede Textänderung wird zusätzlich als eigener
-// Protokoll-Eintrag in der Historie festgehalten (alt → neu, gekürzt).
+// Protokoll-Eintrag in der Historie festgehalten (alt → neu, vollständig).
 router.put('/:id/notes/:noteId', auth, async (req,res) => {
   try {
     const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
@@ -249,8 +249,7 @@ router.put('/:id/notes/:noteId', auth, async (req,res) => {
       const now = new Date().toISOString();
       await pool.query('UPDATE ticket_notes SET text=$1,edited_at=$2 WHERE id=$3',[newText,now,req.params.noteId]);
       const uname=(await getUser(req.uid))?.name||'?';
-      const snippet = s => s.length>60 ? s.slice(0,60)+'…' : s;
-      await auditNote(tk.id,req.uid,`✏️ Eintrag von ${uname} bearbeitet: "${snippet(note.text)}" → "${snippet(newText)}"`);
+      await auditNote(tk.id,req.uid,`✏️ Eintrag von ${uname} bearbeitet: "${note.text}" → "${newText}"`);
       return ok(res,{text:newText,editedAt:now});
     }
 
@@ -265,9 +264,9 @@ router.delete('/:id/notes/:noteId', auth, async (req,res) => {
     if (note.author_id!==req.uid && !req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
     if (note.note_type==='audit') return bad(res,'Protokolleinträge können nicht gelöscht werden',403);
     const uname=(await getUser(req.uid))?.name||'?';
-    const snippet = (note.text||'').length>60 ? note.text.slice(0,60)+'…' : (note.text||'');
+    const deletedText = note.text||'';
     await pool.query('DELETE FROM ticket_notes WHERE id=$1',[req.params.noteId]);
-    await auditNote(req.params.id,req.uid,`🗑️ Eintrag von ${uname} gelöscht: "${snippet}"`);
+    await auditNote(req.params.id,req.uid,`🗑️ Eintrag von ${uname} gelöscht: "${deletedText}"`);
     ok(res);
   } catch(e) { bad(res,'Serverfehler',500); }
 });

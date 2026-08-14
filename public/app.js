@@ -1500,7 +1500,7 @@ function _renderFeed(notes,tkId,canEdit,filter){
             <span style="font-size:11px;color:var(--mu);text-decoration:line-through;word-break:break-word">${esc(parsed.from)}</span>
             <span style="font-size:11px;color:var(--mu)">→</span>
             <span style="font-size:12px;font-weight:600;color:var(--acc);word-break:break-word">${esc(parsed.to)}</span>
-          </div>`:`<div style="font-size:12px;color:var(--mu)">${esc(n.text)}</div>`}
+          </div>`:`<div style="font-size:12px;color:var(--mu);white-space:pre-wrap">${esc(n.text)}</div>`}
           <div style="font-size:10px;color:var(--di);margin-top:2px">
             ${a?`${avHtml(a.initials,a.color,12,5)} ${a.name} · `:''}${fdt(n.createdAt)}
           </div>
