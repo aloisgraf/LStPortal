@@ -3620,10 +3620,6 @@ function renderMeetingDetail(m, canManage) {
 }
 
 function renderInstanceDetail(inst, meeting, canManage) {
-  const statusCols={open:'Zu besprechen',done:'Besprochen',redo:'Nochmal',delegate:'Delegiert'};
-  const statusColors={open:'#3b82f6',done:'#10b981',redo:'#f59e0b',delegate:'#7c3aed'};
-  const groups={open:[],done:[],redo:[],delegate:[]};
-  (inst.items||[]).forEach(it=>{if(groups[it.status])groups[it.status].push(it);else groups.open.push(it);});
   return`<div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div style="font-size:13px;color:var(--mu)">${inst.notes?`<span>${esc(inst.notes)}</span>`:''}</div>
@@ -3635,11 +3631,22 @@ function renderInstanceDetail(inst, meeting, canManage) {
         ${canManage?`<button class="btn-d" style="padding:4px 8px" onclick="deleteInstance('${inst.id}')">&#128465;</button>`:''}
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+    <input class="srch" type="text" id="meetingItemSearch" placeholder="🔍 Punkte durchsuchen …" value="${esc(S._meetingItemSearch||'')}" oninput="filterMeetingItems(this.value)" style="width:100%;margin-bottom:12px;box-sizing:border-box">
+    <div id="meetingItemsGrid">${renderMeetingItemsGrid(inst, canManage, S._meetingItemSearch||'')}</div>
+  </div>`;
+}
+function renderMeetingItemsGrid(inst, canManage, search) {
+  const statusCols={open:'Zu besprechen',done:'Besprochen',redo:'Nochmal',delegate:'Delegiert'};
+  const statusColors={open:'#3b82f6',done:'#10b981',redo:'#f59e0b',delegate:'#7c3aed'};
+  const s=(search||'').toLowerCase().trim();
+  const matches=it=>!s||[it.title,it.description,it.result,getU(it.delegatedTo)?.name].some(v=>(v||'').toLowerCase().includes(s));
+  const groups={open:[],done:[],redo:[],delegate:[]};
+  (inst.items||[]).filter(matches).forEach(it=>{if(groups[it.status])groups[it.status].push(it);else groups.open.push(it);});
+  return`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
       ${Object.entries(groups).map(([st,items])=>`
         <div class="meetings-col">
           <div class="meetings-col-hdr" style="color:${statusColors[st]}">${statusCols[st]} <span style="font-size:11px;opacity:.7">(${items.length})</span></div>
-          ${items.length===0?`<div style="font-size:12px;color:var(--mu);padding:8px;text-align:center">—</div>`:''}
+          ${items.length===0?`<div style="font-size:12px;color:var(--mu);padding:8px;text-align:center">${s?'Keine Treffer':'—'}</div>`:''}
           ${items.map(it=>{const deadlineColor=getDeadlineColor(it.dueDate);return`<div class="meetings-card"${it._canEdit?` onclick="openItemForm('${inst.id}','${it.id}')"`:''} style="${it._canEdit?'':'cursor:default'}${deadlineColor?';border-left:4px solid '+deadlineColor:''}">
             <div style="font-weight:600;font-size:13px;margin-bottom:4px">${esc(it.title)}</div>
             ${it.description?`<div style="font-size:12px;color:var(--mu);margin-bottom:4px">${esc(it.description.slice(0,80))}${it.description.length>80?'…':''}</div>`:''}
@@ -3654,8 +3661,15 @@ function renderInstanceDetail(inst, meeting, canManage) {
             ${it.groupId?`<div style="font-size:11px;color:#0ea5e9;margin-top:4px">🔗 Verknüpft</div>`:''}
           </div>`;}).join('')}
         </div>`).join('')}
-    </div>
-  </div>`;
+    </div>`;
+}
+function filterMeetingItems(val) {
+  S._meetingItemSearch = val;
+  const grid = document.getElementById('meetingItemsGrid');
+  const m = S._selMeeting ? S.meetings.find(x=>x.id===S._selMeeting) : null;
+  const inst = m && S._selInstance ? m.instances.find(x=>x.id===S._selInstance) : null;
+  if (!grid || !inst) return;
+  grid.innerHTML = renderMeetingItemsGrid(inst, m._canManage||false, val);
 }
 
 function openMeetingForm(id=null) {
@@ -3812,12 +3826,16 @@ function openItemForm(instanceId, id=null) {
   // Move/Copy/Unlink buttons (only when editing, only for meeting creators/managers)
   const meeting = S.meetings.find(m=>m.instances.some(i=>i.id===instanceId));
   const canMng = meeting?._canManage||false;
-  document.getElementById('itMoveBtn').style.display = (item && canMng) ? '' : 'none';
-  document.getElementById('itCopyBtn').style.display = (item && canMng) ? '' : 'none';
   document.getElementById('itUnlinkBtn').style.display = (item && item.groupId && canMng) ? '' : 'none';
-  const convertBtn = document.getElementById('itConvertBtn');
-  convertBtn.style.display = (item && canMng && !item.convertedTicketId) ? '' : 'none';
-  if (item) convertBtn.onclick = () => openConvertMeetingItem(item.id);
+  const moreSel = document.getElementById('itMoreActions');
+  const moreOpts = [];
+  if (item && canMng) {
+    moreOpts.push('<option value="move">➡ In andere Besprechung verschieben</option>');
+    moreOpts.push('<option value="copy">📋 In andere Besprechung kopieren (verknüpft)</option>');
+    if (!item.convertedTicketId) moreOpts.push('<option value="convert">🎫 In Ticket umwandeln</option>');
+  }
+  moreSel.innerHTML = '<option value="">Weitere Aktion…</option>' + moreOpts.join('');
+  moreSel.style.display = moreOpts.length ? '' : 'none';
   const convertedInfo = document.getElementById('itConvertedInfo');
   if (item && item.convertedTicketId) {
     const tk = getTk(item.convertedTicketId);
@@ -3935,6 +3953,14 @@ async function deleteInstance(instanceId) {
   } catch(e) { toast('Fehler','err'); }
 }
 
+function handleItemMoreAction(action) {
+  const sel = document.getElementById('itMoreActions');
+  if (!action) return;
+  if (action==='move') openMoveItemModal();
+  else if (action==='copy') openCopyItemModal();
+  else if (action==='convert') openConvertMeetingItem(document.getElementById('itId').value);
+  sel.value = '';
+}
 function openMoveItemModal() {
   const itemId = document.getElementById('itId').value;
   if (!itemId) return;
