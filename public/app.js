@@ -6043,8 +6043,14 @@ async function deleteDpRequirement(id) {
 // ═══════════════════════════════════════════════════════════════════════════
 // DIENSTPLAN — WEIHNACHTSDIENST-ROTATION
 // ═══════════════════════════════════════════════════════════════════════════
-const XMAS_DAY_KEYS = ['24.12','25.12','26.12','31.12','01.01'];
-const XMAS_DAY_SHORT = {'24.12':'24.12.','25.12':'25.12.','26.12':'26.12.','31.12':'31.12.','01.01':'01.01.'};
+const XMAS_DAY_KEYS = ['24.12-T','24.12-N','25.12-T','25.12-N','26.12-T','26.12-N','31.12-T','31.12-N','01.01-T','01.01-N'];
+const XMAS_DAY_SHORT = Object.fromEntries(XMAS_DAY_KEYS.map(k => [k, k.replace('-T','T').replace('-N','N')]));
+
+function xmasFmtScore(s) {
+  if (!s) return '0';
+  const r = Math.round(s*10)/10;
+  return (r>0?'+':'') + (Number.isInteger(r) ? r : r.toFixed(1));
+}
 
 async function renderDPChristmas() {
   const el = document.getElementById('main');
@@ -6055,14 +6061,14 @@ async function renderDPChristmas() {
   const year = S._xmasYear || (S._xmasYear = new Date().getFullYear());
   const histCount = S._xmasHistYearsCount || (S._xmasHistYearsCount = 3);
   const histYears = Array.from({length: histCount}, (_,i) => year - histCount + i);
+  if (S._xmasShowExcluded === undefined) S._xmasShowExcluded = true;
 
   el.innerHTML = '<div style="padding:20px;color:var(--mu)">Lade Weihnachtsdienst-Rotation…</div>';
 
-  let empParams = [];
-  try { empParams = await api('GET', '/dp/employee-params'); S.dpEmpParams = empParams; } catch(e) {}
-  const empIds = [...new Set(empParams.map(p => p.employee_id))];
-  const employees = empIds.map(id => getU(id)).filter(Boolean).sort(byLastName);
+  let employees = [];
+  try { employees = await api('GET', '/dp/christmas/employees'); } catch(e) {}
   S._xmasEmployees = employees;
+  const participantCount = employees.filter(e => e.xmasParticipant).length;
 
   let history = [], proposal = null, wishes = [], scores = {};
   try {
@@ -6080,12 +6086,13 @@ async function renderDPChristmas() {
       <h2>🎄 Weihnachtsdienst-Rotation</h2>
       <div class="yr-row" style="margin:0"><button class="yb" onclick="S._xmasYear=${year-1};renderDPChristmas()">‹</button><span class="yv">${year}</span><button class="yb" onclick="S._xmasYear=${year+1};renderDPChristmas()">›</button></div>
       <div style="flex:1"></div>
-      <span style="font-size:11px;color:var(--mu)">${employees.length} Mitarbeiter</span>
+      <span style="font-size:11px;color:var(--mu)">${participantCount} Mitarbeiter in der Rotation${employees.length>participantCount?` · ${employees.length-participantCount} ausgenommen`:''}</span>
     </div>
     <div style="flex:1;overflow:auto;padding:16px">
       <div style="margin-bottom:12px;font-size:12px;color:var(--mu)">
-        Fairness-Score je Mitarbeiter und Tag: <strong>+1</strong> pro Jahr gearbeitet, <strong>−1</strong> pro Jahr frei/Urlaub — über alle erfassten Jahre, getrennt je Tag (24.12./25.12./26.12./31.12./01.01.).
-        Von den Mitarbeitern mit Urlaubswunsch für ${year} bekommen die mit dem <strong>niedrigsten Score</strong> (am längsten nicht frei gehabt) den Vorschlag „Urlaub empfohlen", begrenzt durch die freien Kapazitäts-Slots.
+        Fairness-Score je Mitarbeiter, Tag <strong>und Schichtart</strong> (Tag-/Nachtdienst getrennt): <strong>+1</strong> pro Jahr gearbeitet, <strong>−1</strong> pro Jahr frei/Urlaub — Nachtdienst an 24.12. und 31.12. zählt mit Faktor <strong>1,5</strong>. „–" (regulär frei) trägt nichts bei.
+        Von den Mitarbeitern mit Urlaubswunsch für ${year} bekommen die mit dem <strong>höchsten Score</strong> (hat in der Vergangenheit am meisten gearbeitet) den Vorschlag „Urlaub empfohlen", begrenzt durch die freien Kapazitäts-Slots. Wiederholt sich sonst eine Vorjahres-Zuteilung, wird nach Möglichkeit auf einen anderen Tag getauscht — sonst als ⚠ markiert.
+        Ausgenommene Mitarbeiter (Mitarbeiterverwaltung → Rotation) fließen nicht in Score, Kapazität oder Vorschlag ein.
         Reine Empfehlung — der Dienstplan wird dadurch <strong>nicht</strong> automatisch verändert.
       </div>
       <div id="xmasProposalBox">${renderXmasProposalCards(proposal)}</div>
@@ -6094,11 +6101,15 @@ async function renderDPChristmas() {
         <span style="font-weight:700;font-size:14px">📋 Historie, Score &amp; Urlaubswunsch ${year}</span>
         <button class="btn-s" style="font-size:11px;padding:2px 8px" onclick="S._xmasHistYearsCount=${histCount+1};renderDPChristmas()">+ weiteres Jahr</button>
         ${histCount>1?`<button class="btn-s" style="font-size:11px;padding:2px 8px" onclick="S._xmasHistYearsCount=${histCount-1};renderDPChristmas()">− Jahr entfernen</button>`:''}
+        <label style="font-size:11px;color:var(--mu);display:flex;align-items:center;gap:4px;cursor:pointer;margin-left:8px">
+          <input type="checkbox" ${S._xmasShowExcluded?'checked':''} onchange="S._xmasShowExcluded=this.checked;refreshXmasBoxes()"> Ausgenommene Mitarbeiter anzeigen
+        </label>
       </div>
       <div style="font-size:11px;color:var(--mu);margin-bottom:8px">
-        <span style="color:#f59e0b">■</span> Historie (${canEditHistory?'Zelle klicken: — / U / A':'nur Planungsberechtigte können bearbeiten'})
-        &nbsp;·&nbsp; <span style="color:#3b82f6">■</span> Score (berechnet, alle Jahre)
+        <span style="color:#f59e0b">■</span> Historie (${canEditHistory?'Zelle klicken: — / U / A / –':'nur Planungsberechtigte können bearbeiten'})
+        &nbsp;·&nbsp; <span style="color:#3b82f6">■</span> Score (berechnet, alle Jahre, T=Tag/N=Nacht)
         &nbsp;·&nbsp; <span style="color:#8b5cf6">■</span> Urlaubswunsch ${year} (Checkbox)
+        &nbsp;·&nbsp; <span style="opacity:.5">grau = von der Rotation ausgenommen</span>
       </div>
       <div id="xmasMatrixBox">${renderXmasMatrix(employees, histYears, history, scores, wishes, year, canEditHistory)}</div>
     </div>
@@ -6133,6 +6144,7 @@ function renderXmasProposalCards(proposal) {
     ${proposal.days.map(d => {
       const dateFmt = d.date.slice(8,10)+'.'+d.date.slice(5,7)+'.'+d.date.slice(0,4);
       const wishers = d.employees.filter(e => e.wishedOff);
+      const repeats = d.employees.filter(e => e.recommendation==='work_suggested' && e.repeatedLastYear);
       return `<div style="background:var(--sf);border:1px solid var(--border);border-radius:var(--r);padding:12px">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
           <strong style="font-size:13px">${esc(d.label)}</strong>
@@ -6141,11 +6153,12 @@ function renderXmasProposalCards(proposal) {
         <div style="font-size:11px;color:var(--mu);margin-bottom:8px">
           Bedarf: <strong>${d.requiredCount}</strong> · Frei-Slots: <strong>${d.freeSlots}</strong> · Wünsche: <strong>${d.wishCount}</strong> · Empfohlen frei: <strong style="color:#10b981">${d.offRecommendedCount}</strong>
         </div>
+        ${repeats.length?`<div style="font-size:11px;color:#f59e0b;margin-bottom:6px">⚠ ${repeats.length} Wiederholung${repeats.length>1?'en':''} zum Vorjahr nicht auflösbar: ${repeats.map(e=>esc(lastNameFirst(e.name))).join(', ')}</div>`:''}
         <div style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:3px">
           ${!wishers.length?'<div style="font-size:11px;color:var(--di)">Keine Urlaubswünsche angemeldet</div>':''}
           ${wishers.map(e => `<div style="display:flex;align-items:center;gap:6px;font-size:11px;padding:3px 6px;border-radius:4px;background:${e.recommendation==='off_recommended'?'rgba(16,185,129,.08)':'rgba(148,163,184,.08)'}">
-            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(e.name)}">${esc(lastNameFirst(e.name))}</span>
-            <span style="color:var(--mu);font-variant-numeric:tabular-nums" title="Score für diesen Tag">${e.score>0?'+':''}${e.score}</span>
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(e.name)}">${esc(lastNameFirst(e.name))}${e.repeatedLastYear?' ⚠':''}${e.swappedFromDayKey?' 🔀':''}</span>
+            <span style="color:var(--mu);font-variant-numeric:tabular-nums" title="Score für diesen Tag">${xmasFmtScore(e.score)}</span>
             <span class="bdg" style="font-size:10px;background:${e.recommendation==='off_recommended'?'rgba(16,185,129,.15)':'rgba(148,163,184,.15)'};color:${e.recommendation==='off_recommended'?'#10b981':'#64748b'}">${e.recommendation==='off_recommended'?'✓ Urlaub empfohlen':'Arbeit vorgeschlagen'}</span>
           </div>`).join('')}
         </div>
@@ -6158,56 +6171,63 @@ const XMAS_NAME_CELL = 'text-align:left;font-weight:600;white-space:nowrap;overf
 
 // Eine gemeinsame Tabelle statt dreier breiter Einzeltabellen: Historie
 // (editierbar) | Score (berechnet) | Urlaubswunsch aktuelles Jahr (Checkbox) —
-// dadurch viele schmale Spalten statt weniger sehr breiter.
+// je Kalendertag zusätzlich nach Tag-/Nachtdienst aufgeschlüsselt (10 Spalten
+// je Gruppe). Ausgenommene Mitarbeiter werden ausgegraut und sind über die
+// Checkbox "Ausgenommene Mitarbeiter anzeigen" ein-/ausblendbar.
 function renderXmasMatrix(employees, histYears, history, scores, wishes, year, canEditHistory) {
-  if (!employees.length) return '<div class="empty">Keine Mitarbeiter mit Dienstplan-Parametern vorhanden.</div>';
+  const visible = S._xmasShowExcluded===false ? employees.filter(e => e.xmasParticipant) : employees;
+  if (!visible.length) return '<div class="empty">Keine Mitarbeiter mit Dienstplan-Parametern vorhanden.</div>';
   const histMap = {};
   history.forEach(h => { histMap[`${h.employee_id}|${h.year}|${h.day_key}`] = h.status; });
   const wishMap = {};
   wishes.forEach(w => { if (w.wants_off) wishMap[`${w.employee_id}|${w.day_key}`] = true; });
 
   const dayCell = 'text-align:center;font-size:11px;padding:3px 4px;min-width:24px';
-  const statusStyle = { '': 'color:var(--di)', 'U': 'color:#f59e0b;font-weight:700', 'A': 'color:#10b981;font-weight:700' };
+  const statusStyle = { '': 'color:var(--di)', 'U': 'color:#f59e0b;font-weight:700', 'A': 'color:#10b981;font-weight:700', '–': 'color:var(--di);font-weight:600' };
   const scoreColor = s => s>0?'#10b981':s<0?'#ef4444':'var(--mu)';
 
   const groupBorder = 'border-left:2px solid var(--border)';
   const scoreBorder = 'border-left:2px solid #3b82f6';
   const wishBorder  = 'border-left:2px solid #8b5cf6';
 
-  const headYear1 = histYears.map((y,gi) => `<th colspan="5" style="text-align:center;${gi===0?groupBorder:groupBorder}">${y}</th>`).join('');
-  const headYear2 = histYears.map((y,gi) => XMAS_DAY_KEYS.map((dk,i) => `<th style="${dayCell}${i===0?';'+groupBorder:''}">${XMAS_DAY_SHORT[dk]}</th>`).join('')).join('');
+  const headYear1 = histYears.map(y => `<th colspan="10" style="text-align:center;${groupBorder}">${y}</th>`).join('');
+  const headYear2 = histYears.map(() => XMAS_DAY_KEYS.map((dk,i) => `<th style="${dayCell}${i===0?';'+groupBorder:''}" title="${XMAS_DAY_SHORT[dk]}">${dk.slice(0,5)}<br>${dk.slice(-1)}</th>`).join('')).join('');
 
   return `<div class="tw" style="overflow-x:auto"><table class="rm-table" style="font-size:11px">
     <thead>
       <tr>
         <th rowspan="2" style="text-align:left;vertical-align:bottom;position:sticky;left:0;background:var(--sf2);z-index:1">Mitarbeiter</th>
         ${headYear1}
-        <th colspan="5" style="text-align:center;${scoreBorder};color:#3b82f6">Score</th>
-        <th colspan="5" style="text-align:center;${wishBorder};color:#8b5cf6">Wunsch ${year}</th>
+        <th colspan="10" style="text-align:center;${scoreBorder};color:#3b82f6">Score</th>
+        <th colspan="10" style="text-align:center;${wishBorder};color:#8b5cf6">Wunsch ${year}</th>
       </tr>
       <tr>
         ${headYear2}
-        ${XMAS_DAY_KEYS.map((dk,i) => `<th style="${dayCell}${i===0?';'+scoreBorder:''}">${XMAS_DAY_SHORT[dk]}</th>`).join('')}
-        ${XMAS_DAY_KEYS.map((dk,i) => `<th style="${dayCell}${i===0?';'+wishBorder:''}">${XMAS_DAY_SHORT[dk]}</th>`).join('')}
+        ${XMAS_DAY_KEYS.map((dk,i) => `<th style="${dayCell}${i===0?';'+scoreBorder:''}" title="${XMAS_DAY_SHORT[dk]}">${dk.slice(0,5)}<br>${dk.slice(-1)}</th>`).join('')}
+        ${XMAS_DAY_KEYS.map((dk,i) => `<th style="${dayCell}${i===0?';'+wishBorder:''}" title="${XMAS_DAY_SHORT[dk]}">${dk.slice(0,5)}<br>${dk.slice(-1)}</th>`).join('')}
       </tr>
     </thead>
     <tbody>
-      ${employees.map(emp => `<tr>
-        <td style="${XMAS_NAME_CELL}" title="${esc(emp.name)}">${esc(lastNameFirst(emp.name))}</td>
+      ${visible.map(emp => {
+        const excluded = !emp.xmasParticipant;
+        const rowStyle = excluded ? 'opacity:.45;font-style:italic' : '';
+        return `<tr style="${rowStyle}" title="${excluded?'Von der Weihnachtsdienst-Rotation ausgenommen (Mitarbeiterverwaltung)':''}">
+        <td style="${XMAS_NAME_CELL}${excluded?';background:var(--sf2)':''}" title="${esc(emp.name)}">${esc(lastNameFirst(emp.name))}${excluded?' 🚫':''}</td>
         ${histYears.map(y => XMAS_DAY_KEYS.map((dk,i) => {
           const st = histMap[`${emp.id}|${y}|${dk}`] || '';
           const onclick = canEditHistory ? `onclick="cycleXmasCell('${emp.id}',${y},'${dk}')"` : '';
-          return `<td style="${dayCell}${i===0?';'+groupBorder:''};${canEditHistory?'cursor:pointer':''};${statusStyle[st]}" ${onclick} title="${canEditHistory?'Klicken zum Ändern':''}">${st||'—'}</td>`;
+          return `<td style="${dayCell}${i===0?';'+groupBorder:''};${canEditHistory?'cursor:pointer':''};${statusStyle[st]||statusStyle['']}" ${onclick} title="${canEditHistory?'Klicken zum Ändern (—/U/A/–)':''}">${st||'—'}</td>`;
         }).join('')).join('')}
         ${XMAS_DAY_KEYS.map((dk,i) => {
           const s = scores[emp.id]?.[dk] ?? 0;
-          return `<td style="${dayCell}${i===0?';'+scoreBorder:''};color:${scoreColor(s)};font-weight:700">${s>0?'+':''}${s}</td>`;
+          return `<td style="${dayCell}${i===0?';'+scoreBorder:''};color:${scoreColor(s)};font-weight:700">${xmasFmtScore(s)}</td>`;
         }).join('')}
         ${XMAS_DAY_KEYS.map((dk,i) => {
           const checked = !!wishMap[`${emp.id}|${dk}`];
           return `<td style="${dayCell}${i===0?';'+wishBorder:''}"><input type="checkbox" ${checked?'checked':''} onchange="toggleXmasWish('${emp.id}',${year},'${dk}',this.checked)" style="cursor:pointer"></td>`;
         }).join('')}
-      </tr>`).join('')}
+      </tr>`;
+      }).join('')}
     </tbody>
   </table></div>`;
 }
@@ -6219,9 +6239,10 @@ async function toggleXmasWish(employeeId, year, dayKey, checked) {
   } catch(e) { toast('⚠️ '+e.message,'err'); }
 }
 
+// Zyklus: — (kein Eintrag) → U (Urlaub) → A (Arbeit) → – (regulär frei, dokumentiert) → —
 async function cycleXmasCell(employeeId, year, dayKey) {
   const cur = S._xmasHistory.find(h => h.employee_id===employeeId && h.year===year && h.day_key===dayKey);
-  const next = {'':'U', 'U':'A', 'A':''}[cur?.status || ''];
+  const next = {'':'U', 'U':'A', 'A':'–', '–':''}[cur?.status || ''];
   try {
     await api('PUT', '/dp/christmas/history', {employeeId, year, dayKey, status: next||null});
     await refreshXmasBoxes();
