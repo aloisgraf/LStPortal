@@ -1530,7 +1530,7 @@ function _renderFeed(notes,tkId,canEdit,filter){
               ${canEdit&&n.authorId===S.currentUser?`<button class="btn-d" style="padding:1px 6px;font-size:10px" onclick="deleteNote('${tkId}','${n.id}')">✕</button>`:''}
             </div>
           </div>
-          <div style="font-size:13px;line-height:1.5;color:var(--mu)">${highlightMentions(n.text)}</div>
+          <div style="font-size:13px;line-height:1.5;color:var(--mu);white-space:pre-wrap">${highlightMentions(n.text)}</div>
         </div>
       </div>`;
     }
@@ -1568,7 +1568,7 @@ function renderTkDetail(){
     </div>`:'';
   const detailsHtml=`
     <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di);margin-bottom:6px">BESCHREIBUNG</div>
-      <div style="font-size:13px;line-height:1.6;color:${tk.description?'var(--tx)':'var(--di)'}">${tk.description||'Keine Beschreibung.'}</div></div>
+      <div style="font-size:13px;line-height:1.6;color:${tk.description?'var(--tx)':'var(--di)'};white-space:pre-wrap">${tk.description?esc(tk.description):'Keine Beschreibung.'}</div></div>
     ${subs.length||canEdit?`<div>
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di);margin-bottom:8px">UNTERTICKETS (${subs.length})</div>
       <div class="subl">${subs.map(st=>`<div class="subi" onclick="S.currentTicketId='${st.id}';renderTkDetail()">\u21b8<span style="font-family:monospace;font-size:11px;color:var(--mu)">${st.number}</span><span style="flex:1;font-size:12px">${st.title}</span>${stBdg(st.status)}</div>`).join('')}
