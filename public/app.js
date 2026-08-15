@@ -702,7 +702,7 @@ function _buildCalHtml(){
           evsHtml+='<div class="cal-ev" style="background:'+color+'22;border-left:2px solid '+color+';color:'+color+'" title="'+titleAttr+'">'+label+'</div>';
         });
         if(devs.length>4)evsHtml+='<div class="cal-ev-more">+'+(devs.length-4)+' weitere</div>';
-        cells+='<td class="'+cls+'" onclick="toggleCalDay(\''+isoDate+'\')" style="cursor:pointer">'+dnHtml+'<div class="cal-evs">'+evsHtml+'</div></td>';
+        cells+='<td class="'+cls+'" onclick="toggleCalDay(\''+isoDate+'\')" ondblclick="openEvtModal(\''+isoDate+'\')" title="Doppelklick: neuer Eintrag" style="cursor:pointer">'+dnHtml+'<div class="cal-evs">'+evsHtml+'</div></td>';
         dayNum++;
       }
     }
@@ -764,7 +764,7 @@ function filtSched(srch,cat){
   if(_scApFilt)evs=evs.filter(ev=>(ev.approvalStatus||'pending')===_scApFilt);
   tb.innerHTML=buildEvCards(evs);
 }
-function openEvtModal(){
+function openEvtModal(date){
   document.getElementById('fEvId').value='';document.getElementById('evtOvT').textContent='Neuer Eintrag';
   const u=getU(S.currentUser);
   document.getElementById('genRow').style.display=S.p.addGeneral?'block':'none';
@@ -777,6 +777,9 @@ function openEvtModal(){
   empSel.value=u?.id||'';
   document.getElementById('fCat').innerHTML='<option value="">\u2014 w\u00e4hlen \u2014</option>'+S.categories.map(c=>`<option value="${c.id}">${c.emoji} ${c.label}</option>`).join('');
   ['fD1','fD2','fT1','fT2','fRsn'].forEach(id=>document.getElementById(id).value='');
+  // Per Doppelklick auf einen Kalendertag geöffnet: Von/Bis gleich mit dem
+  // angeklickten Tag vorbefüllen, statt leer zu lassen.
+  if(date){document.getElementById('fD1').value=date;document.getElementById('fD2').value=date;}
   openModal('evtOv');
 }
 function openEditEvt(id){
