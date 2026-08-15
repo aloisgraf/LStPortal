@@ -530,6 +530,76 @@ describe('Weihnachtsdienst-Rotation — Score-Modell (1 Dimension je Kalendertag
       expect(d24.employees.find(e => e.id === 'b').recommendation).toBe('work_suggested');
     });
   });
+
+  describe('buildChristmasProposal — Wunsch UR (bereits genehmigter, fixer Urlaub)', () => {
+    it('Szenario 1: genehmigter Urlaub (UR) geht IMMER frei, unabhängig vom Score', () => {
+      const wishRows = [{employee_id: 'a', day_key: '24.12', wish: 'UR'}];
+      // a hat den HÖCHSTEN Score (hätte nach der U-Logik zuletzt Anspruch) — UR ignoriert das bewusst
+      const historyRows = [{employee_id: 'a', year: 2025, day_key: '24.12', status: 'TD'}];
+      const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: reqDaily(DAY_SHIFT.id, 2), historyRows, wishRows});
+      const d24 = days.find(d => d.dayKey === '24.12');
+      expect(d24.employees.find(e => e.id === 'a').recommendation).toBe('off_approved');
+      expect(d24.approvedCount).toBe(1);
+    });
+
+    it('genehmigter Urlaub zieht zuerst von den Frei-Slots ab, bevor Wunsch-U-Kandidaten um den Rest konkurrieren', () => {
+      const wishRows = [
+        {employee_id: 'a', day_key: '24.12', wish: 'UR'}, // fix genehmigt
+        {employee_id: 'b', day_key: '24.12', wish: 'U'},  // konkurriert um den Rest
+        {employee_id: 'c', day_key: '24.12', wish: 'U'},  // konkurriert um den Rest
+      ];
+      const historyRows = [
+        {employee_id: 'b', year: 2025, day_key: '24.12', status: 'TD'}, // Score +1 (höher)
+        // c: Score 0
+      ];
+      // 4 MA nötig, damit nach a's Genehmigung noch 1 Frei-Slot übrig bleibt
+      const EMP_D = {id: 'd', name: 'Dora'};
+      const four = [...employees, EMP_D];
+      const days = R.buildChristmasProposal(2026, {employees: four, shiftTypes, requirements: reqDaily(DAY_SHIFT.id, 1), historyRows, wishRows});
+      const d24 = days.find(d => d.dayKey === '24.12');
+      expect(d24.freeSlots).toBe(3); // 4 MA - 1 Bedarf
+      expect(d24.employees.find(e => e.id === 'a').recommendation).toBe('off_approved');
+      // von den verbleibenden 2 Frei-Slots (3 - 1 genehmigt) bekommen b (Score 1) UND c (Score 0) beide noch Platz
+      expect(d24.employees.find(e => e.id === 'b').recommendation).toBe('off_recommended');
+      expect(d24.employees.find(e => e.id === 'c').recommendation).toBe('off_recommended');
+    });
+
+    it('reichen die Frei-Slots nach Abzug der Genehmigungen nicht mehr für alle Wunsch-U-Kandidaten, entscheidet der Score unter ihnen', () => {
+      const wishRows = [
+        {employee_id: 'a', day_key: '24.12', wish: 'UR'}, // fix genehmigt, verbraucht den einzigen Frei-Slot
+        {employee_id: 'b', day_key: '24.12', wish: 'U'},  // bekommt nichts mehr, egal welcher Score
+      ];
+      const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: reqDaily(DAY_SHIFT.id, 2), historyRows: [], wishRows});
+      const d24 = days.find(d => d.dayKey === '24.12');
+      expect(d24.freeSlots).toBe(1);
+      expect(d24.employees.find(e => e.id === 'a').recommendation).toBe('off_approved');
+      expect(d24.employees.find(e => e.id === 'b').recommendation).toBe('work_suggested');
+    });
+
+    it('Szenario 1: mehr genehmigte Urlaube als Frei-Slots → capacityShortfall > 0, Genehmigung bleibt trotzdem bestehen', () => {
+      const wishRows = [
+        {employee_id: 'a', day_key: '24.12', wish: 'UR'},
+        {employee_id: 'b', day_key: '24.12', wish: 'UR'},
+      ];
+      // Bedarf 2 bei 3 MA → freeSlots = 1, aber 2 Genehmigungen liegen vor
+      const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: reqDaily(DAY_SHIFT.id, 2), historyRows: [], wishRows});
+      const d24 = days.find(d => d.dayKey === '24.12');
+      expect(d24.freeSlots).toBe(1);
+      expect(d24.approvedCount).toBe(2);
+      // beide genehmigten MA bleiben trotzdem "off_approved" — keine stille Rücknahme
+      expect(d24.employees.find(e => e.id === 'a').recommendation).toBe('off_approved');
+      expect(d24.employees.find(e => e.id === 'b').recommendation).toBe('off_approved');
+      // nur noch c übrig für 2 benötigte Plätze → Unterbesetzung von 1
+      expect(d24.capacityShortfall).toBe(1);
+    });
+
+    it('keine Unterbesetzung, wenn genehmigte Urlaube innerhalb der Kapazität bleiben', () => {
+      const wishRows = [{employee_id: 'a', day_key: '24.12', wish: 'UR'}];
+      const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: reqDaily(DAY_SHIFT.id, 1), historyRows: [], wishRows});
+      const d24 = days.find(d => d.dayKey === '24.12');
+      expect(d24.capacityShortfall).toBe(0);
+    });
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

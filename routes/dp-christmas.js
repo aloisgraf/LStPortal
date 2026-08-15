@@ -123,10 +123,16 @@ router.get('/christmas/scores', auth, async (req,res) => {
 });
 
 // ── URLAUBSWÜNSCHE (aktuelles Jahr) ───────────────────────────────────────────
-// EIN Wunsch je Kalendertag (nicht je Schichtart): 'U' (möchte frei/Urlaub),
-// 'TD' (möchte gern Tagdienst), 'ND' (möchte gern Nachtdienst), oder kein
-// Eintrag = kein besonderer Wunsch. Fließt NICHT direkt in den Score ein —
-// erst der später eingetragene, finale Historien-Wert wirkt auf den Score.
+// EIN Wunsch je Kalendertag (nicht je Schichtart):
+//  'U'  — möchte gern frei/Urlaub (unverbindlich, konkurriert über den Score
+//         um die freien Kapazitäts-Slots — Vorschlag, keine Zusage)
+//  'UR' — Urlaub bereits GENEHMIGT (fix) — wird im Vorschlag immer als frei
+//         geführt, unabhängig vom Score, zieht zuerst von der Kapazität ab
+//  'TD' — möchte gern Tagdienst
+//  'ND' — möchte gern Nachtdienst
+// oder kein Eintrag = kein besonderer Wunsch. Fließt NICHT direkt in den
+// Score ein — erst der später eingetragene, finale Historien-Wert wirkt auf
+// den Score.
 
 router.get('/christmas/wishes', auth, async (req,res) => {
   try {
@@ -144,8 +150,8 @@ router.put('/christmas/wishes', auth, async (req,res) => {
     const {employeeId, year, dayKey, wish} = req.body;
     if (!employeeId || !year || !CHRISTMAS_CALENDAR_DAY_KEYS.includes(dayKey))
       return bad(res,'employeeId, year und dayKey (24.12/25.12/26.12/31.12/01.01) erforderlich');
-    if (wish && wish!=='U' && wish!=='TD' && wish!=='ND')
-      return bad(res,'wish muss U, TD, ND oder leer sein');
+    if (wish && wish!=='U' && wish!=='UR' && wish!=='TD' && wish!=='ND')
+      return bad(res,'wish muss U, UR, TD, ND oder leer sein');
     // Mitarbeiter dürfen ihren eigenen Wunsch eintragen, Planer (manageUsers) für alle
     if (!req.p.manageUsers && employeeId!==req.uid) return bad(res,'Keine Berechtigung',403);
 
