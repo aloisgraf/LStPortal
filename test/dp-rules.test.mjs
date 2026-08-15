@@ -615,7 +615,32 @@ describe('Weihnachtsdienst-Rotation — Score-Modell (1 Dimension je Kalendertag
       d24.employees.forEach(e => expect(e.recommendation).toBe('work_suggested'));
     });
 
-    it('mit Genehmigungen/Empfehlungen: Off-Gruppen zuerst (Score absteigend), danach Arbeit vorgeschlagen (Score aufsteigend)', () => {
+    it('Tage-übergreifender Ausgleich: wer schon einen Tag priorisiert wurde, rutscht am nächsten Tag zurück, auch bei niedrigerem Score', () => {
+      // a hat an ALLEN drei Tagen (24./25./26.12) den niedrigsten Score (b, c jeweils 0)
+      // — ohne Ausgleich würde a an allen drei Tagen als Erster vorgeschlagen.
+      const historyRows = [
+        {employee_id: 'a', year: 2025, day_key: '24.12', status: 'UR'},
+        {employee_id: 'a', year: 2025, day_key: '25.12', status: 'UR'},
+        {employee_id: 'a', year: 2025, day_key: '26.12', status: 'UR'},
+      ];
+      // Bedarf 2 bei 3 MA → an jedem Tag wird genau 1 MA priorisiert (freeSlots 1, aber ohne Wunsch bleibt trotzdem niemand "off" — requiredCount bestimmt die Top-1-Priorisierung)
+      const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: reqDaily(DAY_SHIFT.id, 2), historyRows, wishRows: []});
+      const d24 = days.find(d => d.dayKey === '24.12');
+      const d25 = days.find(d => d.dayKey === '25.12');
+      const d26 = days.find(d => d.dayKey === '26.12');
+      // Tag 1: a (Score -1) ganz vorne, wie erwartet
+      expect(d24.employees[0].id).toBe('a');
+      // Tag 2: a wurde bereits priorisiert (Ausgleichsgewicht) → jetzt b oder c vorne, NICHT mehr a
+      expect(d25.employees[0].id).not.toBe('a');
+      // Tag 3: die dritte Person (die an Tag 1+2 noch nicht dran war) steht vorne
+      expect(d26.employees[0].id).not.toBe('a');
+      expect(d25.employees[0].id).not.toBe(d26.employees[0].id); // Tag 2 und Tag 3 bevorzugen unterschiedliche Personen
+      // alle drei Mitarbeiter kommen über die drei Tage hinweg mindestens einmal als Erster dran
+      const firsts = new Set([d24.employees[0].id, d25.employees[0].id, d26.employees[0].id]);
+      expect(firsts.size).toBe(3);
+    });
+
+    it('Arbeit vorgeschlagen zuerst (braucht eine Entscheidung), dann Urlaub empfohlen, ganz zuletzt Urlaub genehmigt (schon fix)', () => {
       const EMP_D = {id: 'd', name: 'Dora'};
       const four = [...employees, EMP_D];
       const wishRows = [
@@ -630,8 +655,8 @@ describe('Weihnachtsdienst-Rotation — Score-Modell (1 Dimension je Kalendertag
       // Bedarf 0 → freeSlots = 4, reicht locker für a (genehmigt) + b (Wunsch)
       const days = R.buildChristmasProposal(2026, {employees: four, shiftTypes, requirements: [], historyRows, wishRows});
       const d24 = days.find(d => d.dayKey === '24.12');
-      // a: off_approved; b: off_recommended; c (-1) vor d (0): work_suggested aufsteigend
-      expect(d24.employees.map(e => e.id)).toEqual(['a', 'b', 'c', 'd']);
+      // Arbeit vorgeschlagen (c vor d, Score aufsteigend) → Urlaub empfohlen (b) → Urlaub genehmigt (a)
+      expect(d24.employees.map(e => e.id)).toEqual(['c', 'd', 'b', 'a']);
     });
   });
 });
