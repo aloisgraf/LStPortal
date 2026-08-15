@@ -659,6 +659,70 @@ describe('Weihnachtsdienst-Rotation — Score-Modell (1 Dimension je Kalendertag
       expect(d24.employees.map(e => e.id)).toEqual(['c', 'd', 'b', 'a']);
     });
   });
+
+  describe('buildChristmasProposal — Urlaubskontingent (vacation_config) begrenzt zusätzlich zur Personal-Kapazität', () => {
+    it('ohne konfiguriertes Kontingent gilt der Standard CHRISTMAS_DEFAULT_VACATION_QUOTA', () => {
+      const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: [], historyRows: [], wishRows: []});
+      const d24 = days.find(d => d.dayKey === '24.12');
+      expect(d24.quotaMax).toBe(R.CHRISTMAS_DEFAULT_VACATION_QUOTA);
+    });
+
+    it('Kontingent begrenzt "Urlaub empfohlen" enger als die Personal-Kapazität, auch wenn Frei-Slots reichen würden', () => {
+      const wishRows = [
+        {employee_id: 'a', day_key: '24.12', wish: 'U'},
+        {employee_id: 'b', day_key: '24.12', wish: 'U'},
+        {employee_id: 'c', day_key: '24.12', wish: 'U'},
+      ];
+      const historyRows = [
+        {employee_id: 'a', year: 2025, day_key: '24.12', status: 'TD'}, // Score +1 (höchster → höchste Priorität für frei)
+        // b, c: Score 0
+      ];
+      // Bedarf 0 → freeSlots = 3 (reicht für alle 3 Wünsche), aber Kontingent erlaubt nur 1
+      const vacationQuota = {'2026-12-24': 1};
+      const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: [], historyRows, wishRows, vacationQuota});
+      const d24 = days.find(d => d.dayKey === '24.12');
+      expect(d24.freeSlots).toBe(3);
+      expect(d24.quotaMax).toBe(1);
+      expect(d24.offRecommendedCount).toBe(1);
+      expect(d24.employees.find(e => e.id === 'a').recommendation).toBe('off_recommended'); // höchster Score gewinnt den einzigen Kontingent-Platz
+      expect(d24.employees.find(e => e.id === 'b').recommendation).toBe('work_suggested');
+      expect(d24.employees.find(e => e.id === 'c').recommendation).toBe('work_suggested');
+    });
+
+    it('genehmigter (fixer) Urlaub zieht ebenfalls vom Kontingent ab, nicht nur von der Personal-Kapazität', () => {
+      const wishRows = [
+        {employee_id: 'a', day_key: '24.12', wish: 'UR'}, // fix genehmigt, verbraucht den einzigen Kontingent-Platz
+        {employee_id: 'b', day_key: '24.12', wish: 'U'},  // bekommt trotz freier Personal-Kapazität nichts mehr
+      ];
+      const vacationQuota = {'2026-12-24': 1};
+      const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: [], historyRows: [], wishRows, vacationQuota});
+      const d24 = days.find(d => d.dayKey === '24.12');
+      expect(d24.employees.find(e => e.id === 'a').recommendation).toBe('off_approved');
+      expect(d24.employees.find(e => e.id === 'b').recommendation).toBe('work_suggested');
+    });
+
+    it('mehr genehmigte Urlaube als Kontingent → quotaShortfall, Genehmigung bleibt trotzdem bestehen', () => {
+      const wishRows = [
+        {employee_id: 'a', day_key: '24.12', wish: 'UR'},
+        {employee_id: 'b', day_key: '24.12', wish: 'UR'},
+      ];
+      const vacationQuota = {'2026-12-24': 1}; // nur 1 Platz, aber 2 Genehmigungen
+      const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: [], historyRows: [], wishRows, vacationQuota});
+      const d24 = days.find(d => d.dayKey === '24.12');
+      expect(d24.quotaShortfall).toBe(1);
+      expect(d24.employees.find(e => e.id === 'a').recommendation).toBe('off_approved');
+      expect(d24.employees.find(e => e.id === 'b').recommendation).toBe('off_approved');
+    });
+
+    it('großzügiges Kontingent schränkt nichts zusätzlich ein (Personal-Kapazität bleibt die engere Grenze)', () => {
+      const wishRows = [{employee_id: 'a', day_key: '24.12', wish: 'U'}];
+      const vacationQuota = {'2026-12-24': 20};
+      const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: reqDaily(DAY_SHIFT.id, 2), historyRows: [], wishRows, vacationQuota});
+      const d24 = days.find(d => d.dayKey === '24.12');
+      expect(d24.freeSlots).toBe(1); // 3 MA - 2 Bedarf
+      expect(d24.employees.find(e => e.id === 'a').recommendation).toBe('off_recommended');
+    });
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

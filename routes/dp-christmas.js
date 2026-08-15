@@ -25,7 +25,7 @@
 const router = require('express').Router();
 const { q, q1, newId, pool } = require('../db');
 const { auth, ok, bad } = require('../middleware');
-const { CHRISTMAS_CALENDAR_DAY_KEYS, buildChristmasProposal, computeChristmasScores } = require('../lib/dp-rules');
+const { CHRISTMAS_CALENDAR_DAY_KEYS, CHRISTMAS_CALENDAR_DAYS, christmasDateFor, buildChristmasProposal, computeChristmasScores } = require('../lib/dp-rules');
 const { isUserActive } = require('../db');
 
 // Liefert ALLE Mitarbeiter mit DP-Parametern inkl. Rotations-Teilnahme-Flag
@@ -180,14 +180,19 @@ router.put('/christmas/wishes', auth, async (req,res) => {
 router.get('/christmas/proposal', auth, async (req,res) => {
   try {
     const year = parseInt(req.query.year) || new Date().getFullYear();
+    // Die 5 tatsächlichen Kalenderdaten dieses Rotationsjahres (01.01. liegt
+    // im Folgejahr) — für den Abgleich mit dem bestehenden Urlaubskontingent
+    // (Dienstplan → Urlaubsübersicht, Tabelle vacation_config).
+    const christmasDates = CHRISTMAS_CALENDAR_DAYS.map(d => christmasDateFor(year, d.dateKey));
 
-    const [allEmployees, shiftTypes, requirements, historyRows, wishRows] = await Promise.all([
+    const [allEmployees, shiftTypes, requirements, historyRows, wishRows, vacationConfigRows] = await Promise.all([
       getEmployees(),
       q('SELECT * FROM dp_shift_types'),
       q('SELECT * FROM dp_shift_requirements'),
       // Score fließt aus ALLEN erfassten Jahren ein, kein Lookback-Fenster
       q('SELECT employee_id,year,day_key,status FROM dp_christmas_history'),
       q('SELECT employee_id,day_key,wish FROM dp_christmas_wishes WHERE year=$1', [year]),
+      q('SELECT date,max_slots FROM vacation_config WHERE date=ANY($1::date[])', [christmasDates]),
     ]);
 
     // Ausgenommene (xmasParticipant=false) UND inaktive Mitarbeiter (isActive=false,
@@ -196,7 +201,9 @@ router.get('/christmas/proposal', auth, async (req,res) => {
     // herausgefiltert, tauchen aber weiterhin in der Mitarbeiterverwaltung und
     // im Matrix-Endpoint (getEmployees) auf (dort ausgegraut).
     const employees = allEmployees.filter(e => e.xmasParticipant && e.isActive);
-    const days = buildChristmasProposal(year, {employees, shiftTypes, requirements, historyRows, wishRows});
+    const vacationQuota = {};
+    for (const r of vacationConfigRows) vacationQuota[new Date(r.date).toISOString().slice(0,10)] = r.max_slots;
+    const days = buildChristmasProposal(year, {employees, shiftTypes, requirements, historyRows, wishRows, vacationQuota});
     ok(res, {year, employeeCount: employees.length, excludedCount: allEmployees.length - employees.length, days});
   } catch(e) { console.error('[christmas/proposal]', e.message); bad(res,'Serverfehler',500); }
 });
