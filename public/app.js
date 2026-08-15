@@ -6256,14 +6256,24 @@ function renderXmasProposalCards(proposal) {
         </div>
         ${d.capacityShortfall>0?`<div style="font-size:11px;color:#ef4444;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:5px 8px;margin-bottom:6px">⚠ Unterbesetzung: ${d.capacityShortfall} Mitarbeiter zu wenig für den Schichtbedarf (mehr genehmigte Urlaube als Personal-Kapazität)</div>`:''}
         ${d.quotaShortfall>0?`<div style="font-size:11px;color:#ef4444;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:5px 8px;margin-bottom:8px">⚠ Urlaubskontingent überschritten: ${d.quotaShortfall} genehmigte Urlaube mehr als das Kontingent (${d.quotaMax}) erlaubt</div>`:''}
-        <div style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:3px">
-          ${!d.employees.length?'<div style="font-size:11px;color:var(--di)">Keine Mitarbeiter in der Rotation</div>':''}
-          ${d.employees.map(e => { const b = xmasRecBadge(e); return `<div style="display:flex;align-items:center;gap:6px;font-size:11px;padding:3px 6px;border-radius:4px;background:${b.bg}">
+        ${(() => {
+          const work = d.employees.filter(e => e.recommendation==='work_suggested');
+          const off = d.employees.filter(e => e.recommendation!=='work_suggested');
+          const empRow = e => { const b = xmasRecBadge(e); return `<div style="display:flex;align-items:center;gap:6px;font-size:11px;padding:3px 6px;border-radius:4px;background:${b.bg}">
             <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(e.name)}">${esc(lastNameFirst(e.name))}${e.wish?` <span style="opacity:.6">(Wunsch ${e.wish})</span>`:''}</span>
             <span style="color:var(--mu);font-variant-numeric:tabular-nums" title="Score für diesen Tag">${xmasFmtScore(e.score)}</span>
             <span class="bdg" style="font-size:10px;background:${b.bg};color:${b.fg}">${b.text}</span>
-          </div>`; }).join('')}
-        </div>
+          </div>`; };
+          return `
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di);margin-bottom:3px">Arbeit vorgeschlagen (${work.length})</div>
+          <div style="max-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:3px;margin-bottom:8px">
+            ${!work.length?'<div style="font-size:11px;color:var(--di)">Niemand</div>':work.map(empRow).join('')}
+          </div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di);margin-bottom:3px">Urlaub gewünscht / genehmigt (${off.length})</div>
+          <div style="max-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:3px">
+            ${!off.length?'<div style="font-size:11px;color:var(--di)">Niemand</div>':off.map(empRow).join('')}
+          </div>`;
+        })()}
       </div>`;
     }).join('')}
   </div>`;
