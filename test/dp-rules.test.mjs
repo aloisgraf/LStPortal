@@ -600,6 +600,40 @@ describe('Weihnachtsdienst-Rotation — Score-Modell (1 Dimension je Kalendertag
       expect(d24.capacityShortfall).toBe(0);
     });
   });
+
+  describe('buildChristmasProposal — Anzeige-Reihenfolge der Mitarbeiterliste', () => {
+    it('ohne jeden Wunsch: "Arbeit vorgeschlagen" sortiert nach Score AUFSTEIGEND (wer am wenigsten gearbeitet hat, steht oben)', () => {
+      const historyRows = [
+        {employee_id: 'a', year: 2025, day_key: '24.12', status: 'TD'}, // Score +1 (hat oft gearbeitet)
+        {employee_id: 'b', year: 2025, day_key: '24.12', status: 'UR'}, // Score -1 (hat wenig gearbeitet)
+        // c: Score 0
+      ];
+      const days = R.buildChristmasProposal(2026, {employees, shiftTypes, requirements: [], historyRows, wishRows: []});
+      const d24 = days.find(d => d.dayKey === '24.12');
+      // alle "work_suggested" (kein Wunsch eingetragen) — Reihenfolge: b(-1), c(0), a(+1)
+      expect(d24.employees.map(e => e.id)).toEqual(['b', 'c', 'a']);
+      d24.employees.forEach(e => expect(e.recommendation).toBe('work_suggested'));
+    });
+
+    it('mit Genehmigungen/Empfehlungen: Off-Gruppen zuerst (Score absteigend), danach Arbeit vorgeschlagen (Score aufsteigend)', () => {
+      const EMP_D = {id: 'd', name: 'Dora'};
+      const four = [...employees, EMP_D];
+      const wishRows = [
+        {employee_id: 'a', day_key: '24.12', wish: 'UR'}, // genehmigt
+        {employee_id: 'b', day_key: '24.12', wish: 'U'},  // Wunsch, bekommt evtl. frei
+      ];
+      const historyRows = [
+        {employee_id: 'b', year: 2025, day_key: '24.12', status: 'TD'}, // Score +1
+        {employee_id: 'c', year: 2025, day_key: '24.12', status: 'UR'}, // Score -1
+        // d: Score 0
+      ];
+      // Bedarf 0 → freeSlots = 4, reicht locker für a (genehmigt) + b (Wunsch)
+      const days = R.buildChristmasProposal(2026, {employees: four, shiftTypes, requirements: [], historyRows, wishRows});
+      const d24 = days.find(d => d.dayKey === '24.12');
+      // a: off_approved; b: off_recommended; c (-1) vor d (0): work_suggested aufsteigend
+      expect(d24.employees.map(e => e.id)).toEqual(['a', 'b', 'c', 'd']);
+    });
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
