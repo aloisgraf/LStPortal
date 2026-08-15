@@ -611,6 +611,22 @@ function toggleCalDay(iso){
 function clearCalDay(){
   if(S._calSelectedDate){S._calSelectedDate=null;renderSchedule();}
 }
+// Jeder Klick auf einen Kalendertag ersetzt das komplette Kalender-HTML
+// (toggleCalDay -> renderSchedule), wodurch das ursprüngliche <td> zwischen
+// den beiden Klicks eines nativen Doppelklicks aus dem DOM verschwindet und
+// der Browser das dblclick-Event dadurch nicht zuverlässig zustellt. Deshalb
+// wird der Doppelklick hier manuell per Timer erkannt: kommt der zweite
+// Klick innerhalb der Doppelklick-Schwelle, wird der (bereits geplante)
+// Einzelklick verworfen und stattdessen das Eintragsfenster geöffnet.
+let _calClickTimer=null;
+function calDayClick(iso){
+  if(_calClickTimer){
+    clearTimeout(_calClickTimer);_calClickTimer=null;
+    openEvtModal(iso);
+    return;
+  }
+  _calClickTimer=setTimeout(()=>{_calClickTimer=null;toggleCalDay(iso);},280);
+}
 function getDpMode(){return localStorage.getItem('dpViewMode')||'both';}
 function setDpMode(m){localStorage.setItem('dpViewMode',m);renderSchedule();}
 function renderSchedule(){
@@ -702,7 +718,7 @@ function _buildCalHtml(){
           evsHtml+='<div class="cal-ev" style="background:'+color+'22;border-left:2px solid '+color+';color:'+color+'" title="'+titleAttr+'">'+label+'</div>';
         });
         if(devs.length>4)evsHtml+='<div class="cal-ev-more">+'+(devs.length-4)+' weitere</div>';
-        cells+='<td class="'+cls+'" onclick="toggleCalDay(\''+isoDate+'\')" ondblclick="openEvtModal(\''+isoDate+'\')" title="Doppelklick: neuer Eintrag" style="cursor:pointer">'+dnHtml+'<div class="cal-evs">'+evsHtml+'</div></td>';
+        cells+='<td class="'+cls+'" onclick="calDayClick(\''+isoDate+'\')" title="Doppelklick: neuer Eintrag" style="cursor:pointer">'+dnHtml+'<div class="cal-evs">'+evsHtml+'</div></td>';
         dayNum++;
       }
     }
