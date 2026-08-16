@@ -22,6 +22,56 @@ const DEPTS = ['technik','leitung','dienstplanung','ausbildung','qm','frei'];
 // — dort liegt sie, damit sie ohne DB-Verbindung testbar ist (Vitest).
 const { isUserActive } = require('./lib/dp-rules');
 
+// Jeder Menü-Reiter (public/index.html, Sidebar-Elemente id="ni-<key>") — für
+// die "Reiter-Sichtbarkeit" in Einstellungen → Rechte. Reine Anzeige-Steuerung
+// im Menü, ersetzt keine serverseitige Route-Absicherung (die bleibt separat
+// bestehen, z.B. canManageDp für die Dienstplanungs-Reiter).
+const NAV_TABS = [
+  {key:'home', label:'Übersicht'},
+  {key:'docs', label:'Dokumente'},
+  {key:'meetings', label:'Besprechungen'},
+  {key:'todos', label:'Todos'},
+  {key:'schedule', label:'Dienstplan (Kalender)'},
+  {key:'allw', label:'Zulagendienste'},
+  {key:'homeoffice', label:'Homeoffice'},
+  {key:'vacation', label:'Urlaubsübersicht'},
+  {key:'diensttausch', label:'Diensttausch'},
+  {key:'abrechnung', label:'Abrechnung'},
+  {key:'dienstplaene', label:'Dienstpläne'},
+  {key:'zahnarzt', label:'Dienstplan Zahnärzte'},
+  {key:'platz', label:'Platzübersicht'},
+  {key:'links', label:'Links'},
+  {key:'tickets', label:'Tickets: Offene'},
+  {key:'tickets_closed', label:'Tickets: Abgeschlossene'},
+  {key:'tickets_deleted', label:'Tickets: Gelöschte'},
+  {key:'checklists', label:'Checklisten'},
+  {key:'dp', label:'Dienstplanung: Planerstellung'},
+  {key:'dp-config', label:'Dienstplanung: Konfiguration'},
+  {key:'dp-christmas', label:'Dienstplanung: Weihnachtsdienst'},
+  {key:'dp-mine', label:'Dienstplanung: Mein Dienstplan'},
+  {key:'messages', label:'Nachrichten: Eingang'},
+  {key:'messages_sent', label:'Nachrichten: Gesendet'},
+  {key:'news', label:'News'},
+  {key:'statistik', label:'Statistik'},
+];
+
+// Wendet dieselbe "Grant gewinnt über Deny"-Merge-Logik wie getP()/overrideMap
+// an, aber auf role_permissions-Zeilen mit dem Schlüsselpräfix "tab:<key>".
+// Default (kein Override vorhanden) = sichtbar, damit ein neu hinzugefügter
+// Reiter nicht versehentlich für alle verschwindet.
+function getTabVisibility(roles, overrides) {
+  const ovMap = {};
+  (overrides||[]).forEach(o => {
+    if (!roles.includes(o.role) || !o.permission.startsWith('tab:')) return;
+    const key = o.permission.slice(4);
+    if (o.granted && ovMap[key] !== false) ovMap[key] = true;
+    else if (!o.granted && ovMap[key] === undefined) ovMap[key] = false;
+  });
+  const result = {};
+  NAV_TABS.forEach(t => { result[t.key] = ovMap[t.key] !== undefined ? ovMap[t.key] : true; });
+  return result;
+}
+
 async function getP(uid, userObj=null, overrides=[]) {
   const u = userObj || await getUser(uid);
   const roles = parseRoles(u?.roles);
@@ -47,6 +97,7 @@ async function getP(uid, userObj=null, overrides=[]) {
     canApproveEvents: perm('canApproveEvents', has('admin','dienstplanung','leitung')),
     canSendMessages: perm('canSendMessages', !has('standard')),
     seeAllAbrechnung: perm('seeAllAbrechnung', has('admin','dienstplanung')),
+    tabs: getTabVisibility(roles, overrides),
     roles,
   };
 }
@@ -65,14 +116,22 @@ async function getTP(uid, userObj=null) {
   };
 }
 
+// Sichtbarkeit: Ersteller und zugewiesener Bearbeiter sehen ihr Ticket IMMER,
+// unabhängig von Sichtbarkeit/Fachbereich. Für alle anderen User desselben
+// Fachbereichs-Rechts gilt: nur ÖFFENTLICHE Tickets sind sichtbar. Ein Ticket
+// OHNE zugewiesenen Bearbeiter gilt automatisch als öffentlich (es gibt sonst
+// niemanden, der es exklusiv bearbeiten könnte).
 const canSeeTk = (tp,tk,uid) => {
-  if(tp.seeAll||tk.is_public||tk.created_by===uid||tk.department==='frei') return true;
+  if(tp.seeAll || tk.created_by===uid || tk.assignee_id===uid || tk.department==='frei') return true;
+  try { if (JSON.parse(tk.mentioned_users||'[]').includes(uid)) return true; } catch {}
+  const isPublic = !!tk.is_public || !tk.assignee_id;
+  if(!isPublic) return false;
   if(tp.myDepts.includes(tk.department)) return true;
   if(tk.subcategory && tp.canSeeSubcat) return true;
-  try { return JSON.parse(tk.mentioned_users||'[]').includes(uid); } catch { return false; }
+  return false;
 };
 const canEditTk = (tp,tk,uid) => {
-  if(tp.editAll || tk.created_by===uid || tp.myDepts.includes(tk.department)) return true;
+  if(tp.editAll || tk.created_by===uid || tk.assignee_id===uid || tp.myDepts.includes(tk.department)) return true;
   if(tk.subcategory && tp.canEditSubcat) return true;
   return false;
 };
@@ -107,4 +166,4 @@ async function logAct(uid, name, action, details={}) {
 
 module.exports = { pool, q, q1, newId, parseRoles, parseTags, getUser, getUserByUsername, DEPTS, logAct,
   getP, getTP, canSeeTk, canEditTk, nextTicketNumber, auditNote, createNotification,
-  parseMentions, isUserActive };
+  parseMentions, isUserActive, NAV_TABS, getTabVisibility };

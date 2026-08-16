@@ -13,9 +13,13 @@ router.get('/', auth, async (req,res) => {
       q('SELECT id,name,initials,roles,color,must_change_pw,last_seen,category,email,username,hire_date,termination_date FROM users ORDER BY name'),
       q('SELECT * FROM categories ORDER BY sort_order,label'),
       q('SELECT * FROM tags ORDER BY label'),
-      p.canApproveEvents
-        ? q('SELECT * FROM events ORDER BY date_from')
-        : q('SELECT * FROM events WHERE is_general=true OR user_id=$1 OR created_by=$1 ORDER BY date_from',[uid]),
+      // Alle Events werden für JEDEN Nutzer geladen — die Sichtbarkeits-/
+      // Anonymisierungs-Logik weiter unten (canSeeAll/isForMe/createdByMe)
+      // entscheidet, was davon im Detail (Name/Grund) sichtbar ist. Eine
+      // zusätzliche SQL-Einschränkung hier würde Standard-Usern auch die
+      // ANONYMISIERTE Sicht auf Kolleg:innen-Einträge (z.B. im Dienstplan)
+      // unmöglich machen, statt sie nur zu maskieren.
+      q('SELECT * FROM events ORDER BY date_from'),
       q('SELECT event_id FROM event_confirms WHERE user_id=$1',[uid]),
       q('SELECT * FROM tickets ORDER BY created_at DESC'),
       q('SELECT * FROM ticket_notes ORDER BY created_at'),
@@ -123,13 +127,14 @@ router.get('/', auth, async (req,res) => {
         seeAllAbrechnung:p.seeAllAbrechnung,
         myDepts:tp.myDepts, seeAllTickets:tp.seeAll,
         canSetPublic:tp.canSetPublic, canAssign:tp.canAssign,
+        tabs:p.tabs,
         roles: p.roles,
         canManageDp,
       },
       users: usersRaw.map(u=>({
         id:u.id, name:u.name, initials:u.initials, roles:parseRoles(u.roles),
         color:u.color, mustChangePW:u.must_change_pw,
-        category:u.category||'',
+        category:u.category||'', username:u.username||'', email:u.email||'',
         isOnline: !!(u.last_seen && new Date(u.last_seen) > fiveMinAgo),
         hireDate: u.hire_date ? new Date(u.hire_date).toISOString().slice(0,10) : null,
         terminationDate: u.termination_date ? new Date(u.termination_date).toISOString().slice(0,10) : null,

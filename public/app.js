@@ -216,6 +216,7 @@ async function logout(){
 }
 function openPwModal(){
   const u=getU(S.currentUser);
+  document.getElementById('myUsername').value=u?.username||'';
   S.myColor=u?.color||pal()[0];
   buildCP('myCR',S.myColor,'pickMyColor');
   document.getElementById('cpw0').value='';document.getElementById('cpw1').value='';document.getElementById('cpw2').value='';
@@ -268,11 +269,25 @@ function restoreNavSectionState() {
     }
   }
 }
+// Alle Sidebar-Reiter (id="ni-<key>") — muss mit db.js NAV_TABS übereinstimmen.
+const NAV_TAB_IDS=['home','docs','meetings','todos','schedule','allw','homeoffice','vacation','diensttausch','abrechnung','dienstplaene','zahnarzt','platz','links','tickets','tickets_closed','tickets_deleted','checklists','dp','dp-config','dp-christmas','dp-mine','messages','messages_sent','news','statistik'];
+// Zusätzlich zur (abschaltbaren) Reiter-Sichtbarkeit weiterhin hart verdrahtete
+// Mindestanforderungen für die Dienstplanungs-/Statistik-Reiter — ein Reiter
+// ist nur sichtbar, wenn BEIDES zutrifft.
+const NAV_BASELINE={statistik:()=>!!S.p?.manageUsers, dp:()=>!!S.p?.canManageDp, 'dp-config':()=>!!S.p?.canManageDp, 'dp-christmas':()=>!!S.p?.canManageDp};
+function applyNavVisibility(){
+  const tabs=S.p?.tabs||{};
+  NAV_TAB_IDS.forEach(id=>{
+    const el=document.getElementById('ni-'+id);if(!el)return;
+    const baseline=NAV_BASELINE[id]?NAV_BASELINE[id]():true;
+    const tabAllowed=tabs[id]!==false; // Default sichtbar, nur ein explizites false blendet aus
+    el.style.display=(baseline&&tabAllowed)?'':'none';
+  });
+}
 function setView(v){
   S.view=v;
-  ['home','schedule','allw','diensttausch','abrechnung','dienstplaene','tickets','tickets_closed','tickets_deleted','checklists','messages','messages_sent','zahnarzt','platz','links','statistik','docs','meetings','dp','dp-config','dp-mine','todos'].forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
-  const statEl=document.getElementById('ni-statistik');if(statEl)statEl.style.display=S.p?.manageUsers?'flex':'none';
-  const dpEl=document.getElementById('ni-dp');if(dpEl)dpEl.style.display=S.p?.canManageDp?'flex':'none';
+  NAV_TAB_IDS.forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
+  applyNavVisibility();
   document.getElementById('sidebar').classList.remove('open');document.getElementById('sbOv').classList.remove('open');
   renderSBF();renderMain();
 }
@@ -2101,18 +2116,31 @@ function backToAdmin(tab='users'){['ufOv','cfOv','tfOv'].forEach(closeModal);ope
 function renderUsrList(){document.getElementById('usrList').innerHTML=S.users.map(u=>`<div class="ai"${u.isActive===false?' style="opacity:.45;font-style:italic"':''}>${avHtml(u.initials,u.color,34,13,u.isOnline)}<div class="aii"><div class="ain">${u.name} ${u.isActive===false?'\uD83D\uDEAB inaktiv \u00B7 ':''}${roleBadges(u.id)}${u.isOnline?'<span style="font-size:10px;color:var(--ok)">\u25cf online</span>':''}</div><div class="ais">${u.mustChangePW?'\u26A0\uFE0F PW ausstehend':'\u2713 Aktiv'}${u.hireDate?' \u00B7 seit '+u.hireDate.split('-').reverse().join('.'):''}${u.terminationDate?' \u00B7 bis '+u.terminationDate.split('-').reverse().join('.'):''}</div></div><div class="aia"><button class="btn-e" onclick="openUF('${u.id}')">\u270e</button>${S.users.length>1&&u.id!==S.currentUser?`<button class="btn-d" onclick="delUser('${u.id}')">\u2715</button>`:''}</div></div>`).join('');}
 function renderCatList(){document.getElementById('catList').innerHTML=S.categories.map(c=>`<div class="ai"><div style="width:14px;height:14px;border-radius:3px;background:${c.color};flex-shrink:0"></div><div class="aii"><div class="ain">${c.emoji} ${c.label}</div></div><div class="aia"><button class="btn-e" onclick="openCF('${c.id}')">\u270e</button>${S.categories.length>1?`<button class="btn-d" onclick="delCat('${c.id}')">\u2715</button>`:''}</div></div>`).join('');}
 function renderTagList(){document.getElementById('tagList').innerHTML=S.tags.map(t=>`<div class="ai"><div style="width:14px;height:14px;border-radius:3px;background:${t.color};flex-shrink:0"></div><div class="aii"><div class="ain"><span class="tag-chip" style="background:${t.color}1a;color:${t.color}">${t.label}</span></div></div><div class="aia"><button class="btn-e" onclick="openTF('${t.id}')">\u270e</button>${S.tags.length>1?`<button class="btn-d" onclick="delTag('${t.id}')">\u2715</button>`:''}</div></div>`).join('');}
+const RIGHTS_ROLES_LIST=['admin','leitung','dienstplanung','schichtleiter','technik','qm','standard'];
+// Muss mit db.js NAV_TABS (key+label) \u00fcbereinstimmen \u2014 bewusst dupliziert
+// (Frontend hat keinen Zugriff auf db.js), Reihenfolge/Gruppierung entspricht
+// der Sidebar.
+const RIGHTS_NAV_TABS=[
+  {key:'home',label:'\u00dcbersicht'},{key:'docs',label:'Dokumente'},{key:'meetings',label:'Besprechungen'},{key:'todos',label:'Todos'},
+  {key:'schedule',label:'Dienstplan (Kalender)'},{key:'allw',label:'Zulagendienste'},{key:'homeoffice',label:'Homeoffice'},{key:'vacation',label:'Urlaubs\u00fcbersicht'},
+  {key:'diensttausch',label:'Diensttausch'},{key:'abrechnung',label:'Abrechnung'},{key:'dienstplaene',label:'Dienstpl\u00e4ne'},
+  {key:'zahnarzt',label:'Dienstplan Zahn\u00e4rzte'},{key:'platz',label:'Platz\u00fcbersicht'},{key:'links',label:'Links'},
+  {key:'tickets',label:'Tickets: Offene'},{key:'tickets_closed',label:'Tickets: Abgeschlossene'},{key:'tickets_deleted',label:'Tickets: Gel\u00f6schte'},{key:'checklists',label:'Checklisten'},
+  {key:'dp',label:'Dienstplanung: Planerstellung'},{key:'dp-config',label:'Dienstplanung: Konfiguration'},{key:'dp-christmas',label:'Dienstplanung: Weihnachtsdienst'},{key:'dp-mine',label:'Dienstplanung: Mein Dienstplan'},
+  {key:'messages',label:'Nachrichten: Eingang'},{key:'messages_sent',label:'Nachrichten: Gesendet'},{key:'news',label:'News'},{key:'statistik',label:'Statistik'},
+];
 function renderRightsMatrix(){
   const el=document.getElementById('rightsMatrix');if(!el)return;
-  const ROLES_LIST=['admin','leitung','dienstplanung','schichtleiter','technik','qm','standard'];
+  const ROLES_LIST=RIGHTS_ROLES_LIST;
   const PERMS=[
     {key:'manageUsers',label:'Benutzerverwaltung'},
-    {key:'canApproveEvents',label:'Dienste genehmigen'},
+    {key:'canApproveEvents',label:'Kalender/Urlaub: alle Eintr\u00e4ge sehen',hint:'Sonst nur eigene + f\u00fcr einen erstellte Eintr\u00e4ge; andere User werden im Dienstplan/in der Urlaubs\u00fcbersicht anonymisiert angezeigt (Name/Grund verborgen).'},
     {key:'editAllPersonal',label:'Alle Eintr\u00e4ge bearbeiten'},
     {key:'addForOthers',label:'F\u00fcr andere eintragen'},
     {key:'addGeneral',label:'Allg. Eintr\u00e4ge'},
-    {key:'seeAllAllw',label:'Alle Zulagen sehen'},
+    {key:'seeAllAllw',label:'Zulagendienste: alle sehen',hint:'Sonst nur die eigenen Zulagendienste.'},
     {key:'editAllw',label:'Zulagen bearbeiten'},
-    {key:'seeAllAbrechnung',label:'Alle Abrechnungen'},
+    {key:'seeAllAbrechnung',label:'Abrechnung: alle sehen',hint:'Sonst nur die eigene Abrechnung.'},
     {key:'canSendMessages',label:'Nachrichten senden'},
   ];
   const defaults={
@@ -2126,30 +2154,37 @@ function renderRightsMatrix(){
   };
   const ovMap={};
   (S.rolePermissions||[]).forEach(o=>{if(!ovMap[o.role])ovMap[o.role]={};ovMap[o.role][o.permission]=o.granted;});
-  el.innerHTML=`<div style="overflow-x:auto">
-    <table style="width:100%;border-collapse:collapse;font-size:12px">
+  const permTable=(rows,keyOf,defaultOf)=>`<table style="width:100%;border-collapse:collapse;font-size:12px">
       <thead><tr>
-        <th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--border);min-width:160px">Recht</th>
+        <th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--border);min-width:200px">Recht</th>
         ${ROLES_LIST.map(r=>`<th style="padding:6px 8px;border-bottom:2px solid var(--border);text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.5px">${r}</th>`).join('')}
       </tr></thead>
       <tbody>
-        ${PERMS.map((p2,pi)=>`<tr style="background:${pi%2===0?'var(--sf2)':'transparent'}">
-          <td style="padding:6px 8px;font-size:12px;color:var(--tx)">${p2.label}</td>
+        ${rows.map((p2,pi)=>`<tr style="background:${pi%2===0?'var(--sf2)':'transparent'}">
+          <td style="padding:6px 8px;font-size:12px;color:var(--tx)" title="${p2.hint?esc(p2.hint):''}">${p2.label}${p2.hint?' \u2139\ufe0f':''}</td>
           ${ROLES_LIST.map(r=>{
-            const defVal=!!(defaults[r]||{})[p2.key];
-            const override=ovMap[r]?.[p2.key];
+            const permKey=keyOf(p2);
+            const defVal=defaultOf(r,p2);
+            const override=ovMap[r]?.[permKey];
             const effective=override!==undefined?override:defVal;
             const isOverridden=override!==undefined;
             return`<td style="text-align:center;padding:6px 8px">
               <label style="cursor:pointer;display:flex;align-items:center;justify-content:center;gap:2px" title="${isOverridden?'\u00dcberschrieben':'Standard'}">
-                <input type="checkbox" ${effective?'checked':''} onchange="setRightOverride('${r}','${p2.key}',this.checked)" style="cursor:pointer">
+                <input type="checkbox" ${effective?'checked':''} onchange="setRightOverride('${r}','${permKey}',this.checked)" style="cursor:pointer">
                 ${isOverridden?`<span style="font-size:9px;color:${override?'var(--ok)':'var(--danger)'}">${override?'\u2191':'\u2193'}</span>`:''}
               </label>
             </td>`;
           }).join('')}
         </tr>`).join('')}
       </tbody>
-    </table>
+    </table>`;
+  el.innerHTML=`<div style="overflow-x:auto">
+    <div style="font-weight:700;font-size:13px;margin-bottom:8px">Rechte</div>
+    ${permTable(PERMS, p2=>p2.key, (r,p2)=>!!(defaults[r]||{})[p2.key])}
+    <div style="font-size:11px;color:var(--mu);margin:10px 0 20px">\u2191/\u2193 = manuell \u00fcberschrieben \u00b7 \u00c4nderungen werden sofort gespeichert</div>
+    <div style="font-weight:700;font-size:13px;margin-bottom:4px">Reiter-Sichtbarkeit im Men\u00fc</div>
+    <div style="font-size:11px;color:var(--mu);margin-bottom:8px">Blendet den jeweiligen Reiter in der Seitenleiste f\u00fcr die Rolle aus \u2014 ersetzt keine serverseitige Zugriffssperre (z.B. Dienstplanung bleibt zus\u00e4tzlich auf berechtigte Rollen beschr\u00e4nkt).</div>
+    ${permTable(RIGHTS_NAV_TABS, t=>'tab:'+t.key, ()=>true)}
     <div style="font-size:11px;color:var(--mu);margin-top:10px">\u2191/\u2193 = manuell \u00fcberschrieben \u00b7 \u00c4nderungen werden sofort gespeichert</div>
   </div>`;
 }
@@ -2663,7 +2698,11 @@ function renderVacation(){
   for(var dt=new Date(firstDay);dt<=lastDay;dt.setDate(dt.getDate()+1)){
     var iso=year+'-'+pad(dt.getMonth()+1)+'-'+pad(dt.getDate());
     var dow=dt.getDay();
-    var vacEntries=S.events.filter(function(ev){if(ev.isGeneral||ev._anonymized)return false;if(!vacCatIds.length||!vacCatIds.includes(ev.category))return false;return ev.dateFrom<=iso&&ev.dateTo>=iso&&ev.approvalStatus!=='rejected';});
+    // Anonymisierte Einträge (Urlaub von Kolleg:innen, für die kein Vollzugriff
+    // besteht) werden NICHT ausgeblendet, sondern weiter unten mit Schloss-Icon
+    // statt Name gezeigt — sonst würden Standard-User in der Belegungs-Übersicht
+    // fälschlich freie Slots sehen, wo eigentlich schon jemand Urlaub hat.
+    var vacEntries=S.events.filter(function(ev){if(ev.isGeneral)return false;if(!vacCatIds.length||!vacCatIds.includes(ev.category))return false;return ev.dateFrom<=iso&&ev.dateTo>=iso&&ev.approvalStatus!=='rejected';});
     var cfg=cfgMap[iso]||{maxSlots:8,note:''};
     days.push({iso:iso,dow:dow,day:dt.getDate(),dayName:dayNamesLong[dow],isWe:dow===0||dow===6,vacEntries:vacEntries,maxS:cfg.maxSlots,note:cfg.note,full:vacEntries.length>=cfg.maxSlots});
   }
@@ -2688,7 +2727,10 @@ function renderVacation(){
   days.forEach(function(day){
     var full=day.full&&!day.isWe;
     var cc=day.vacEntries.length===0?'var(--di)':full?'var(--danger)':'var(--warn)';
-    var users=day.vacEntries.map(function(ev){var u=getU(ev.userId);return u?'<span style="background:'+(u.color||'var(--acc)')+'22;color:'+(u.color||'var(--acc)')+';border-radius:4px;padding:1px 6px;font-size:11px;font-weight:600;margin-right:3px" title="'+u.name+'">'+u.initials+'</span>':'';}).join('');
+    var users=day.vacEntries.map(function(ev){
+      if(ev._anonymized)return '<span style="background:var(--sf2);color:var(--mu);border-radius:4px;padding:1px 6px;font-size:11px;font-weight:600;margin-right:3px" title="Anonymisiert">&#128274;</span>';
+      var u=getU(ev.userId);return u?'<span style="background:'+(u.color||'var(--acc)')+'22;color:'+(u.color||'var(--acc)')+';border-radius:4px;padding:1px 6px;font-size:11px;font-weight:600;margin-right:3px" title="'+u.name+'">'+u.initials+'</span>':'';
+    }).join('');
     var label=pad(day.day)+'. '+moName+' '+year+' ('+day.dayName+')';
     h+='<tr style="'+(day.isWe?'opacity:.7':'')+(full?';border-left:3px solid var(--danger)':'')+'">';
     h+='<td style="white-space:nowrap;font-size:12px">'+label+'</td>';

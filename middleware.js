@@ -12,6 +12,9 @@ async function getRolePerms() {
     return _rolePermsCache;
   } catch(e) { return []; }
 }
+// Wird nach jeder Änderung an role_permissions (POST/DELETE-Route) aufgerufen,
+// damit neue Rechte sofort greifen statt erst nach bis zu 5 Minuten Cache.
+function invalidateRolePermsCache() { _rolePermsCache = null; }
 
 async function auth(req, res, next) {
   if (!req.session?.userId)
@@ -37,4 +40,4 @@ const adminOnly = (req,res,next) => req.p?.manageUsers ? next() : res.status(403
 const ok  = (res, data) => res.json({ success:true, data: data??null });
 const bad = (res, msg, code=400) => res.status(code).json({ success:false, error:msg });
 
-module.exports = { auth, adminOnly, ok, bad };
+module.exports = { auth, adminOnly, ok, bad, invalidateRolePermsCache };

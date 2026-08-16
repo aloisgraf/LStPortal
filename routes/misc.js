@@ -2,7 +2,7 @@
 const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const { q, q1, newId, pool, parseRoles, logAct, nextTicketNumber, getUser, createNotification } = require('../db');
-const { auth, adminOnly, ok, bad } = require('../middleware');
+const { auth, adminOnly, ok, bad, invalidateRolePermsCache } = require('../middleware');
 
 
 router.put('/allowances', auth, async (req,res) => {
@@ -863,6 +863,7 @@ router.post('/role-permissions', auth, async (req,res) => {
       'INSERT INTO role_permissions (role,permission,granted) VALUES ($1,$2,$3) ON CONFLICT (role,permission) DO UPDATE SET granted=$3',
       [role,permission,granted!==false]
     );
+    invalidateRolePermsCache();
     ok(res);
   } catch(e) { bad(res,'Serverfehler',500); }
 });
@@ -870,6 +871,7 @@ router.delete('/role-permissions/:role/:permission', auth, async (req,res) => {
   try {
     if(!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
     await pool.query('DELETE FROM role_permissions WHERE role=$1 AND permission=$2',[req.params.role,req.params.permission]);
+    invalidateRolePermsCache();
     ok(res);
   } catch(e) { bad(res,'Serverfehler',500); }
 });
