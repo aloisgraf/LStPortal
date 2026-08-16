@@ -179,6 +179,9 @@ async function initDB() {
     )`,
     `ALTER TABLE ticket_notes ADD COLUMN IF NOT EXISTS mentioned_users JSONB DEFAULT '[]'`,
     `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS mentioned_users JSONB DEFAULT '[]'`,
+    // Explizit hinzugefügte Ticket-Teilnehmer (unabhängig von @-Erwähnungen in
+    // Notizen) — dürfen das Ticket unabhängig von Fachbereich/Sichtbarkeit sehen.
+    `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS participants JSONB DEFAULT '[]'`,
     `CREATE TABLE IF NOT EXISTS news (
       id TEXT PRIMARY KEY, title TEXT NOT NULL, body TEXT NOT NULL,
       from_date DATE, to_date DATE, is_important BOOLEAN DEFAULT false,

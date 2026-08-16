@@ -1745,6 +1745,13 @@ function renderTkDetail(){
     </div>
     <div class="tkf"><label>Erstellt von</label><div style="font-size:12px">${getU(tk.createdBy)?.name||'?'}</div></div>
     <div class="tkf"><label>Erstellt am</label><div style="font-size:11px;color:var(--mu)">${fdt(tk.createdAt)}</div></div>
+    <div class="tkf"><label>&#128101; Teilnehmer</label>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:${canEdit?'4px':'0'}">
+        ${(tk.participants||[]).map(pid=>{const pu=getU(pid);if(!pu)return'';return `<span class="bdg" style="display:inline-flex;align-items:center;gap:4px;padding:2px 6px;background:var(--sf2)" title="${esc(pu.name)}">${avHtml(pu.initials,pu.color,16,7)}<span style="font-size:11px">${esc(lastNameFirst(pu.name))}</span>${canEdit?`<button onclick="removeTkParticipant('${tk.id}','${pid}')" title="Entfernen" style="border:none;background:none;cursor:pointer;color:var(--danger);font-size:11px;padding:0;margin-left:2px">&#10005;</button>`:''}</span>`;}).join('')}
+        ${!(tk.participants||[]).length?'<span style="font-size:11px;color:var(--di)">— keine —</span>':''}
+      </div>
+      ${canEdit?`<select onchange="if(this.value){addTkParticipant('${tk.id}',this.value);}this.value='';" style="width:100%;font-size:12px"><option value="">+ Teilnehmer hinzufügen…</option>${S.users.filter(u=>isAssignable(u)&&u.id!==tk.createdBy&&u.id!==tk.assigneeId&&!(tk.participants||[]).includes(u.id)).slice().sort(byLastName).map(u=>`<option value="${u.id}">${lastNameFirst(u.name)}</option>`).join('')}</select>`:''}
+    </div>
     ${par?`<div class="tkf"><label>Elternticket</label><div class="subi" onclick="S.currentTicketId='${par.id}';renderTkDetail()" style="margin-top:4px"><span style="font-family:monospace;font-size:11px">${par.number}</span><span style="font-size:12px;flex:1">${par.title.slice(0,22)}</span></div></div>`:''}
     ${canEdit?`<div class="tkdiv"></div>
     <button class="btn-s" style="width:100%;justify-content:center;font-size:12px" onclick="openAttachCl('${tk.id}')">&#9745;&#65039; Checkliste anh\u00e4ngen</button>
@@ -1772,6 +1779,14 @@ function insertMention(name){
 }
 async function updateTkField(id,field,value){
   try{await api('PUT','/tickets/'+id,{[field]:value});await fetchData();renderMain();const tk=getTk(id);if(tk){S.currentTicketId=id;renderTkDetail();}}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
+}
+async function addTkParticipant(tkId,userId){
+  try{await api('PUT','/tickets/'+tkId+'/participants',{userId,action:'add'});await fetchData();renderTkDetail();toast('\u2705 Teilnehmer hinzugef\u00FCgt');}
+  catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
+}
+async function removeTkParticipant(tkId,userId){
+  try{await api('PUT','/tickets/'+tkId+'/participants',{userId,action:'remove'});await fetchData();renderTkDetail();}
+  catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
 }
 function applyNoteTpl(body){const inp=document.getElementById('noteInput');if(inp){inp.value=body;inp.focus();inp.setSelectionRange(body.length,body.length);}}
 async function addNote(tkId){

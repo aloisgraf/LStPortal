@@ -181,6 +181,7 @@ router.get('/', auth, async (req,res) => {
         snoozedUntil:tk.snoozed_until?(typeof tk.snoozed_until==='string'?tk.snoozed_until.slice(0,10):tk.snoozed_until.toISOString().slice(0,10)):null,
         createdBy:tk.created_by, createdAt:tk.created_at, updatedAt:tk.updated_at, lastViewedAt:tkViewMap.get(tk.id)||null,
         mentionedUsers:[...new Set((noteMap[tk.id]||[]).flatMap(n=>n.mentionedUsers||[]))].filter(Boolean),
+        participants:(()=>{try{return JSON.parse(tk.participants||'[]');}catch{return [];}})(),
         notes:noteMap[tk.id]||[], checklists:tkClMap[tk.id]||[], files:tkFileMap[tk.id]||[],
         _canEdit:canEditTk(tp,tk,uid),
       })),

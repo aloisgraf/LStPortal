@@ -278,6 +278,37 @@ router.delete('/:id/notes/:noteId', auth, async (req,res) => {
   } catch(e) { bad(res,'Serverfehler',500); }
 });
 
+// ── TEILNEHMER ── explizit hinzugefügte User sehen das Ticket unabhängig von
+// Fachbereich/Sichtbarkeit (siehe db.js canSeeTk). Nur wer das Ticket
+// bearbeiten darf, kann Teilnehmer hinzufügen/entfernen.
+router.put('/:id/participants', auth, async (req,res) => {
+  try {
+    const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
+    if (!tk) return bad(res,'Nicht gefunden',404);
+    if (!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
+    const { userId, action } = req.body;
+    if (!userId || (action!=='add' && action!=='remove'))
+      return bad(res,'userId und action (add/remove) erforderlich');
+    const target = await getUser(userId);
+    if (!target) return bad(res,'Benutzer nicht gefunden',404);
+    const current = (()=>{try{return JSON.parse(tk.participants||'[]');}catch{return[];}})();
+    const updated = action==='add'
+      ? (current.includes(userId) ? current : [...current, userId])
+      : current.filter(id=>id!==userId);
+    await pool.query('UPDATE tickets SET participants=$1,updated_at=NOW() WHERE id=$2',[JSON.stringify(updated),req.params.id]);
+    const uname=(await getUser(req.uid))?.name||'?';
+    await auditNote(tk.id,req.uid, action==='add'
+      ? `👥 ${target.name} als Teilnehmer hinzugefügt (von ${uname})`
+      : `👥 ${target.name} als Teilnehmer entfernt (von ${uname})`);
+    if (action==='add' && userId!==req.uid) {
+      await createNotification(userId,'mention',`${uname} hat dich zum Ticket ${tk.number} hinzugefügt`,tk.id,null,req.uid);
+      mailUser(userId, `[${tk.number}] Du wurdest zum Ticket hinzugefügt`,
+        `${uname} hat dich als Teilnehmer zum Ticket "${tk.title}" (${tk.number}) hinzugefügt.`).catch(()=>{});
+    }
+    ok(res, {participants: updated});
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
 // TICKET CHECKLISTS
 router.post('/:id/checklists', auth, async (req,res) => {
   try {
