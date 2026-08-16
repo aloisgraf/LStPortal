@@ -330,7 +330,139 @@ function renderMain(){
   else if(S.view==='todos')renderTodos();
 }
 // HOME
+// ── ÜBERSICHT: Alt/Neu-Umschalter ─────────────────────────────────────────────
+// "Neu" wird schrittweise ausgebaut (Tickets/Todos/Besprechungen/Dienstplan-
+// Vorschau); "Alt" bleibt unverändert bestehen, bis "Neu" so weit ist, dass
+// es abgelöst werden kann. Auswahl wird pro Browser gemerkt.
+function getHomeVersion(){ try{return localStorage.getItem('lst_home_version')||'old';}catch(e){return 'old';} }
+function setHomeVersion(v){ try{localStorage.setItem('lst_home_version',v);}catch(e){} renderHome(); }
+function homeVersionToggleHtml(){
+  const v=getHomeVersion();
+  return '<div style="display:flex;gap:2px;background:var(--sf2);border:1px solid var(--border);border-radius:6px;padding:2px">'
+    +'<button onclick="setHomeVersion(\'old\')" style="padding:4px 11px;font-size:12px;border:none;border-radius:4px;cursor:pointer;font-family:inherit;background:'+(v==='old'?'var(--acc)':'transparent')+';color:'+(v==='old'?'var(--act)':'var(--mu)')+'">Alt</button>'
+    +'<button onclick="setHomeVersion(\'new\')" style="padding:4px 11px;font-size:12px;border:none;border-radius:4px;cursor:pointer;font-family:inherit;background:'+(v==='new'?'var(--acc)':'transparent')+';color:'+(v==='new'?'var(--act)':'var(--mu)')+'">Neu &#x1F9EA;</button>'
+    +'</div>';
+}
+function homeCardWrap(id,title,bodyHtml,accent){
+  var open; try{open=localStorage.getItem('cc_'+id);open=open===null?true:open==='1';}catch(ex){open=true;}
+  var accentStyle=accent?';border-top:3px solid '+accent+';background:'+accent+'0d':'';
+  return '<details class="dash-card" data-cc-id="'+id+'"'+(open?' open':'')+' style="width:100%;box-sizing:border-box;margin-bottom:14px'+accentStyle+'">'
+    +'<summary><h3 style="margin:0;display:inline;color:'+(accent||'var(--tx)')+'">'+title+'</h3></summary>'
+    +bodyHtml+'</details>';
+}
 function renderHome(){
+  if(getHomeVersion()==='new') return renderHomeNew();
+  return renderHomeOld();
+}
+// ── ÜBERSICHT NEU (Beta) ───────────────────────────────────────────────────
+function getHomeDpRange(){ try{return parseInt(localStorage.getItem('lst_home_dp_range')||'3');}catch(e){return 3;} }
+function setHomeDpRange(n){ try{localStorage.setItem('lst_home_dp_range',String(n));}catch(e){} renderHome(); }
+function renderHomeNew(){
+  const u=getU(S.currentUser);
+  const today=new Date(); today.setHours(0,0,0,0);
+
+  // ── Tickets: grobe Übersicht, Fokus auf (bald) überfällige ──
+  const openTks=S.tickets.filter(tk=>tk.status!=='closed'&&!tk.isDeleted);
+  const withDue=openTks.filter(tk=>tk.dueDate);
+  const overdueTks=withDue.filter(tk=>new Date(tk.dueDate)<today);
+  const soonTks=withDue.filter(tk=>{const d=new Date(tk.dueDate);const diff=Math.round((d-today)/86400000);return diff>=0&&diff<=3;});
+  const focusTks=[...overdueTks,...soonTks].sort((a,b)=>(a.dueDate||'').localeCompare(b.dueDate||'')).slice(0,8);
+  const ticketRow=tk=>{
+    const asn=getU(tk.assigneeId);
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="openTkDetail(\''+tk.id+'\')">'
+      +'<div style="width:3px;align-self:stretch;background:'+(new Date(tk.dueDate)<today?'#ef4444':'#ea580c')+';border-radius:2px;flex-shrink:0"></div>'
+      +'<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+tk.number+': '+esc(tk.title)+'</div>'
+      +'<div style="font-size:10px;color:var(--mu)">'+dueBdg(tk)+' &middot; '+(asn?esc(asn.name):'nicht zugewiesen')+'</div></div>'+prioBdg(tk.priority)+'</div>';
+  };
+  const ticketsBody=(focusTks.length?focusTks.map(ticketRow).join(''):'<div style="color:var(--di);font-size:12px;padding:8px 14px">Keine bald fälligen Tickets &#127881;</div>')
+    +'<div style="padding:8px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--mu)">'+openTks.length+' offen insgesamt &middot; '+overdueTks.length+' überfällig &middot; '+soonTks.length+' bald fällig'
+    +' &middot; <a href="javascript:void(0)" onclick="setView(\'tickets\')" style="color:var(--acc)">alle ansehen &#8594;</a></div>';
+  const ticketsCard=homeCardWrap('new_tickets','&#127931; Tickets',ticketsBody,'#ea580c');
+
+  // ── Offene Todos ──
+  const openTodos=S.todos.filter(t=>t.items&&t.items.some(i=>!i.is_done));
+  let todosBody='';
+  if(openTodos.length){
+    openTodos.slice(0,8).forEach(todo=>{
+      const openItems=todo.items.filter(i=>!i.is_done);
+      todosBody+='<div style="padding:8px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="setView(\'todos\')">'
+        +'<div style="font-size:12px;font-weight:600">'+escHtml(todo.title)+'</div>'
+        +'<div style="font-size:11px;color:var(--mu)">'+openItems.length+' offen</div></div>';
+    });
+    todosBody+='<div style="padding:8px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--mu)">'+openTodos.length+' Todo(s) mit offenen Punkten'
+      +' &middot; <a href="javascript:void(0)" onclick="setView(\'todos\')" style="color:var(--acc)">alle ansehen &#8594;</a></div>';
+  } else {
+    todosBody='<div style="color:var(--di);font-size:12px;padding:8px 14px">Keine offenen Todos &#127881;</div>';
+  }
+  const todosCard=homeCardWrap('new_todos','&#9989; Offene Todos ('+openTodos.length+')',todosBody,'#10b981');
+
+  // ── Offene Besprechungen (kommende Termine) ──
+  const nowTs=new Date();
+  const openMeetings=(S.meetings||[]).filter(m=>m.instances&&m.instances.some(inst=>new Date(inst.scheduledFor)>=nowTs))
+    .map(m=>({m,next:m.instances.filter(inst=>new Date(inst.scheduledFor)>=nowTs).sort((a,b)=>new Date(a.scheduledFor)-new Date(b.scheduledFor))[0]}))
+    .sort((a,b)=>new Date(a.next.scheduledFor)-new Date(b.next.scheduledFor));
+  let meetingsBody='';
+  if(openMeetings.length){
+    openMeetings.slice(0,8).forEach(({m,next})=>{
+      const d=new Date(next.scheduledFor);
+      meetingsBody+='<div style="padding:8px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="setView(\'meetings\')">'
+        +'<div style="font-size:12px;font-weight:600">'+escHtml(m.title)+'</div>'
+        +'<div style="font-size:11px;color:var(--mu)">'+d.toLocaleDateString('de-AT')+' um '+d.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'})+'</div></div>';
+    });
+    meetingsBody+='<div style="padding:8px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--mu)">'+openMeetings.length+' offene Besprechung(en)'
+      +' &middot; <a href="javascript:void(0)" onclick="setView(\'meetings\')" style="color:var(--acc)">alle ansehen &#8594;</a></div>';
+  } else {
+    meetingsBody='<div style="color:var(--di);font-size:12px;padding:8px 14px">Keine offenen Besprechungen &#127881;</div>';
+  }
+  const meetingsCard=homeCardWrap('new_meetings','&#128483;&#65039; Offene Besprechungen ('+openMeetings.length+')',meetingsBody,'#8b5cf6');
+
+  // ── Dienstplan-Vorschau (nächste 3/7/30 Tage) ──
+  const range=getHomeDpRange();
+  const rangeBtn=(n,label)=>'<button onclick="setHomeDpRange('+n+')" style="padding:4px 11px;font-size:12px;border:none;border-radius:4px;cursor:pointer;font-family:inherit;background:'+(range===n?'var(--acc)':'transparent')+';color:'+(range===n?'var(--act)':'var(--mu)')+'">'+label+'</button>';
+  const dpMoNs=['Jän','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+  const dpDyNs=['So','Mo','Di','Mi','Do','Fr','Sa'];
+  let dpBody='';
+  let shownDays=0;
+  for(let i=0;i<range;i++){
+    const d=new Date(today); d.setDate(d.getDate()+i);
+    const iso=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    const dayEvs=S.events.filter(ev=>ev.dateFrom<=iso&&(ev.dateTo||ev.dateFrom)>=iso&&ev.approvalStatus!=='rejected');
+    if(range>7&&!dayEvs.length) continue; // bei 1 Monat: leere Tage überspringen, sonst zu lang
+    shownDays++;
+    const dayLabel=(i===0?'Heute, ':i===1?'Morgen, ':'')+dpDyNs[d.getDay()]+' '+String(d.getDate()).padStart(2,'0')+'.'+dpMoNs[d.getMonth()];
+    dpBody+='<div style="padding:8px 14px;border-top:1px solid var(--border)">'
+      +'<div style="font-size:11px;font-weight:700;color:var(--mu);margin-bottom:4px">'+dayLabel+'</div>';
+    if(!dayEvs.length){
+      dpBody+='<div style="font-size:11px;color:var(--di)">Keine Einträge</div>';
+    } else {
+      dpBody+='<div style="display:flex;flex-wrap:wrap;gap:5px">';
+      dayEvs.slice(0,12).forEach(ev=>{
+        if(ev._anonymized){dpBody+='<span class="bdg" style="font-size:10px;background:var(--sf2);color:var(--mu)" title="Anonymisiert">&#128274;</span>';return;}
+        const cat=S.categories.find(c=>c.id===ev.category);
+        const uu=ev.isGeneral?null:getU(ev.userId);
+        const label=(ev.isGeneral?'&#127760; ':uu?esc(lastNameFirst(uu.name))+': ':'')+(cat?cat.emoji+' ':'')+esc((ev.reason||cat?.label||'').slice(0,22));
+        const color=ev.isGeneral?'#10b981':cat?cat.color:'#3b6dd4';
+        dpBody+='<span class="bdg" style="font-size:10px;background:'+color+'1a;color:'+color+'">'+label+'</span>';
+      });
+      if(dayEvs.length>12) dpBody+='<span style="font-size:10px;color:var(--mu)">+'+(dayEvs.length-12)+' weitere</span>';
+      dpBody+='</div>';
+    }
+    dpBody+='</div>';
+  }
+  if(range>7&&!shownDays) dpBody='<div style="color:var(--di);font-size:12px;padding:8px 14px">Keine Einträge im gewählten Zeitraum</div>';
+  dpBody+='<div style="padding:8px 14px;border-top:1px solid var(--border)"><a href="javascript:void(0)" onclick="setView(\'schedule\')" style="color:var(--acc);font-size:11px">zum Dienstplan &#8594;</a></div>';
+  const dpHeaderExtra='<div style="display:flex;gap:2px;background:var(--sf2);border:1px solid var(--border);border-radius:6px;padding:2px;margin:8px 14px 0">'
+    +rangeBtn(3,'3 Tage')+rangeBtn(7,'7 Tage')+rangeBtn(30,'1 Monat')+'</div>';
+  const dpCard=homeCardWrap('new_dp','&#128197; Dienstplan &ndash; nächste Tage',dpHeaderExtra+dpBody,'#3b82f6');
+
+  document.getElementById('main').innerHTML=`
+    <div class="ph"><div class="pt">&#128196; Übersicht <span>${u?.name||''}</span></div>${homeVersionToggleHtml()}</div>
+    <div style="background:rgba(59,109,212,.06);border:1px solid rgba(59,109,212,.2);border-radius:var(--r);padding:8px 12px;margin-bottom:14px;font-size:11px;color:var(--mu)">&#x1F9EA; Neue Übersicht (Beta) &mdash; wird schrittweise ausgebaut. Mit "Alt" zur bisherigen Ansicht wechseln.</div>
+    ${ticketsCard}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">${todosCard}${meetingsCard}</div>
+    ${dpCard}`;
+}
+function renderHomeOld(){
   const u=getU(S.currentUser);
   const online=S.users.filter(x=>x.isOnline&&x.id!==S.currentUser);
   const unreadMsg=S.messages.filter(m=>!m.isRead&&m.senderId!==S.currentUser);
@@ -505,7 +637,7 @@ function renderHome(){
     _ticketsHtml='<div style="color:var(--mu);font-size:12px">Keine relevanten Tickets</div>';
   }
     document.getElementById('main').innerHTML=`
-    <div class="ph"><div class="pt">&#128196; \u00dcbersicht <span>${u?.name||''}</span></div></div>
+    <div class="ph"><div class="pt">&#128196; \u00dcbersicht <span>${u?.name||''}</span></div>${homeVersionToggleHtml()}</div>
     ${pinnedMsg.length?_ccWrap('pinned_msgs','&#128204; Angepinnte Nachrichten ('+pinnedMsg.length+')','<div class="card-rows">'+
       pinnedMsg.map(m=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="openMsg('${m.id}')">
         <div style="width:3px;align-self:stretch;background:#f59e0b;border-radius:2px;flex-shrink:0"></div>
