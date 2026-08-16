@@ -34,6 +34,12 @@ router.post('/todos', auth, async (req,res) => {
   } catch(e) { bad(res,'Serverfehler',500); }
 });
 
+// pg liefert DATE-Spalten als Date-Objekt zurück; Vergleiche gegen den vom
+// Client gesendeten "YYYY-MM-DD"-String wären sonst IMMER ungleich (falscher
+// Typ), auch wenn sich das Datum gar nicht geändert hat — würde ständig
+// unnötige "geändert"-Protokolleinträge erzeugen.
+const toISODateOrNull = d => !d ? null : (d instanceof Date ? d.toISOString().slice(0,10) : String(d).slice(0,10));
+
 router.put('/todos/:id', auth, async (req,res) => {
   const {title, description, priority, dueDate, assignedTo, status} = req.body;
   try {
@@ -44,7 +50,7 @@ router.put('/todos/:id', auth, async (req,res) => {
     if(title!==undefined&&title!==old.title)entry.changes.title={from:old.title,to:title};
     if(description!==undefined&&description!==old.description)entry.changes.description={from:old.description,to:description};
     if(priority!==undefined&&priority!==old.priority)entry.changes.priority={from:old.priority,to:priority};
-    if(dueDate!==undefined&&dueDate!==old.due_date)entry.changes.dueDate={from:old.due_date,to:dueDate};
+    if(dueDate!==undefined&&(dueDate||null)!==toISODateOrNull(old.due_date))entry.changes.dueDate={from:toISODateOrNull(old.due_date),to:dueDate};
     if(assignedTo!==undefined&&assignedTo!==old.assigned_to)entry.changes.assignedTo={from:old.assigned_to,to:assignedTo};
     if(status!==undefined&&status!==old.status)entry.changes.status={from:old.status,to:status};
     if(Object.keys(entry.changes).length>0){
@@ -104,7 +110,7 @@ router.put('/todos/:todoId/items/:id', auth, async (req,res) => {
     if(title!==undefined&&title!==old.title)entry.changes.title={from:old.title,to:title};
     if(comment!==undefined&&comment!==old.comment)entry.changes.comment={from:old.comment,to:comment};
     if(isDone!==undefined&&isDone!==old.is_done)entry.changes.isDone={from:old.is_done,to:isDone};
-    if(dueDate!==undefined&&dueDate!==old.due_date)entry.changes.dueDate={from:old.due_date,to:dueDate};
+    if(dueDate!==undefined&&(dueDate||null)!==toISODateOrNull(old.due_date))entry.changes.dueDate={from:toISODateOrNull(old.due_date),to:dueDate};
     if(sortOrder!==undefined&&sortOrder!==old.sort_order)entry.changes.sortOrder={from:old.sort_order,to:sortOrder};
     if(Object.keys(entry.changes).length>0){
       const protokoll = (()=>{try{return JSON.parse(todo.protokoll||'[]');}catch{return [];}})();

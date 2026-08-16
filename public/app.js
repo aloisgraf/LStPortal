@@ -361,21 +361,28 @@ function renderHomeNew(){
   const u=getU(S.currentUser);
   const today=new Date(); today.setHours(0,0,0,0);
 
-  // ── Tickets: grobe Übersicht, Fokus auf (bald) überfällige ──
+  // ── Tickets: Top 5 in Summe, zuerst nach Fälligkeit (offene Tickets ohne
+  // Fälligkeitsdatum kommen danach), innerhalb dessen nach Priorität sortiert ──
   const openTks=S.tickets.filter(tk=>tk.status!=='closed'&&!tk.isDeleted);
-  const withDue=openTks.filter(tk=>tk.dueDate);
-  const overdueTks=withDue.filter(tk=>new Date(tk.dueDate)<today);
-  const soonTks=withDue.filter(tk=>{const d=new Date(tk.dueDate);const diff=Math.round((d-today)/86400000);return diff>=0&&diff<=3;});
-  const focusTks=[...overdueTks,...soonTks].sort((a,b)=>(a.dueDate||'').localeCompare(b.dueDate||'')).slice(0,8);
+  const overdueTks=openTks.filter(tk=>tk.dueDate&&new Date(tk.dueDate)<today);
+  const prioOrder={high:0,medium:1,low:2};
+  const ticketSort=(a,b)=>{
+    if(a.dueDate&&b.dueDate) return a.dueDate.localeCompare(b.dueDate);
+    if(a.dueDate) return -1;
+    if(b.dueDate) return 1;
+    return (prioOrder[a.priority]??1)-(prioOrder[b.priority]??1);
+  };
+  const focusTks=[...openTks].sort(ticketSort).slice(0,5);
   const ticketRow=tk=>{
     const asn=getU(tk.assigneeId);
+    const overdue=tk.dueDate&&new Date(tk.dueDate)<today;
     return '<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="openTkDetail(\''+tk.id+'\')">'
-      +'<div style="width:3px;align-self:stretch;background:'+(new Date(tk.dueDate)<today?'#ef4444':'#ea580c')+';border-radius:2px;flex-shrink:0"></div>'
+      +'<div style="width:3px;align-self:stretch;background:'+(overdue?'#ef4444':'#ea580c')+';border-radius:2px;flex-shrink:0"></div>'
       +'<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+tk.number+': '+esc(tk.title)+'</div>'
       +'<div style="font-size:10px;color:var(--mu)">'+dueBdg(tk)+' &middot; '+(asn?esc(asn.name):'nicht zugewiesen')+'</div></div>'+prioBdg(tk.priority)+'</div>';
   };
-  const ticketsBody=(focusTks.length?focusTks.map(ticketRow).join(''):'<div style="color:var(--di);font-size:12px;padding:8px 14px">Keine bald fälligen Tickets &#127881;</div>')
-    +'<div style="padding:8px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--mu)">'+openTks.length+' offen insgesamt &middot; '+overdueTks.length+' überfällig &middot; '+soonTks.length+' bald fällig'
+  const ticketsBody=(focusTks.length?focusTks.map(ticketRow).join(''):'<div style="color:var(--di);font-size:12px;padding:8px 14px">Keine offenen Tickets &#127881;</div>')
+    +'<div style="padding:8px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--mu)">'+openTks.length+' offen insgesamt &middot; '+overdueTks.length+' überfällig'
     +' &middot; <a href="javascript:void(0)" onclick="setView(\'tickets\')" style="color:var(--acc)">alle ansehen &#8594;</a></div>';
   const ticketsCard=homeCardWrap('new_tickets','&#127931; Tickets',ticketsBody,'#ea580c');
 
@@ -3875,12 +3882,17 @@ function renderMeetingDetail(m, canManage) {
       ${[...(m.instances||[])].sort((a,b)=>new Date(b.date)-new Date(a.date)).map(i=>{
         const open=(i.items||[]).filter(it=>it.status==='open'||it.status==='redo').length;
         const statusColor={planned:'#3b82f6',done:'#10b981',cancelled:'#ef4444'}[i.status]||'#64748b';
-        return`<div class="meetings-inst-tab${S._selInstance===i.id?' active':''}" onclick="S._selInstance='${i.id}';renderMeetings()">
-          <div style="font-size:12px;font-weight:600">${i.title?esc(i.title)+' • ':''}${i.date?fmtDate(i.date):'📅 Datum offen'}${i.time?' '+i.time:''}</div>
-          <div style="display:flex;gap:4px;margin-top:2px">
-            <span style="font-size:10px;color:${statusColor}">${{planned:'Geplant',done:'Abgeschlossen',cancelled:'Abgesagt'}[i.status]||i.status}</span>
-            ${open>0?`<span style="font-size:10px;color:#92400e;background:#fef3c7;padding:0 4px;border-radius:8px">${open}</span>`:''}
+        const titleLine=(i.title?esc(i.title):'')+(i.title&&i.date?' • ':'')+(i.date?fmtDate(i.date):(i.title?'':'Termin'))+(i.time?' '+i.time:'');
+        return`<div class="meetings-inst-tab${S._selInstance===i.id?' active':''}" style="position:relative">
+          <div onclick="S._selInstance='${i.id}';renderMeetings()" style="cursor:pointer;${canManage?'padding-right:18px':''}">
+            <div style="font-size:12px;font-weight:600">${titleLine}</div>
+            <div style="display:flex;gap:4px;margin-top:2px;align-items:center;flex-wrap:wrap">
+              ${!i.date?`<span style="font-size:10px;color:#f59e0b">Datum offen</span>`:''}
+              <span style="font-size:10px;color:${statusColor}">${{planned:'Geplant',done:'Abgeschlossen',cancelled:'Abgesagt'}[i.status]||i.status}</span>
+              ${open>0?`<span style="font-size:10px;color:#92400e;background:#fef3c7;padding:0 4px;border-radius:8px">${open}</span>`:''}
+            </div>
           </div>
+          ${canManage?`<button class="btn-s" style="position:absolute;top:4px;right:4px;padding:1px 5px;font-size:10px;line-height:1.4" title="Termin ändern" onclick="event.stopPropagation();openInstanceForm('${m.id}','${i.id}')">&#9998;</button>`:''}
         </div>`;
       }).join('')}
     </div>
@@ -7028,16 +7040,10 @@ async function toggleTodoItem(todoId, itemId, isDone) {
   const comment = commentEl ? commentEl.value : undefined;
   try {
     await api('PUT', `/todos/${todoId}/items/${itemId}`, {isDone, ...(comment!==undefined ? {comment} : {})});
-    const todo = S.todos.find(t => t.id === todoId);
-    if (todo) {
-      const item = todo.items.find(i => i.id === itemId);
-      if (item) {
-        item.is_done = isDone;
-        item.comment = comment !== undefined ? comment : item.comment;
-        item.done_by = isDone ? S.currentUser : null;
-        item.done_at = isDone ? new Date().toISOString() : null;
-      }
-    }
+    // Neu laden statt nur lokal zu patchen — sonst bleibt z.B. das Protokoll
+    // (wird serverseitig korrekt geschrieben) im Client veraltet, bis
+    // irgendeine andere Aktion zufällig ein fetchData() auslöst.
+    await fetchData();
     const detail = document.getElementById('todosDetail');
     const todo2  = S.todos.find(t => t.id === todoId);
     if (detail && todo2) detail.innerHTML = renderTodoDetail(todo2);
@@ -7053,7 +7059,11 @@ async function saveTodoItemComment(todoId, itemId) {
   if (item && item.comment === comment) return; // no change
   try {
     await api('PUT', `/todos/${todoId}/items/${itemId}`, {comment});
-    if (item) item.comment = comment;
+    // Siehe toggleTodoItem: neu laden, damit das Protokoll nicht veraltet.
+    await fetchData();
+    const detail = document.getElementById('todosDetail');
+    const todo2  = S.todos.find(t => t.id === todoId);
+    if (detail && todo2) detail.innerHTML = renderTodoDetail(todo2);
   } catch(e) { toast('Fehler beim Speichern','err'); }
 }
 
