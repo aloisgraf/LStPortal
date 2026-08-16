@@ -31,6 +31,7 @@ const NAV_TABS = [
   {key:'docs', label:'Dokumente'},
   {key:'meetings', label:'Besprechungen'},
   {key:'todos', label:'Todos'},
+  {key:'contacts', label:'Kontakte'},
   {key:'schedule', label:'Dienstplan (Kalender)'},
   {key:'allw', label:'Zulagendienste'},
   {key:'homeoffice', label:'Homeoffice'},

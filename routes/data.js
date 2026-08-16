@@ -9,7 +9,7 @@ router.get('/', auth, async (req,res) => {
     const uid=req.uid, p=req.p, tp=req.tp, roles=p.roles;
     const canManageDp = roles.some(r=>['admin','leitung','dienstplanung'].includes(r));
     const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
-           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw,dpQualificationsRaw,dpShiftPrefsRaw,dpProtocolRaw,todosRaw,todoItemsRaw,todoAssigneesRaw,myDpPlanIdsRaw,todoNotificationsRaw] = await Promise.all([
+           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw,dpQualificationsRaw,dpShiftPrefsRaw,dpProtocolRaw,todosRaw,todoItemsRaw,todoAssigneesRaw,myDpPlanIdsRaw,todoNotificationsRaw,contactsRaw] = await Promise.all([
       q('SELECT id,name,initials,roles,color,must_change_pw,last_seen,category,email,username,hire_date,termination_date FROM users ORDER BY name'),
       q('SELECT * FROM categories ORDER BY sort_order,label'),
       q('SELECT * FROM tags ORDER BY label'),
@@ -69,6 +69,7 @@ router.get('/', auth, async (req,res) => {
       q('SELECT * FROM todo_item_assignees').catch(()=>[]),
       canManageDp ? Promise.resolve([]) : q('SELECT DISTINCT plan_id FROM dp_assignments WHERE employee_id=$1',[uid]).catch(()=>[]),
       q('SELECT * FROM todo_item_notifications WHERE user_id=$1 AND read_at IS NULL',[uid]).catch(()=>[]),
+      q('SELECT * FROM contacts ORDER BY name').catch(()=>[]),
     ]);
 
     const tkViewMap = new Map((tkViewsRaw||[]).map(v=>[v.ticket_id, v.viewed_at]));
@@ -268,6 +269,12 @@ router.get('/', auth, async (req,res) => {
         const hasUnread = items.some(i=>todoNotifSet.has(i.id));
         return {...t,_canManage:canMng,protokoll,_hasUnreadNotifications:hasUnread,items};
       }),
+      contacts: (contactsRaw||[]).map(c=>({
+        id:c.id, title:c.title||'', name:c.name, email:c.email||'',
+        phone1:c.phone1||'', phone2:c.phone2||'', company:c.company||'',
+        responsibleFor:c.responsible_for||'', availability:c.availability||'',
+        createdBy:c.created_by, createdAt:c.created_at,
+      })),
     });
   } catch(e) { console.error('[/api/data FEHLER]', e.message, e.stack?.split('\n')[1]); bad(res,'Serverfehler',500); }
 });

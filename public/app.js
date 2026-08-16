@@ -55,6 +55,7 @@ let S={
   tp:{seeAll:false,editAll:false,myDepts:[],canSetPublic:false,canAssign:false,canSeeSubcat:false,canEditSubcat:false,roles:[]},
   dpPlans:[], dpShiftTypes:[], dpAbsenceTypes:[], dpEmpParams:[], dpQualifications:[], dpShiftPrefs:[], dpProtocol:[], dpEmpRules:[],
   todos:[], _selTodo:null,
+  contacts:[], _contactSearch:'',
   _dpPlanId:null, _dpMatrix:null, _dpStatsExpanded:false, _dpConfigTab:'shift-types', _dpSelection:new Set(),
   _dpQualLocalChanges:{}, _dpQualLocalPrefsChanges:{}, _dpReportExpanded: false,
   _dpQualWeightsExpanded:{}, _dpQualSearchQuery:'',
@@ -94,6 +95,7 @@ async function fetchData(){
     S.dpProtocol=data.dpProtocol||[];
     S.dpEmpRules=data.dpEmpRules||[];
     S.todos=data.todos||[];
+    S.contacts=data.contacts||[];
     S.currentUser=data.currentUser;S.p=data.permissions||{};
     const u=getU(S.currentUser);const roles=u?.roles||['standard'];
     const has=(...r)=>r.some(x=>roles.includes(x));
@@ -270,7 +272,7 @@ function restoreNavSectionState() {
   }
 }
 // Alle Sidebar-Reiter (id="ni-<key>") — muss mit db.js NAV_TABS übereinstimmen.
-const NAV_TAB_IDS=['home','docs','meetings','todos','schedule','allw','homeoffice','vacation','diensttausch','abrechnung','dienstplaene','zahnarzt','platz','links','tickets','tickets_closed','tickets_deleted','checklists','dp','dp-config','dp-christmas','dp-mine','messages','messages_sent','news','statistik'];
+const NAV_TAB_IDS=['home','docs','meetings','todos','contacts','schedule','allw','homeoffice','vacation','diensttausch','abrechnung','dienstplaene','zahnarzt','platz','links','tickets','tickets_closed','tickets_deleted','checklists','dp','dp-config','dp-christmas','dp-mine','messages','messages_sent','news','statistik'];
 // Zusätzlich zur (abschaltbaren) Reiter-Sichtbarkeit weiterhin hart verdrahtete
 // Mindestanforderungen für die Dienstplanungs-/Statistik-Reiter — ein Reiter
 // ist nur sichtbar, wenn BEIDES zutrifft.
@@ -328,6 +330,7 @@ function renderMain(){
   else if(S.view==='dp-christmas')renderDPChristmas();
   else if(S.view==='dp-mine')renderDPMine();
   else if(S.view==='todos')renderTodos();
+  else if(S.view==='contacts')renderContacts();
 }
 // HOME
 // ── ÜBERSICHT: Alt/Neu-Umschalter ─────────────────────────────────────────────
@@ -356,7 +359,10 @@ function renderHome(){
 }
 // ── ÜBERSICHT NEU (Beta) ───────────────────────────────────────────────────
 function getHomeDpRange(){ try{return parseInt(localStorage.getItem('lst_home_dp_range')||'3');}catch(e){return 3;} }
-function setHomeDpRange(n){ try{localStorage.setItem('lst_home_dp_range',String(n));}catch(e){} renderHome(); }
+function setHomeDpRange(n){ try{localStorage.setItem('lst_home_dp_range',String(n));localStorage.setItem('lst_home_dp_mode','days');}catch(e){} renderHome(); }
+function getHomeDpMode(){ try{return localStorage.getItem('lst_home_dp_mode')||'days';}catch(e){return 'days';} }
+function getHomeDpCount(){ try{return parseInt(localStorage.getItem('lst_home_dp_count')||'10');}catch(e){return 10;} }
+function setHomeDpCount(n){ try{localStorage.setItem('lst_home_dp_count',String(n));localStorage.setItem('lst_home_dp_mode','count');}catch(e){} renderHome(); }
 function renderHomeNew(){
   const u=getU(S.currentUser);
   const today=new Date(); today.setHours(0,0,0,0);
@@ -429,43 +435,70 @@ function renderHomeNew(){
   }
   const meetingsCard=homeCardWrap('new_meetings','&#128483;&#65039; Offene Besprechungen ('+openMeetings.length+')',meetingsBody,'#8b5cf6');
 
-  // ── Dienstplan-Vorschau (nächste 3/7/30 Tage) ──
+  // ── Dienstplan-Vorschau: entweder die nächsten 3/7/30 Tage (mit allen
+  // Einträgen je Tag) ODER die nächsten 5/10/30 Termine (Einträge) in Summe,
+  // unabhängig davon, wie viele Tage das umfasst ──
+  const dpMode=getHomeDpMode();
   const range=getHomeDpRange();
-  const rangeBtn=(n,label)=>'<button onclick="setHomeDpRange('+n+')" style="padding:4px 11px;font-size:12px;border:none;border-radius:4px;cursor:pointer;font-family:inherit;background:'+(range===n?'var(--acc)':'transparent')+';color:'+(range===n?'var(--act)':'var(--mu)')+'">'+label+'</button>';
+  const dpCount=getHomeDpCount();
+  const rangeBtn=(n,label)=>'<button onclick="setHomeDpRange('+n+')" style="padding:4px 11px;font-size:12px;border:none;border-radius:4px;cursor:pointer;font-family:inherit;background:'+(dpMode==='days'&&range===n?'var(--acc)':'transparent')+';color:'+(dpMode==='days'&&range===n?'var(--act)':'var(--mu)')+'">'+label+'</button>';
+  const countBtn=(n,label)=>'<button onclick="setHomeDpCount('+n+')" style="padding:4px 11px;font-size:12px;border:none;border-radius:4px;cursor:pointer;font-family:inherit;background:'+(dpMode==='count'&&dpCount===n?'var(--acc)':'transparent')+';color:'+(dpMode==='count'&&dpCount===n?'var(--act)':'var(--mu)')+'">'+label+'</button>';
   const dpMoNs=['Jän','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
   const dpDyNs=['So','Mo','Di','Mi','Do','Fr','Sa'];
-  let dpBody='';
-  let shownDays=0;
-  for(let i=0;i<range;i++){
-    const d=new Date(today); d.setDate(d.getDate()+i);
-    const iso=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-    const dayEvs=S.events.filter(ev=>ev.dateFrom<=iso&&(ev.dateTo||ev.dateFrom)>=iso&&ev.approvalStatus!=='rejected');
-    if(range>7&&!dayEvs.length) continue; // bei 1 Monat: leere Tage überspringen, sonst zu lang
-    shownDays++;
-    const dayLabel=(i===0?'Heute, ':i===1?'Morgen, ':'')+dpDyNs[d.getDay()]+' '+String(d.getDate()).padStart(2,'0')+'.'+dpMoNs[d.getMonth()];
-    dpBody+='<div style="padding:8px 14px;border-top:1px solid var(--border)">'
+  const isoOf=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const isoToday=isoOf(today);
+  const dpDayBlock=(iso,dayEvs)=>{
+    const d=new Date(iso+'T00:00:00');
+    const diffDays=Math.round((d-today)/86400000);
+    const dayLabel=(diffDays===0?'Heute, ':diffDays===1?'Morgen, ':'')+dpDyNs[d.getDay()]+' '+String(d.getDate()).padStart(2,'0')+'.'+dpMoNs[d.getMonth()];
+    let block='<div style="padding:8px 14px;border-top:1px solid var(--border)">'
       +'<div style="font-size:11px;font-weight:700;color:var(--mu);margin-bottom:4px">'+dayLabel+'</div>';
     if(!dayEvs.length){
-      dpBody+='<div style="font-size:11px;color:var(--di)">Keine Einträge</div>';
+      block+='<div style="font-size:11px;color:var(--di)">Keine Einträge</div>';
     } else {
-      dpBody+='<div style="display:flex;flex-wrap:wrap;gap:5px">';
+      block+='<div style="display:flex;flex-wrap:wrap;gap:5px">';
       dayEvs.slice(0,12).forEach(ev=>{
-        if(ev._anonymized){dpBody+='<span class="bdg" style="font-size:10px;background:var(--sf2);color:var(--mu)" title="Anonymisiert">&#128274;</span>';return;}
+        if(ev._anonymized){block+='<span class="bdg" style="font-size:10px;background:var(--sf2);color:var(--mu)" title="Anonymisiert">&#128274;</span>';return;}
         const cat=S.categories.find(c=>c.id===ev.category);
         const uu=ev.isGeneral?null:getU(ev.userId);
         const label=(ev.isGeneral?'&#127760; ':uu?esc(lastNameFirst(uu.name))+': ':'')+(cat?cat.emoji+' ':'')+esc((ev.reason||cat?.label||'').slice(0,22));
         const color=ev.isGeneral?'#10b981':cat?cat.color:'#3b6dd4';
-        dpBody+='<span class="bdg" style="font-size:10px;background:'+color+'1a;color:'+color+'">'+label+'</span>';
+        block+='<span class="bdg" style="font-size:10px;background:'+color+'1a;color:'+color+'">'+label+'</span>';
       });
-      if(dayEvs.length>12) dpBody+='<span style="font-size:10px;color:var(--mu)">+'+(dayEvs.length-12)+' weitere</span>';
-      dpBody+='</div>';
+      if(dayEvs.length>12) block+='<span style="font-size:10px;color:var(--mu)">+'+(dayEvs.length-12)+' weitere</span>';
+      block+='</div>';
     }
-    dpBody+='</div>';
+    return block+'</div>';
+  };
+  let dpBody='';
+  if(dpMode==='count'){
+    const futureEvs=S.events.filter(ev=>(ev.dateTo||ev.dateFrom)>=isoToday&&ev.approvalStatus!=='rejected')
+      .sort((a,b)=>a.dateFrom.localeCompare(b.dateFrom));
+    const shown=futureEvs.slice(0,dpCount);
+    if(!shown.length){
+      dpBody='<div style="color:var(--di);font-size:12px;padding:8px 14px">Keine anstehenden Termine</div>';
+    } else {
+      const byDay={};
+      shown.forEach(ev=>{const day=ev.dateFrom<isoToday?isoToday:ev.dateFrom;(byDay[day]=byDay[day]||[]).push(ev);});
+      Object.keys(byDay).sort().forEach(iso=>{dpBody+=dpDayBlock(iso,byDay[iso]);});
+    }
+  } else {
+    let shownDays=0;
+    for(let i=0;i<range;i++){
+      const d=new Date(today); d.setDate(d.getDate()+i);
+      const iso=isoOf(d);
+      const dayEvs=S.events.filter(ev=>ev.dateFrom<=iso&&(ev.dateTo||ev.dateFrom)>=iso&&ev.approvalStatus!=='rejected');
+      if(range>7&&!dayEvs.length) continue; // bei 1 Monat: leere Tage überspringen, sonst zu lang
+      shownDays++;
+      dpBody+=dpDayBlock(iso,dayEvs);
+    }
+    if(range>7&&!shownDays) dpBody='<div style="color:var(--di);font-size:12px;padding:8px 14px">Keine Einträge im gewählten Zeitraum</div>';
   }
-  if(range>7&&!shownDays) dpBody='<div style="color:var(--di);font-size:12px;padding:8px 14px">Keine Einträge im gewählten Zeitraum</div>';
   dpBody+='<div style="padding:8px 14px;border-top:1px solid var(--border)"><a href="javascript:void(0)" onclick="setView(\'schedule\')" style="color:var(--acc);font-size:11px">zum Dienstplan &#8594;</a></div>';
-  const dpHeaderExtra='<div style="display:flex;gap:2px;background:var(--sf2);border:1px solid var(--border);border-radius:6px;padding:2px;margin:8px 14px 0">'
-    +rangeBtn(3,'3 Tage')+rangeBtn(7,'7 Tage')+rangeBtn(30,'1 Monat')+'</div>';
+  const dpHeaderExtra='<div style="display:flex;gap:10px;flex-wrap:wrap;margin:8px 14px 0">'
+    +'<div style="display:flex;gap:2px;background:var(--sf2);border:1px solid var(--border);border-radius:6px;padding:2px">'+rangeBtn(3,'3 Tage')+rangeBtn(7,'7 Tage')+rangeBtn(30,'1 Monat')+'</div>'
+    +'<div style="display:flex;gap:2px;background:var(--sf2);border:1px solid var(--border);border-radius:6px;padding:2px">'+countBtn(5,'5 Termine')+countBtn(10,'10 Termine')+countBtn(30,'30 Termine')+'</div>'
+    +'</div>';
   const dpCard=homeCardWrap('new_dp','&#128197; Dienstplan &ndash; nächste Tage',dpHeaderExtra+dpBody,'#3b82f6');
 
   document.getElementById('main').innerHTML=`
@@ -2280,7 +2313,7 @@ const RIGHTS_ROLES_LIST=['admin','leitung','dienstplanung','schichtleiter','tech
 // (Frontend hat keinen Zugriff auf db.js), Reihenfolge/Gruppierung entspricht
 // der Sidebar.
 const RIGHTS_NAV_TABS=[
-  {key:'home',label:'\u00dcbersicht'},{key:'docs',label:'Dokumente'},{key:'meetings',label:'Besprechungen'},{key:'todos',label:'Todos'},
+  {key:'home',label:'\u00dcbersicht'},{key:'docs',label:'Dokumente'},{key:'meetings',label:'Besprechungen'},{key:'todos',label:'Todos'},{key:'contacts',label:'Kontakte'},
   {key:'schedule',label:'Dienstplan (Kalender)'},{key:'allw',label:'Zulagendienste'},{key:'homeoffice',label:'Homeoffice'},{key:'vacation',label:'Urlaubs\u00fcbersicht'},
   {key:'diensttausch',label:'Diensttausch'},{key:'abrechnung',label:'Abrechnung'},{key:'dienstplaene',label:'Dienstpl\u00e4ne'},
   {key:'zahnarzt',label:'Dienstplan Zahn\u00e4rzte'},{key:'platz',label:'Platz\u00fcbersicht'},{key:'links',label:'Links'},
@@ -2478,7 +2511,7 @@ function startAutoRefresh(){
       S.messages=data.messages||[];S.notifications=data.notifications||[];
       S.allowances=data.allowances||[];S.checklists=data.checklists||[];
       S.abrechnung=data.abrechnung||{einspringer:[],homeoffice:[]};S.dienstplaene=data.dienstplaene||[];S.diensttausch=data.diensttausch||[];S.homeoffice=data.homeoffice||{slots:[],config:[],boxes:[],dienste:[]};S.vacationConfig=data.vacationConfig||[];S.diensttausch=data.diensttausch||[];
-      S.stationSessions=data.stationSessions||[];S.stationShifts=data.stationShifts||[];S.stationOutages=data.stationOutages||[];S.links=data.portalLinks||[];S.docs=data.docs||[];S.docCategories=data.docCategories||[];S.rolePermissions=data.rolePermissions||[];S.meetings=data.meetings||[];
+      S.stationSessions=data.stationSessions||[];S.stationShifts=data.stationShifts||[];S.stationOutages=data.stationOutages||[];S.links=data.portalLinks||[];S.docs=data.docs||[];S.docCategories=data.docCategories||[];S.rolePermissions=data.rolePermissions||[];S.meetings=data.meetings||[];S.contacts=data.contacts||[];
       updateBadges();
       if(_lastMsgCount>=0&&newMsgCount>_lastMsgCount)toast('\uD83D\uDCEC Neue Nachricht eingegangen!');
       if(_lastTkCount>=0&&newTkCount>_lastTkCount)toast('\uD83C\uDFAB Neues Ticket in deinem Bereich!');
@@ -3632,6 +3665,79 @@ async function addLink(){
 async function deleteLink(id){
   if(!confirm('Link löschen?'))return;
   try{await api('DELETE','/portal-links/'+id);await fetchData();renderLinksAdmin();toast('✅ Link gelöscht');}catch(e){toast('⚠️ '+e.message,'err');}
+}
+
+// ── KONTAKTE ──────────────────────────────────────────────────────────────
+function renderContacts(){
+  const canManage=!!S.p.addGeneral;
+  const search=(S._contactSearch||'').toLowerCase().trim();
+  let list=(S.contacts||[]).slice().sort((a,b)=>a.name.localeCompare(b.name,'de'));
+  if(search) list=list.filter(c=>[c.name,c.title,c.company,c.responsibleFor,c.email,c.phone1,c.phone2].some(v=>(v||'').toLowerCase().includes(search)));
+  const contactCard=c=>{
+    const lines=[];
+    if(c.company) lines.push('<div style="font-size:12px;color:var(--mu)">&#127970; '+esc(c.company)+'</div>');
+    if(c.responsibleFor) lines.push('<div style="font-size:12px;color:var(--mu)">&#128736;&#65039; '+esc(c.responsibleFor)+'</div>');
+    if(c.phone1) lines.push('<div style="font-size:12px">&#128222; <a href="tel:'+esc(c.phone1)+'" style="color:var(--tx);text-decoration:none">'+esc(c.phone1)+'</a></div>');
+    if(c.phone2) lines.push('<div style="font-size:12px">&#128222; <a href="tel:'+esc(c.phone2)+'" style="color:var(--tx);text-decoration:none">'+esc(c.phone2)+'</a></div>');
+    if(c.email) lines.push('<div style="font-size:12px">&#9993;&#65039; <a href="mailto:'+esc(c.email)+'" style="color:var(--tx);text-decoration:none">'+esc(c.email)+'</a></div>');
+    if(c.availability) lines.push('<div style="font-size:12px;color:var(--mu)">&#128337; '+esc(c.availability)+'</div>');
+    return '<div style="background:var(--sf);border:1px solid var(--border);border-radius:12px;padding:14px 16px;position:relative">'
+      +(canManage?'<div style="position:absolute;top:10px;right:10px;display:flex;gap:4px">'
+        +'<button class="btn-s" style="font-size:11px;padding:2px 6px" title="Bearbeiten" onclick="openContactForm(\''+c.id+'\')">&#9998;</button>'
+        +'<button class="btn-d" style="font-size:11px;padding:2px 6px" title="L&ouml;schen" onclick="deleteContact(\''+c.id+'\')">&#10005;</button>'
+        +'</div>':'')
+      +'<div style="font-size:14px;font-weight:600;padding-right:'+(canManage?'56px':'0')+'">'+esc(c.name)+'</div>'
+      +(c.title?'<div style="font-size:12px;color:var(--acc);margin-bottom:6px">'+esc(c.title)+'</div>':'<div style="margin-bottom:6px"></div>')
+      +lines.join('')
+      +'</div>';
+  };
+  document.getElementById('main').innerHTML=`
+    <div class="ph"><div class="pt">&#128222; Kontakte</div>${canManage?`<button class="btn-p" onclick="openContactForm()">&#65291; Kontakt</button>`:''}</div>
+    <div style="padding:0 20px 12px">
+      <input type="text" class="srch" placeholder="&#128269; Suchen (Name, Firma, Zust&auml;ndigkeit, ...)" value="${(S._contactSearch||'').replace(/"/g,'&quot;')}" oninput="S._contactSearch=this.value;renderContacts()" style="width:100%;max-width:360px">
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;padding:0 20px 20px">
+    ${list.map(contactCard).join('')}
+    ${!list.length?'<div style="color:var(--di);font-size:13px;padding:20px">'+(search?'Keine Kontakte gefunden.':'Noch keine Kontakte eingetragen.')+'</div>':''}
+    </div>`;
+}
+function openContactForm(id){
+  const c=id?S.contacts.find(x=>x.id===id):null;
+  document.getElementById('contactFT').textContent=c?'Kontakt bearbeiten':'Neuer Kontakt';
+  document.getElementById('cFId').value=id||'';
+  document.getElementById('cFName').value=c?.name||'';
+  document.getElementById('cFTitle').value=c?.title||'';
+  document.getElementById('cFCompany').value=c?.company||'';
+  document.getElementById('cFResp').value=c?.responsibleFor||'';
+  document.getElementById('cFPhone1').value=c?.phone1||'';
+  document.getElementById('cFPhone2').value=c?.phone2||'';
+  document.getElementById('cFEmail').value=c?.email||'';
+  document.getElementById('cFAvail').value=c?.availability||'';
+  openModal('contactOv');
+}
+async function saveContact(){
+  const id=document.getElementById('cFId').value;
+  const name=document.getElementById('cFName').value.trim();
+  if(!name)return toast('⚠️ Name erforderlich','err');
+  const body={
+    name,
+    title:document.getElementById('cFTitle').value.trim(),
+    company:document.getElementById('cFCompany').value.trim(),
+    responsibleFor:document.getElementById('cFResp').value.trim(),
+    phone1:document.getElementById('cFPhone1').value.trim(),
+    phone2:document.getElementById('cFPhone2').value.trim(),
+    email:document.getElementById('cFEmail').value.trim(),
+    availability:document.getElementById('cFAvail').value.trim(),
+  };
+  try{
+    if(id) await api('PUT','/contacts/'+id,body);
+    else await api('POST','/contacts',body);
+    await fetchData();closeModal('contactOv');renderContacts();toast(id?'✅ Aktualisiert!':'✅ Gespeichert!');
+  }catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function deleteContact(id){
+  if(!confirm('Kontakt löschen?'))return;
+  try{await api('DELETE','/contacts/'+id);await fetchData();renderContacts();toast('✅ Kontakt gelöscht');}catch(e){toast('⚠️ '+e.message,'err');}
 }
 
 // ── DOKUMENTE / DATEIABLAGE ───────────────────────────────────────────────────

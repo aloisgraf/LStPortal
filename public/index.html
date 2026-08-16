@@ -77,9 +77,14 @@
   <aside class="sb" id="sidebar">
     <div class="nav-area">
       <div class="ni top active" id="ni-home" onclick="setView('home')">&#127968; &#220;bersicht</div>
-      <div class="ni top" id="ni-docs" onclick="setView('docs')">&#128193; Dokumente</div>
-      <div class="ni top" id="ni-meetings" onclick="setView('meetings')">&#128483;&#65039; Besprechungen</div>
-      <div class="ni top" id="ni-todos" onclick="setView('todos')">&#9989; Todos</div>
+      <div class="ndiv"></div>
+      <div class="nsh open" id="genHdr" onclick="toggleNS('gen')"><span>&#128194; Allgemein</span><span class="arr">&#9660;</span></div>
+      <div class="nsub open" id="genSub">
+        <div class="ni" id="ni-docs" onclick="setView('docs')">&#128193; Dokumente</div>
+        <div class="ni" id="ni-meetings" onclick="setView('meetings')">&#128483;&#65039; Besprechungen</div>
+        <div class="ni" id="ni-todos" onclick="setView('todos')">&#9989; Todos</div>
+        <div class="ni" id="ni-contacts" onclick="setView('contacts')">&#128222; Kontakte</div>
+      </div>
       <div class="ndiv"></div>
       <div class="nsh open" id="dpHdr" onclick="toggleNS('dp')"><span>&#128203; Dienstplan</span><span class="arr">&#9660;</span></div>
       <div class="nsub open" id="dpSub">
@@ -197,6 +202,24 @@
       </div>
     </div>
     <div class="mf"><button class="btn-s" onclick="closeModal('allwOv')">Abbrechen</button><button class="btn-p" onclick="saveAllw()">&#128190; Speichern</button></div>
+  </div>
+</div>
+
+<!-- KONTAKT FORM -->
+<div class="ov" id="contactOv">
+  <div class="modal">
+    <div class="mh"><h2 id="contactFT">Neuer Kontakt</h2><button class="mc" onclick="closeModal('contactOv')">&#10005;</button></div>
+    <div class="mb2">
+      <input type="hidden" id="cFId">
+      <div class="fg full"><label>Name *</label><input type="text" id="cFName"></div>
+      <div class="fg full"><label>Titel</label><input type="text" id="cFTitle" placeholder="z.B. IT-Leiter"></div>
+      <div class="fg full"><label>Firma</label><input type="text" id="cFCompany"></div>
+      <div class="fg full"><label>Zust&auml;ndig f&uuml;r</label><input type="text" id="cFResp" placeholder="z.B. Netzwerk, Telefonanlage"></div>
+      <div class="fr"><div class="fg"><label>Telefonnummer 1</label><input type="text" id="cFPhone1"></div><div class="fg"><label>Telefonnummer 2</label><input type="text" id="cFPhone2"></div></div>
+      <div class="fg full"><label>E-Mail</label><input type="email" id="cFEmail"></div>
+      <div class="fg full"><label>Erreichbar</label><input type="text" id="cFAvail" placeholder="z.B. 24/7, B&uuml;rozeiten, Mo-Fr 8-16 Uhr"></div>
+    </div>
+    <div class="mf"><button class="btn-s" onclick="closeModal('contactOv')">Abbrechen</button><button class="btn-p" onclick="saveContact()">&#128190; Speichern</button></div>
   </div>
 </div>
 

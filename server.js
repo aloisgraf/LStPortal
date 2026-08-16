@@ -605,6 +605,20 @@ async function initDB() {
     // (Zeitpunkt der letzten Bearbeitung), die eigentliche Änderung wird
     // zusätzlich als eigener Protokoll-Eintrag (note_type='audit') erfasst.
     `ALTER TABLE ticket_notes ADD COLUMN IF NOT EXISTS edited_at TIMESTAMPTZ`,
+    `CREATE TABLE IF NOT EXISTS contacts (
+  id TEXT PRIMARY KEY,
+  title TEXT DEFAULT '',
+  name TEXT NOT NULL,
+  email TEXT DEFAULT '',
+  phone1 TEXT DEFAULT '',
+  phone2 TEXT DEFAULT '',
+  company TEXT DEFAULT '',
+  responsible_for TEXT DEFAULT '',
+  availability TEXT DEFAULT '',
+  created_by TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+)`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }
@@ -698,6 +712,7 @@ app.use('/api',          require('./routes/meetings'));
 app.use('/api/dp', require('./routes/dp'));
 app.use('/api/dp', require('./routes/dp-christmas'));
 app.use('/api',   require('./routes/todos'));
+app.use('/api',   require('./routes/contacts'));
 
 app.get('*', (req,res) => res.sendFile(path.join(__dirname,'public','index.html')));
 
