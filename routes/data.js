@@ -9,7 +9,7 @@ router.get('/', auth, async (req,res) => {
     const uid=req.uid, p=req.p, tp=req.tp, roles=p.roles;
     const canManageDp = roles.some(r=>['admin','leitung','dienstplanung'].includes(r));
     const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
-           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw,dpQualificationsRaw,dpShiftPrefsRaw,dpProtocolRaw,todosRaw,todoItemsRaw,todoAssigneesRaw,myDpPlanIdsRaw,todoNotificationsRaw,contactsRaw] = await Promise.all([
+           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw,dpQualificationsRaw,dpShiftPrefsRaw,dpProtocolRaw,todosRaw,todoItemsRaw,todoAssigneesRaw,myDpPlanIdsRaw,todoNotificationsRaw,contactsRaw,sopTemplatesRaw,sopItemsRaw,sopRunsRaw,sopRunItemsRaw] = await Promise.all([
       q('SELECT id,name,initials,roles,color,must_change_pw,last_seen,category,email,username,hire_date,termination_date FROM users ORDER BY name'),
       q('SELECT * FROM categories ORDER BY sort_order,label'),
       q('SELECT * FROM tags ORDER BY label'),
@@ -70,6 +70,11 @@ router.get('/', auth, async (req,res) => {
       canManageDp ? Promise.resolve([]) : q('SELECT DISTINCT plan_id FROM dp_assignments WHERE employee_id=$1',[uid]).catch(()=>[]),
       q('SELECT * FROM todo_item_notifications WHERE user_id=$1 AND read_at IS NULL',[uid]).catch(()=>[]),
       q('SELECT * FROM contacts ORDER BY name').catch(()=>[]),
+      q('SELECT * FROM sop_checklists ORDER BY category,title,version DESC').catch(()=>[]),
+      q('SELECT * FROM sop_checklist_items ORDER BY template_id,sort_order').catch(()=>[]),
+      p.manageSop ? q('SELECT * FROM sop_checklist_runs ORDER BY started_at DESC LIMIT 200').catch(()=>[])
+        : q('SELECT * FROM sop_checklist_runs WHERE started_by=$1 ORDER BY started_at DESC LIMIT 200',[uid]).catch(()=>[]),
+      q('SELECT * FROM sop_checklist_run_items').catch(()=>[]),
     ]);
 
     const tkViewMap = new Map((tkViewsRaw||[]).map(v=>[v.ticket_id, v.viewed_at]));
@@ -130,7 +135,7 @@ router.get('/', auth, async (req,res) => {
         canSetPublic:tp.canSetPublic, canAssign:tp.canAssign,
         tabs:p.tabs,
         roles: p.roles,
-        canManageDp,
+        canManageDp, manageSop:p.manageSop,
       },
       users: usersRaw.map(u=>({
         id:u.id, name:u.name, initials:u.initials, roles:parseRoles(u.roles),
@@ -274,6 +279,28 @@ router.get('/', auth, async (req,res) => {
         phone1:c.phone1||'', phone2:c.phone2||'', company:c.company||'',
         responsibleFor:c.responsible_for||'', availability:c.availability||'',
         createdBy:c.created_by, createdAt:c.created_at,
+      })),
+      // Notfall-Checklisten: Nicht-Manager sehen nur die jeweils freigegebene+
+      // aktive Version jeder Checkliste; der technische Leiter (manageSop)
+      // sieht zusätzlich Entwürfe und deaktivierte/ältere Versionen zur Pflege.
+      sopTemplates: (sopTemplatesRaw||[]).filter(t=>p.manageSop||(t.status==='approved'&&t.active)).map(t=>({
+        id:t.id, baseId:t.base_id, version:t.version, title:t.title, category:t.category||'',
+        description:t.description||'', status:t.status, active:t.active,
+        createdBy:t.created_by, createdAt:t.created_at,
+        approvedBy:t.approved_by||null, approvedAt:t.approved_at||null,
+        lastPrintedAt:t.last_printed_at||null,
+        items:(sopItemsRaw||[]).filter(i=>i.template_id===t.id).map(i=>({
+          id:i.id, sortOrder:i.sort_order, text:i.text, required:i.required,
+          itemType:i.item_type, hint:i.hint||'',
+        })),
+      })),
+      sopRuns: (sopRunsRaw||[]).map(r=>({
+        id:r.id, templateId:r.template_id, startedBy:r.started_by, startedAt:r.started_at,
+        completedAt:r.completed_at||null, status:r.status,
+        items:(sopRunItemsRaw||[]).filter(ri=>ri.run_id===r.id).map(ri=>({
+          id:ri.id, itemId:ri.item_id, done:ri.done, value:ri.value||'',
+          updatedAt:ri.updated_at||null, updatedBy:ri.updated_by||null,
+        })),
       })),
     });
   } catch(e) { console.error('[/api/data FEHLER]', e.message, e.stack?.split('\n')[1]); bad(res,'Serverfehler',500); }

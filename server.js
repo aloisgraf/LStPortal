@@ -619,6 +619,56 @@ async function initDB() {
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 )`,
+    // ── Notfall-/Vorgehens-Checklisten ("SOP") — bewusst eigener Tabellen-
+    // Präfix "sop_", da "checklist_templates"/"checklist_template_items"
+    // bereits für die (davon unabhängigen) Ticket-Checklisten-Vorlagen
+    // vergeben sind. base_id verbindet alle Versionen einer Checkliste
+    // (Versionierung: eine Änderung an einer freigegebenen Checkliste legt
+    // eine neue Zeile mit version+1 an, statt die alte zu überschreiben —
+    // damit bleiben abgeschlossene Durchläufe mit ihrer damals gültigen
+    // Version verknüpft).
+    `CREATE TABLE IF NOT EXISTS sop_checklists (
+  id TEXT PRIMARY KEY,
+  base_id TEXT NOT NULL,
+  version INTEGER NOT NULL DEFAULT 1,
+  title TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT '',
+  description TEXT DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'draft',
+  active BOOLEAN NOT NULL DEFAULT false,
+  created_by TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  approved_by TEXT,
+  approved_at TIMESTAMPTZ,
+  last_printed_at TIMESTAMPTZ
+)`,
+    `CREATE TABLE IF NOT EXISTS sop_checklist_items (
+  id TEXT PRIMARY KEY,
+  template_id TEXT NOT NULL REFERENCES sop_checklists(id) ON DELETE CASCADE,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  text TEXT NOT NULL,
+  required BOOLEAN NOT NULL DEFAULT true,
+  item_type TEXT NOT NULL DEFAULT 'check',
+  hint TEXT DEFAULT ''
+)`,
+    `CREATE TABLE IF NOT EXISTS sop_checklist_runs (
+  id TEXT PRIMARY KEY,
+  template_id TEXT NOT NULL REFERENCES sop_checklists(id),
+  started_by TEXT NOT NULL,
+  started_at TIMESTAMPTZ DEFAULT NOW(),
+  completed_at TIMESTAMPTZ,
+  status TEXT NOT NULL DEFAULT 'running'
+)`,
+    `CREATE TABLE IF NOT EXISTS sop_checklist_run_items (
+  id TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL REFERENCES sop_checklist_runs(id) ON DELETE CASCADE,
+  item_id TEXT NOT NULL REFERENCES sop_checklist_items(id),
+  done BOOLEAN NOT NULL DEFAULT false,
+  value TEXT DEFAULT '',
+  updated_at TIMESTAMPTZ,
+  updated_by TEXT,
+  UNIQUE(run_id, item_id)
+)`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }
@@ -713,6 +763,7 @@ app.use('/api/dp', require('./routes/dp'));
 app.use('/api/dp', require('./routes/dp-christmas'));
 app.use('/api',   require('./routes/todos'));
 app.use('/api',   require('./routes/contacts'));
+app.use('/api',   require('./routes/sop'));
 
 app.get('*', (req,res) => res.sendFile(path.join(__dirname,'public','index.html')));
 

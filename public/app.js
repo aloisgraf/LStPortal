@@ -51,11 +51,13 @@ let S={
   meetings:[], _selMeeting:null, _selInstance:null,
   tkBatchMode:false,tkBatchSel:new Set(),_tkFeedFilter:'all',_tkTab:'details',tkGroupBy:'dept',tkFiltSubcat:'',
   checklists:[],messages:[],notifications:[],abrechnung:{einspringer:[],homeoffice:[]},dienstplaene:[],
-  p:{canApproveEvents:false,canSendMessages:false,seeAllEntries:true,editAllPersonal:false,addForOthers:false,addGeneral:false,manageUsers:false,seeAllAllw:false,editAllw:false,seeAllAbrechnung:false},
+  p:{canApproveEvents:false,canSendMessages:false,seeAllEntries:true,editAllPersonal:false,addForOthers:false,addGeneral:false,manageUsers:false,seeAllAllw:false,editAllw:false,seeAllAbrechnung:false,manageSop:false},
   tp:{seeAll:false,editAll:false,myDepts:[],canSetPublic:false,canAssign:false,canSeeSubcat:false,canEditSubcat:false,roles:[]},
   dpPlans:[], dpShiftTypes:[], dpAbsenceTypes:[], dpEmpParams:[], dpQualifications:[], dpShiftPrefs:[], dpProtocol:[], dpEmpRules:[],
   todos:[], _selTodo:null,
   contacts:[], _contactSearch:'',
+  sopTemplates:[], sopRuns:[], _sopView:'overview', _sopSearch:'', _sopCatFilter:'',
+  _selSopTemplateId:null, _selSopRunId:null,
   _dpPlanId:null, _dpMatrix:null, _dpStatsExpanded:false, _dpConfigTab:'shift-types', _dpSelection:new Set(),
   _dpQualLocalChanges:{}, _dpQualLocalPrefsChanges:{}, _dpReportExpanded: false,
   _dpQualWeightsExpanded:{}, _dpQualSearchQuery:'',
@@ -96,6 +98,7 @@ async function fetchData(){
     S.dpEmpRules=data.dpEmpRules||[];
     S.todos=data.todos||[];
     S.contacts=data.contacts||[];
+    S.sopTemplates=data.sopTemplates||[];S.sopRuns=data.sopRuns||[];
     S.currentUser=data.currentUser;S.p=data.permissions||{};
     const u=getU(S.currentUser);const roles=u?.roles||['standard'];
     const has=(...r)=>r.some(x=>roles.includes(x));
@@ -272,7 +275,7 @@ function restoreNavSectionState() {
   }
 }
 // Alle Sidebar-Reiter (id="ni-<key>") — muss mit db.js NAV_TABS übereinstimmen.
-const NAV_TAB_IDS=['home','docs','meetings','todos','contacts','schedule','allw','homeoffice','vacation','diensttausch','abrechnung','dienstplaene','zahnarzt','platz','links','tickets','tickets_closed','tickets_deleted','checklists','dp','dp-config','dp-christmas','dp-mine','messages','messages_sent','news','statistik'];
+const NAV_TAB_IDS=['home','sop','docs','meetings','todos','contacts','schedule','allw','homeoffice','vacation','diensttausch','abrechnung','dienstplaene','zahnarzt','platz','links','tickets','tickets_closed','tickets_deleted','checklists','dp','dp-config','dp-christmas','dp-mine','messages','messages_sent','news','statistik'];
 // Zusätzlich zur (abschaltbaren) Reiter-Sichtbarkeit weiterhin hart verdrahtete
 // Mindestanforderungen für die Dienstplanungs-/Statistik-Reiter — ein Reiter
 // ist nur sichtbar, wenn BEIDES zutrifft.
@@ -331,6 +334,7 @@ function renderMain(){
   else if(S.view==='dp-mine')renderDPMine();
   else if(S.view==='todos')renderTodos();
   else if(S.view==='contacts')renderContacts();
+  else if(S.view==='sop')renderSop();
 }
 // HOME
 // ── ÜBERSICHT: Alt/Neu-Umschalter ─────────────────────────────────────────────
@@ -504,6 +508,7 @@ function renderHomeNew(){
   document.getElementById('main').innerHTML=`
     <div class="ph"><div class="pt">&#128196; Übersicht <span>${u?.name||''}</span></div>${homeVersionToggleHtml()}</div>
     <div style="background:rgba(59,109,212,.06);border:1px solid rgba(59,109,212,.2);border-radius:var(--r);padding:8px 12px;margin-bottom:14px;font-size:11px;color:var(--mu)">&#x1F9EA; Neue Übersicht (Beta) &mdash; wird schrittweise ausgebaut. Mit "Alt" zur bisherigen Ansicht wechseln.</div>
+    ${sopHomeBannerHtml()}
     ${ticketsCard}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">${todosCard}${meetingsCard}</div>
     ${dpCard}`;
@@ -726,6 +731,7 @@ function renderHomeOld(){
       </div>`;}).join('')}
     </div>`:''}
 
+    ${sopHomeBannerHtml()}
     ${importantNewsHtml}${(hoHtml||vacHtml)?('<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">'+hoHtml+vacHtml+'</div>'):''}
     ${_dueFaelligHtml?_ccWrap('due_week','&#128197; Diese Woche fällig','<div class="card-rows">'+_dueFaelligHtml+'</div>'):''}
     ${_beschwerdenHtml?_ccWrap('beschwerden','&#128680; Zu erledigen &ndash; Beschwerden','<div class="card-rows">'+_beschwerdenHtml+'</div>'):''}
@@ -2313,7 +2319,7 @@ const RIGHTS_ROLES_LIST=['admin','leitung','dienstplanung','schichtleiter','tech
 // (Frontend hat keinen Zugriff auf db.js), Reihenfolge/Gruppierung entspricht
 // der Sidebar.
 const RIGHTS_NAV_TABS=[
-  {key:'home',label:'\u00dcbersicht'},{key:'docs',label:'Dokumente'},{key:'meetings',label:'Besprechungen'},{key:'todos',label:'Todos'},{key:'contacts',label:'Kontakte'},
+  {key:'home',label:'\u00dcbersicht'},{key:'sop',label:'Notfall-Checklisten'},{key:'docs',label:'Dokumente'},{key:'meetings',label:'Besprechungen'},{key:'todos',label:'Todos'},{key:'contacts',label:'Kontakte'},
   {key:'schedule',label:'Dienstplan (Kalender)'},{key:'allw',label:'Zulagendienste'},{key:'homeoffice',label:'Homeoffice'},{key:'vacation',label:'Urlaubs\u00fcbersicht'},
   {key:'diensttausch',label:'Diensttausch'},{key:'abrechnung',label:'Abrechnung'},{key:'dienstplaene',label:'Dienstpl\u00e4ne'},
   {key:'zahnarzt',label:'Dienstplan Zahn\u00e4rzte'},{key:'platz',label:'Platz\u00fcbersicht'},{key:'links',label:'Links'},
@@ -2334,13 +2340,14 @@ function renderRightsMatrix(){
     {key:'editAllw',label:'Zulagen bearbeiten'},
     {key:'seeAllAbrechnung',label:'Abrechnung: alle sehen',hint:'Sonst nur die eigene Abrechnung.'},
     {key:'canSendMessages',label:'Nachrichten senden'},
+    {key:'manageSop',label:'Notfall-Checklisten verwalten',hint:'Vorlagen anlegen/bearbeiten/freigeben. Ausführen können weiterhin alle Nutzer, unabhängig von diesem Recht.'},
   ];
   const defaults={
-    admin:{manageUsers:1,canApproveEvents:1,editAllPersonal:1,addForOthers:1,addGeneral:1,seeAllAllw:1,editAllw:1,seeAllAbrechnung:1,canSendMessages:1},
-    leitung:{canApproveEvents:1,editAllPersonal:1,addForOthers:1,addGeneral:1,seeAllAllw:1,editAllw:1,canSendMessages:1},
+    admin:{manageUsers:1,canApproveEvents:1,editAllPersonal:1,addForOthers:1,addGeneral:1,seeAllAllw:1,editAllw:1,seeAllAbrechnung:1,canSendMessages:1,manageSop:1},
+    leitung:{canApproveEvents:1,editAllPersonal:1,addForOthers:1,addGeneral:1,seeAllAllw:1,editAllw:1,canSendMessages:1,manageSop:1},
     dienstplanung:{canApproveEvents:1,editAllPersonal:1,addForOthers:1,addGeneral:1,seeAllAllw:1,editAllw:1,seeAllAbrechnung:1,canSendMessages:1},
     schichtleiter:{addForOthers:1,canSendMessages:1},
-    technik:{addGeneral:1,canSendMessages:1},
+    technik:{addGeneral:1,canSendMessages:1,manageSop:1},
     qm:{addForOthers:1,addGeneral:1,canSendMessages:1},
     standard:{},
   };
@@ -2512,6 +2519,7 @@ function startAutoRefresh(){
       S.allowances=data.allowances||[];S.checklists=data.checklists||[];
       S.abrechnung=data.abrechnung||{einspringer:[],homeoffice:[]};S.dienstplaene=data.dienstplaene||[];S.diensttausch=data.diensttausch||[];S.homeoffice=data.homeoffice||{slots:[],config:[],boxes:[],dienste:[]};S.vacationConfig=data.vacationConfig||[];S.diensttausch=data.diensttausch||[];
       S.stationSessions=data.stationSessions||[];S.stationShifts=data.stationShifts||[];S.stationOutages=data.stationOutages||[];S.links=data.portalLinks||[];S.docs=data.docs||[];S.docCategories=data.docCategories||[];S.rolePermissions=data.rolePermissions||[];S.meetings=data.meetings||[];S.contacts=data.contacts||[];
+      S.sopTemplates=data.sopTemplates||[];S.sopRuns=data.sopRuns||[];
       updateBadges();
       if(_lastMsgCount>=0&&newMsgCount>_lastMsgCount)toast('\uD83D\uDCEC Neue Nachricht eingegangen!');
       if(_lastTkCount>=0&&newTkCount>_lastTkCount)toast('\uD83C\uDFAB Neues Ticket in deinem Bereich!');
@@ -2523,6 +2531,7 @@ function startAutoRefresh(){
       else if(S.view==='links')renderLinks();
       else if(S.view==='docs')renderDocs();
       else if(S.view==='meetings')renderMeetings();
+      else if(S.view==='sop'&&(S._sopView==='run'||S._sopView==='runlist'))renderSop();
     var _rd=document.getElementById('lastRefreshDisplay');if(_rd){var _n=new Date();_rd.textContent='↻ '+_n.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit',second:'2-digit'});_rd.style.display='block';}
     }catch(e){}
   },30000);
@@ -3738,6 +3747,382 @@ async function saveContact(){
 async function deleteContact(id){
   if(!confirm('Kontakt löschen?'))return;
   try{await api('DELETE','/contacts/'+id);await fetchData();renderContacts();toast('✅ Kontakt gelöscht');}catch(e){toast('⚠️ '+e.message,'err');}
+}
+
+// ── NOTFALL-CHECKLISTEN (SOP) ───────────────────────────────────────────────
+// Eigenständiges Modul für Vorgehens-/Notfall-Checklisten (z.B. "Ausfall
+// Einsatzleitsystem") — bewusst getrennt von den kleinen Ticket-Checklisten
+// unter "Checklisten" im Ticketsystem. Ablauf: Entwurf (nur der Ersteller
+// sieht/bearbeitet ihn) → Freigabe durch den technischen Leiter (wird aktiv,
+// für alle sichtbar/ausführbar) → bei weiteren Änderungen wird eine neue
+// Version als Entwurf angelegt, die alte bleibt bis zur Freigabe der neuen
+// unverändert aktiv (Nachvollziehbarkeit abgeschlossener Durchläufe).
+const SOP_CATEGORY_SUGGESTIONS=['Systemausfall Einsatzleitsystem','Ausfall Telefonanlage','Stromausfall','Schichtübergabe-Check','Großschadenslage'];
+const SOP_ITEM_TYPES=[{id:'check',label:'Checkbox'},{id:'text',label:'Texteingabe'},{id:'yesno',label:'Ja/Nein'},{id:'photo',label:'Foto-Upload'}];
+function sopCategoryIcon(cat){
+  const c=(cat||'').toLowerCase();
+  if(c.includes('einsatzleitsystem')||c.includes('systemausfall')||c.includes('it'))return '💻';
+  if(c.includes('telefon'))return '☎️';
+  if(c.includes('strom'))return '⚡';
+  if(c.includes('schicht'))return '🔄';
+  if(c.includes('großschaden')||c.includes('grossschaden'))return '🚨';
+  if(c.includes('wartung'))return '🛠️';
+  return '📋';
+}
+function sopHomeBannerHtml(){
+  const active=(S.sopTemplates||[]).filter(t=>t.status==='approved'&&t.active);
+  if(!active.length&&!S.p?.manageSop) return '';
+  const chips=active.slice(0,8).map(t=>'<span class="bdg" style="background:#dc262622;color:#dc2626;cursor:pointer;font-size:11px" onclick="setView(\'sop\')">'+sopCategoryIcon(t.category)+' '+esc(t.title)+'</span>').join('');
+  return '<div style="background:rgba(220,38,38,.06);border:1px solid rgba(220,38,38,.25);border-radius:var(--r);padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
+    +'<div style="font-size:13px;font-weight:700;color:#dc2626;flex-shrink:0">🚨 Notfall-Checklisten</div>'
+    +(active.length?'<div style="display:flex;gap:6px;flex-wrap:wrap;flex:1">'+chips+'</div>':'<div style="font-size:12px;color:var(--mu);flex:1">Noch keine freigegebenen Checklisten.</div>')
+    +'<a href="javascript:void(0)" onclick="setView(\'sop\')" style="color:#dc2626;font-size:11px;font-weight:600;flex-shrink:0">alle ansehen &#8594;</a>'
+    +'</div>';
+}
+function sopGroups(){
+  const byBase={};
+  (S.sopTemplates||[]).forEach(t=>{(byBase[t.baseId]=byBase[t.baseId]||[]).push(t);});
+  return Object.values(byBase).map(versions=>{
+    versions.sort((a,b)=>b.version-a.version);
+    const active=versions.find(v=>v.active&&v.status==='approved');
+    const draft=versions.find(v=>v.status==='draft');
+    return {baseId:versions[0].baseId,versions,active,draft};
+  });
+}
+function renderSop(){
+  if(S._sopView==='edit')renderSopEditor(S._selSopTemplateId);
+  else if(S._sopView==='run')renderSopRun(S._selSopRunId);
+  else if(S._sopView==='stats')renderSopStats(S._selSopTemplateId);
+  else if(S._sopView==='runlist')renderSopRunList();
+  else renderSopOverview();
+}
+function renderSopOverview(){
+  const canManage=!!S.p.manageSop;
+  const groups=sopGroups();
+  const search=(S._sopSearch||'').toLowerCase().trim();
+  const catFilter=S._sopCatFilter||'';
+  const matches=t=>{
+    if(search&&![t.title,t.category,t.description].some(v=>(v||'').toLowerCase().includes(search)))return false;
+    if(catFilter&&t.category!==catFilter)return false;
+    return true;
+  };
+  const activeGroups=groups.filter(g=>g.active&&matches(g.active));
+  const draftGroups=canManage?groups.filter(g=>g.draft&&matches(g.draft)):[];
+  const cats=[...new Set(groups.flatMap(g=>g.versions.map(v=>v.category)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'de'));
+  const tile=(t,isDraftOnly)=>`<div style="background:var(--sf);border:1px solid var(--border);border-radius:12px;padding:16px 18px;cursor:pointer;position:relative" onclick="sopOpenTemplate('${t.id}')">
+      ${isDraftOnly?'<span class="bdg" style="position:absolute;top:10px;right:10px;background:#f59e0b22;color:#f59e0b">Entwurf</span>':''}
+      <div style="font-size:26px;margin-bottom:6px">${sopCategoryIcon(t.category)}</div>
+      <div style="font-size:14px;font-weight:600;margin-bottom:2px">${esc(t.title)}</div>
+      <div style="font-size:11px;color:var(--acc);margin-bottom:6px">${esc(t.category||'Ohne Kategorie')}</div>
+      ${t.description?`<div style="font-size:12px;color:var(--mu);margin-bottom:8px">${esc(t.description)}</div>`:''}
+      <div style="font-size:11px;color:var(--di)">${t.items.length} Schritt(e) &middot; v${t.version}</div>
+    </div>`;
+  document.getElementById('main').innerHTML=`
+    <div class="ph"><div class="pt">🚨 Notfall-Checklisten</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a href="/api/sop/print-all" target="_blank" class="btn-s" style="text-decoration:none;font-size:12px">🖨️ Alle drucken</a>
+        <button class="btn-s" onclick="S._sopView='runlist';renderSop()">📋 ${canManage?'Durchläufe':'Meine Durchläufe'}</button>
+        ${canManage?`<button class="btn-p" onclick="sopNewTemplate()">+ Neue Checkliste</button>`:''}
+      </div>
+    </div>
+    <div style="padding:0 20px 12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <input type="text" class="srch" placeholder="🔍 Suchen…" value="${(S._sopSearch||'').replace(/"/g,'&quot;')}" oninput="S._sopSearch=this.value;renderSop()" style="max-width:280px">
+      <button class="mb ${!catFilter?'on':''}" style="padding:4px 8px;font-size:12px" onclick="S._sopCatFilter='';renderSop()">Alle</button>
+      ${cats.map(c=>`<button class="mb ${catFilter===c?'on':''}" style="padding:4px 8px;font-size:12px" onclick="S._sopCatFilter='${esc(c)}';renderSop()">${esc(c)}</button>`).join('')}
+    </div>
+    ${draftGroups.length?`<div style="padding:0 20px 6px">
+      <div style="font-size:12px;font-weight:700;color:var(--mu);margin-bottom:8px">📝 Entwürfe (Freigabe ausständig)</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-bottom:20px">${draftGroups.map(g=>tile(g.draft,true)).join('')}</div>
+    </div>`:''}
+    <div style="padding:0 20px 20px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px">
+        ${activeGroups.map(g=>tile(g.active,false)).join('')}
+        ${!activeGroups.length?'<div style="color:var(--di);font-size:13px;padding:20px">Keine freigegebenen Checklisten'+(search||catFilter?' gefunden.':canManage?'. Lege die erste an.':'.')+'</div>':''}
+      </div>
+    </div>`;
+}
+function sopOpenTemplate(id){
+  if(S.p.manageSop){S._selSopTemplateId=id;S._sopView='edit';renderSop();return;}
+  sopStartRun(id);
+}
+async function sopStartRun(tplId){
+  const existing=(S.sopRuns||[]).find(r=>r.templateId===tplId&&r.status==='running'&&r.startedBy===S.currentUser);
+  if(existing){S._selSopRunId=existing.id;S._sopView='run';renderSop();return;}
+  try{
+    const r=await api('POST','/sop/runs',{templateId:tplId});
+    await fetchData();
+    S._selSopRunId=r.id;S._sopView='run';renderSop();
+  }catch(e){toast('⚠️ '+e.message,'err');}
+}
+function renderSopEditor(id){
+  const t=(S.sopTemplates||[]).find(x=>x.id===id);
+  if(!t){S._sopView='overview';renderSopOverview();return;}
+  const canManage=!!S.p.manageSop;
+  const isDraft=t.status==='draft';
+  const items=(t.items||[]).slice().sort((a,b)=>a.sortOrder-b.sortOrder);
+  const typeLabel=ty=>(SOP_ITEM_TYPES.find(x=>x.id===ty)||{}).label||ty;
+  const itemRow=(it,i)=>`<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--border)">
+    ${isDraft?`<div style="display:flex;flex-direction:column;gap:2px">
+      <button class="btn-s" style="padding:1px 6px;font-size:10px" ${i===0?'disabled':''} onclick="sopMoveItem('${t.id}',${i},-1)">▲</button>
+      <button class="btn-s" style="padding:1px 6px;font-size:10px" ${i===items.length-1?'disabled':''} onclick="sopMoveItem('${t.id}',${i},1)">▼</button>
+    </div>`:`<div style="width:22px;text-align:center;color:var(--di);font-size:11px;flex-shrink:0">${i+1}.</div>`}
+    <div style="flex:1">
+      <div style="font-size:13px;font-weight:600">${i+1}. ${esc(it.text)} ${it.required?'<span style="color:#ef4444">*</span>':''} <span class="bdg" style="font-size:10px">${typeLabel(it.itemType)}</span></div>
+      ${it.hint?`<div style="font-size:11px;color:var(--mu);margin-top:2px">💡 ${esc(it.hint)}</div>`:''}
+    </div>
+    ${isDraft&&canManage?`<div style="display:flex;gap:4px;flex-shrink:0">
+      <button class="btn-s" style="font-size:11px;padding:3px 8px" onclick="sopEditItem('${t.id}','${it.id}')">✎</button>
+      <button class="btn-d" style="font-size:11px;padding:3px 8px" onclick="sopDeleteItem('${t.id}','${it.id}')">✕</button>
+    </div>`:''}
+  </div>`;
+  document.getElementById('main').innerHTML=`
+    <div class="ph"><div class="pt">← <a href="javascript:void(0)" onclick="S._sopView='overview';renderSop()" style="color:var(--tx);text-decoration:none">🚨 Notfall-Checklisten</a> / ${esc(t.title)}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a href="/api/sop/templates/${t.id}/print" target="_blank" class="btn-s" style="text-decoration:none;font-size:12px">🖨️ Drucken</a>
+        ${canManage?`<button class="btn-s" onclick="sopGotoStats('${t.id}')">📊 Auswertung</button>`:''}
+        ${(t.status==='approved'&&t.active)?`<button class="btn-p" onclick="sopStartRun('${t.id}')">▶ Durchlauf starten</button>`:''}
+      </div>
+    </div>
+    <div style="padding:0 20px 12px">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+        <span class="bdg" style="background:${t.status==='approved'?'#10b98122':'#f59e0b22'};color:${t.status==='approved'?'#10b981':'#f59e0b'}">${t.status==='approved'?'✓ Freigegeben':'📝 Entwurf'}</span>
+        ${t.status==='approved'&&!t.active?'<span class="bdg" style="background:var(--sf2);color:var(--mu)">Deaktiviert / durch neuere Version ersetzt</span>':''}
+        <span style="font-size:11px;color:var(--mu)">Version ${t.version} &middot; ${esc(t.category||'Ohne Kategorie')} &middot; erstellt von ${esc(getU(t.createdBy)?.name||'?')}${t.lastPrintedAt?' &middot; zuletzt gedruckt '+fdt(t.lastPrintedAt):''}</span>
+      </div>
+      ${t.description?`<div style="font-size:13px;color:var(--tx);margin-bottom:10px">${esc(t.description)}</div>`:''}
+      ${canManage&&isDraft?`<div style="margin-bottom:10px"><button class="btn-s" onclick="sopEditMeta('${t.id}')">✎ Titel/Kategorie/Beschreibung</button></div>`:''}
+    </div>
+    <div style="padding:0 20px 20px">
+      ${items.map(itemRow).join('')}
+      ${!items.length?'<div style="color:var(--di);font-size:12px;padding:12px 0">Noch keine Schritte.</div>':''}
+      ${canManage&&isDraft?`<div style="padding-top:10px"><button class="btn-s" onclick="sopAddItem('${t.id}')">+ Schritt hinzufügen</button></div>`:''}
+    </div>
+    ${canManage?`<div style="padding:16px 20px 30px;display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid var(--border)">
+      ${isDraft?`<button class="btn-p" onclick="sopApprove('${t.id}')">✓ Freigeben</button>`:''}
+      ${isDraft?`<button class="btn-d" onclick="sopDeleteTemplate('${t.id}')">🗑️ Entwurf löschen</button>`:''}
+      ${!isDraft&&t.active?`<button class="btn-s" onclick="sopNewVersion('${t.id}')">📝 Neue Version bearbeiten</button>`:''}
+      ${!isDraft&&t.active?`<button class="btn-d" onclick="sopDeactivate('${t.id}')">Deaktivieren</button>`:''}
+      ${!isDraft&&!t.active?`<button class="btn-s" onclick="sopReactivate('${t.id}')">Reaktivieren</button>`:''}
+    </div>`:''}`;
+}
+function sopNewTemplate(){
+  document.getElementById('stFT').textContent='Neue Checkliste';
+  document.getElementById('stId').value='';
+  document.getElementById('stTitle').value='';
+  document.getElementById('stCategory').value='';
+  document.getElementById('stDesc').value='';
+  openModal('sopTplOv');
+}
+function sopEditMeta(id){
+  const t=S.sopTemplates.find(x=>x.id===id);if(!t)return;
+  document.getElementById('stFT').textContent='Checkliste bearbeiten';
+  document.getElementById('stId').value=id;
+  document.getElementById('stTitle').value=t.title;
+  document.getElementById('stCategory').value=t.category;
+  document.getElementById('stDesc').value=t.description;
+  openModal('sopTplOv');
+}
+async function saveSopTemplate(){
+  const id=document.getElementById('stId').value;
+  const title=document.getElementById('stTitle').value.trim();
+  if(!title)return toast('⚠️ Titel erforderlich','err');
+  const body={title,category:document.getElementById('stCategory').value.trim(),description:document.getElementById('stDesc').value.trim()};
+  try{
+    if(id){
+      await api('PUT','/sop/templates/'+id,body);await fetchData();closeModal('sopTplOv');
+      S._sopView='edit';S._selSopTemplateId=id;renderSop();toast('✅ Aktualisiert!');
+    } else {
+      const r=await api('POST','/sop/templates',body);await fetchData();closeModal('sopTplOv');
+      S._sopView='edit';S._selSopTemplateId=r.id;renderSop();toast('✅ Angelegt! Jetzt Schritte hinzufügen.');
+    }
+  }catch(e){toast('⚠️ '+e.message,'err');}
+}
+function openSopItemForm(tplId,itemId){
+  const t=S.sopTemplates.find(x=>x.id===tplId);if(!t)return;
+  const it=itemId?t.items.find(i=>i.id===itemId):null;
+  document.getElementById('siFT').textContent=it?'Schritt bearbeiten':'Neuer Schritt';
+  document.getElementById('siTplId').value=tplId;
+  document.getElementById('siItemId').value=itemId||'';
+  document.getElementById('siText').value=it?.text||'';
+  document.getElementById('siRequired').checked=it?!!it.required:true;
+  document.getElementById('siType').value=it?.itemType||'check';
+  document.getElementById('siHint').value=it?.hint||'';
+  openModal('sopItemOv');
+}
+function sopAddItem(tplId){openSopItemForm(tplId,null);}
+function sopEditItem(tplId,itemId){openSopItemForm(tplId,itemId);}
+async function saveSopItem(){
+  const tplId=document.getElementById('siTplId').value;
+  const itemId=document.getElementById('siItemId').value;
+  const text=document.getElementById('siText').value.trim();
+  if(!text)return toast('⚠️ Text erforderlich','err');
+  const body={text,required:document.getElementById('siRequired').checked,itemType:document.getElementById('siType').value,hint:document.getElementById('siHint').value.trim()};
+  try{
+    if(itemId) await api('PUT','/sop/templates/'+tplId+'/items/'+itemId,body);
+    else await api('POST','/sop/templates/'+tplId+'/items',body);
+    await fetchData();closeModal('sopItemOv');S._sopView='edit';S._selSopTemplateId=tplId;renderSop();
+    toast(itemId?'✅ Aktualisiert!':'✅ Hinzugefügt!');
+  }catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function sopDeleteItem(tplId,itemId){
+  if(!confirm('Schritt löschen?'))return;
+  try{await api('DELETE','/sop/templates/'+tplId+'/items/'+itemId);await fetchData();renderSop();toast('✅ Gelöscht');}catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function sopMoveItem(tplId,index,dir){
+  const t=S.sopTemplates.find(x=>x.id===tplId);if(!t)return;
+  const items=t.items.slice().sort((a,b)=>a.sortOrder-b.sortOrder);
+  const j=index+dir;
+  if(j<0||j>=items.length)return;
+  const tmp=items[index];items[index]=items[j];items[j]=tmp;
+  try{await api('PUT','/sop/templates/'+tplId+'/items-reorder',{order:items.map(i=>i.id)});await fetchData();renderSop();}catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function sopApprove(id){
+  if(!confirm('Checkliste freigeben? Sie wird damit für alle Mitarbeiter sichtbar und ausführbar.'))return;
+  try{await api('POST','/sop/templates/'+id+'/approve');await fetchData();renderSop();toast('✅ Freigegeben!');}catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function sopNewVersion(id){
+  try{const r=await api('POST','/sop/templates/'+id+'/new-version');await fetchData();S._selSopTemplateId=r.id;renderSop();toast('✅ Neuer Entwurf angelegt');}catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function sopDeactivate(id){
+  if(!confirm('Checkliste deaktivieren? Mitarbeiter können sie danach nicht mehr starten.'))return;
+  try{await api('POST','/sop/templates/'+id+'/deactivate');await fetchData();renderSop();toast('✅ Deaktiviert');}catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function sopReactivate(id){
+  try{await api('POST','/sop/templates/'+id+'/reactivate');await fetchData();renderSop();toast('✅ Reaktiviert');}catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function sopDeleteTemplate(id){
+  if(!confirm('Entwurf endgültig löschen?'))return;
+  try{await api('DELETE','/sop/templates/'+id);await fetchData();S._sopView='overview';renderSop();toast('✅ Gelöscht');}catch(e){toast('⚠️ '+e.message,'err');}
+}
+function sopGotoStats(id){S._selSopTemplateId=id;S._sopView='stats';S._sopStatsData=null;renderSop();loadSopStats(id);}
+async function loadSopStats(id){
+  try{const data=await api('GET','/sop/templates/'+id+'/stats');S._sopStatsData=data;if(S._sopView==='stats'&&S._selSopTemplateId===id)renderSop();}catch(e){toast('⚠️ '+e.message,'err');}
+}
+function renderSopStats(id){
+  const t=(S.sopTemplates||[]).find(x=>x.id===id);
+  if(!t){S._sopView='overview';renderSopOverview();return;}
+  const d=S._sopStatsData;
+  document.getElementById('main').innerHTML=`
+    <div class="ph"><div class="pt">← <a href="javascript:void(0)" onclick="S._sopView='edit';renderSop()" style="color:var(--tx);text-decoration:none">${esc(t.title)}</a> / Auswertung</div></div>
+    <div style="padding:0 20px 20px">
+    ${!d?'<div style="color:var(--di);font-size:13px">Lade…</div>':`
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:20px">
+        <div class="ib3">Durchläufe gesamt<br><b style="font-size:20px">${d.totalRuns}</b></div>
+        <div class="ib3">Abgeschlossen<br><b style="font-size:20px">${d.completedCount}</b></div>
+        <div class="ib3">Laufend<br><b style="font-size:20px">${d.runningCount}</b></div>
+        <div class="ib3">Abgebrochen<br><b style="font-size:20px">${d.abortedCount}</b></div>
+        <div class="ib3">&Oslash; Dauer<br><b style="font-size:20px">${d.avgDurationMin!=null?Math.round(d.avgDurationMin)+' min':'–'}</b></div>
+      </div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px">Schritte &ndash; wie oft nicht erledigt/leer (bezogen auf abgeschlossene Durchläufe)</div>
+      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:400px">
+        <thead><tr><th style="text-align:left;padding:6px;border-bottom:2px solid var(--border)">Schritt</th><th style="padding:6px;border-bottom:2px solid var(--border)">Nicht erledigt</th><th style="padding:6px;border-bottom:2px solid var(--border)">Leer</th></tr></thead>
+        <tbody>${(d.items||[]).map(it=>`<tr><td style="padding:6px;border-bottom:1px solid var(--border)">${esc(it.text)}</td><td style="text-align:center;padding:6px;border-bottom:1px solid var(--border)">${it.notDoneCount}/${it.totalRuns||0}</td><td style="text-align:center;padding:6px;border-bottom:1px solid var(--border)">${it.emptyCount}/${it.totalRuns||0}</td></tr>`).join('')}</tbody>
+      </table></div>
+    `}
+    </div>`;
+}
+function renderSopRun(runId){
+  const run=(S.sopRuns||[]).find(r=>r.id===runId);
+  if(!run){S._sopView='overview';renderSopOverview();return;}
+  const t=(S.sopTemplates||[]).find(x=>x.id===run.templateId);
+  if(!t){S._sopView='overview';renderSopOverview();return;}
+  const items=(t.items||[]).slice().sort((a,b)=>a.sortOrder-b.sortOrder);
+  const isOwner=run.startedBy===S.currentUser;
+  const canEdit=run.status==='running'&&(isOwner||S.p.manageSop);
+  const doneCount=items.filter(it=>{const ri=run.items.find(x=>x.itemId===it.id);return ri&&ri.done;}).length;
+  const pct=items.length?Math.round(doneCount/items.length*100):0;
+  const stepRow=it=>{
+    const ri=run.items.find(x=>x.itemId===it.id)||{};
+    const disabled=!canEdit?'disabled':'';
+    let control='';
+    if(it.itemType==='text'){
+      control=`<input type="text" value="${esc(ri.value||'')}" ${disabled} onchange="sopRunSetValue('${run.id}','${it.id}',this.value)" style="width:100%;max-width:400px;margin-top:6px;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--sf);color:var(--tx);box-sizing:border-box" placeholder="Eingabe...">`;
+    } else if(it.itemType==='yesno'){
+      control=`<div style="display:flex;gap:8px;margin-top:6px">
+        <button class="mb ${ri.value==='ja'?'on':''}" ${disabled} onclick="sopRunSetValue('${run.id}','${it.id}','ja')">Ja</button>
+        <button class="mb ${ri.value==='nein'?'on':''}" ${disabled} onclick="sopRunSetValue('${run.id}','${it.id}','nein')">Nein</button>
+      </div>`;
+    } else if(it.itemType==='photo'){
+      control=`<div style="margin-top:6px">
+        ${ri.value?`<img src="${ri.value}" style="max-width:160px;max-height:160px;border-radius:8px;display:block;margin-bottom:6px">`:''}
+        ${canEdit?`<input type="file" accept="image/*" onchange="sopRunPhotoUpload('${run.id}','${it.id}',this)">`:''}
+      </div>`;
+    }
+    return `<div style="display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-bottom:1px solid var(--border);${ri.done?'opacity:.65':''}">
+      <input type="checkbox" ${ri.done?'checked':''} ${disabled} onchange="sopRunToggle('${run.id}','${it.id}',this.checked)" style="width:26px;height:26px;flex-shrink:0;margin-top:2px;cursor:${canEdit?'pointer':'default'}">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:15px;font-weight:600;${ri.done?'text-decoration:line-through':''}">${esc(it.text)}${it.required?' <span style="color:#ef4444">*</span>':''}</div>
+        ${it.hint?`<div style="font-size:12px;color:var(--mu);margin-top:2px">💡 ${esc(it.hint)}</div>`:''}
+        ${control}
+        ${ri.updatedAt?`<div style="font-size:10px;color:var(--di);margin-top:4px">zuletzt ${fdt(ri.updatedAt)} von ${esc(getU(ri.updatedBy)?.name||'?')}</div>`:''}
+      </div>
+    </div>`;
+  };
+  document.getElementById('main').innerHTML=`
+    <div class="ph"><div class="pt">← <a href="javascript:void(0)" onclick="S._sopView='overview';renderSop()" style="color:var(--tx);text-decoration:none">🚨 Notfall-Checklisten</a> / ${esc(t.title)}</div>
+      <div style="display:flex;gap:8px">
+        <a href="/api/sop/templates/${t.id}/print" target="_blank" class="btn-s" style="text-decoration:none;font-size:12px">🖨️ Drucken</a>
+        ${canEdit?`<button class="btn-d" onclick="sopRunAbort('${run.id}')">Abbrechen</button>`:''}
+        ${canEdit?`<button class="btn-p" onclick="sopRunComplete('${run.id}')">✓ Abschließen</button>`:''}
+      </div>
+    </div>
+    <div style="padding:0 20px">
+      <div style="font-size:11px;color:var(--mu);margin-bottom:4px">Gestartet von ${esc(getU(run.startedBy)?.name||'?')} um ${fdt(run.startedAt)}${run.status!=='running'?' &middot; Status: '+(run.status==='completed'?'✓ Abgeschlossen':'✗ Abgebrochen'):''}</div>
+      <div style="background:var(--sf2);border-radius:10px;height:10px;overflow:hidden;margin-bottom:4px"><div style="background:${pct===100?'#10b981':'#3b6dd4'};height:100%;width:${pct}%;transition:.2s"></div></div>
+      <div style="font-size:11px;color:var(--mu);margin-bottom:10px">${doneCount}/${items.length} erledigt (${pct}%)</div>
+    </div>
+    <div style="padding:0 20px 30px">${items.map(stepRow).join('')}</div>`;
+}
+async function sopRunToggle(runId,itemId,done){
+  const run=S.sopRuns.find(r=>r.id===runId);
+  const ri=run?.items.find(x=>x.itemId===itemId);
+  try{await api('PUT','/sop/runs/'+runId+'/items/'+itemId,{done,value:ri?.value||''});await fetchData();renderSop();}catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function sopRunSetValue(runId,itemId,value){
+  const run=S.sopRuns.find(r=>r.id===runId);
+  const ri=run?.items.find(x=>x.itemId===itemId);
+  try{await api('PUT','/sop/runs/'+runId+'/items/'+itemId,{done:ri?.done||false,value});await fetchData();if(S._sopView==='run')renderSop();}catch(e){toast('⚠️ '+e.message,'err');}
+}
+function sopRunPhotoUpload(runId,itemId,input){
+  const file=input.files[0];if(!file)return;
+  if(file.size>3*1024*1024){toast('⚠️ Foto zu groß (max. 3 MB)','err');return;}
+  const reader=new FileReader();
+  reader.onload=()=>sopRunSetValue(runId,itemId,reader.result);
+  reader.readAsDataURL(file);
+}
+async function sopRunComplete(runId){
+  if(!confirm('Durchlauf als abgeschlossen markieren?'))return;
+  try{await api('PUT','/sop/runs/'+runId+'/complete');await fetchData();renderSop();toast('✅ Abgeschlossen!');}catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function sopRunAbort(runId){
+  if(!confirm('Durchlauf abbrechen?'))return;
+  try{await api('PUT','/sop/runs/'+runId+'/abort');await fetchData();renderSop();toast('Durchlauf abgebrochen');}catch(e){toast('⚠️ '+e.message,'err');}
+}
+function renderSopRunList(){
+  const canManage=!!S.p.manageSop;
+  const runs=(S.sopRuns||[]).slice().sort((a,b)=>new Date(b.startedAt)-new Date(a.startedAt));
+  const statusLabel={running:'▶ Läuft',completed:'✓ Abgeschlossen',aborted:'✗ Abgebrochen'};
+  const statusColor={running:'#3b6dd4',completed:'#10b981',aborted:'#ef4444'};
+  document.getElementById('main').innerHTML=`
+    <div class="ph"><div class="pt">← <a href="javascript:void(0)" onclick="S._sopView='overview';renderSop()" style="color:var(--tx);text-decoration:none">🚨 Notfall-Checklisten</a> / ${canManage?'Durchläufe (alle)':'Meine Durchläufe'}</div></div>
+    <div style="padding:0 20px 20px">
+    ${!runs.length?'<div style="color:var(--di);font-size:13px;padding:20px">Noch keine Durchläufe.</div>':`
+      <div style="display:flex;flex-direction:column;gap:8px">
+      ${runs.map(r=>{
+        const t=(S.sopTemplates||[]).find(x=>x.id===r.templateId);
+        const items=t?.items||[];
+        const doneCount=items.filter(it=>{const ri=r.items.find(x=>x.itemId===it.id);return ri&&ri.done;}).length;
+        const pct=items.length?Math.round(doneCount/items.length*100):0;
+        return `<div style="background:var(--sf);border:1px solid var(--border);border-radius:10px;padding:12px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px" onclick="S._selSopRunId='${r.id}';S._sopView='run';renderSop()">
+          <div style="min-width:0">
+            <div style="font-size:13px;font-weight:600">${esc(t?.title||'?')}</div>
+            <div style="font-size:11px;color:var(--mu)">${esc(getU(r.startedBy)?.name||'?')} &middot; ${fdt(r.startedAt)} &middot; ${doneCount}/${items.length} (${pct}%)</div>
+          </div>
+          <span class="bdg" style="background:${statusColor[r.status]}22;color:${statusColor[r.status]};flex-shrink:0">${statusLabel[r.status]||r.status}</span>
+        </div>`;
+      }).join('')}
+      </div>`}
+    </div>`;
 }
 
 // ── DOKUMENTE / DATEIABLAGE ───────────────────────────────────────────────────

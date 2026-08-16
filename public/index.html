@@ -77,6 +77,7 @@
   <aside class="sb" id="sidebar">
     <div class="nav-area">
       <div class="ni top active" id="ni-home" onclick="setView('home')">&#127968; &#220;bersicht</div>
+      <div class="ni top" id="ni-sop" onclick="setView('sop')" style="color:#dc2626;font-weight:700">&#128680; Notfall-Checklisten</div>
       <div class="ndiv"></div>
       <div class="nsh open" id="genHdr" onclick="toggleNS('gen')"><span>&#128194; Allgemein</span><span class="arr">&#9660;</span></div>
       <div class="nsub open" id="genSub">
@@ -220,6 +221,37 @@
       <div class="fg full"><label>Erreichbar</label><input type="text" id="cFAvail" placeholder="z.B. 24/7, B&uuml;rozeiten, Mo-Fr 8-16 Uhr"></div>
     </div>
     <div class="mf"><button class="btn-s" onclick="closeModal('contactOv')">Abbrechen</button><button class="btn-p" onclick="saveContact()">&#128190; Speichern</button></div>
+  </div>
+</div>
+
+<!-- SOP-CHECKLISTE: VORLAGE (Titel/Kategorie/Beschreibung) -->
+<div class="ov" id="sopTplOv">
+  <div class="modal">
+    <div class="mh"><h2 id="stFT">Neue Checkliste</h2><button class="mc" onclick="closeModal('sopTplOv')">&#10005;</button></div>
+    <div class="mb2">
+      <input type="hidden" id="stId">
+      <div class="fg full"><label>Titel *</label><input type="text" id="stTitle" placeholder="z.B. Ausfall Einsatzleitsystem"></div>
+      <div class="fg full"><label>Kategorie</label><input type="text" id="stCategory" list="sopCatSuggestions" placeholder="z.B. Systemausfall"><datalist id="sopCatSuggestions"><option value="Systemausfall Einsatzleitsystem"><option value="Ausfall Telefonanlage"><option value="Stromausfall"><option value="Schichtübergabe-Check"><option value="Großschadenslage"></datalist></div>
+      <div class="fg full"><label>Beschreibung</label><textarea id="stDesc" rows="3" placeholder="Kurze Erklärung, wann/wofür diese Checkliste gilt"></textarea></div>
+    </div>
+    <div class="mf"><button class="btn-s" onclick="closeModal('sopTplOv')">Abbrechen</button><button class="btn-p" onclick="saveSopTemplate()">&#128190; Speichern</button></div>
+  </div>
+</div>
+
+<!-- SOP-CHECKLISTE: SCHRITT -->
+<div class="ov" id="sopItemOv">
+  <div class="modal">
+    <div class="mh"><h2 id="siFT">Neuer Schritt</h2><button class="mc" onclick="closeModal('sopItemOv')">&#10005;</button></div>
+    <div class="mb2">
+      <input type="hidden" id="siTplId"><input type="hidden" id="siItemId">
+      <div class="fg full"><label>Text *</label><textarea id="siText" rows="2" placeholder="z.B. Ausweichsystem XY starten"></textarea></div>
+      <div class="fr">
+        <div class="fg"><label>Typ</label><select id="siType"><option value="check">Checkbox</option><option value="text">Texteingabe</option><option value="yesno">Ja/Nein</option><option value="photo">Foto-Upload</option></select></div>
+        <div class="fg"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:22px"><input type="checkbox" id="siRequired" style="width:16px;height:16px;cursor:pointer" checked> Pflichtfeld</label></div>
+      </div>
+      <div class="fg full"><label>Hinweistext</label><input type="text" id="siHint" placeholder="z.B. Telefonnummer, Kontaktperson, Link zur SOP"></div>
+    </div>
+    <div class="mf"><button class="btn-s" onclick="closeModal('sopItemOv')">Abbrechen</button><button class="btn-p" onclick="saveSopItem()">&#128190; Speichern</button></div>
   </div>
 </div>
 

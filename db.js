@@ -32,6 +32,7 @@ const NAV_TABS = [
   {key:'meetings', label:'Besprechungen'},
   {key:'todos', label:'Todos'},
   {key:'contacts', label:'Kontakte'},
+  {key:'sop', label:'Notfall-Checklisten'},
   {key:'schedule', label:'Dienstplan (Kalender)'},
   {key:'allw', label:'Zulagendienste'},
   {key:'homeoffice', label:'Homeoffice'},
@@ -98,6 +99,10 @@ async function getP(uid, userObj=null, overrides=[]) {
     canApproveEvents: perm('canApproveEvents', has('admin','dienstplanung','leitung')),
     canSendMessages: perm('canSendMessages', !has('standard')),
     seeAllAbrechnung: perm('seeAllAbrechnung', has('admin','dienstplanung')),
+    // Notfall-Checklisten anlegen/bearbeiten/freigeben — standardmäßig "technischer
+    // Leiter" (Rolle technik) + admin/leitung, wie in der Anforderung beschrieben.
+    // Ausführen dürfen weiterhin alle angemeldeten Nutzer (kein eigenes Recht nötig).
+    manageSop: perm('manageSop', has('admin','technik','leitung')),
     tabs: getTabVisibility(roles, overrides),
     roles,
   };
