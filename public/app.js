@@ -379,35 +379,41 @@ function renderHomeNew(){
     +' &middot; <a href="javascript:void(0)" onclick="setView(\'tickets\')" style="color:var(--acc)">alle ansehen &#8594;</a></div>';
   const ticketsCard=homeCardWrap('new_tickets','&#127931; Tickets',ticketsBody,'#ea580c');
 
-  // ── Offene Todos ──
-  const openTodos=S.todos.filter(t=>t.items&&t.items.some(i=>!i.is_done));
+  // ── Offene Todos ── ein Todo gilt als offen, solange sein eigener Status
+  // nicht "done" ist — unabhängig davon, ob es Unterpunkte hat (ein Todo ganz
+  // ohne Punkte, z.B. "morgen XY anrufen", ist selbst die Aufgabe).
+  const openTodos=S.todos.filter(t=>t.status!=='done');
   let todosBody='';
   if(openTodos.length){
     openTodos.slice(0,8).forEach(todo=>{
-      const openItems=todo.items.filter(i=>!i.is_done);
+      const openItems=(todo.items||[]).filter(i=>!i.is_done);
+      const dueTxt=todo.due_date?fmtDateShort(String(todo.due_date).slice(0,10)):'';
       todosBody+='<div style="padding:8px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="setView(\'todos\')">'
         +'<div style="font-size:12px;font-weight:600">'+escHtml(todo.title)+'</div>'
-        +'<div style="font-size:11px;color:var(--mu)">'+openItems.length+' offen</div></div>';
+        +'<div style="font-size:11px;color:var(--mu)">'+(openItems.length?openItems.length+' Punkt(e) offen':'ohne Unterpunkte')+(dueTxt?' &middot; fällig '+dueTxt:'')+'</div></div>';
     });
-    todosBody+='<div style="padding:8px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--mu)">'+openTodos.length+' Todo(s) mit offenen Punkten'
+    todosBody+='<div style="padding:8px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--mu)">'+openTodos.length+' offene(s) Todo(s)'
       +' &middot; <a href="javascript:void(0)" onclick="setView(\'todos\')" style="color:var(--acc)">alle ansehen &#8594;</a></div>';
   } else {
     todosBody='<div style="color:var(--di);font-size:12px;padding:8px 14px">Keine offenen Todos &#127881;</div>';
   }
   const todosCard=homeCardWrap('new_todos','&#9989; Offene Todos ('+openTodos.length+')',todosBody,'#10b981');
 
-  // ── Offene Besprechungen (kommende Termine) ──
-  const nowTs=new Date();
-  const openMeetings=(S.meetings||[]).filter(m=>m.instances&&m.instances.some(inst=>new Date(inst.scheduledFor)>=nowTs))
-    .map(m=>({m,next:m.instances.filter(inst=>new Date(inst.scheduledFor)>=nowTs).sort((a,b)=>new Date(a.scheduledFor)-new Date(b.scheduledFor))[0]}))
-    .sort((a,b)=>new Date(a.next.scheduledFor)-new Date(b.next.scheduledFor));
+  // ── Offene Besprechungen ── ein Termin (Instanz) gilt als offen, solange er
+  // status "planned" hat (noch nicht abgehalten/abgesagt) — unabhängig vom
+  // Datum, das bei neu angelegten Terminen auch noch offen sein kann.
+  const meetingSort=(a,b)=>{ if(a.date&&b.date) return a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||''); if(a.date) return -1; if(b.date) return 1; return 0; };
+  const openMeetings=(S.meetings||[])
+    .map(m=>({m,planned:(m.instances||[]).filter(inst=>inst.status==='planned').sort(meetingSort)}))
+    .filter(x=>x.planned.length)
+    .sort((a,b)=>meetingSort(a.planned[0],b.planned[0]));
   let meetingsBody='';
   if(openMeetings.length){
-    openMeetings.slice(0,8).forEach(({m,next})=>{
-      const d=new Date(next.scheduledFor);
+    openMeetings.slice(0,8).forEach(({m,planned})=>{
+      const next=planned[0];
       meetingsBody+='<div style="padding:8px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="setView(\'meetings\')">'
-        +'<div style="font-size:12px;font-weight:600">'+escHtml(m.title)+'</div>'
-        +'<div style="font-size:11px;color:var(--mu)">'+d.toLocaleDateString('de-AT')+' um '+d.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'})+'</div></div>';
+        +'<div style="font-size:12px;font-weight:600">'+escHtml(m.title)+(planned.length>1?' <span style="font-weight:400;color:var(--mu)">('+planned.length+' Termine)</span>':'')+'</div>'
+        +'<div style="font-size:11px;color:var(--mu)">'+(next.date?fmtDate(next.date)+(next.time?' um '+next.time:''):'Datum offen')+'</div></div>';
     });
     meetingsBody+='<div style="padding:8px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--mu)">'+openMeetings.length+' offene Besprechung(en)'
       +' &middot; <a href="javascript:void(0)" onclick="setView(\'meetings\')" style="color:var(--acc)">alle ansehen &#8594;</a></div>';
@@ -684,42 +690,41 @@ function renderHomeOld(){
     ${_dueFaelligHtml?_ccWrap('due_week','&#128197; Diese Woche fällig','<div class="card-rows">'+_dueFaelligHtml+'</div>'):''}
     ${_beschwerdenHtml?_ccWrap('beschwerden','&#128680; Zu erledigen &ndash; Beschwerden','<div class="card-rows">'+_beschwerdenHtml+'</div>'):''}
     ${(() => {
-      const openTodos = S.todos.filter(t => t.items && t.items.some(i => !i.is_done));
+      // Ein Todo ohne Unterpunkte (z.B. "morgen XY anrufen") ist selbst die
+      // Aufgabe und zählt daher auch ohne offene Punkte als offen.
+      const openTodos = S.todos.filter(t => t.status !== 'done');
       if (!openTodos.length) return '';
       let todosHtml = '';
       openTodos.slice(0, 5).forEach(todo => {
-        const openItems = todo.items.filter(i => !i.is_done);
+        const openItems = (todo.items||[]).filter(i => !i.is_done);
         todosHtml += '<div style="padding:8px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="setView(\'todos\')">';
         todosHtml += '<div style="font-size:12px;font-weight:600">'+escHtml(todo.title)+'</div>';
-        todosHtml += '<div style="font-size:11px;color:var(--mu)">'+openItems.length+' offen</div>';
+        todosHtml += '<div style="font-size:11px;color:var(--mu)">'+(openItems.length?openItems.length+' offen':'ohne Unterpunkte')+'</div>';
         todosHtml += '</div>';
       });
       if (openTodos.length > 5) todosHtml += '<div style="padding:8px 14px;border-top:1px solid var(--border)"><button class="btn-s" style="font-size:11px;width:100%" onclick="setView(\'todos\')">Alle Todos anzeigen &#8594;</button></div>';
       return _ccWrap('todos_home', '&#9989; Offene Todos (' + openTodos.length + ')', '<div class="card-rows">' + todosHtml + '</div>');
     })()}
     ${(() => {
-      const now = new Date();
-      const in7days = new Date(now.getTime() + 7*24*60*60*1000);
-      const upcomingMeetings = S.meetings.filter(m => {
-        const hasUpcoming = m.instances && m.instances.some(inst => {
-          const instDate = new Date(inst.scheduledFor);
-          return instDate >= now && instDate <= in7days;
-        });
-        return hasUpcoming;
-      });
+      // Instanzen mit status "planned" gelten als offen (Feldname ist date/time,
+      // nicht scheduledFor — das gab es hier vorher nicht, daher blieb dieser
+      // Block immer leer).
+      const mSort=(a,b)=>{ if(a.date&&b.date) return a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||''); if(a.date) return -1; if(b.date) return 1; return 0; };
+      const upcomingMeetings = (S.meetings||[])
+        .map(m=>({m,planned:(m.instances||[]).filter(inst=>inst.status==='planned').sort(mSort)}))
+        .filter(x=>x.planned.length)
+        .sort((a,b)=>mSort(a.planned[0],b.planned[0]));
       if (!upcomingMeetings.length) return '';
       let meetingsHtml = '';
-      upcomingMeetings.slice(0, 5).forEach(meeting => {
-        const nextInst = meeting.instances ? meeting.instances.find(inst => new Date(inst.scheduledFor) >= now) : null;
-        if (!nextInst) return;
-        const instDate = new Date(nextInst.scheduledFor);
+      upcomingMeetings.slice(0, 5).forEach(({m,planned}) => {
+        const next=planned[0];
         meetingsHtml += `<div style="padding:8px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="setView('meetings')">`;
-        meetingsHtml += `<div style="font-size:12px;font-weight:600">${escHtml(meeting.title)}</div>`;
-        meetingsHtml += `<div style="font-size:11px;color:var(--mu)">${instDate.toLocaleDateString('de-AT')} um ${instDate.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'})}</div>`;
+        meetingsHtml += `<div style="font-size:12px;font-weight:600">${escHtml(m.title)}</div>`;
+        meetingsHtml += `<div style="font-size:11px;color:var(--mu)">${next.date?fmtDate(next.date)+(next.time?' um '+next.time:''):'Datum offen'}</div>`;
         meetingsHtml += '</div>';
       });
       if (upcomingMeetings.length > 5) meetingsHtml += '<div style="padding:8px 14px;border-top:1px solid var(--border)"><button class="btn-s" style="font-size:11px;width:100%" onclick="setView(\'meetings\')">Alle Besprechungen &#8594;</button></div>';
-      return _ccWrap('meetings_home', '&#128483;&#65039; Kommende Besprechungen (' + upcomingMeetings.length + ')', '<div class="card-rows">' + meetingsHtml + '</div>');
+      return _ccWrap('meetings_home', '&#128483;&#65039; Offene Besprechungen (' + upcomingMeetings.length + ')', '<div class="card-rows">' + meetingsHtml + '</div>');
     })()}
     ${_ccWrap('online','&#128101; Online ('+(online.length+1)+')',_onlineHtml)}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
