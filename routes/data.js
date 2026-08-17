@@ -10,7 +10,7 @@ router.get('/', auth, async (req,res) => {
     const canManageDp = roles.some(r=>['admin','leitung','dienstplanung'].includes(r));
     const canManageSpint = roles.some(r=>['admin','leitung','technik'].includes(r));
     const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
-           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw,dpQualificationsRaw,dpShiftPrefsRaw,dpProtocolRaw,todosRaw,todoItemsRaw,todoAssigneesRaw,myDpPlanIdsRaw,todoNotificationsRaw,contactsRaw,sopTemplatesRaw,sopItemsRaw,sopRunsRaw,sopRunItemsRaw,lockersRaw] = await Promise.all([
+           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw,dpQualificationsRaw,dpShiftPrefsRaw,dpProtocolRaw,todosRaw,todoItemsRaw,todoAssigneesRaw,myDpPlanIdsRaw,todoNotificationsRaw,contactsRaw,sopTemplatesRaw,sopItemsRaw,sopRunsRaw,sopRunItemsRaw,lockersRaw,sopBranchOptionsRaw] = await Promise.all([
       q('SELECT id,name,initials,roles,color,must_change_pw,last_seen,category,email,username,hire_date,termination_date FROM users ORDER BY name'),
       q('SELECT * FROM categories ORDER BY sort_order,label'),
       q('SELECT * FROM tags ORDER BY label'),
@@ -77,6 +77,7 @@ router.get('/', auth, async (req,res) => {
         : q('SELECT * FROM sop_checklist_runs WHERE started_by=$1 ORDER BY started_at DESC LIMIT 200',[uid]).catch(()=>[]),
       q('SELECT * FROM sop_checklist_run_items').catch(()=>[]),
       canManageSpint ? q('SELECT * FROM lockers ORDER BY number').catch(()=>[]) : Promise.resolve([]),
+      q('SELECT * FROM sop_checklist_item_branch_options ORDER BY item_id,sort_order').catch(()=>[]),
     ]);
 
     const tkViewMap = new Map((tkViewsRaw||[]).map(v=>[v.ticket_id, v.viewed_at]));
@@ -294,6 +295,8 @@ router.get('/', auth, async (req,res) => {
         items:(sopItemsRaw||[]).filter(i=>i.template_id===t.id).map(i=>({
           id:i.id, sortOrder:i.sort_order, text:i.text, required:i.required,
           itemType:i.item_type, hint:i.hint||'', contactId:i.contact_id||null,
+          branchOptionId:i.branch_option_id||null,
+          options:(sopBranchOptionsRaw||[]).filter(o=>o.item_id===i.id).map(o=>({id:o.id,label:o.label,sortOrder:o.sort_order})),
         })),
       })),
       sopRuns: (sopRunsRaw||[]).map(r=>({

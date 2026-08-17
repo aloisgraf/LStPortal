@@ -694,6 +694,21 @@ async function initDB() {
   updated_by TEXT,
   updated_at TIMESTAMPTZ DEFAULT NOW()
 )`,
+    // ── Verzweigungen in Notfall-Checklisten ── ein Schritt vom Typ "branch"
+    // stellt eine Entscheidung mit mehreren benannten Optionen dar (z.B.
+    // "07-19 Uhr" / "19-07 Uhr"). Andere Schritte können optional einer
+    // Option zugeordnet werden (branch_option_id) — sie erscheinen dann nur,
+    // wenn genau diese Option gewählt wurde. Schritte OHNE Zuordnung bleiben
+    // immer sichtbar, das ist der "Hauptpfad" und zugleich der natürliche
+    // Zusammenführungspunkt: sobald ein Zweig wieder untaggierte Schritte
+    // erreicht, laufen beide Pfade dort automatisch wieder zusammen.
+    `CREATE TABLE IF NOT EXISTS sop_checklist_item_branch_options (
+  id TEXT PRIMARY KEY,
+  item_id TEXT NOT NULL REFERENCES sop_checklist_items(id) ON DELETE CASCADE,
+  label TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0
+)`,
+    `ALTER TABLE sop_checklist_items ADD COLUMN IF NOT EXISTS branch_option_id TEXT REFERENCES sop_checklist_item_branch_options(id) ON DELETE SET NULL`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }

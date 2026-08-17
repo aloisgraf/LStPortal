@@ -3829,7 +3829,50 @@ async function deleteContact(id){
 // Version als Entwurf angelegt, die alte bleibt bis zur Freigabe der neuen
 // unverändert aktiv (Nachvollziehbarkeit abgeschlossener Durchläufe).
 const SOP_CATEGORY_SUGGESTIONS=['Systemausfall Einsatzleitsystem','Ausfall Telefonanlage','Stromausfall','Schichtübergabe-Check','Großschadenslage'];
-const SOP_ITEM_TYPES=[{id:'check',label:'Checkbox'},{id:'text',label:'Texteingabe'},{id:'yesno',label:'Ja/Nein'},{id:'photo',label:'Foto-Upload'},{id:'contact',label:'Kontakt'}];
+const SOP_ITEM_TYPES=[{id:'check',label:'Checkbox'},{id:'text',label:'Texteingabe'},{id:'yesno',label:'Ja/Nein'},{id:'photo',label:'Foto-Upload'},{id:'contact',label:'Kontakt'},{id:'branch',label:'Verzweigung'}];
+// ── Verzweigungen: ein Schritt vom Typ "branch" hat mehrere Optionen
+// (t.items[].options); andere Schritte können optional einer Option
+// zugeordnet werden (item.branchOptionId) und sind dann nur sichtbar, wenn
+// genau diese Option gewählt wurde. Schritte ohne Zuordnung ("Hauptpfad")
+// sind immer sichtbar — das ist zugleich der Zusammenführungspunkt nach
+// einer Verzweigung.
+function sopOptionOwnerMap(items){
+  // optionId -> Item, das diese Option anbietet (der Verzweigungs-Schritt)
+  const map={};
+  (items||[]).forEach(it=>(it.options||[]).forEach(o=>{map[o.id]=it;}));
+  return map;
+}
+function sopItemDepth(items,item){
+  const ownerMap=sopOptionOwnerMap(items);
+  let depth=0, cur=item, guard=0;
+  while(cur&&cur.branchOptionId&&guard++<20){
+    depth++;
+    cur=ownerMap[cur.branchOptionId]||null;
+  }
+  return depth;
+}
+// Ermittelt, welche Schritte bei den bisher getroffenen Entscheidungen
+// (chosenOptionIds) tatsächlich auf dem aktiven Pfad liegen (Hauptpfad-
+// Schritte immer, verzweigte Schritte nur bei passender Wahl) — iterativ,
+// damit auch verschachtelte Verzweigungen korrekt aufgelöst werden.
+function sopVisibleItems(items,runItemsByItemId){
+  const visible=new Set((items||[]).filter(it=>!it.branchOptionId).map(it=>it.id));
+  let changed=true;
+  while(changed){
+    changed=false;
+    (items||[]).forEach(it=>{
+      if(visible.has(it.id)&&it.itemType==='branch'){
+        const chosen=runItemsByItemId[it.id]?.value;
+        if(chosen){
+          (items||[]).forEach(sub=>{
+            if(sub.branchOptionId===chosen&&!visible.has(sub.id)){visible.add(sub.id);changed=true;}
+          });
+        }
+      }
+    });
+  }
+  return (items||[]).filter(it=>visible.has(it.id));
+}
 function sopContactCardHtml(c){
   if(!c) return '<div style="font-size:11px;color:var(--di)">(Kontakt wurde gelöscht)</div>';
   const lines=[];
@@ -3957,21 +4000,38 @@ function renderSopEditor(id){
   const isDraft=t.status==='draft';
   const items=(t.items||[]).slice().sort((a,b)=>a.sortOrder-b.sortOrder);
   const typeLabel=ty=>(SOP_ITEM_TYPES.find(x=>x.id===ty)||{}).label||ty;
-  const itemRow=(it,i)=>`<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--border)">
+  const optionLabel=optId=>{ for(const x of items){ const o=(x.options||[]).find(y=>y.id===optId); if(o) return o.label; } return '?'; };
+  const itemRow=(it,i)=>{
+    const indent=sopItemDepth(items,it)*24;
+    const branchTag=it.branchOptionId?`<div style="font-size:10px;color:var(--acc);font-weight:600;margin-bottom:2px">↳ Falls „${esc(optionLabel(it.branchOptionId))}“</div>`:'';
+    const optionsHtml=it.itemType==='branch'?`<div style="margin-top:8px;padding:8px 10px;background:var(--sf2);border-radius:8px">
+      <div style="font-size:11px;font-weight:700;color:var(--mu);margin-bottom:6px">Optionen</div>
+      ${(it.options||[]).map(o=>`<div style="display:flex;align-items:center;gap:6px;padding:2px 0;font-size:12px">
+        <span style="flex:1">${esc(o.label)}</span>
+        ${isDraft&&canManage?`<button class="btn-s" style="font-size:10px;padding:2px 6px" onclick="sopEditBranchOption('${t.id}','${it.id}','${o.id}')">✎</button>
+        <button class="btn-d" style="font-size:10px;padding:2px 6px" onclick="sopDeleteBranchOption('${t.id}','${it.id}','${o.id}')">✕</button>`:''}
+      </div>`).join('')}
+      ${!(it.options||[]).length?'<div style="font-size:11px;color:var(--di)">Noch keine Optionen.</div>':''}
+      ${isDraft&&canManage?`<button class="btn-s" style="font-size:11px;margin-top:6px" onclick="sopAddBranchOption('${t.id}','${it.id}')">+ Option hinzufügen</button>`:''}
+    </div>`:'';
+    return `<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 0 10px ${indent}px;border-top:1px solid var(--border)">
     ${isDraft?`<div style="display:flex;flex-direction:column;gap:2px">
       <button class="btn-s" style="padding:1px 6px;font-size:10px" ${i===0?'disabled':''} onclick="sopMoveItem('${t.id}',${i},-1)">▲</button>
       <button class="btn-s" style="padding:1px 6px;font-size:10px" ${i===items.length-1?'disabled':''} onclick="sopMoveItem('${t.id}',${i},1)">▼</button>
     </div>`:`<div style="width:22px;text-align:center;color:var(--di);font-size:11px;flex-shrink:0">${i+1}.</div>`}
     <div style="flex:1">
+      ${branchTag}
       <div style="font-size:13px;font-weight:600">${i+1}. ${esc(it.text)} ${it.required?'<span style="color:#ef4444">*</span>':''} <span class="bdg" style="font-size:10px">${typeLabel(it.itemType)}</span></div>
       ${it.hint?`<div style="font-size:11px;color:var(--mu);margin-top:2px">💡 ${esc(it.hint)}</div>`:''}
       ${it.itemType==='contact'?sopContactCardHtml((S.contacts||[]).find(c=>c.id===it.contactId)):''}
+      ${optionsHtml}
     </div>
     ${isDraft&&canManage?`<div style="display:flex;gap:4px;flex-shrink:0">
       <button class="btn-s" style="font-size:11px;padding:3px 8px" onclick="sopEditItem('${t.id}','${it.id}')">✎</button>
       <button class="btn-d" style="font-size:11px;padding:3px 8px" onclick="sopDeleteItem('${t.id}','${it.id}')">✕</button>
     </div>`:''}
   </div>`;
+  };
   document.getElementById('main').innerHTML=`
     <div class="ph"><div class="pt">← <a href="javascript:void(0)" onclick="S._sopView='overview';renderSop()" style="color:var(--tx);text-decoration:none">🚨 Notfall-Checklisten</a> / ${esc(t.title)}</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -4050,6 +4110,13 @@ function openSopItemForm(tplId,itemId){
     contactSel.innerHTML='<option value="">— Kontakt wählen —</option>'+sorted.map(c=>`<option value="${c.id}">${esc(c.name)}${c.company?' ('+esc(c.company)+')':''}</option>`).join('');
     contactSel.value=it?.contactId||'';
   }
+  const branchSel=document.getElementById('siBranchOption');
+  if(branchSel){
+    const opts=[];
+    (t.items||[]).forEach(x=>{ if(x.id===itemId) return; (x.options||[]).forEach(o=>opts.push({item:x,opt:o})); });
+    branchSel.innerHTML='<option value="">— Hauptpfad (immer sichtbar) —</option>'+opts.map(({item,opt})=>`<option value="${opt.id}">${esc(item.text.slice(0,30))} → ${esc(opt.label)}</option>`).join('');
+    branchSel.value=it?.branchOptionId||'';
+  }
   sopToggleContactRow();
   openModal('sopItemOv');
 }
@@ -4067,7 +4134,7 @@ async function saveSopItem(){
   if(!text)return toast('⚠️ Text erforderlich','err');
   const itemType=document.getElementById('siType').value;
   if(itemType==='contact'&&!document.getElementById('siContact')?.value)return toast('⚠️ Bitte einen Kontakt wählen','err');
-  const body={text,required:document.getElementById('siRequired').checked,itemType,hint:document.getElementById('siHint').value.trim(),contactId:document.getElementById('siContact')?.value||''};
+  const body={text,required:document.getElementById('siRequired').checked,itemType,hint:document.getElementById('siHint').value.trim(),contactId:document.getElementById('siContact')?.value||'',branchOptionId:document.getElementById('siBranchOption')?.value||''};
   try{
     if(itemId) await api('PUT','/sop/templates/'+tplId+'/items/'+itemId,body);
     else await api('POST','/sop/templates/'+tplId+'/items',body);
@@ -4086,6 +4153,23 @@ async function sopMoveItem(tplId,index,dir){
   if(j<0||j>=items.length)return;
   const tmp=items[index];items[index]=items[j];items[j]=tmp;
   try{await api('PUT','/sop/templates/'+tplId+'/items-reorder',{order:items.map(i=>i.id)});await fetchData();renderSop();}catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function sopAddBranchOption(tplId,itemId){
+  const label=prompt('Bezeichnung der Option (z.B. "07-19 Uhr"):');
+  if(!label||!label.trim())return;
+  try{await api('POST','/sop/templates/'+tplId+'/items/'+itemId+'/branch-options',{label:label.trim()});await fetchData();renderSop();}catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function sopEditBranchOption(tplId,itemId,optId){
+  const t=S.sopTemplates.find(x=>x.id===tplId);
+  const it=t?.items.find(x=>x.id===itemId);
+  const cur=it?.options.find(x=>x.id===optId);
+  const label=prompt('Bezeichnung ändern:',cur?.label||'');
+  if(!label||!label.trim())return;
+  try{await api('PUT','/sop/templates/'+tplId+'/items/'+itemId+'/branch-options/'+optId,{label:label.trim()});await fetchData();renderSop();}catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function sopDeleteBranchOption(tplId,itemId,optId){
+  if(!confirm('Option löschen? Schritte, die dieser Option zugeordnet waren, fallen auf den Hauptpfad zurück (immer sichtbar).'))return;
+  try{await api('DELETE','/sop/templates/'+tplId+'/items/'+itemId+'/branch-options/'+optId);await fetchData();renderSop();}catch(e){toast('⚠️ '+e.message,'err');}
 }
 async function sopApprove(id){
   if(!confirm('Checkliste freigeben? Sie wird damit für alle Mitarbeiter sichtbar und ausführbar.'))return;
@@ -4137,14 +4221,20 @@ function renderSopRun(runId){
   if(!run){S._sopView='overview';renderSopOverview();return;}
   const t=(S.sopTemplates||[]).find(x=>x.id===run.templateId);
   if(!t){S._sopView='overview';renderSopOverview();return;}
-  const items=(t.items||[]).slice().sort((a,b)=>a.sortOrder-b.sortOrder);
+  const allItems=(t.items||[]).slice().sort((a,b)=>a.sortOrder-b.sortOrder);
+  const runItemsByItemId={}; run.items.forEach(ri=>{runItemsByItemId[ri.itemId]=ri;});
+  // Nur die Schritte anzeigen, die auf dem aufgrund bisheriger Entscheidungen
+  // aktiven Pfad liegen (Hauptpfad + gewählte Verzweigungen) — Fortschritt
+  // bezieht sich ebenfalls nur auf diese, nicht auf alle jemals möglichen Schritte.
+  const items=sopVisibleItems(allItems,runItemsByItemId);
   const isOwner=run.startedBy===S.currentUser;
   const canEdit=run.status==='running'&&(isOwner||S.p.manageSop);
-  const doneCount=items.filter(it=>{const ri=run.items.find(x=>x.itemId===it.id);return ri&&ri.done;}).length;
+  const doneCount=items.filter(it=>runItemsByItemId[it.id]?.done).length;
   const pct=items.length?Math.round(doneCount/items.length*100):0;
   const stepRow=it=>{
-    const ri=run.items.find(x=>x.itemId===it.id)||{};
+    const ri=runItemsByItemId[it.id]||{};
     const disabled=!canEdit?'disabled':'';
+    const indent=sopItemDepth(allItems,it)*24;
     let control='';
     if(it.itemType==='text'){
       control=`<input type="text" value="${esc(ri.value||'')}" ${disabled} onchange="sopRunSetValue('${run.id}','${it.id}',this.value)" style="width:100%;max-width:400px;margin-top:6px;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--sf);color:var(--tx);box-sizing:border-box" placeholder="Eingabe...">`;
@@ -4160,11 +4250,19 @@ function renderSopRun(runId){
       </div>`;
     } else if(it.itemType==='contact'){
       control=sopContactCardHtml((S.contacts||[]).find(c=>c.id===it.contactId));
+    } else if(it.itemType==='branch'){
+      control=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">`
+        +(it.options||[]).map(o=>`<button class="mb ${ri.value===o.id?'on':''}" ${disabled} onclick="sopRunChooseBranch('${run.id}','${it.id}','${o.id}')">${esc(o.label)}</button>`).join('')
+        +(!(it.options||[]).length?'<span style="font-size:11px;color:var(--di)">Keine Optionen hinterlegt</span>':'')
+        +`</div>`;
     }
-    return `<div style="display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-bottom:1px solid var(--border);${ri.done?'opacity:.65':''}">
-      <input type="checkbox" ${ri.done?'checked':''} ${disabled} onchange="sopRunToggle('${run.id}','${it.id}',this.checked)" style="width:26px;height:26px;flex-shrink:0;margin-top:2px;cursor:${canEdit?'pointer':'default'}">
+    const isBranch=it.itemType==='branch';
+    return `<div style="display:flex;gap:12px;align-items:flex-start;padding:14px 16px 14px ${16+indent}px;border-bottom:1px solid var(--border);${ri.done?'opacity:.65':''}">
+      ${isBranch
+        ?`<div style="font-size:22px;flex-shrink:0;margin-top:2px">🔀</div>`
+        :`<input type="checkbox" ${ri.done?'checked':''} ${disabled} onchange="sopRunToggle('${run.id}','${it.id}',this.checked)" style="width:26px;height:26px;flex-shrink:0;margin-top:2px;cursor:${canEdit?'pointer':'default'}">`}
       <div style="flex:1;min-width:0">
-        <div style="font-size:15px;font-weight:600;${ri.done?'text-decoration:line-through':''}">${esc(it.text)}${it.required?' <span style="color:#ef4444">*</span>':''}</div>
+        <div style="font-size:15px;font-weight:600;${ri.done&&!isBranch?'text-decoration:line-through':''}">${esc(it.text)}${it.required&&!isBranch?' <span style="color:#ef4444">*</span>':''}</div>
         ${it.hint?`<div style="font-size:12px;color:var(--mu);margin-top:2px">💡 ${esc(it.hint)}</div>`:''}
         ${control}
         <textarea placeholder="Dokumentation / Notiz…" ${disabled} onchange="sopRunSetNote('${run.id}','${it.id}',this.value)" rows="2" style="width:100%;max-width:400px;margin-top:6px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--sf);color:var(--tx);box-sizing:border-box;font-size:12px;font-family:inherit;resize:vertical">${esc(ri.note||'')}</textarea>
@@ -4189,6 +4287,9 @@ function renderSopRun(runId){
 }
 async function sopRunToggle(runId,itemId,done){
   try{await api('PUT','/sop/runs/'+runId+'/items/'+itemId,{done});await fetchData();renderSop();}catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function sopRunChooseBranch(runId,itemId,optionId){
+  try{await api('PUT','/sop/runs/'+runId+'/items/'+itemId,{done:true,value:optionId});await fetchData();renderSop();}catch(e){toast('⚠️ '+e.message,'err');}
 }
 async function sopRunSetValue(runId,itemId,value){
   try{await api('PUT','/sop/runs/'+runId+'/items/'+itemId,{value});await fetchData();if(S._sopView==='run')renderSop();}catch(e){toast('⚠️ '+e.message,'err');}
