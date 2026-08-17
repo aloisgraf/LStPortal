@@ -8303,11 +8303,20 @@ function renderChatList(){
 if(!S._chatWindows)S._chatWindows=[];
 
 function _chatWin(id){ return (S._chatWindows||[]).find(w=>w.id===id); }
+// #qaWrap trägt ein inline style="display:flex" (siehe index.html) — das
+// gewinnt IMMER gegen eine CSS-Klasse/@media-Regel, egal wie spezifisch.
+// Deshalb hier direkt das inline style setzen statt nur eine Klasse zu toggeln.
+function _setQaWrapVisible(visible){
+  const wrap=document.getElementById('qaWrap');
+  if(!wrap)return;
+  const shouldHide=!visible&&window.innerWidth<=640;
+  wrap.style.display=shouldHide?'none':'flex';
+}
 function renderChatWindows(){
   const row=document.getElementById('chatWinRow');
   if(!row)return;
   const wins=S._chatWindows||[];
-  if(!wins.length){row.innerHTML='';row.classList.remove('open');document.getElementById('qaWrap')?.classList.remove('hide-for-chat');return;}
+  if(!wins.length){row.innerHTML='';row.classList.remove('open');_setQaWrapVisible(true);return;}
   row.classList.add('open');
   row.innerHTML=wins.map(w=>{
     if(w.id==='__picker__')return chatWinPickerHtml(w);
@@ -8317,7 +8326,7 @@ function renderChatWindows(){
   // zugriff-Button — solange ein Fenster maximiert (nicht nur als Leiste
   // minimiert) offen ist, blenden wir ihn aus.
   const anyMaximized=S._chatWindows.some(w=>!w.minimized);
-  document.getElementById('qaWrap')?.classList.toggle('hide-for-chat',anyMaximized);
+  _setQaWrapVisible(!anyMaximized);
   S._chatWindows.filter(w=>!w.minimized&&w.id!=='__picker__').forEach(w=>{
     const el=document.getElementById('chatWinMsgs_'+w.id);
     if(el)el.scrollTop=el.scrollHeight;
