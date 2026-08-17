@@ -229,12 +229,16 @@ router.delete('/sop/templates/:id/items/:itemId/branch-options/:optId', auth, as
 // ── DURCHLÄUFE ──────────────────────────────────────────────────────────────
 router.post('/sop/runs', auth, async (req,res) => {
   try {
-    const {templateId} = req.body;
+    const {templateId, isTest} = req.body;
     const tpl = await q1('SELECT * FROM sop_checklists WHERE id=$1',[templateId]);
     if (!tpl) return bad(res,'Checkliste nicht gefunden',404);
-    if (tpl.status!=='approved'||!tpl.active) return bad(res,'Checkliste ist nicht freigegeben/aktiv');
+    // Ein Testdurchlauf dient dem Durchklicken eines NOCH NICHT freigegebenen
+    // Entwurfs — nur wer Checklisten verwalten darf, darf ihn starten, und die
+    // sonst nötige approved/active-Prüfung entfällt bewusst dafür.
+    if (isTest) { if (!req.p.manageSop) return bad(res,'Keine Berechtigung',403); }
+    else if (tpl.status!=='approved'||!tpl.active) return bad(res,'Checkliste ist nicht freigegeben/aktiv');
     const id = newId();
-    await pool.query(`INSERT INTO sop_checklist_runs (id,template_id,started_by,status) VALUES ($1,$2,$3,'running')`,[id,templateId,req.uid]);
+    await pool.query(`INSERT INTO sop_checklist_runs (id,template_id,started_by,status,is_test) VALUES ($1,$2,$3,'running',$4)`,[id,templateId,req.uid,!!isTest]);
     const items = await q('SELECT * FROM sop_checklist_items WHERE template_id=$1',[templateId]);
     for (const it of items) {
       await pool.query('INSERT INTO sop_checklist_run_items (id,run_id,item_id,done,value) VALUES ($1,$2,$3,false,$4)',[newId(),id,it.id,'']);
@@ -285,13 +289,24 @@ router.put('/sop/runs/:id/abort', auth, async (req,res) => {
   } catch(e) { bad(res,'Serverfehler',500); }
 });
 
+router.delete('/sop/runs/:id', auth, async (req,res) => {
+  try {
+    const run = await q1('SELECT * FROM sop_checklist_runs WHERE id=$1',[req.params.id]);
+    if (!run) return bad(res,'Nicht gefunden',404);
+    if (!run.is_test) return bad(res,'Nur Testdurchläufe können gelöscht werden');
+    if (run.started_by!==req.uid && !req.p.manageSop) return bad(res,'Keine Berechtigung',403);
+    await pool.query('DELETE FROM sop_checklist_runs WHERE id=$1',[req.params.id]);
+    ok(res);
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
 // ── AUSWERTUNG ──────────────────────────────────────────────────────────────
 router.get('/sop/templates/:id/stats', auth, async (req,res) => {
   try {
     if (!requireManage(req,res)) return;
     const tpl = await q1('SELECT * FROM sop_checklists WHERE id=$1',[req.params.id]);
     if (!tpl) return bad(res,'Nicht gefunden',404);
-    const runs = await q('SELECT * FROM sop_checklist_runs WHERE template_id=$1',[req.params.id]);
+    const runs = (await q('SELECT * FROM sop_checklist_runs WHERE template_id=$1',[req.params.id])).filter(r=>!r.is_test);
     const completed = runs.filter(r=>r.status==='completed');
     const durations = completed.map(r=>(new Date(r.completed_at)-new Date(r.started_at))/60000).filter(n=>n>=0);
     const avgDurationMin = durations.length ? durations.reduce((a,b)=>a+b,0)/durations.length : null;

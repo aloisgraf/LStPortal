@@ -10,6 +10,11 @@ const pick = (obj, keys) => {
   return '';
 };
 const stripHtml = html => String(html||'').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/\s+/g,' ').trim();
+// Bei intern verschickten Outlook-Mails liefert das X.500-Feld (statt einer
+// SMTP-Adresse) oft eine Exchange-Legacy-DN wie
+// "/O=EXCHANGELABS/OU=EXCHANGE ADMINISTRATIVE GROUP.../CN=RECIPIENTS/CN=..."
+// — so etwas darf nie als Absenderadresse durchgereicht werden.
+const isRealEmail = s => /^[^\s@\/]+@[^\s@\/]+\.[^\s@\/]+$/.test(String(s||'').trim());
 
 function parseMsg(buffer) {
   const MsgReaderMod = require('@kenjiuno/msgreader');
@@ -18,7 +23,13 @@ function parseMsg(buffer) {
   const fileData = reader.getFileData();
   const subject = pick(fileData, ['subject','Subject']);
   const senderName = pick(fileData, ['senderName','SenderName']);
-  const senderEmail = pick(fileData, ['senderEmail','SenderEmail','senderSmtpAddress']);
+  let senderEmail = pick(fileData, ['senderSmtpAddress','senderEmail','SenderEmail']);
+  if (!isRealEmail(senderEmail)) {
+    // Fallback: rohe Internet-Header (falls im .msg erhalten) nach "From:" durchsuchen
+    const headers = pick(fileData, ['headers','transportMessageHeaders']);
+    const m = String(headers||'').match(/^From:.*?<?([^\s<>]+@[^\s<>]+)>?\s*$/im);
+    senderEmail = m && isRealEmail(m[1]) ? m[1] : '';
+  }
   let body = pick(fileData, ['body','Body']);
   if (!body) body = stripHtml(pick(fileData, ['bodyHTML','bodyHtml']));
   return { subject, senderName, senderEmail, body };

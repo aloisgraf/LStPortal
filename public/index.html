@@ -277,7 +277,7 @@
 <!-- FACHBEREICH -->
 <div class="ov" id="deptOv">
   <div class="modal">
-    <div class="mh"><h2 id="dpFT">Neuer Fachbereich</h2><button class="mc" onclick="closeModal('deptOv')">&#10005;</button></div>
+    <div class="mh"><h2 id="dpFT">Neuer Fachbereich</h2><button class="mc" onclick="backToAdmin('depts')">&#10005;</button></div>
     <div class="mb2">
       <input type="hidden" id="dpId">
       <div class="fg full"><label>Bezeichnung *</label><input type="text" id="dpLabel" placeholder="z.B. Logistik"></div>
@@ -286,7 +286,7 @@
         <div class="fg"><label>Farbe</label><input type="color" id="dpColor" style="width:100%;height:38px;padding:2px;cursor:pointer"></div>
       </div>
     </div>
-    <div class="mf"><button class="btn-s" onclick="closeModal('deptOv')">Abbrechen</button><button class="btn-p" onclick="saveDept()">&#128190; Speichern</button></div>
+    <div class="mf"><button class="btn-s" onclick="backToAdmin('depts')">Abbrechen</button><button class="btn-p" onclick="saveDept()">&#128190; Speichern</button></div>
   </div>
 </div>
 
@@ -297,6 +297,7 @@
     <div class="mb2">
       <input type="hidden" id="tkFId">
       <div class="fg full"><label>Ticketname *</label><input type="text" id="tkFNm"></div>
+      <div class="fg full"><label>Einmelder</label><input type="text" id="tkFReporter" placeholder="z.B. Max Mustermann &lt;max@example.com&gt; (optional)"></div>
       <div class="fg full"><label>Beschreibung</label><textarea id="tkFDesc" rows="4"></textarea></div>
       <div class="fr">
         <div class="fg"><label>Fachbereich *</label><select id="tkFDept" onchange="onTkDeptChange()">
@@ -480,6 +481,7 @@
         <button class="tb" id="atb-tags" onclick="swTab('tags')">&#127991;&#65039; Tags</button>
         <button class="tb" id="atb-stats" onclick="swTab('stats')">&#128202; Statistiken</button>
         <button class="tb" id="atb-rights" onclick="swTab('rights')">&#128272; Rechte</button>
+        <button class="tb" id="atb-depts" onclick="swTab('depts')">&#127970; Fachbereiche</button>
         <button class="tb" id="atb-subcats" onclick="swTab('subcats')">&#127991; Unterkategorien</button>
         <button class="tb" id="atb-notetpls" onclick="swTab('notetpls')">&#128172; Notizvorlagen</button>
         <button class="tb" id="atb-log" onclick="swTab('log');loadLog(true)">&#128221; Aktivitätslog</button>
@@ -491,6 +493,7 @@
       <div class="tp" id="atp-tags"><div class="al" id="tagList"></div><button class="btn-p" style="width:100%;justify-content:center" onclick="openTF(null)">&#65291; Tag</button></div>
       <div class="tp" id="atp-stats"><div id="statsPanel"></div></div>
       <div class="tp" id="atp-rights"><div id="rightsMatrix" style="overflow-x:auto"></div></div>
+      <div class="tp" id="atp-depts"><div id="deptsList"></div></div>
       <div class="tp" id="atp-subcats">
         <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:flex-end">
           <div class="fg" style="margin:0;flex:1;min-width:140px"><label style="font-size:11px">Fachbereich</label><select id="scFDept" style="font-size:12px;padding:5px 8px">

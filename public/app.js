@@ -406,10 +406,15 @@ function renderHomeNew(){
     const byTicket={}; const singles=[];
     unreadNotif.forEach(n=>{ if(n.ticketId){ (byTicket[n.ticketId]=byTicket[n.ticketId]||[]).push(n); } else singles.push(n); });
     const typePrio={assigned:0,mention:1,new_ticket:2};
+    // Jede Phrase ist ein vollständiger, für sich grammatisch korrekter
+    // Teilsatz (eigenes Subjekt/Verb) — sie werden nur mit " · " aneinander-
+    // gereiht, nicht künstlich unter ein gemeinsames "es wurde" gezwungen
+    // (das ergab z.B. "es wurde dir zugewiesen und du erwähnt und ein neues
+    // Ticket erstellt", was grammatisch nicht passt).
     const notifPhrase=(type,tk)=>{
-      if(type==='new_ticket') return 'ein neues Ticket'+(tk?' in '+(DEPT_LABELS[tk.department]||tk.department):'')+' erstellt';
-      if(type==='assigned') return 'dir zugewiesen';
-      if(type==='mention') return 'du erwähnt';
+      if(type==='new_ticket') return 'Neu erstellt'+(tk?' in '+(DEPT_LABELS[tk.department]||tk.department):'');
+      if(type==='assigned') return 'Dir zugewiesen';
+      if(type==='mention') return 'Du wurdest erwähnt';
       return null;
     };
     const groups=[
@@ -423,7 +428,7 @@ function renderHomeNew(){
           const types=[...new Set(g.map(x=>x.type))];
           const phrases=types.map(t=>notifPhrase(t,tk)).filter(Boolean);
           text=phrases.length
-            ? (tk?tk.number+': '+tk.title+' — es wurde '+phrases.join(' und ')+'.':'Es wurde '+phrases.join(' und ')+'.')
+            ? (tk?tk.number+': '+tk.title+' — '+phrases.join(' · '):phrases.join(' · '))
             : g.map(x=>x.title).join(' · ');
         }
         return {ids:g.map(x=>x.id),text,count:g.length,ticketId,type:g[0].type,createdAt:g.map(x=>x.createdAt).sort().pop()};
@@ -473,9 +478,11 @@ function renderHomeNew(){
     openTodos.slice(0,8).forEach(todo=>{
       const openItems=(todo.items||[]).filter(i=>!i.is_done);
       const dueTxt=todo.due_date?fmtDateShort(String(todo.due_date).slice(0,10)):'';
-      todosBody+='<div style="padding:8px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="setView(\'todos\')">'
-        +'<div style="font-size:12px;font-weight:600">'+escHtml(todo.title)+'</div>'
-        +'<div style="font-size:11px;color:var(--mu)">'+(openItems.length?openItems.length+' Punkt(e) offen':'ohne Unterpunkte')+(dueTxt?' &middot; fällig '+dueTxt:'')+'</div></div>';
+      const prio=TODO_PRIO[todo.priority]||TODO_PRIO.medium;
+      todosBody+='<div style="padding:8px 14px;border-top:1px solid var(--border);cursor:pointer;display:flex;align-items:flex-start;gap:8px" onclick="setView(\'todos\')">'
+        +'<span title="'+prio.label+'" style="width:8px;height:8px;border-radius:50%;background:'+prio.color+';flex-shrink:0;margin-top:5px"></span>'
+        +'<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600">'+escHtml(todo.title)+'</div>'
+        +'<div style="font-size:11px;color:var(--mu)">'+(openItems.length?openItems.length+' Punkt(e) offen':'ohne Unterpunkte')+(dueTxt?' &middot; fällig '+dueTxt:'')+'</div></div></div>';
     });
     todosBody+='<div style="padding:8px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--mu)">'+openTodos.length+' offene(s) Todo(s)'
       +' &middot; <a href="javascript:void(0)" onclick="setView(\'todos\')" style="color:var(--acc)">alle ansehen &#8594;</a></div>';
@@ -1997,12 +2004,14 @@ function renderTkDetail(){
       const closed = S.tickets.filter(t=>t.id!==tk.id && !t.parentTicketId && !t.isDeleted && t.status==='closed').map(t=>`<option value="${t.id}"${tk.parentTicketId===t.id?' selected':''}>${t.number}: ${t.title.slice(0,25)}</option>`).join('');
       return active + (closed ? `<optgroup label="Abgeschlossen">${closed}</optgroup>` : '');
     })()}</select></div>
-    <div class="tkf"><label>&#128197; F\u00e4lligkeit</label><input type="date" value="${tk.dueDate||''}" onchange="updateTkField('${tk.id}','dueDate',this.value||null)" style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:var(--r);background:var(--sf);color:var(--tx);width:100%;box-sizing:border-box"></div>`
+    <div class="tkf"><label>&#128197; F\u00e4lligkeit</label><input type="date" value="${tk.dueDate||''}" onchange="updateTkField('${tk.id}','dueDate',this.value||null)" style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:var(--r);background:var(--sf);color:var(--tx);width:100%;box-sizing:border-box"></div>
+    <div class="tkf"><label>&#128100; Einmelder</label><input type="text" value="${esc(tk.reporter||'')}" placeholder="optional" onchange="updateTkField('${tk.id}','reporter',this.value.trim())" style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:var(--r);background:var(--sf);color:var(--tx);width:100%;box-sizing:border-box"></div>`
     :`<div class="tkf"><label>Status</label><div class="val">${stBdg(tk.status)}</div></div>
     <div class="tkf"><label>Priorit\u00e4t</label><div class="val">${prioBdg(tk.priority)}</div></div>
     <div class="tkf"><label>Fachbereich</label><div class="val">${deptBdg(tk.department)}</div></div>
     ${S.tp.canSeeSubcat&&tk.subcategory?`<div class="tkf"><label>Unterkategorie</label><div class="val"><span class="bdg" style="font-size:11px;background:rgba(124,58,237,.12);color:#7c3aed">${tk.subcategory}</span></div></div>`:''}
-    <div class="tkf"><label>Zust\u00e4ndig</label><div class="val">${getU(tk.assigneeId)?`<div style="display:flex;align-items:center;gap:5px">${avHtml(getU(tk.assigneeId).initials,getU(tk.assigneeId).color,18,8)}<span style="font-size:12px">${getU(tk.assigneeId).name}</span></div>`:'\u2014'}</div></div>`}
+    <div class="tkf"><label>Zust\u00e4ndig</label><div class="val">${getU(tk.assigneeId)?`<div style="display:flex;align-items:center;gap:5px">${avHtml(getU(tk.assigneeId).initials,getU(tk.assigneeId).color,18,8)}<span style="font-size:12px">${getU(tk.assigneeId).name}</span></div>`:'\u2014'}</div></div>
+    ${tk.reporter?`<div class="tkf"><label>&#128100; Einmelder</label><div class="val" style="font-size:12px">${esc(tk.reporter)}</div></div>`:''}`}
     <div class="tkdiv"></div>
     <div class="tkf"><label>Tags</label><div>${tagChips(tk.tags)||'<span style="color:var(--di);font-size:11px">\u2014</span>'}</div></div>
     <div class="tkf"><label>&#128164; Wiedervorlage</label>
@@ -2131,8 +2140,7 @@ function _arrayBufferToBase64(buf){
 }
 // E-Mail (Outlook .msg oder .eml) per Drag&Drop auf die Ticket-Liste ziehen →
 // Server liest Betreff/Absender/Text aus, "Neues Ticket"-Formular öffnet sich
-// vorausgefüllt (Absender kommt als "Einmelder:"-Zeile in die Beschreibung,
-// da es kein eigenes Ticketfeld dafür gibt).
+// vorausgefüllt (Absender landet im eigenen "Einmelder"-Feld).
 async function tkEmailDrop(event,el){
   event.preventDefault();
   el.style.borderColor='var(--border)';el.style.color='var(--mu)';el.style.background='transparent';
@@ -2147,9 +2155,8 @@ async function tkEmailDrop(event,el){
     const result=await api('POST','/email/parse',{filename:file.name,data});
     openTkForm(null);
     document.getElementById('tkFNm').value=(result.subject||'').slice(0,200);
-    const senderParts=[result.senderName,result.senderEmail?'<'+result.senderEmail+'>':''].filter(Boolean).join(' ');
-    const senderLine=senderParts?('Einmelder: '+senderParts+'\n\n'):'';
-    document.getElementById('tkFDesc').value=senderLine+(result.body||'').trim();
+    document.getElementById('tkFReporter').value=[result.senderName,result.senderEmail?'<'+result.senderEmail+'>':''].filter(Boolean).join(' ');
+    document.getElementById('tkFDesc').value=(result.body||'').trim();
     toast('✅ E-Mail übernommen — bitte Angaben prüfen');
   }catch(e){toast('⚠️ '+e.message,'err');}
 }
@@ -2158,6 +2165,7 @@ function openTkForm(id,parentId){
   document.getElementById('tkFT').textContent=tk?`Ticket bearbeiten: ${tk.number}`:'Neues Ticket';
   document.getElementById('tkFId').value=tk?.id||'';
   document.getElementById('tkFNm').value=tk?.title||'';
+  document.getElementById('tkFReporter').value=tk?.reporter||'';
   document.getElementById('tkFDesc').value=tk?.description||'';
   // Auswahl aus dem aktuellen (admin-verwaltbaren) DEPTS-Stand neu aufbauen —
   // statisches HTML kennt nur die 6 ursprünglichen Fachbereiche.
@@ -2186,7 +2194,7 @@ async function saveTicket(){
   const nm=document.getElementById('tkFNm').value.trim();if(!nm){toast('\u26A0\uFE0F Name erforderlich!');return;}
   const id=document.getElementById('tkFId').value;
   const tags=Array.from(document.getElementById('tkFTags').selectedOptions).map(o=>o.value);
-  const body={title:nm,description:document.getElementById('tkFDesc').value.trim(),department:document.getElementById('tkFDept').value,subcategory:document.getElementById('tkFSubcat')?.value||'',priority:document.getElementById('tkFPrio').value,status:document.getElementById('tkFSt').value,bucket:document.getElementById('tkFBkt').value,tags,assigneeId:document.getElementById('tkFAsgn').value||null,parentTicketId:document.getElementById('tkFPar').value||null,dueDate:document.getElementById('tkFDue')?.value||null};
+  const body={title:nm,reporter:document.getElementById('tkFReporter').value.trim(),description:document.getElementById('tkFDesc').value.trim(),department:document.getElementById('tkFDept').value,subcategory:document.getElementById('tkFSubcat')?.value||'',priority:document.getElementById('tkFPrio').value,status:document.getElementById('tkFSt').value,bucket:document.getElementById('tkFBkt').value,tags,assigneeId:document.getElementById('tkFAsgn').value||null,parentTicketId:document.getElementById('tkFPar').value||null,dueDate:document.getElementById('tkFDue')?.value||null};
   try{
     if(id)await api('PUT','/tickets/'+id,body);else await api('POST','/tickets',body);
     await fetchData();closeModal('tkFormOv');renderMain();toast(id?'\u2705 Aktualisiert!':'\u2705 Erstellt!');
@@ -2434,8 +2442,8 @@ async function loadLog(reset){
 function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 function openAdminModal(){renderUsrList();renderCatList();renderTagList();renderRightsMatrix();openModal('admOv');}
-function swTab(t){['users','cats','tags','stats','rights','subcats','notetpls','log','ho','shifts','links'].forEach(x=>{document.getElementById('atb-'+x)?.classList.toggle('on',x===t);document.getElementById('atp-'+x)?.classList.toggle('on',x===t);});if(t==='ho')renderHoAdmin();if(t==='subcats')renderSubcatAdmin();if(t==='notetpls')renderNoteTplAdmin();if(t==='stats')renderStatsPanel();if(t==='shifts')renderShiftsAdmin();if(t==='links')renderLinksAdmin();if(t==='rights')renderRightsMatrix();}
-function backToAdmin(tab='users'){['ufOv','cfOv','tfOv'].forEach(closeModal);openAdminModal();swTab(tab);}
+function swTab(t){['users','cats','tags','stats','rights','depts','subcats','notetpls','log','ho','shifts','links'].forEach(x=>{document.getElementById('atb-'+x)?.classList.toggle('on',x===t);document.getElementById('atp-'+x)?.classList.toggle('on',x===t);});if(t==='ho')renderHoAdmin();if(t==='subcats')renderSubcatAdmin();if(t==='notetpls')renderNoteTplAdmin();if(t==='stats')renderStatsPanel();if(t==='shifts')renderShiftsAdmin();if(t==='links')renderLinksAdmin();if(t==='rights')renderRightsMatrix();if(t==='depts')renderDeptsAdmin();}
+function backToAdmin(tab='users'){['ufOv','cfOv','tfOv','deptOv'].forEach(closeModal);openAdminModal();swTab(tab);}
 function renderUsrList(){document.getElementById('usrList').innerHTML=S.users.map(u=>`<div class="ai"${u.isActive===false?' style="opacity:.45;font-style:italic"':''}>${avHtml(u.initials,u.color,34,13,u.isOnline)}<div class="aii"><div class="ain">${u.name} ${u.isActive===false?'\uD83D\uDEAB inaktiv \u00B7 ':''}${roleBadges(u.id)}${u.isOnline?'<span style="font-size:10px;color:var(--ok)">\u25cf online</span>':''}</div><div class="ais">${u.mustChangePW?'\u26A0\uFE0F PW ausstehend':'\u2713 Aktiv'}${u.hireDate?' \u00B7 seit '+u.hireDate.split('-').reverse().join('.'):''}${u.terminationDate?' \u00B7 bis '+u.terminationDate.split('-').reverse().join('.'):''}</div></div><div class="aia"><button class="btn-e" onclick="openUF('${u.id}')">\u270e</button>${S.users.length>1&&u.id!==S.currentUser?`<button class="btn-d" onclick="delUser('${u.id}')">\u2715</button>`:''}</div></div>`).join('');}
 function renderCatList(){document.getElementById('catList').innerHTML=S.categories.map(c=>`<div class="ai"><div style="width:14px;height:14px;border-radius:3px;background:${c.color};flex-shrink:0"></div><div class="aii"><div class="ain">${c.emoji} ${c.label}</div></div><div class="aia"><button class="btn-e" onclick="openCF('${c.id}')">\u270e</button>${S.categories.length>1?`<button class="btn-d" onclick="delCat('${c.id}')">\u2715</button>`:''}</div></div>`).join('');}
 function renderTagList(){document.getElementById('tagList').innerHTML=S.tags.map(t=>`<div class="ai"><div style="width:14px;height:14px;border-radius:3px;background:${t.color};flex-shrink:0"></div><div class="aii"><div class="ain"><span class="tag-chip" style="background:${t.color}1a;color:${t.color}">${t.label}</span></div></div><div class="aia"><button class="btn-e" onclick="openTF('${t.id}')">\u270e</button>${S.tags.length>1?`<button class="btn-d" onclick="delTag('${t.id}')">\u2715</button>`:''}</div></div>`).join('');}
@@ -2511,16 +2519,18 @@ function renderRightsMatrix(){
     <div style="font-size:11px;color:var(--mu);margin-bottom:8px">Blendet den jeweiligen Reiter in der Seitenleiste f\u00fcr die Rolle aus \u2014 ersetzt keine serverseitige Zugriffssperre (z.B. Dienstplanung bleibt zus\u00e4tzlich auf berechtigte Rollen beschr\u00e4nkt).</div>
     ${permTable(RIGHTS_NAV_TABS, t=>'tab:'+t.key, ()=>true)}
     <div style="font-size:11px;color:var(--mu);margin-top:10px">\u2191/\u2193 = manuell \u00fcberschrieben \u00b7 \u00c4nderungen werden sofort gespeichert</div>
-    <div style="font-weight:700;font-size:13px;margin:20px 0 4px">Fachbereiche</div>
-    <div style="font-size:11px;color:var(--mu);margin-bottom:8px">Werden bei Tickets, Statistik und der Zuordnung von Mitarbeitern verwendet. Ein neuer Fachbereich muss einem Mitarbeiter zus\u00e4tzlich unter "Rollen" im Bearbeiten-Formular zugewiesen werden.</div>
+  </div>`;
+}
+function renderDeptsAdmin(){
+  const el=document.getElementById('deptsList');if(!el)return;
+  el.innerHTML=`<div style="font-size:11px;color:var(--mu);margin-bottom:8px">Werden bei Tickets, Statistik und der Zuordnung von Mitarbeitern verwendet. Ein neuer Fachbereich muss einem Mitarbeiter zus\u00e4tzlich unter "Rollen" im Bearbeiten-Formular zugewiesen werden.</div>
     <div>${(S.departments||[]).slice().sort((a,b)=>a.sortOrder-b.sortOrder).map(d=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid var(--border)">
       <span style="font-size:16px">${d.emoji||'\ud83c\udfe2'}</span>
       <span style="flex:1;font-size:13px">${esc(d.label)}</span>
       <button class="btn-s" style="font-size:11px;padding:2px 6px" onclick="openDeptForm('${d.id}')">\u270e</button>
       <button class="btn-d" style="font-size:11px;padding:2px 6px" onclick="deleteDept('${d.id}')">\u2715</button>
     </div>`).join('')}</div>
-    <button class="btn-s" style="margin-top:8px" onclick="openDeptForm()">+ Fachbereich hinzuf\u00fcgen</button>
-  </div>`;
+    <button class="btn-s" style="margin-top:8px" onclick="openDeptForm()">+ Fachbereich hinzuf\u00fcgen</button>`;
 }
 function openDeptForm(id){
   const d=id?(S.departments||[]).find(x=>x.id===id):null;
@@ -2529,7 +2539,7 @@ function openDeptForm(id){
   document.getElementById('dpLabel').value=d?.label||'';
   document.getElementById('dpEmoji').value=d?.emoji||'';
   document.getElementById('dpColor').value=d?.color||'#64748b';
-  openModal('deptOv');
+  closeModal('admOv');openModal('deptOv');
 }
 async function saveDept(){
   const id=document.getElementById('dpId').value;
@@ -2539,12 +2549,12 @@ async function saveDept(){
   try{
     if(id) await api('PUT','/departments/'+id,body);
     else await api('POST','/departments',body);
-    await fetchData();closeModal('deptOv');renderRightsMatrix();toast(id?'\u2705 Aktualisiert!':'\u2705 Angelegt!');
+    await fetchData();backToAdmin('depts');toast(id?'\u2705 Aktualisiert!':'\u2705 Angelegt!');
   }catch(e){toast('\u26a0\ufe0f '+e.message,'err');}
 }
 async function deleteDept(id){
   if(!confirm('Fachbereich l\u00f6schen?'))return;
-  try{await api('DELETE','/departments/'+id);await fetchData();renderRightsMatrix();toast('\u2705 Gel\u00f6scht');}catch(e){toast('\u26a0\ufe0f '+e.message,'err');}
+  try{await api('DELETE','/departments/'+id);await fetchData();renderDeptsAdmin();toast('\u2705 Gel\u00f6scht');}catch(e){toast('\u26a0\ufe0f '+e.message,'err');}
 }
 async function setRightOverride(role,permission,granted){
   try{
@@ -2611,7 +2621,7 @@ function openModal(id){document.getElementById(id)?.classList.add('open');}
 function closeModal(id){document.getElementById(id)?.classList.remove('open');}
 function eyeToggle(inputId,btn){const inp=document.getElementById(inputId);const show=inp.type==='password';inp.type=show?'text':'password';btn.textContent=show?'\uD83D\uDE48':'\uD83D\uDC41';}
 function toast(msg,type='',dur=3200){const t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),dur);}
-const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOr','clFormOv','attachClOv','changelogOv','dpOv','rejectEinspOv','helpOv','msgFormOv','msgDetOv','gSearchOv','stLoginOv','docFormOv','docVerOv','docHistOv','docCatOv','dpReportModal'];
+const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOr','clFormOv','attachClOv','changelogOv','dpOv','rejectEinspOv','helpOv','msgFormOv','msgDetOv','gSearchOv','stLoginOv','docFormOv','docVerOv','docHistOv','docCatOv','dpReportModal','deptOv'];
 document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();openGSearch();return;}
   if(e.key==='Escape'){ALL_MODALS.forEach(closeModal);closeGSearch();}
@@ -4087,13 +4097,30 @@ function sopOpenTemplate(id){
   sopStartRun(id);
 }
 async function sopStartRun(tplId){
-  const existing=(S.sopRuns||[]).find(r=>r.templateId===tplId&&r.status==='running'&&r.startedBy===S.currentUser);
+  const existing=(S.sopRuns||[]).find(r=>r.templateId===tplId&&r.status==='running'&&r.startedBy===S.currentUser&&!r.isTest);
   if(existing){S._selSopRunId=existing.id;S._sopView='run';renderSop();return;}
   try{
     const r=await api('POST','/sop/runs',{templateId:tplId});
     await fetchData();
     S._selSopRunId=r.id;S._sopView='run';renderSop();
   }catch(e){toast('⚠️ '+e.message,'err');}
+}
+// Testdurchlauf: läuft technisch wie ein normaler Durchlauf (gleiche Steps/
+// Verzweigungen/Merge-Logik lassen sich so wirklich prüfen), ist aber als
+// is_test markiert — taucht nicht in der Auswertung/Historie auf und wird
+// beim Beenden wieder gelöscht statt abgeschlossen/abgebrochen zu werden.
+async function sopStartTestRun(tplId){
+  const existing=(S.sopRuns||[]).find(r=>r.templateId===tplId&&r.status==='running'&&r.startedBy===S.currentUser&&r.isTest);
+  if(existing){S._selSopRunId=existing.id;S._sopView='run';renderSop();return;}
+  try{
+    const r=await api('POST','/sop/runs',{templateId:tplId,isTest:true});
+    await fetchData();
+    S._selSopRunId=r.id;S._sopView='run';renderSop();
+  }catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function sopEndTestRun(runId,tplId){
+  try{await api('DELETE','/sop/runs/'+runId);await fetchData();S._sopView='edit';S._selSopTemplateId=tplId;renderSop();toast('🧪 Testdurchlauf beendet');}
+  catch(e){toast('⚠️ '+e.message,'err');}
 }
 function renderSopEditor(id){
   const t=(S.sopTemplates||[]).find(x=>x.id===id);
@@ -4139,6 +4166,7 @@ function renderSopEditor(id){
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <a href="/api/sop/templates/${t.id}/print" target="_blank" class="btn-s" style="text-decoration:none;font-size:12px">🖨️ Drucken</a>
         ${canManage?`<button class="btn-s" onclick="sopGotoStats('${t.id}')">📊 Auswertung</button>`:''}
+        ${canManage&&items.length?`<button class="btn-s" onclick="sopStartTestRun('${t.id}')" title="Zum Ausprobieren durchklicken — zählt nicht in der Statistik und wird nicht gespeichert">🧪 Testdurchlauf</button>`:''}
         ${(t.status==='approved'&&t.active)?`<button class="btn-p" onclick="sopStartRun('${t.id}')">▶ Durchlauf starten</button>`:''}
       </div>
     </div>
@@ -4376,10 +4404,12 @@ function renderSopRun(runId){
     <div class="ph"><div class="pt">← <a href="javascript:void(0)" onclick="S._sopView='overview';renderSop()" style="color:var(--tx);text-decoration:none">🚨 Notfall-Checklisten</a> / ${esc(t.title)}</div>
       <div style="display:flex;gap:8px">
         <a href="/api/sop/templates/${t.id}/print" target="_blank" class="btn-s" style="text-decoration:none;font-size:12px">🖨️ Drucken</a>
-        ${canEdit?`<button class="btn-d" onclick="sopRunAbort('${run.id}')">Abbrechen</button>`:''}
-        ${canEdit?`<button class="btn-p" onclick="sopRunComplete('${run.id}')">✓ Abschließen</button>`:''}
+        ${canEdit&&run.isTest?`<button class="btn-d" onclick="sopEndTestRun('${run.id}','${t.id}')">🧪 Testdurchlauf beenden</button>`:''}
+        ${canEdit&&!run.isTest?`<button class="btn-d" onclick="sopRunAbort('${run.id}')">Abbrechen</button>`:''}
+        ${canEdit&&!run.isTest?`<button class="btn-p" onclick="sopRunComplete('${run.id}')">✓ Abschließen</button>`:''}
       </div>
     </div>
+    ${run.isTest?`<div style="margin:0 20px 10px;padding:8px 12px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.25);border-radius:var(--r);font-size:12px;color:#7c3aed">🧪 Testdurchlauf — zum Ausprobieren des Entwurfs, zählt nicht in der Statistik und wird beim Beenden wieder gelöscht.</div>`:''}
     <div style="padding:0 20px">
       <div style="font-size:11px;color:var(--mu);margin-bottom:4px">Gestartet von ${esc(getU(run.startedBy)?.name||'?')} um ${fdt(run.startedAt)}${run.status!=='running'?' &middot; Status: '+(run.status==='completed'?'✓ Abgeschlossen':'✗ Abgebrochen'):''}</div>
       <div style="background:var(--sf2);border-radius:10px;height:10px;overflow:hidden;margin-bottom:4px"><div style="background:${pct===100?'#10b981':'#3b6dd4'};height:100%;width:${pct}%;transition:.2s"></div></div>
@@ -4416,7 +4446,7 @@ async function sopRunAbort(runId){
 }
 function renderSopRunList(){
   const canManage=!!S.p.manageSop;
-  const runs=(S.sopRuns||[]).slice().sort((a,b)=>new Date(b.startedAt)-new Date(a.startedAt));
+  const runs=(S.sopRuns||[]).filter(r=>!r.isTest).slice().sort((a,b)=>new Date(b.startedAt)-new Date(a.startedAt));
   const statusLabel={running:'▶ Läuft',completed:'✓ Abgeschlossen',aborted:'✗ Abgebrochen'};
   const statusColor={running:'#3b6dd4',completed:'#10b981',aborted:'#ef4444'};
   document.getElementById('main').innerHTML=`

@@ -183,7 +183,7 @@ router.get('/', auth, async (req,res) => {
       }),
       tickets: tkRaw.filter(tk=>canSeeTk(tp,tk,uid)).map(tk=>({
         id:tk.id, number:tk.number, title:tk.title, description:tk.description||'',
-        department:tk.department, subcategory:tk.subcategory||'', tags:parseTags(tk.tags), priority:tk.priority,
+        department:tk.department, subcategory:tk.subcategory||'', reporter:tk.reporter||'', tags:parseTags(tk.tags), priority:tk.priority,
         status:tk.status, bucket:tk.bucket||'', isPublic:tk.is_public,
         isDeleted:!!tk.is_deleted, deletedAt:tk.deleted_at||null, deletedBy:tk.deleted_by||null,
         assigneeId:tk.assignee_id, parentTicketId:tk.parent_ticket_id,
@@ -302,7 +302,7 @@ router.get('/', auth, async (req,res) => {
       })),
       sopRuns: (sopRunsRaw||[]).map(r=>({
         id:r.id, templateId:r.template_id, startedBy:r.started_by, startedAt:r.started_at,
-        completedAt:r.completed_at||null, status:r.status,
+        completedAt:r.completed_at||null, status:r.status, isTest:!!r.is_test,
         items:(sopRunItemsRaw||[]).filter(ri=>ri.run_id===r.id).map(ri=>({
           id:ri.id, itemId:ri.item_id, done:ri.done, value:ri.value||'', note:ri.note||'',
           updatedAt:ri.updated_at||null, updatedBy:ri.updated_by||null,

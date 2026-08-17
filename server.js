@@ -237,6 +237,7 @@ async function initDB() {
     `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false`,
     `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`,
     `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS deleted_by TEXT`,
+    `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS reporter TEXT DEFAULT ''`,
     `CREATE TABLE IF NOT EXISTS station_shifts (
       id TEXT PRIMARY KEY, label TEXT NOT NULL,
       sort_order INTEGER DEFAULT 0, created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
@@ -659,6 +660,7 @@ async function initDB() {
   completed_at TIMESTAMPTZ,
   status TEXT NOT NULL DEFAULT 'running'
 )`,
+    `ALTER TABLE sop_checklist_runs ADD COLUMN IF NOT EXISTS is_test BOOLEAN NOT NULL DEFAULT false`,
     `CREATE TABLE IF NOT EXISTS sop_checklist_run_items (
   id TEXT PRIMARY KEY,
   run_id TEXT NOT NULL REFERENCES sop_checklist_runs(id) ON DELETE CASCADE,

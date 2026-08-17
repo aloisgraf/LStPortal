@@ -13,7 +13,7 @@ try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch(e) {}
 
 router.post('/', auth, async (req,res) => {
   try {
-    const {title,description,subcategory,tags,priority,status,bucket,assigneeId,parentTicketId,dueDate} = req.body;
+    const {title,description,subcategory,tags,priority,status,bucket,assigneeId,parentTicketId,dueDate,reporter} = req.body;
     let {department} = req.body;
     if (!title?.trim()) return bad(res,'Titel erforderlich');
     // Kindticket übernimmt IMMER den Fachbereich des Elterntickets — verhindert
@@ -24,8 +24,8 @@ router.post('/', auth, async (req,res) => {
     }
     const id=newId(), number=await nextTicketNumber();
     const subcat = subcategory||'';
-    await pool.query('INSERT INTO tickets (id,number,title,description,department,subcategory,tags,priority,status,bucket,assignee_id,parent_ticket_id,created_by,due_date) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)',
-      [id,number,title.trim(),description||'',department||'technik',subcat,JSON.stringify(tags||[]),priority||'medium',status||'open',bucket||'',assigneeId||null,parentTicketId||null,req.uid,dueDate||null]);
+    await pool.query('INSERT INTO tickets (id,number,title,description,department,subcategory,tags,priority,status,bucket,assignee_id,parent_ticket_id,created_by,due_date,reporter) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)',
+      [id,number,title.trim(),description||'',department||'technik',subcat,JSON.stringify(tags||[]),priority||'medium',status||'open',bucket||'',assigneeId||null,parentTicketId||null,req.uid,dueDate||null,(reporter||'').trim()]);
     const uname = (await getUser(req.uid))?.name||'?';
     await auditNote(id,req.uid,`✅ Ticket erstellt von ${uname}${subcat?' ['+subcat+']':''}`);
     const deptUsers = await q('SELECT id FROM users WHERE roles @> $1::jsonb AND id != $2',
@@ -110,6 +110,8 @@ router.put('/:id', auth, async (req,res) => {
       await auditField('visibility', tk.is_public?'Öffentlich':'Privat', b.isPublic?'Öffentlich':'Privat');
     if (b.subcategory!==undefined&&(b.subcategory||'')!==(tk.subcategory||''))
       await auditField('subcategory', tk.subcategory||'—', b.subcategory||'—');
+    if (b.reporter!==undefined&&(b.reporter||'')!==(tk.reporter||''))
+      await auditField('reporter', tk.reporter||'—', b.reporter||'—');
     if (b.dueDate!==undefined&&(b.dueDate||null)!==(tk.due_date?tk.due_date.toISOString?.().slice(0,10)||String(tk.due_date).slice(0,10):null))
       await auditField('due_date', fmtDate(tk.due_date), fmtDate(b.dueDate));
     if (b.snoozedUntil!==undefined&&(b.snoozedUntil||null)!==(tk.snoozed_until?String(tk.snoozed_until).slice(0,10):null))
@@ -146,6 +148,7 @@ router.put('/:id', auth, async (req,res) => {
     if (b.assigneeId!==undefined) add('assignee_id',b.assigneeId||null);
     if (b.parentTicketId!==undefined) add('parent_ticket_id',b.parentTicketId||null);
     if (b.subcategory!==undefined) add('subcategory',b.subcategory||'');
+    if (b.reporter!==undefined) add('reporter',b.reporter||'');
     if (b.dueDate!==undefined) add('due_date',b.dueDate||null);
     if (b.snoozedUntil!==undefined) add('snoozed_until',b.snoozedUntil||null);
     if (!setClauses.length) return ok(res);
