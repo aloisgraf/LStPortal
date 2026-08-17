@@ -352,9 +352,12 @@ function homeVersionToggleHtml(){
 }
 function homeCardWrap(id,title,bodyHtml,accent){
   var open; try{open=localStorage.getItem('cc_'+id);open=open===null?true:open==='1';}catch(ex){open=true;}
-  var accentStyle=accent?';border-top:3px solid '+accent+';background:'+accent+'0d':'';
+  // Dezenter oberer Rahmen als einzige Farbmarkierung (statt vollflächig
+  // eingefärbter Karte + farbiger Überschrift) — ruhigeres, "professionelleres"
+  // Erscheinungsbild in der neuen Übersicht.
+  var accentStyle=accent?';border-top:3px solid '+accent:'';
   return '<details class="dash-card" data-cc-id="'+id+'"'+(open?' open':'')+' style="width:100%;box-sizing:border-box;margin-bottom:14px'+accentStyle+'">'
-    +'<summary><h3 style="margin:0;display:inline;color:'+(accent||'var(--tx)')+'">'+title+'</h3></summary>'
+    +'<summary><h3 style="margin:0;display:inline;color:var(--tx)">'+title+'</h3></summary>'
     +bodyHtml+'</details>';
 }
 function renderHome(){
@@ -372,17 +375,26 @@ function renderHomeNew(){
   const today=new Date(); today.setHours(0,0,0,0);
 
   // ── Benachrichtigungen ("Dir wurde zugewiesen…", "Neues Ticket in…", Erwähnungen)
-  // — in der alten Übersicht schon vorhanden, hier bisher gefehlt.
+  // — in der alten Übersicht schon vorhanden, hier bisher gefehlt. Mehrere
+  // Benachrichtigungen zum selben Ticket (z.B. "Neues Ticket in Technik" +
+  // "Dir wurde zugewiesen") werden zu einer Zeile zusammengefasst.
   const unreadNotif=S.notifications.filter(n=>!n.isRead&&n.type!=='event_added'&&n.type!=='event_changed'&&n.type!=='einspringer_rejected');
   let notifCard='';
   if(unreadNotif.length){
+    const byTicket={}; const singles=[];
+    unreadNotif.forEach(n=>{ if(n.ticketId){ (byTicket[n.ticketId]=byTicket[n.ticketId]||[]).push(n); } else singles.push(n); });
+    const typePrio={assigned:0,mention:1,new_ticket:2};
+    const groups=[
+      ...Object.values(byTicket).map(g=>{ g.sort((a,b)=>(typePrio[a.type]??9)-(typePrio[b.type]??9)); return {ids:g.map(x=>x.id),primary:g[0],count:g.length,ticketId:g[0].ticketId,createdAt:g.map(x=>x.createdAt).sort().pop()}; }),
+      ...singles.map(n=>({ids:[n.id],primary:n,count:1,ticketId:null,createdAt:n.createdAt})),
+    ].sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
     const notifIcon=n=>n.type==='mention'?'💬':n.type==='assigned'?'👤':'🎫';
     const notifBody='<div style="padding:6px 14px 4px;text-align:right"><button class="btn-s" style="font-size:11px" onclick="readAllNotifs()">Alle gelesen</button></div>'
-      +unreadNotif.slice(0,8).map(n=>'<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="openNotif(\''+n.id+'\',\''+(n.ticketId||'')+'\')">'
-        +'<div style="font-size:16px;flex-shrink:0">'+notifIcon(n)+'</div>'
-        +'<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600">'+esc(n.title)+'</div><div style="font-size:10px;color:var(--mu)">'+fdt(n.createdAt)+'</div></div>'
+      +groups.slice(0,8).map(g=>'<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="openNotifGroup(\''+g.ids.join(',')+'\',\''+(g.ticketId||'')+'\')">'
+        +'<div style="font-size:16px;flex-shrink:0">'+notifIcon(g.primary)+'</div>'
+        +'<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600">'+esc(g.primary.title)+(g.count>1?' <span style="font-weight:400;color:var(--mu)">(+'+(g.count-1)+')</span>':'')+'</div><div style="font-size:10px;color:var(--mu)">'+fdt(g.createdAt)+'</div></div>'
         +'</div>').join('');
-    notifCard=homeCardWrap('new_notif','🔔 Benachrichtigungen ('+unreadNotif.length+')',notifBody,'#f59e0b');
+    notifCard=homeCardWrap('new_notif','🔔 Benachrichtigungen ('+unreadNotif.length+')',notifBody,'#b45309');
   }
 
   // ── Tickets: Top 5 in Summe, zuerst nach Fälligkeit (offene Tickets ohne
@@ -408,7 +420,7 @@ function renderHomeNew(){
   const ticketsBody=(focusTks.length?focusTks.map(ticketRow).join(''):'<div style="color:var(--di);font-size:12px;padding:8px 14px">Keine offenen Tickets &#127881;</div>')
     +'<div style="padding:8px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--mu)">'+openTks.length+' offen insgesamt &middot; '+overdueTks.length+' überfällig'
     +' &middot; <a href="javascript:void(0)" onclick="setView(\'tickets\')" style="color:var(--acc)">alle ansehen &#8594;</a></div>';
-  const ticketsCard=homeCardWrap('new_tickets','&#127931; Tickets',ticketsBody,'#ea580c');
+  const ticketsCard=homeCardWrap('new_tickets','&#127931; Tickets',ticketsBody,'#3b6dd4');
 
   // ── Offene Todos ── ein Todo gilt als offen, solange sein eigener Status
   // nicht "done" ist — unabhängig davon, ob es Unterpunkte hat (ein Todo ganz
@@ -428,7 +440,7 @@ function renderHomeNew(){
   } else {
     todosBody='<div style="color:var(--di);font-size:12px;padding:8px 14px">Keine offenen Todos &#127881;</div>';
   }
-  const todosCard=homeCardWrap('new_todos','&#9989; Offene Todos ('+openTodos.length+')',todosBody,'#10b981');
+  const todosCard=homeCardWrap('new_todos','&#9989; Offene Todos ('+openTodos.length+')',todosBody,'#3b6dd4');
 
   // ── Offene Besprechungen ── ein Termin (Instanz) gilt als offen, solange er
   // status "planned" hat (noch nicht abgehalten/abgesagt) — unabhängig vom
@@ -451,7 +463,7 @@ function renderHomeNew(){
   } else {
     meetingsBody='<div style="color:var(--di);font-size:12px;padding:8px 14px">Keine offenen Besprechungen &#127881;</div>';
   }
-  const meetingsCard=homeCardWrap('new_meetings','&#128483;&#65039; Offene Besprechungen ('+openMeetings.length+')',meetingsBody,'#8b5cf6');
+  const meetingsCard=homeCardWrap('new_meetings','&#128483;&#65039; Offene Besprechungen ('+openMeetings.length+')',meetingsBody,'#3b6dd4');
 
   // ── Dienstplan-Vorschau: entweder die nächsten 3/7/30 Tage (mit allen
   // Einträgen je Tag) ODER die nächsten 5/10/30 Termine (Einträge) in Summe,
@@ -517,14 +529,19 @@ function renderHomeNew(){
     +'<div style="display:flex;gap:2px;background:var(--sf2);border:1px solid var(--border);border-radius:6px;padding:2px">'+rangeBtn(3,'3 Tage')+rangeBtn(7,'7 Tage')+rangeBtn(30,'1 Monat')+'</div>'
     +'<div style="display:flex;gap:2px;background:var(--sf2);border:1px solid var(--border);border-radius:6px;padding:2px">'+countBtn(5,'5 Termine')+countBtn(10,'10 Termine')+countBtn(30,'30 Termine')+'</div>'
     +'</div>';
-  const dpCard=homeCardWrap('new_dp','&#128197; Dienstplan &ndash; nächste Tage',dpHeaderExtra+dpBody,'#3b82f6');
+  const dpCard=homeCardWrap('new_dp','&#128197; Dienstplan &ndash; nächste Tage',dpHeaderExtra+dpBody,'#3b6dd4');
 
+  // Benachrichtigungen + Tickets brauchen keine volle Breite → nebeneinander,
+  // spart Platz (nur wenn tatsächlich Benachrichtigungen vorliegen, sonst
+  // bekommen die Tickets die volle Breite statt einer leeren Spalte).
+  const topRow = notifCard
+    ? '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">'+notifCard+ticketsCard+'</div>'
+    : ticketsCard;
   document.getElementById('main').innerHTML=`
     <div class="ph"><div class="pt">&#128196; Übersicht <span>${u?.name||''}</span></div>${homeVersionToggleHtml()}</div>
     <div style="background:rgba(59,109,212,.06);border:1px solid rgba(59,109,212,.2);border-radius:var(--r);padding:8px 12px;margin-bottom:14px;font-size:11px;color:var(--mu)">&#x1F9EA; Neue Übersicht (Beta) &mdash; wird schrittweise ausgebaut. Mit "Alt" zur bisherigen Ansicht wechseln.</div>
-    ${notifCard}
     ${sopHomeBannerHtml()}
-    ${ticketsCard}
+    ${topRow}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">${todosCard}${meetingsCard}</div>
     ${dpCard}`;
 }
@@ -804,6 +821,15 @@ async function markTkSeen(id) {
 }
 
 async function openNotif(notifId,ticketId){try{await api('POST','/notifications/'+notifId+'/read');}catch(e){}await fetchData();if(ticketId){openTkDetail(ticketId);setView('tickets');}else renderHome();}
+// Für zu einer Zeile zusammengefasste Benachrichtigungen (z.B. "Neues Ticket
+// in Technik" + "Dir wurde zugewiesen" zum selben Ticket) — markiert alle
+// zusammengefassten Einträge als gelesen, nicht nur den angeklickten.
+async function openNotifGroup(idsCsv,ticketId){
+  const ids=idsCsv.split(',').filter(Boolean);
+  await Promise.all(ids.map(id=>api('POST','/notifications/'+id+'/read').catch(()=>{})));
+  await fetchData();
+  if(ticketId){openTkDetail(ticketId);setView('tickets');}else renderHome();
+}
 async function readAllNotifs(){try{await api('POST','/notifications/read-all');await fetchData();renderHome();}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}}
 // SCHEDULE
 function getVisEvts(){
@@ -3944,7 +3970,7 @@ function renderSopEditor(id){
     ${canManage?`<div style="padding:16px 20px 30px;display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid var(--border)">
       ${isDraft?`<button class="btn-p" onclick="sopApprove('${t.id}')">✓ Freigeben</button>`:''}
       ${isDraft?`<button class="btn-d" onclick="sopDeleteTemplate('${t.id}')">🗑️ Entwurf löschen</button>`:''}
-      ${!isDraft&&t.active?`<button class="btn-s" onclick="sopNewVersion('${t.id}')">📝 Neue Version bearbeiten</button>`:''}
+      ${!isDraft?`<button class="btn-s" onclick="sopNewVersion('${t.id}')">📝 Neue Version bearbeiten</button>`:''}
       ${!isDraft&&t.active?`<button class="btn-d" onclick="sopDeactivate('${t.id}')">Deaktivieren</button>`:''}
       ${!isDraft&&!t.active?`<button class="btn-s" onclick="sopReactivate('${t.id}')">Reaktivieren</button>`:''}
     </div>`:''}`;
@@ -7298,7 +7324,10 @@ function renderTodos() {
   const todoSideItem = t => {
     const done    = t.items.filter(i => i.is_done).length;
     const total   = t.items.length;
-    const allDone = total > 0 && done === total;
+    // Ausgegraut wird nach demselben Kriterium wie oben/unten einsortiert
+    // (t.status), nicht nach den Punkten — sonst bleibt ein abgeschlossenes
+    // Todo ohne Punkte (oder mit noch offenen Punkten trotz Abschluss) fett.
+    const allDone = isTodoDone(t);
     const prio    = TODO_PRIO[t.priority] || TODO_PRIO.medium;
     const active  = t.id === (sel?.id);
     const deadlineColor = getDeadlineColorFromItems(t.items);
