@@ -119,8 +119,8 @@
         <div class="ni" id="ni-checklists" onclick="setView('checklists')">&#9745;&#65039; Checklisten</div>
       </div>
       <div class="ndiv"></div>
-      <div class="nsh open" id="dpHdr" onclick="toggleNS('dp')"><span>&#128197; Dienstplanung</span><span class="arr">&#9660;</span></div>
-      <div class="nsub open" id="dpSub">
+      <div class="nsh open" id="dpgHdr" onclick="toggleNS('dpg')"><span>&#128197; Dienstplanung</span><span class="arr">&#9660;</span></div>
+      <div class="nsub open" id="dpgSub">
         <div class="ni" id="ni-dp" onclick="setView('dp')">&#128203; Planerstellung</div>
         <div class="ni ni-admin-only" id="ni-dp-config" onclick="setView('dp-config')">&#9881;&#65039; Konfiguration</div>
         <div class="ni ni-admin-only" id="ni-dp-christmas" onclick="setView('dp-christmas')">&#127876; Weihnachtsdienst</div>
@@ -316,7 +316,7 @@
     <div class="mh"><h2 id="dpFT">Neuer Fachbereich</h2><button class="mc" onclick="backToAdmin('depts')">&#10005;</button></div>
     <div class="mb2">
       <input type="hidden" id="dpId">
-      <div class="fg full"><label>Bezeichnung *</label><input type="text" id="dpLabel" placeholder="z.B. Logistik"></div>
+      <div class="fg full"><label>Bezeichnung *</label><input type="text" id="deptLabel" placeholder="z.B. Logistik"></div>
       <div class="fr">
         <div class="fg"><label>Symbol (Emoji)</label><div style="display:flex;gap:6px"><input type="text" id="dpEmoji" placeholder="z.B. 🚚" maxlength="4" style="flex:1"><button type="button" class="btn-s emoji-pick-btn" onclick="openEmojiPicker('dpEmoji',this)">😀</button></div></div>
         <div class="fg"><label>Farbe</label><input type="color" id="dpColor" style="width:100%;height:38px;padding:2px;cursor:pointer"></div>
@@ -1956,7 +1956,7 @@
   <div class="modal sm">
     <div class="mh"><h2 id="todoFormTitle">Neues Todo</h2><button class="mc" onclick="closeModal('todoFormOv')">&#10005;</button></div>
     <div class="mb2">
-      <input type="hidden" id="tfId">
+      <input type="hidden" id="todoFormId">
       <div class="fg"><label>Titel *</label><input type="text" id="tfTitle" placeholder="Todo-Titel…"></div>
       <div class="fg"><label>Beschreibung</label><textarea id="tfDesc" rows="2" placeholder="Optional…"></textarea></div>
       <div class="fg"><label>Priorität</label>

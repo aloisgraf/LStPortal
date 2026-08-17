@@ -2553,14 +2553,14 @@ function openDeptForm(id){
   const d=id?(S.departments||[]).find(x=>x.id===id):null;
   document.getElementById('dpFT').textContent=d?'Fachbereich bearbeiten':'Neuer Fachbereich';
   document.getElementById('dpId').value=id||'';
-  document.getElementById('dpLabel').value=d?.label||'';
+  document.getElementById('deptLabel').value=d?.label||'';
   document.getElementById('dpEmoji').value=d?.emoji||'';
   document.getElementById('dpColor').value=d?.color||'#64748b';
   closeModal('admOv');openModal('deptOv');
 }
 async function saveDept(){
   const id=document.getElementById('dpId').value;
-  const label=document.getElementById('dpLabel').value.trim();
+  const label=document.getElementById('deptLabel').value.trim();
   if(!label)return toast('\u26a0\ufe0f Bezeichnung erforderlich','err');
   const body={label,emoji:document.getElementById('dpEmoji').value.trim(),color:document.getElementById('dpColor').value};
   try{
@@ -7980,7 +7980,7 @@ function renderTodoDetail(t) {
 function openTodoForm(id) {
   const t = id ? S.todos.find(x => x.id === id) : null;
   document.getElementById('todoFormTitle').textContent = t ? 'Todo bearbeiten' : 'Neues Todo';
-  document.getElementById('tfId').value = t?.id || '';
+  document.getElementById('todoFormId').value = t?.id || '';
   document.getElementById('tfTitle').value = t?.title || '';
   document.getElementById('tfDesc').value = t?.description || '';
   document.getElementById('tfPriority').value = t?.priority || 'medium';
@@ -7991,7 +7991,7 @@ function openTodoForm(id) {
 }
 
 async function submitTodoForm() {
-  const id    = document.getElementById('tfId').value;
+  const id    = document.getElementById('todoFormId').value;
   const title = document.getElementById('tfTitle').value.trim();
   if (!title) return toast('Titel erforderlich','err');
   const body = {
