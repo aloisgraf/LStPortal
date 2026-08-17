@@ -189,7 +189,8 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
 .toast{position:fixed;bottom:18px;right:18px;background:var(--sf);border:1px solid var(--ok);border-radius:var(--r);padding:9px 16px;font-size:13px;font-weight:500;z-index:999;animation:fup .3s ease;box-shadow:var(--sh2)}
 .toast.err{border-color:var(--danger)}
 .toast.chat{bottom:auto;top:18px;right:18px;border-color:var(--acc)}
-.sop-step-cols{display:grid;grid-template-columns:minmax(200px,420px) 240px;gap:16px;align-items:start}
+.sop-step-cols{display:grid;grid-template-columns:460px 280px;gap:16px;align-items:start}
+@media (max-width:1100px){.sop-step-cols{grid-template-columns:1fr 280px}}
 @media (max-width:640px){.sop-step-cols{grid-template-columns:1fr}}
 #chatWinRow{display:none;position:fixed;bottom:0;right:92px;z-index:600;flex-direction:row-reverse;align-items:flex-end;gap:10px;max-width:calc(100vw - 100px)}
 #chatWinRow.open{display:flex}

@@ -4550,8 +4550,8 @@ function renderSopRun(runId){
           ?`<div style="font-size:22px">🔀</div>`
           :`<input type="checkbox" ${ri.done?'checked':''} ${disabled} onchange="sopRunToggle('${run.id}','${it.id}',this.checked)" style="width:26px;height:26px;cursor:${canEdit?'pointer':'default'};accent-color:#10b981">`}
       </div>
-      <div class="sop-step-cols" style="min-width:0;margin-left:${8+indent}px">
-        <div style="min-width:0">
+      <div class="sop-step-cols" style="min-width:0;margin-left:8px">
+        <div style="min-width:0;padding-left:${indent}px;box-sizing:border-box">
           ${branchTagRun?`<div>${branchTagRun}</div>`:''}
           <div style="font-size:15px;font-weight:600;${ri.done&&!isBranch?'text-decoration:line-through':''}">${esc(it.text)}${it.required&&!isBranch?' <span style="color:#ef4444">*</span>':''}</div>
           ${it.hint?`<div style="font-size:12px;color:var(--mu);margin-top:2px">💡 ${esc(it.hint)}</div>`:''}
