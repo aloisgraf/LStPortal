@@ -1,6 +1,6 @@
 {
   "name": "lst-portal",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "LSt Portal – Dienstplanung & Ticketsystem (PostgreSQL)",
   "main": "server.js",
   "scripts": {
