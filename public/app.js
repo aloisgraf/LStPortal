@@ -1722,6 +1722,10 @@ function renderTickets(){
         <button class="btn-s${S.tkBatchMode?' on':''}" onclick="toggleTkBatch()" title="Mehrfachauswahl" style="font-size:13px;padding:5px 10px">&#9745; Auswahl</button>
         ${!deleted?`<button class="btn-p" onclick="openTkForm(null)">&#65291; Ticket</button>`:''}
       </div></div>
+    ${!closed&&!deleted?`<div id="tkEmailDropzone" style="border:2px dashed var(--border);border-radius:var(--r);padding:10px 14px;margin-bottom:12px;font-size:12px;color:var(--mu);text-align:center;transition:.15s"
+      ondragover="event.preventDefault();this.style.borderColor='var(--acc)';this.style.color='var(--acc)';this.style.background='rgba(59,109,212,.05)'"
+      ondragleave="this.style.borderColor='var(--border)';this.style.color='var(--mu)';this.style.background='transparent'"
+      ondrop="tkEmailDrop(event,this)">&#128231; E-Mail hierher ziehen, um daraus ein Ticket zu erstellen</div>`:''}
     ${S.tkBatchMode&&S.tkBatchSel.size?`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px;background:rgba(59,109,212,.06);border:1px solid rgba(59,109,212,.2);border-radius:var(--r);margin-bottom:10px">
       <span style="font-size:13px;font-weight:600;color:var(--acc)">${S.tkBatchSel.size} ausgewählt</span>
       ${!deleted?`<select id="batchStatus" class="flt" style="font-size:12px"><option value="">Status ändern…</option>${STATUSES.map(s=>`<option value="${s.id}">${s.label}</option>`).join('')}</select>
@@ -2117,6 +2121,37 @@ function onTkParentChange(){
     deptSel.disabled=false;
     if(hint)hint.style.display='none';
   }
+}
+function _arrayBufferToBase64(buf){
+  let binary='';
+  const bytes=new Uint8Array(buf);
+  const chunk=0x8000;
+  for(let i=0;i<bytes.length;i+=chunk) binary+=String.fromCharCode.apply(null,bytes.subarray(i,i+chunk));
+  return btoa(binary);
+}
+// E-Mail (Outlook .msg oder .eml) per Drag&Drop auf die Ticket-Liste ziehen →
+// Server liest Betreff/Absender/Text aus, "Neues Ticket"-Formular öffnet sich
+// vorausgefüllt (Absender kommt als "Einmelder:"-Zeile in die Beschreibung,
+// da es kein eigenes Ticketfeld dafür gibt).
+async function tkEmailDrop(event,el){
+  event.preventDefault();
+  el.style.borderColor='var(--border)';el.style.color='var(--mu)';el.style.background='transparent';
+  const file=event.dataTransfer.files?.[0];
+  if(!file)return;
+  const name=file.name.toLowerCase();
+  if(!name.endsWith('.msg')&&!name.endsWith('.eml')){toast('⚠️ Bitte eine .msg- oder .eml-Datei ablegen','err');return;}
+  toast('📧 E-Mail wird gelesen…');
+  try{
+    const buf=await file.arrayBuffer();
+    const data=_arrayBufferToBase64(buf);
+    const result=await api('POST','/email/parse',{filename:file.name,data});
+    openTkForm(null);
+    document.getElementById('tkFNm').value=(result.subject||'').slice(0,200);
+    const senderParts=[result.senderName,result.senderEmail?'<'+result.senderEmail+'>':''].filter(Boolean).join(' ');
+    const senderLine=senderParts?('Einmelder: '+senderParts+'\n\n'):'';
+    document.getElementById('tkFDesc').value=senderLine+(result.body||'').trim();
+    toast('✅ E-Mail übernommen — bitte Angaben prüfen');
+  }catch(e){toast('⚠️ '+e.message,'err');}
 }
 function openTkForm(id,parentId){
   const tk=id?getTk(id):null;

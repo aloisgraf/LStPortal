@@ -827,6 +827,7 @@ app.use('/api',   require('./routes/contacts'));
 app.use('/api',   require('./routes/sop'));
 app.use('/api',   require('./routes/lockers'));
 app.use('/api',   require('./routes/departments'));
+app.use('/api',   require('./routes/email'));
 
 app.get('*', (req,res) => res.sendFile(path.join(__dirname,'public','index.html')));
 
