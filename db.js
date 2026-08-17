@@ -33,7 +33,7 @@ const NAV_TABS = [
   {key:'todos', label:'Todos'},
   {key:'contacts', label:'Kontakte'},
   {key:'sop', label:'Notfall-Checklisten'},
-  {key:'spint', label:'Spintvergabe'},
+  {key:'spint', label:'Spindvergabe'},
   {key:'schedule', label:'Dienstplan (Kalender)'},
   {key:'allw', label:'Zulagendienste'},
   {key:'homeoffice', label:'Homeoffice'},

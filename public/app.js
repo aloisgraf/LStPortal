@@ -380,22 +380,44 @@ function renderHomeNew(){
   // ── Benachrichtigungen ("Dir wurde zugewiesen…", "Neues Ticket in…", Erwähnungen)
   // — in der alten Übersicht schon vorhanden, hier bisher gefehlt. Mehrere
   // Benachrichtigungen zum selben Ticket (z.B. "Neues Ticket in Technik" +
-  // "Dir wurde zugewiesen") werden zu einer Zeile zusammengefasst.
+  // "Dir wurde zugewiesen") werden zu einer Zeile mit einem zusammengefassten
+  // Satz kombiniert — bei nur einer Benachrichtigung (z.B. eine einzelne
+  // Erwähnung) bleibt der ursprüngliche Text unverändert erhalten.
   const unreadNotif=S.notifications.filter(n=>!n.isRead&&n.type!=='event_added'&&n.type!=='event_changed'&&n.type!=='einspringer_rejected');
   let notifCard='';
   if(unreadNotif.length){
     const byTicket={}; const singles=[];
     unreadNotif.forEach(n=>{ if(n.ticketId){ (byTicket[n.ticketId]=byTicket[n.ticketId]||[]).push(n); } else singles.push(n); });
     const typePrio={assigned:0,mention:1,new_ticket:2};
+    const notifPhrase=(type,tk)=>{
+      if(type==='new_ticket') return 'ein neues Ticket'+(tk?' in '+(DEPT_LABELS[tk.department]||tk.department):'')+' erstellt';
+      if(type==='assigned') return 'dir zugewiesen';
+      if(type==='mention') return 'du erwähnt';
+      return null;
+    };
     const groups=[
-      ...Object.values(byTicket).map(g=>{ g.sort((a,b)=>(typePrio[a.type]??9)-(typePrio[b.type]??9)); return {ids:g.map(x=>x.id),primary:g[0],count:g.length,ticketId:g[0].ticketId,createdAt:g.map(x=>x.createdAt).sort().pop()}; }),
-      ...singles.map(n=>({ids:[n.id],primary:n,count:1,ticketId:null,createdAt:n.createdAt})),
+      ...Object.entries(byTicket).map(([ticketId,g])=>{
+        g.sort((a,b)=>(typePrio[a.type]??9)-(typePrio[b.type]??9));
+        const tk=getTk(ticketId);
+        let text;
+        if(g.length===1){
+          text=g[0].title;
+        } else {
+          const types=[...new Set(g.map(x=>x.type))];
+          const phrases=types.map(t=>notifPhrase(t,tk)).filter(Boolean);
+          text=phrases.length
+            ? (tk?tk.number+': '+tk.title+' — es wurde '+phrases.join(' und ')+'.':'Es wurde '+phrases.join(' und ')+'.')
+            : g.map(x=>x.title).join(' · ');
+        }
+        return {ids:g.map(x=>x.id),text,count:g.length,ticketId,type:g[0].type,createdAt:g.map(x=>x.createdAt).sort().pop()};
+      }),
+      ...singles.map(n=>({ids:[n.id],text:n.title,count:1,ticketId:null,type:n.type,createdAt:n.createdAt})),
     ].sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
-    const notifIcon=n=>n.type==='mention'?'💬':n.type==='assigned'?'👤':'🎫';
+    const notifIcon=t=>t==='mention'?'💬':t==='assigned'?'👤':'🎫';
     const notifBody='<div style="padding:6px 14px 4px;text-align:right"><button class="btn-s" style="font-size:11px" onclick="readAllNotifs()">Alle gelesen</button></div>'
       +groups.slice(0,8).map(g=>'<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="openNotifGroup(\''+g.ids.join(',')+'\',\''+(g.ticketId||'')+'\')">'
-        +'<div style="font-size:16px;flex-shrink:0">'+notifIcon(g.primary)+'</div>'
-        +'<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600">'+esc(g.primary.title)+(g.count>1?' <span style="font-weight:400;color:var(--mu)">(+'+(g.count-1)+')</span>':'')+'</div><div style="font-size:10px;color:var(--mu)">'+fdt(g.createdAt)+'</div></div>'
+        +'<div style="font-size:16px;flex-shrink:0">'+notifIcon(g.type)+'</div>'
+        +'<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600">'+esc(g.text)+'</div><div style="font-size:10px;color:var(--mu)">'+fdt(g.createdAt)+'</div></div>'
         +'</div>').join('');
     notifCard=homeCardWrap('new_notif','🔔 Benachrichtigungen ('+unreadNotif.length+')',notifBody,'#b45309');
   }
@@ -2373,7 +2395,7 @@ const RIGHTS_NAV_TABS=[
   {key:'tickets',label:'Tickets: Offene'},{key:'tickets_closed',label:'Tickets: Abgeschlossene'},{key:'tickets_deleted',label:'Tickets: Gel\u00f6schte'},{key:'checklists',label:'Checklisten'},
   {key:'dp',label:'Dienstplanung: Planerstellung'},{key:'dp-config',label:'Dienstplanung: Konfiguration'},{key:'dp-christmas',label:'Dienstplanung: Weihnachtsdienst'},{key:'dp-mine',label:'Dienstplanung: Mein Dienstplan'},
   {key:'messages',label:'Nachrichten: Eingang'},{key:'messages_sent',label:'Nachrichten: Gesendet'},{key:'news',label:'News'},{key:'statistik',label:'Statistik'},
-  {key:'spint',label:'Spintvergabe'},
+  {key:'spint',label:'Spindvergabe'},
 ];
 function renderRightsMatrix(){
   const el=document.getElementById('rightsMatrix');if(!el)return;
@@ -4242,7 +4264,7 @@ function renderSpint(){
       +'</div>';
   };
   document.getElementById('main').innerHTML=`
-    <div class="ph"><div class="pt">&#128188; Spintvergabe</div><button class="btn-p" onclick="openSpintForm()">+ Spind hinzufügen</button></div>
+    <div class="ph"><div class="pt">&#128188; Spindvergabe</div><button class="btn-p" onclick="openSpintForm()">+ Spind hinzufügen</button></div>
     <div style="padding:0 20px 12px;display:flex;gap:10px;flex-wrap:wrap">
       <div class="ib3">Gesamt<br><b style="font-size:18px">${total}</b></div>
       <div class="ib3">Mitarbeitern zugeteilt<br><b style="font-size:18px">${assignedUser}</b></div>
@@ -4261,7 +4283,7 @@ function openSpintForm(id){
   document.getElementById('spFT').textContent=l?'Spind bearbeiten':'Neuer Spind';
   document.getElementById('spId').value=id||'';
   document.getElementById('spNumber').value=l?.number||'';
-  document.getElementById('spType').value=l?.assigneeType||'none';
+  document.getElementById('spType').value=l?.assigneeType||'user';
   const userSel=document.getElementById('spUser');
   userSel.innerHTML='<option value="">— Mitarbeiter wählen —</option>'+S.users.slice().sort(byLastName).map(u=>`<option value="${u.id}">${esc(lastNameFirst(u.name))}</option>`).join('');
   userSel.value=l?.assigneeUserId||'';
