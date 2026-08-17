@@ -2593,7 +2593,17 @@ function openEmojiPicker(inputId,btn,mode){
   _emojiPickerMode=mode||'replace';
   pop.innerHTML=EMOJI_PALETTE.map(e=>`<span onclick="pickEmoji('${e}')" style="cursor:pointer;font-size:18px;padding:4px;display:inline-block;border-radius:4px" onmouseover="this.style.background='var(--sf2)'" onmouseout="this.style.background='none'">${e}</span>`).join('');
   const r=btn.getBoundingClientRect();
-  pop.style.top=(r.bottom+4)+'px';
+  // Popup ist ~230px hoch — passt es unterhalb des Buttons nicht mehr in den
+  // sichtbaren Bereich (z.B. Emoji-Button im Chatfenster ganz unten am
+  // Bildschirmrand), stattdessen oberhalb öffnen statt es abzuschneiden.
+  const popH=230;
+  if(r.bottom+popH+4>window.innerHeight){
+    pop.style.top='';
+    pop.style.bottom=(window.innerHeight-r.top+4)+'px';
+  } else {
+    pop.style.bottom='';
+    pop.style.top=(r.bottom+4)+'px';
+  }
   pop.style.left=Math.max(4,Math.min(r.left,window.innerWidth-270))+'px';
   pop.style.display='block';
   // vorher entfernen statt bedingt hinzuzufügen — sonst sammeln sich bei
@@ -8266,10 +8276,10 @@ function chatWinMinHtml(w){
   const t=(S.chatThreads||[]).find(x=>x.id===w.threadId);
   const ou=t?getU(t.otherUserId):null;
   const unread=w.threadId?chatUnreadCount(w.threadId):0;
-  return `<div style="width:220px;flex-shrink:0;background:var(--bg);border:1px solid var(--border);border-bottom:none;border-radius:10px 10px 0 0;box-shadow:0 -4px 16px rgba(0,0,0,.18);display:flex;align-items:center;gap:8px;padding:9px 10px;cursor:pointer" onclick="maximizeChatWindow('${w.id}')">
+  return `<div style="width:220px;flex-shrink:0;background:${unread?'rgba(239,68,68,.1)':'var(--bg)'};border:1px solid ${unread?'rgba(239,68,68,.4)':'var(--border)'};border-bottom:none;border-radius:10px 10px 0 0;box-shadow:0 -4px 16px rgba(0,0,0,.18);display:flex;align-items:center;gap:8px;padding:9px 10px;cursor:pointer" onclick="maximizeChatWindow('${w.id}')">
     ${ou?avHtml(ou.initials,ou.color,26,10,ou.isOnline):'<div style="width:26px;height:26px;border-radius:50%;background:var(--sf2)"></div>'}
     <div style="flex:1;min-width:0;font-size:12px;font-weight:${unread?'700':'600'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(ou?.name||'Chat')}</div>
-    ${unread?`<span class="nbdg" style="display:flex;flex-shrink:0">${unread}</span>`:''}
+    ${unread?`<span style="min-width:18px;height:18px;background:#ef4444;color:#fff;border-radius:9px;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;flex-shrink:0">${unread}</span>`:''}
     <button class="mc" title="Maximieren" style="font-size:12px;flex-shrink:0" onclick="event.stopPropagation();maximizeChatWindow('${w.id}')">&#9650;</button>
     <button class="mc" title="Schließen" style="font-size:12px;flex-shrink:0" onclick="event.stopPropagation();closeChatWindow('${w.id}')">&#10005;</button>
   </div>`;
@@ -8278,10 +8288,11 @@ function chatWinMaxHtml(w){
   const t=(S.chatThreads||[]).find(x=>x.id===w.threadId);
   const ou=t?getU(t.otherUserId):null;
   const msgs=(S.chatMessages||[]).filter(m=>m.threadId===w.threadId);
+  const otherColor=ou?.color||'#64748b';
   const msgsHtml=msgs.map(m=>{
     const mine=m.senderId===S.currentUser;
     return `<div style="align-self:${mine?'flex-end':'flex-start'};max-width:80%">
-      <div style="background:${mine?'var(--acc)':'var(--sf2)'};color:${mine?'var(--act)':'var(--tx)'};padding:7px 11px;border-radius:12px;${mine?'border-bottom-right-radius:2px':'border-bottom-left-radius:2px'};font-size:13px;white-space:pre-wrap;word-break:break-word">${esc(m.text)}</div>
+      <div style="background:${mine?'var(--acc)':otherColor+'2a'};color:${mine?'var(--act)':otherColor};padding:7px 11px;border-radius:12px;${mine?'border-bottom-right-radius:2px':'border-bottom-left-radius:2px'};font-size:13px;white-space:pre-wrap;word-break:break-word">${esc(m.text)}</div>
       <div style="font-size:9px;color:var(--di);margin-top:2px;text-align:${mine?'right':'left'}">${fdt(m.createdAt)}</div>
     </div>`;
   }).join('')||'<div style="color:var(--di);font-size:12px;text-align:center;padding:20px 0">Noch keine Nachrichten — schreib was!</div>';
@@ -8371,12 +8382,22 @@ async function sendChatWinMessage(threadId){
   if(!input)return;
   const text=input.value.trim();if(!text)return;
   input.value='';
+  // Optimistisch sofort anzeigen, statt auf den vollen Datenabgleich zu
+  // warten — der lief bisher unbemerkt im Hintergrund, konnte aber je nach
+  // Serverlast ein paar Sekunden dauern, bis die eigene Nachricht auftauchte.
+  const tempMsg={id:'_pending_'+Date.now()+'_'+Math.random().toString(36).slice(2),threadId,senderId:S.currentUser,text,createdAt:new Date().toISOString()};
+  S.chatMessages.push(tempMsg);
+  renderChatWindows();
+  if(S.view==='chat')renderChatList();
   try{
-    await api('POST','/chat/threads/'+threadId+'/messages',{text});
-    await silentRefresh();
+    const r=await api('POST','/chat/threads/'+threadId+'/messages',{text});
+    tempMsg.id=r.id;
+    silentRefresh();
+  }catch(e){
+    S.chatMessages=S.chatMessages.filter(m=>m!==tempMsg);
     renderChatWindows();
-    if(S.view==='chat')renderChatList();
-  }catch(e){toast('⚠️ '+e.message,'err');input.value=text;}
+    toast('⚠️ '+e.message,'err');input.value=text;
+  }
 }
 async function markChatThreadRead(threadId){
   try{
