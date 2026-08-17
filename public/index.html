@@ -134,6 +134,7 @@
       </div>
       <div class="ndiv"></div>
       <div class="ni top ni-admin-only" id="ni-statistik" onclick="setView('statistik')">&#128202; Statistik</div>
+      <div class="ni top ni-admin-only" id="ni-spint" onclick="setView('spint')">&#128188; Spintvergabe</div>
     </div>
     <div class="sbf" id="sbf"><div class="sfl">Filter</div></div>
     <div class="sbver" onclick="openModal('changelogOv')" title="Changelog">LSt Portal <span id="versionBadge"></span> &#9432;</div>
@@ -253,6 +254,22 @@
       <div class="fg full"><label>Hinweistext</label><input type="text" id="siHint" placeholder="z.B. Telefonnummer, Kontaktperson, Link zur SOP"></div>
     </div>
     <div class="mf"><button class="btn-s" onclick="closeModal('sopItemOv')">Abbrechen</button><button class="btn-p" onclick="saveSopItem()">&#128190; Speichern</button></div>
+  </div>
+</div>
+
+<!-- SPINTVERGABE -->
+<div class="ov" id="spintOv">
+  <div class="modal">
+    <div class="mh"><h2 id="spFT">Neuer Spind</h2><button class="mc" onclick="closeModal('spintOv')">&#10005;</button></div>
+    <div class="mb2">
+      <input type="hidden" id="spId">
+      <div class="fg full"><label>Spind-Nummer *</label><input type="text" id="spNumber" placeholder="z.B. 12 oder A-04"></div>
+      <div class="fg full"><label>Zuteilung</label><select id="spType" onchange="spintToggleFields()"><option value="none">— frei —</option><option value="user">Mitarbeiter</option><option value="general">Anderweitig (z.B. Allgemein, Technik)</option></select></div>
+      <div class="fg full" id="spUserRow" style="display:none"><label>Mitarbeiter *</label><select id="spUser"></select></div>
+      <div class="fg full" id="spLabelRow" style="display:none"><label>Bezeichnung *</label><input type="text" id="spLabel" list="spintLabelSuggestions" placeholder="z.B. Allgemein"><datalist id="spintLabelSuggestions"><option value="Allgemein"><option value="Technik"><option value="Leitung"><option value="Ausbildung"><option value="Wartung"></datalist></div>
+      <div class="fg full"><label>Notiz</label><input type="text" id="spNote" placeholder="optional"></div>
+    </div>
+    <div class="mf"><button class="btn-s" onclick="closeModal('spintOv')">Abbrechen</button><button class="btn-p" onclick="saveLocker()">&#128190; Speichern</button></div>
   </div>
 </div>
 

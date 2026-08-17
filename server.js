@@ -677,6 +677,23 @@ async function initDB() {
     // Dokumentations-Freitextfeld je Schritt — unabhängig vom typ-spezifischen
     // "value" (z.B. bei Checkbox/Kontakt/Foto zusätzlich Platz für Notizen).
     `ALTER TABLE sop_checklist_run_items ADD COLUMN IF NOT EXISTS note TEXT DEFAULT ''`,
+    // ── Spintvergabe ── ein Spind ist entweder einem Mitarbeiter zugeteilt
+    // (assignee_user_id) oder anderweitig vergeben (assignee_label, z.B.
+    // "Allgemein"/"Technik") oder frei (assignee_type='none'). Ein Mitarbeiter
+    // kann mehrere Spinde haben, da hier je Spind (nicht je Mitarbeiter) eine
+    // Zeile existiert.
+    `CREATE TABLE IF NOT EXISTS lockers (
+  id TEXT PRIMARY KEY,
+  number TEXT NOT NULL,
+  assignee_type TEXT NOT NULL DEFAULT 'none',
+  assignee_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+  assignee_label TEXT DEFAULT '',
+  note TEXT DEFAULT '',
+  created_by TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_by TEXT,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+)`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }
@@ -772,6 +789,7 @@ app.use('/api/dp', require('./routes/dp-christmas'));
 app.use('/api',   require('./routes/todos'));
 app.use('/api',   require('./routes/contacts'));
 app.use('/api',   require('./routes/sop'));
+app.use('/api',   require('./routes/lockers'));
 
 app.get('*', (req,res) => res.sendFile(path.join(__dirname,'public','index.html')));
 

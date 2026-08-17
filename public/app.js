@@ -51,13 +51,14 @@ let S={
   meetings:[], _selMeeting:null, _selInstance:null,
   tkBatchMode:false,tkBatchSel:new Set(),_tkFeedFilter:'all',_tkTab:'details',tkGroupBy:'dept',tkFiltSubcat:'',
   checklists:[],messages:[],notifications:[],abrechnung:{einspringer:[],homeoffice:[]},dienstplaene:[],
-  p:{canApproveEvents:false,canSendMessages:false,seeAllEntries:true,editAllPersonal:false,addForOthers:false,addGeneral:false,manageUsers:false,seeAllAllw:false,editAllw:false,seeAllAbrechnung:false,manageSop:false},
+  p:{canApproveEvents:false,canSendMessages:false,seeAllEntries:true,editAllPersonal:false,addForOthers:false,addGeneral:false,manageUsers:false,seeAllAllw:false,editAllw:false,seeAllAbrechnung:false,manageSop:false,canManageSpint:false},
   tp:{seeAll:false,editAll:false,myDepts:[],canSetPublic:false,canAssign:false,canSeeSubcat:false,canEditSubcat:false,roles:[]},
   dpPlans:[], dpShiftTypes:[], dpAbsenceTypes:[], dpEmpParams:[], dpQualifications:[], dpShiftPrefs:[], dpProtocol:[], dpEmpRules:[],
   todos:[], _selTodo:null,
   contacts:[], _contactSearch:'',
   sopTemplates:[], sopRuns:[], _sopView:'overview', _sopSearch:'', _sopCatFilter:'',
   _selSopTemplateId:null, _selSopRunId:null,
+  lockers:[], _spintFilter:'',
   _dpPlanId:null, _dpMatrix:null, _dpStatsExpanded:false, _dpConfigTab:'shift-types', _dpSelection:new Set(),
   _dpQualLocalChanges:{}, _dpQualLocalPrefsChanges:{}, _dpReportExpanded: false,
   _dpQualWeightsExpanded:{}, _dpQualSearchQuery:'',
@@ -99,6 +100,7 @@ async function fetchData(){
     S.todos=data.todos||[];
     S.contacts=data.contacts||[];
     S.sopTemplates=data.sopTemplates||[];S.sopRuns=data.sopRuns||[];
+    S.lockers=data.lockers||[];
     S.currentUser=data.currentUser;S.p=data.permissions||{};
     const u=getU(S.currentUser);const roles=u?.roles||['standard'];
     const has=(...r)=>r.some(x=>roles.includes(x));
@@ -275,11 +277,11 @@ function restoreNavSectionState() {
   }
 }
 // Alle Sidebar-Reiter (id="ni-<key>") — muss mit db.js NAV_TABS übereinstimmen.
-const NAV_TAB_IDS=['home','sop','docs','meetings','todos','contacts','schedule','allw','homeoffice','vacation','diensttausch','abrechnung','dienstplaene','zahnarzt','platz','links','tickets','tickets_closed','tickets_deleted','checklists','dp','dp-config','dp-christmas','dp-mine','messages','messages_sent','news','statistik'];
+const NAV_TAB_IDS=['home','sop','docs','meetings','todos','contacts','schedule','allw','homeoffice','vacation','diensttausch','abrechnung','dienstplaene','zahnarzt','platz','links','tickets','tickets_closed','tickets_deleted','checklists','dp','dp-config','dp-christmas','dp-mine','messages','messages_sent','news','statistik','spint'];
 // Zusätzlich zur (abschaltbaren) Reiter-Sichtbarkeit weiterhin hart verdrahtete
 // Mindestanforderungen für die Dienstplanungs-/Statistik-Reiter — ein Reiter
 // ist nur sichtbar, wenn BEIDES zutrifft.
-const NAV_BASELINE={statistik:()=>!!S.p?.manageUsers, dp:()=>!!S.p?.canManageDp, 'dp-config':()=>!!S.p?.canManageDp, 'dp-christmas':()=>!!S.p?.canManageDp};
+const NAV_BASELINE={statistik:()=>!!S.p?.manageUsers, dp:()=>!!S.p?.canManageDp, 'dp-config':()=>!!S.p?.canManageDp, 'dp-christmas':()=>!!S.p?.canManageDp, spint:()=>!!S.p?.canManageSpint};
 function applyNavVisibility(){
   const tabs=S.p?.tabs||{};
   NAV_TAB_IDS.forEach(id=>{
@@ -335,6 +337,7 @@ function renderMain(){
   else if(S.view==='todos')renderTodos();
   else if(S.view==='contacts')renderContacts();
   else if(S.view==='sop')renderSop();
+  else if(S.view==='spint')renderSpint();
 }
 // HOME
 // ── ÜBERSICHT: Alt/Neu-Umschalter ─────────────────────────────────────────────
@@ -2370,6 +2373,7 @@ const RIGHTS_NAV_TABS=[
   {key:'tickets',label:'Tickets: Offene'},{key:'tickets_closed',label:'Tickets: Abgeschlossene'},{key:'tickets_deleted',label:'Tickets: Gel\u00f6schte'},{key:'checklists',label:'Checklisten'},
   {key:'dp',label:'Dienstplanung: Planerstellung'},{key:'dp-config',label:'Dienstplanung: Konfiguration'},{key:'dp-christmas',label:'Dienstplanung: Weihnachtsdienst'},{key:'dp-mine',label:'Dienstplanung: Mein Dienstplan'},
   {key:'messages',label:'Nachrichten: Eingang'},{key:'messages_sent',label:'Nachrichten: Gesendet'},{key:'news',label:'News'},{key:'statistik',label:'Statistik'},
+  {key:'spint',label:'Spintvergabe'},
 ];
 function renderRightsMatrix(){
   const el=document.getElementById('rightsMatrix');if(!el)return;
@@ -2564,6 +2568,7 @@ function startAutoRefresh(){
       S.abrechnung=data.abrechnung||{einspringer:[],homeoffice:[]};S.dienstplaene=data.dienstplaene||[];S.diensttausch=data.diensttausch||[];S.homeoffice=data.homeoffice||{slots:[],config:[],boxes:[],dienste:[]};S.vacationConfig=data.vacationConfig||[];S.diensttausch=data.diensttausch||[];
       S.stationSessions=data.stationSessions||[];S.stationShifts=data.stationShifts||[];S.stationOutages=data.stationOutages||[];S.links=data.portalLinks||[];S.docs=data.docs||[];S.docCategories=data.docCategories||[];S.rolePermissions=data.rolePermissions||[];S.meetings=data.meetings||[];S.contacts=data.contacts||[];
       S.sopTemplates=data.sopTemplates||[];S.sopRuns=data.sopRuns||[];
+      S.lockers=data.lockers||[];
       updateBadges();
       if(_lastMsgCount>=0&&newMsgCount>_lastMsgCount)toast('\uD83D\uDCEC Neue Nachricht eingegangen!');
       if(_lastTkCount>=0&&newTkCount>_lastTkCount)toast('\uD83C\uDFAB Neues Ticket in deinem Bereich!');
@@ -4209,6 +4214,84 @@ function renderSopRunList(){
       }).join('')}
       </div>`}
     </div>`;
+}
+
+// ── SPINTVERGABE ─────────────────────────────────────────────────────────────
+// Fest auf admin/leitung/technik beschränkt (S.p.canManageSpint, siehe
+// NAV_BASELINE) — kein separates Recht in der Rechte-Matrix wie bei manageSop.
+function renderSpint(){
+  if(!S.p.canManageSpint){ document.getElementById('main').innerHTML='<div class="empty">⚠️ Kein Zugriff</div>'; return; }
+  const lockers=(S.lockers||[]).slice().sort((a,b)=>a.number.localeCompare(b.number,'de',{numeric:true}));
+  const search=(S._spintFilter||'').toLowerCase().trim();
+  const assigneeText=l=>l.assigneeType==='user'?(getU(l.assigneeUserId)?.name||'Unbekannt'):l.assigneeType==='general'?l.assigneeLabel:'';
+  let filtered=lockers;
+  if(search) filtered=filtered.filter(l=>[l.number,assigneeText(l),l.note].some(v=>(v||'').toLowerCase().includes(search)));
+  const total=lockers.length;
+  const assignedUser=lockers.filter(l=>l.assigneeType==='user').length;
+  const assignedGeneral=lockers.filter(l=>l.assigneeType==='general').length;
+  const free=lockers.filter(l=>l.assigneeType==='none').length;
+  const row=l=>{
+    const label=l.assigneeType==='user'?('👤 '+esc(getU(l.assigneeUserId)?.name||'Unbekannt'))
+      :l.assigneeType==='general'?('🏷️ '+esc(l.assigneeLabel||'—'))
+      :'<span style="color:var(--di)">— frei —</span>';
+    return '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid var(--border)">'
+      +'<div style="font-weight:700;font-size:13px;min-width:70px;flex-shrink:0">'+esc(l.number)+'</div>'
+      +'<div style="flex:1;min-width:0;font-size:13px">'+label+(l.note?'<div style="font-size:11px;color:var(--mu);margin-top:2px">'+esc(l.note)+'</div>':'')+'</div>'
+      +'<button class="btn-s" style="font-size:11px;padding:3px 8px;flex-shrink:0" onclick="openSpintForm(\''+l.id+'\')">✎</button>'
+      +'<button class="btn-d" style="font-size:11px;padding:3px 8px;flex-shrink:0" onclick="deleteLocker(\''+l.id+'\')">✕</button>'
+      +'</div>';
+  };
+  document.getElementById('main').innerHTML=`
+    <div class="ph"><div class="pt">&#128188; Spintvergabe</div><button class="btn-p" onclick="openSpintForm()">+ Spind hinzufügen</button></div>
+    <div style="padding:0 20px 12px;display:flex;gap:10px;flex-wrap:wrap">
+      <div class="ib3">Gesamt<br><b style="font-size:18px">${total}</b></div>
+      <div class="ib3">Mitarbeitern zugeteilt<br><b style="font-size:18px">${assignedUser}</b></div>
+      <div class="ib3">Anderweitig vergeben<br><b style="font-size:18px">${assignedGeneral}</b></div>
+      <div class="ib3">Frei<br><b style="font-size:18px">${free}</b></div>
+    </div>
+    <div style="padding:0 20px 12px">
+      <input type="text" class="srch" placeholder="&#128269; Suchen (Spind-Nr., Mitarbeiter, Notiz …)" value="${(S._spintFilter||'').replace(/"/g,'&quot;')}" oninput="S._spintFilter=this.value;renderSpint()" style="max-width:320px">
+    </div>
+    <div style="padding:0 20px 30px">
+      ${filtered.length?filtered.map(row).join(''):'<div style="color:var(--di);font-size:13px;padding:20px">'+(search?'Keine Spinde gefunden.':'Noch keine Spinde angelegt.')+'</div>'}
+    </div>`;
+}
+function openSpintForm(id){
+  const l=id?S.lockers.find(x=>x.id===id):null;
+  document.getElementById('spFT').textContent=l?'Spind bearbeiten':'Neuer Spind';
+  document.getElementById('spId').value=id||'';
+  document.getElementById('spNumber').value=l?.number||'';
+  document.getElementById('spType').value=l?.assigneeType||'none';
+  const userSel=document.getElementById('spUser');
+  userSel.innerHTML='<option value="">— Mitarbeiter wählen —</option>'+S.users.slice().sort(byLastName).map(u=>`<option value="${u.id}">${esc(lastNameFirst(u.name))}</option>`).join('');
+  userSel.value=l?.assigneeUserId||'';
+  document.getElementById('spLabel').value=l?.assigneeLabel||'';
+  document.getElementById('spNote').value=l?.note||'';
+  spintToggleFields();
+  openModal('spintOv');
+}
+function spintToggleFields(){
+  const type=document.getElementById('spType').value;
+  document.getElementById('spUserRow').style.display=type==='user'?'':'none';
+  document.getElementById('spLabelRow').style.display=type==='general'?'':'none';
+}
+async function saveLocker(){
+  const id=document.getElementById('spId').value;
+  const number=document.getElementById('spNumber').value.trim();
+  if(!number) return toast('⚠️ Spind-Nummer erforderlich','err');
+  const assigneeType=document.getElementById('spType').value;
+  if(assigneeType==='user'&&!document.getElementById('spUser').value) return toast('⚠️ Bitte Mitarbeiter wählen','err');
+  if(assigneeType==='general'&&!document.getElementById('spLabel').value.trim()) return toast('⚠️ Bitte Bezeichnung eingeben','err');
+  const body={number,assigneeType,assigneeUserId:document.getElementById('spUser').value,assigneeLabel:document.getElementById('spLabel').value.trim(),note:document.getElementById('spNote').value.trim()};
+  try{
+    if(id) await api('PUT','/lockers/'+id,body);
+    else await api('POST','/lockers',body);
+    await fetchData();closeModal('spintOv');renderSpint();toast(id?'✅ Aktualisiert!':'✅ Angelegt!');
+  }catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function deleteLocker(id){
+  if(!confirm('Spind löschen?'))return;
+  try{await api('DELETE','/lockers/'+id);await fetchData();renderSpint();toast('✅ Gelöscht');}catch(e){toast('⚠️ '+e.message,'err');}
 }
 
 // ── DOKUMENTE / DATEIABLAGE ───────────────────────────────────────────────────
