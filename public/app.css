@@ -189,12 +189,26 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
 .toast{position:fixed;bottom:18px;right:18px;background:var(--sf);border:1px solid var(--ok);border-radius:var(--r);padding:9px 16px;font-size:13px;font-weight:500;z-index:999;animation:fup .3s ease;box-shadow:var(--sh2)}
 .toast.err{border-color:var(--danger)}
 .toast.chat{bottom:auto;top:18px;right:18px;border-color:var(--acc)}
+.sop-step-cols{display:grid;grid-template-columns:minmax(200px,420px) 240px;gap:16px;align-items:start}
+@media (max-width:640px){.sop-step-cols{grid-template-columns:1fr}}
+#chatWinRow{display:none;position:fixed;bottom:0;right:92px;z-index:600;flex-direction:row-reverse;align-items:flex-end;gap:10px;max-width:calc(100vw - 100px)}
+#chatWinRow.open{display:flex}
+.chat-win-min{width:220px;flex-shrink:0;border-bottom:none;border-radius:10px 10px 0 0;box-shadow:0 -4px 16px rgba(0,0,0,.18);display:flex;align-items:center;gap:8px;padding:9px 10px;cursor:pointer}
+.chat-win-max{width:320px;flex-shrink:0;height:440px;max-height:calc(100vh - 90px);background:var(--bg);border:1px solid var(--border);border-bottom:none;border-radius:10px 10px 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.25);display:flex;flex-direction:column}
+.chat-win-picker{width:280px;flex-shrink:0;height:380px;max-height:calc(100vh - 90px);background:var(--bg);border:1px solid var(--border);border-bottom:none;border-radius:10px 10px 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.25);display:flex;flex-direction:column}
+@media (max-width:640px){
+  /* bottom:76px statt 0 — sonst sitzt der runde "+"-Schnellzugriff-Button
+     (unten rechts, 52px + 24px Abstand) direkt über dem Senden-Button */
+  #chatWinRow{right:0;left:0;bottom:76px;max-width:none;padding:0 8px;flex-wrap:wrap-reverse;justify-content:flex-end}
+  .chat-win-max,.chat-win-picker{width:100%;max-width:none;height:min(70vh,calc(100vh - 160px));border-radius:12px}
+  .chat-win-min{width:calc(50% - 4px);min-width:0}
+}
 .loading-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:400;align-items:center;justify-content:center}.loading-ov.open{display:flex}
 .spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--acc);border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:49}
 @media(max-width:768px){
-  .hbg{display:flex}.logo{width:auto}
+  .hbg{display:flex;width:44px;height:44px;font-size:20px}.logo{width:auto}
   .app{grid-template-columns:1fr}
   .sb{position:fixed;top:var(--hdr);left:-250px;width:250px;height:calc(100vh - var(--hdr));transition:left .25s;z-index:50}
   .sb.open{left:0;box-shadow:var(--sh2)}.sb-overlay.open{display:block}
