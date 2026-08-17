@@ -10,7 +10,7 @@ router.get('/', auth, async (req,res) => {
     const canManageDp = roles.some(r=>['admin','leitung','dienstplanung'].includes(r));
     const canManageSpint = roles.some(r=>['admin','leitung','technik'].includes(r));
     const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
-           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw,dpQualificationsRaw,dpShiftPrefsRaw,dpProtocolRaw,todosRaw,todoItemsRaw,todoAssigneesRaw,myDpPlanIdsRaw,todoNotificationsRaw,contactsRaw,sopTemplatesRaw,sopItemsRaw,sopRunsRaw,sopRunItemsRaw,lockersRaw,sopBranchOptionsRaw,departmentsRaw] = await Promise.all([
+           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw,dpQualificationsRaw,dpShiftPrefsRaw,dpProtocolRaw,todosRaw,todoItemsRaw,todoAssigneesRaw,myDpPlanIdsRaw,todoNotificationsRaw,contactsRaw,sopTemplatesRaw,sopItemsRaw,sopRunsRaw,sopRunItemsRaw,lockersRaw,sopBranchOptionsRaw,departmentsRaw,lockerCategoriesRaw] = await Promise.all([
       q('SELECT id,name,initials,roles,color,must_change_pw,last_seen,category,email,username,hire_date,termination_date FROM users ORDER BY name'),
       q('SELECT * FROM categories ORDER BY sort_order,label'),
       q('SELECT * FROM tags ORDER BY label'),
@@ -76,9 +76,11 @@ router.get('/', auth, async (req,res) => {
       p.manageSop ? q('SELECT * FROM sop_checklist_runs ORDER BY started_at DESC LIMIT 200').catch(()=>[])
         : q('SELECT * FROM sop_checklist_runs WHERE started_by=$1 ORDER BY started_at DESC LIMIT 200',[uid]).catch(()=>[]),
       q('SELECT * FROM sop_checklist_run_items').catch(()=>[]),
-      canManageSpint ? q('SELECT * FROM lockers ORDER BY number').catch(()=>[]) : Promise.resolve([]),
+      canManageSpint ? q('SELECT * FROM lockers ORDER BY number').catch(()=>[])
+        : q('SELECT * FROM lockers WHERE assignee_type=\'user\' AND assignee_user_id=$1 ORDER BY number',[uid]).catch(()=>[]),
       q('SELECT * FROM sop_checklist_item_branch_options ORDER BY item_id,sort_order').catch(()=>[]),
       q('SELECT * FROM departments ORDER BY sort_order,label').catch(()=>[]),
+      q('SELECT * FROM locker_categories ORDER BY sort_order,label').catch(()=>[]),
     ]);
 
     const tkViewMap = new Map((tkViewsRaw||[]).map(v=>[v.ticket_id, v.viewed_at]));
@@ -311,8 +313,11 @@ router.get('/', auth, async (req,res) => {
       lockers: (lockersRaw||[]).map(l=>({
         id:l.id, number:l.number, assigneeType:l.assignee_type,
         assigneeUserId:l.assignee_user_id||null, assigneeLabel:l.assignee_label||'',
-        note:l.note||'', createdBy:l.created_by, createdAt:l.created_at,
+        note:l.note||'', categoryId:l.category_id||null, createdBy:l.created_by, createdAt:l.created_at,
         updatedBy:l.updated_by||null, updatedAt:l.updated_at||null,
+      })),
+      lockerCategories: (lockerCategoriesRaw||[]).map(c=>({
+        id:c.id, label:c.label, emoji:c.emoji||'', sortOrder:c.sort_order,
       })),
       departments: (departmentsRaw||[]).map(d=>({
         id:d.id, label:d.label, emoji:d.emoji||'', color:d.color||'#64748b', sortOrder:d.sort_order,

@@ -162,6 +162,10 @@
       </div>
       <div style="border-top:1px solid var(--border);margin:4px 0 8px"></div>
       <div class="fg"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px"><input type="checkbox" id="setDueHeat" onchange="toggleDueHeatPref(this.checked)" style="width:16px;height:16px;cursor:pointer"> &#128293; F&#228;lligkeits-F&#228;rbung in der Ticketliste</label><div style="font-size:11px;color:var(--mu);margin-top:2px;margin-left:24px">F&#228;rbt Tickets ab 14 Tagen vor F&#228;lligkeit dezent orange bis r&#246;tlich ein.</div></div>
+      <div id="myLockersBlock" style="display:none">
+        <div style="border-top:1px solid var(--border);margin:4px 0 8px"></div>
+        <div class="fg"><label>&#128188; Meine Spinde</label><div id="myLockersList"></div></div>
+      </div>
       <div style="border-top:1px solid var(--border);margin:4px 0 8px"></div>
       <div style="font-size:12px;font-weight:600;color:var(--mu);margin-bottom:6px">&#128272; Passwort &#228;ndern</div>
       <div class="fg"><label>Aktuelles Passwort</label><div class="pw-w"><input type="password" id="cpw0"><button class="eye" onclick="eyeToggle('cpw0',this)">&#128065;</button></div></div>
@@ -265,12 +269,36 @@
     <div class="mb2">
       <input type="hidden" id="spId">
       <div class="fg full"><label>Spind-Nummer *</label><input type="text" id="spNumber" placeholder="z.B. 12 oder A-04"></div>
+      <div class="fg full"><label>Kategorie</label><select id="spCategory"></select></div>
       <div class="fg full"><label>Zuteilung</label><select id="spType" onchange="spintToggleFields()"><option value="none">— frei —</option><option value="user">Mitarbeiter</option><option value="general">Anderweitig (z.B. Allgemein, Technik)</option></select></div>
       <div class="fg full" id="spUserRow" style="display:none"><label>Mitarbeiter *</label><select id="spUser"></select></div>
       <div class="fg full" id="spLabelRow" style="display:none"><label>Bezeichnung *</label><input type="text" id="spLabel" list="spintLabelSuggestions" placeholder="z.B. Allgemein"><datalist id="spintLabelSuggestions"><option value="Allgemein"><option value="Technik"><option value="Leitung"><option value="Ausbildung"><option value="Wartung"></datalist></div>
       <div class="fg full"><label>Notiz</label><input type="text" id="spNote" placeholder="optional"></div>
     </div>
     <div class="mf"><button class="btn-s" onclick="closeModal('spintOv')">Abbrechen</button><button class="btn-p" onclick="saveLocker()">&#128190; Speichern</button></div>
+  </div>
+</div>
+
+<!-- SPIND-KATEGORIEN -->
+<div class="ov" id="spintCatOv">
+  <div class="modal">
+    <div class="mh"><h2>Spind-Kategorien</h2><button class="mc" onclick="closeModal('spintCatOv')">&#10005;</button></div>
+    <div class="mb2">
+      <div id="spintCatList"></div>
+      <button class="btn-s" style="margin-top:8px" onclick="openSpintCatForm()">+ Kategorie hinzufügen</button>
+    </div>
+    <div class="mf"><button class="btn-s" onclick="closeModal('spintCatOv')">Schließen</button></div>
+  </div>
+</div>
+<div class="ov" id="spintCatFormOv">
+  <div class="modal">
+    <div class="mh"><h2 id="scFT2">Neue Kategorie</h2><button class="mc" onclick="closeModal('spintCatFormOv');openSpintCatOv()">&#10005;</button></div>
+    <div class="mb2">
+      <input type="hidden" id="scId2">
+      <div class="fg full"><label>Bezeichnung *</label><input type="text" id="scLabel2" placeholder="z.B. Groß"></div>
+      <div class="fg full"><label>Symbol (Emoji)</label><input type="text" id="scEmoji2" placeholder="z.B. 📦" maxlength="4"></div>
+    </div>
+    <div class="mf"><button class="btn-s" onclick="closeModal('spintCatFormOv');openSpintCatOv()">Abbrechen</button><button class="btn-p" onclick="saveSpintCat()">&#128190; Speichern</button></div>
   </div>
 </div>
 

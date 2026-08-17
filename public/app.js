@@ -245,6 +245,17 @@ function openPwModal(){
   buildCP('myCR',S.myColor,'pickMyColor');
   document.getElementById('cpw0').value='';document.getElementById('cpw1').value='';document.getElementById('cpw2').value='';
   const dh=document.getElementById('setDueHeat');if(dh)dh.checked=getDueHeatPref();
+  const myLockers=(S.lockers||[]).filter(l=>l.assigneeType==='user'&&l.assigneeUserId===S.currentUser);
+  const lockersBlock=document.getElementById('myLockersBlock');
+  if(lockersBlock){
+    lockersBlock.style.display=myLockers.length?'':'none';
+    document.getElementById('myLockersList').innerHTML=myLockers.map(l=>
+      `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px">
+        <span style="font-weight:700">${esc(l.number)}</span>
+        ${l.categoryId?`<span class="bdg" style="font-size:11px">${esc(lockerCatLabel(l.categoryId))}</span>`:''}
+        ${l.note?`<span style="color:var(--mu);font-size:11px">${esc(l.note)}</span>`:''}
+      </div>`).join('');
+  }
   openModal('pwModal');
 }
 function pickMyColor(col,cid){S.myColor=col;document.querySelectorAll('#'+cid+' .cp').forEach(el=>el.classList.toggle('on',el.style.backgroundColor===h2r(col)));}
@@ -2621,7 +2632,7 @@ function openModal(id){document.getElementById(id)?.classList.add('open');}
 function closeModal(id){document.getElementById(id)?.classList.remove('open');}
 function eyeToggle(inputId,btn){const inp=document.getElementById(inputId);const show=inp.type==='password';inp.type=show?'text':'password';btn.textContent=show?'\uD83D\uDE48':'\uD83D\uDC41';}
 function toast(msg,type='',dur=3200){const t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),dur);}
-const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOr','clFormOv','attachClOv','changelogOv','dpOv','rejectEinspOv','helpOv','msgFormOv','msgDetOv','gSearchOv','stLoginOv','docFormOv','docVerOv','docHistOv','docCatOv','dpReportModal','deptOv'];
+const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOr','clFormOv','attachClOv','changelogOv','dpOv','rejectEinspOv','helpOv','msgFormOv','msgDetOv','gSearchOv','stLoginOv','docFormOv','docVerOv','docHistOv','docCatOv','dpReportModal','deptOv','spintCatOv','spintCatFormOv'];
 document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();openGSearch();return;}
   if(e.key==='Escape'){ALL_MODALS.forEach(closeModal);closeGSearch();}
@@ -3942,6 +3953,25 @@ async function deleteContact(id){
 // unverändert aktiv (Nachvollziehbarkeit abgeschlossener Durchläufe).
 const SOP_CATEGORY_SUGGESTIONS=['Systemausfall Einsatzleitsystem','Ausfall Telefonanlage','Stromausfall','Schichtübergabe-Check','Großschadenslage'];
 const SOP_ITEM_TYPES=[{id:'check',label:'Checkbox'},{id:'text',label:'Texteingabe'},{id:'yesno',label:'Ja/Nein'},{id:'photo',label:'Foto-Upload'},{id:'contact',label:'Kontakt'},{id:'branch',label:'Verzweigung'}];
+// Neutrale, helle Farben zur Kennzeichnung von Verzweigungs-Optionen — bewusst
+// kein Rot/Grün (das wäre falsch/richtig-konnotiert, hier geht's nur um
+// "welcher Pfad"). Option 1 einer Verzweigung ist immer Farbe[0], Option 2
+// immer Farbe[1] usw. — konsistent über Editor, Durchlauf und Ausdruck.
+const SOP_BRANCH_PALETTE=[
+  {bg:'#fde2e4',fg:'#9f1239'},  // rose
+  {bg:'#e0f2fe',fg:'#0369a1'},  // sky
+  {bg:'#ede9fe',fg:'#6d28d9'},  // violet
+  {bg:'#fef3c7',fg:'#92400e'},  // amber
+  {bg:'#ccfbf1',fg:'#0f766e'},  // teal
+  {bg:'#e2e8f0',fg:'#334155'},  // slate
+];
+function sopOptColor(allItems,optId){
+  for(const x of allItems){
+    const idx=(x.options||[]).findIndex(y=>y.id===optId);
+    if(idx>=0) return SOP_BRANCH_PALETTE[idx%SOP_BRANCH_PALETTE.length];
+  }
+  return SOP_BRANCH_PALETTE[SOP_BRANCH_PALETTE.length-1];
+}
 // ── Verzweigungen: ein Schritt vom Typ "branch" hat mehrere Optionen
 // (t.items[].options); andere Schritte können optional einer Option
 // zugeordnet werden (item.branchOptionId) und sind dann nur sichtbar, wenn
@@ -4132,14 +4162,15 @@ function renderSopEditor(id){
   const optionLabel=optId=>{ for(const x of items){ const o=(x.options||[]).find(y=>y.id===optId); if(o) return o.label; } return '?'; };
   const itemRow=(it,i)=>{
     const indent=sopItemDepth(items,it)*24;
-    const branchTag=it.branchOptionId?`<div style="font-size:10px;color:var(--acc);font-weight:600;margin-bottom:2px">↳ Falls „${esc(optionLabel(it.branchOptionId))}“</div>`:'';
+    const branchTag=it.branchOptionId?(()=>{const c=sopOptColor(items,it.branchOptionId);return `<div style="margin-bottom:2px"><span style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:9px;background:${c.bg};color:${c.fg}">↳ Falls „${esc(optionLabel(it.branchOptionId))}“</span></div>`;})():'';
     const optionsHtml=it.itemType==='branch'?`<div style="margin-top:8px;padding:8px 10px;background:var(--sf2);border-radius:8px">
       <div style="font-size:11px;font-weight:700;color:var(--mu);margin-bottom:6px">Optionen</div>
-      ${(it.options||[]).map(o=>`<div style="display:flex;align-items:center;gap:6px;padding:2px 0;font-size:12px">
+      ${(it.options||[]).map((o,oi)=>{const c=SOP_BRANCH_PALETTE[oi%SOP_BRANCH_PALETTE.length];return `<div style="display:flex;align-items:center;gap:6px;padding:2px 0;font-size:12px">
+        <span style="width:10px;height:10px;border-radius:50%;background:${c.fg};flex-shrink:0"></span>
         <span style="flex:1">${esc(o.label)}</span>
         ${isDraft&&canManage?`<button class="btn-s" style="font-size:10px;padding:2px 6px" onclick="sopEditBranchOption('${t.id}','${it.id}','${o.id}')">✎</button>
         <button class="btn-d" style="font-size:10px;padding:2px 6px" onclick="sopDeleteBranchOption('${t.id}','${it.id}','${o.id}')">✕</button>`:''}
-      </div>`).join('')}
+      </div>`;}).join('')}
       ${!(it.options||[]).length?'<div style="font-size:11px;color:var(--di)">Noch keine Optionen.</div>':''}
       ${isDraft&&canManage?`<button class="btn-s" style="font-size:11px;margin-top:6px" onclick="sopAddBranchOption('${t.id}','${it.id}')">+ Option hinzufügen</button>`:''}
     </div>`:'';
@@ -4382,21 +4413,30 @@ function renderSopRun(runId){
       control=sopContactCardHtml((S.contacts||[]).find(c=>c.id===it.contactId));
     } else if(it.itemType==='branch'){
       control=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">`
-        +(it.options||[]).map(o=>`<button class="mb ${ri.value===o.id?'on':''}" ${disabled} onclick="sopRunChooseBranch('${run.id}','${it.id}','${o.id}')">${esc(o.label)}</button>`).join('')
+        +(it.options||[]).map((o,oi)=>{const c=SOP_BRANCH_PALETTE[oi%SOP_BRANCH_PALETTE.length];const sel=ri.value===o.id;
+          return `<button class="mb" ${disabled} onclick="sopRunChooseBranch('${run.id}','${it.id}','${o.id}')" style="background:${sel?c.fg:c.bg};color:${sel?'#fff':c.fg};border-color:${c.fg}">${esc(o.label)}</button>`;}).join('')
         +(!(it.options||[]).length?'<span style="font-size:11px;color:var(--di)">Keine Optionen hinterlegt</span>':'')
         +`</div>`;
     }
     const isBranch=it.itemType==='branch';
-    return `<div style="display:flex;gap:12px;align-items:flex-start;padding:14px 16px 14px ${16+indent}px;border-bottom:1px solid var(--border);${ri.done?'opacity:.65':''}">
-      ${isBranch
-        ?`<div style="font-size:22px;flex-shrink:0;margin-top:2px">🔀</div>`
-        :`<input type="checkbox" ${ri.done?'checked':''} ${disabled} onchange="sopRunToggle('${run.id}','${it.id}',this.checked)" style="width:26px;height:26px;flex-shrink:0;margin-top:2px;cursor:${canEdit?'pointer':'default'}">`}
-      <div style="flex:1;min-width:0">
-        <div style="font-size:15px;font-weight:600;${ri.done&&!isBranch?'text-decoration:line-through':''}">${esc(it.text)}${it.required&&!isBranch?' <span style="color:#ef4444">*</span>':''}</div>
-        ${it.hint?`<div style="font-size:12px;color:var(--mu);margin-top:2px">💡 ${esc(it.hint)}</div>`:''}
-        ${control}
-        <textarea placeholder="Dokumentation / Notiz…" ${disabled} onchange="sopRunSetNote('${run.id}','${it.id}',this.value)" rows="2" style="width:100%;max-width:400px;margin-top:6px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--sf);color:var(--tx);box-sizing:border-box;font-size:12px;font-family:inherit;resize:vertical">${esc(ri.note||'')}</textarea>
-        ${ri.updatedAt?`<div style="font-size:10px;color:var(--di);margin-top:4px">zuletzt ${fdt(ri.updatedAt)} von ${esc(getU(ri.updatedBy)?.name||'?')}</div>`:''}
+    const branchTagRun=it.branchOptionId?(()=>{const c=sopOptColor(allItems,it.branchOptionId);return `<span style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:9px;background:${c.bg};color:${c.fg};margin-bottom:4px">↳ ${esc((()=>{for(const x of allItems){const o=(x.options||[]).find(y=>y.id===it.branchOptionId);if(o)return o.label;}return '?';})())}</span>`;})():'';
+    return `<div style="display:flex;align-items:flex-start;padding:14px 16px;border-bottom:1px solid var(--border);${ri.done?'opacity:.65':''}">
+      <div style="width:26px;flex-shrink:0;margin-top:2px;display:flex;justify-content:center">
+        ${isBranch
+          ?`<div style="font-size:22px">🔀</div>`
+          :`<input type="checkbox" ${ri.done?'checked':''} ${disabled} onchange="sopRunToggle('${run.id}','${it.id}',this.checked)" style="width:26px;height:26px;cursor:${canEdit?'pointer':'default'};accent-color:#10b981">`}
+      </div>
+      <div style="flex:1;min-width:0;margin-left:${8+indent}px;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+        <div style="flex:1;min-width:200px">
+          ${branchTagRun?`<div>${branchTagRun}</div>`:''}
+          <div style="font-size:15px;font-weight:600;${ri.done&&!isBranch?'text-decoration:line-through':''}">${esc(it.text)}${it.required&&!isBranch?' <span style="color:#ef4444">*</span>':''}</div>
+          ${it.hint?`<div style="font-size:12px;color:var(--mu);margin-top:2px">💡 ${esc(it.hint)}</div>`:''}
+          ${control}
+        </div>
+        <div style="width:260px;flex-shrink:0">
+          <textarea placeholder="Dokumentation / Notiz…" ${disabled} onchange="sopRunSetNote('${run.id}','${it.id}',this.value)" rows="3" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--sf);color:var(--tx);box-sizing:border-box;font-size:12px;font-family:inherit;resize:vertical">${esc(ri.note||'')}</textarea>
+          ${ri.updatedAt?`<div style="font-size:10px;color:var(--di);margin-top:4px">zuletzt ${fdt(ri.updatedAt)} von ${esc(getU(ri.updatedBy)?.name||'?')}</div>`:''}
+        </div>
       </div>
     </div>`;
   };
@@ -4474,12 +4514,15 @@ function renderSopRunList(){
 // ── SPINTVERGABE ─────────────────────────────────────────────────────────────
 // Fest auf admin/leitung/technik beschränkt (S.p.canManageSpint, siehe
 // NAV_BASELINE) — kein separates Recht in der Rechte-Matrix wie bei manageSop.
+function lockerCatLabel(catId){const c=(S.lockerCategories||[]).find(x=>x.id===catId);return c?(c.emoji?c.emoji+' ':'')+c.label:'';}
 function renderSpint(){
   if(!S.p.canManageSpint){ document.getElementById('main').innerHTML='<div class="empty">⚠️ Kein Zugriff</div>'; return; }
   const lockers=(S.lockers||[]).slice().sort((a,b)=>a.number.localeCompare(b.number,'de',{numeric:true}));
   const search=(S._spintFilter||'').toLowerCase().trim();
+  const catFilter=S._spintCatFilter||'';
   const assigneeText=l=>l.assigneeType==='user'?(getU(l.assigneeUserId)?.name||'Unbekannt'):l.assigneeType==='general'?l.assigneeLabel:'';
   let filtered=lockers;
+  if(catFilter) filtered=filtered.filter(l=>(l.categoryId||'')===catFilter);
   if(search) filtered=filtered.filter(l=>[l.number,assigneeText(l),l.note].some(v=>(v||'').toLowerCase().includes(search)));
   const total=lockers.length;
   const assignedUser=lockers.filter(l=>l.assigneeType==='user').length;
@@ -4491,24 +4534,26 @@ function renderSpint(){
       :'<span style="color:var(--di)">— frei —</span>';
     return '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid var(--border)">'
       +'<div style="font-weight:700;font-size:13px;min-width:70px;flex-shrink:0">'+esc(l.number)+'</div>'
+      +(l.categoryId?'<span class="bdg" style="font-size:11px;flex-shrink:0">'+esc(lockerCatLabel(l.categoryId))+'</span>':'')
       +'<div style="flex:1;min-width:0;font-size:13px">'+label+(l.note?'<div style="font-size:11px;color:var(--mu);margin-top:2px">'+esc(l.note)+'</div>':'')+'</div>'
       +'<button class="btn-s" style="font-size:11px;padding:3px 8px;flex-shrink:0" onclick="openSpintForm(\''+l.id+'\')">✎</button>'
       +'<button class="btn-d" style="font-size:11px;padding:3px 8px;flex-shrink:0" onclick="deleteLocker(\''+l.id+'\')">✕</button>'
       +'</div>';
   };
   document.getElementById('main').innerHTML=`
-    <div class="ph"><div class="pt">&#128188; Spindvergabe</div><button class="btn-p" onclick="openSpintForm()">+ Spind hinzufügen</button></div>
+    <div class="ph"><div class="pt">&#128188; Spindvergabe</div><div style="display:flex;gap:6px"><button class="btn-s" onclick="openSpintCatOv()">⚙️ Kategorien</button><button class="btn-p" onclick="openSpintForm()">+ Spind hinzufügen</button></div></div>
     <div style="padding:0 20px 12px;display:flex;gap:10px;flex-wrap:wrap">
       <div class="ib3">Gesamt<br><b style="font-size:18px">${total}</b></div>
       <div class="ib3">Mitarbeitern zugeteilt<br><b style="font-size:18px">${assignedUser}</b></div>
       <div class="ib3">Anderweitig vergeben<br><b style="font-size:18px">${assignedGeneral}</b></div>
       <div class="ib3">Frei<br><b style="font-size:18px">${free}</b></div>
     </div>
-    <div style="padding:0 20px 12px">
+    <div style="padding:0 20px 12px;display:flex;gap:8px;flex-wrap:wrap">
       <input type="text" class="srch" placeholder="&#128269; Suchen (Spind-Nr., Mitarbeiter, Notiz …)" value="${(S._spintFilter||'').replace(/"/g,'&quot;')}" oninput="S._spintFilter=this.value;renderSpint()" style="max-width:320px">
+      ${(S.lockerCategories||[]).length?`<select class="flt" onchange="S._spintCatFilter=this.value;renderSpint()"><option value="">Alle Kategorien</option>${(S.lockerCategories||[]).map(c=>`<option value="${c.id}"${catFilter===c.id?' selected':''}>${esc((c.emoji?c.emoji+' ':'')+c.label)}</option>`).join('')}</select>`:''}
     </div>
     <div style="padding:0 20px 30px">
-      ${filtered.length?filtered.map(row).join(''):'<div style="color:var(--di);font-size:13px;padding:20px">'+(search?'Keine Spinde gefunden.':'Noch keine Spinde angelegt.')+'</div>'}
+      ${filtered.length?filtered.map(row).join(''):'<div style="color:var(--di);font-size:13px;padding:20px">'+(search||catFilter?'Keine Spinde gefunden.':'Noch keine Spinde angelegt.')+'</div>'}
     </div>`;
 }
 function openSpintForm(id){
@@ -4517,6 +4562,9 @@ function openSpintForm(id){
   document.getElementById('spId').value=id||'';
   document.getElementById('spNumber').value=l?.number||'';
   document.getElementById('spType').value=l?.assigneeType||'user';
+  const catSel=document.getElementById('spCategory');
+  catSel.innerHTML='<option value="">— keine Kategorie —</option>'+(S.lockerCategories||[]).map(c=>`<option value="${c.id}">${esc((c.emoji?c.emoji+' ':'')+c.label)}</option>`).join('');
+  catSel.value=l?.categoryId||'';
   const userSel=document.getElementById('spUser');
   userSel.innerHTML='<option value="">— Mitarbeiter wählen —</option>'+S.users.slice().sort(byLastName).map(u=>`<option value="${u.id}">${esc(lastNameFirst(u.name))}</option>`).join('');
   userSel.value=l?.assigneeUserId||'';
@@ -4537,7 +4585,7 @@ async function saveLocker(){
   const assigneeType=document.getElementById('spType').value;
   if(assigneeType==='user'&&!document.getElementById('spUser').value) return toast('⚠️ Bitte Mitarbeiter wählen','err');
   if(assigneeType==='general'&&!document.getElementById('spLabel').value.trim()) return toast('⚠️ Bitte Bezeichnung eingeben','err');
-  const body={number,assigneeType,assigneeUserId:document.getElementById('spUser').value,assigneeLabel:document.getElementById('spLabel').value.trim(),note:document.getElementById('spNote').value.trim()};
+  const body={number,assigneeType,assigneeUserId:document.getElementById('spUser').value,assigneeLabel:document.getElementById('spLabel').value.trim(),note:document.getElementById('spNote').value.trim(),categoryId:document.getElementById('spCategory').value||null};
   try{
     if(id) await api('PUT','/lockers/'+id,body);
     else await api('POST','/lockers',body);
@@ -4547,6 +4595,38 @@ async function saveLocker(){
 async function deleteLocker(id){
   if(!confirm('Spind löschen?'))return;
   try{await api('DELETE','/lockers/'+id);await fetchData();renderSpint();toast('✅ Gelöscht');}catch(e){toast('⚠️ '+e.message,'err');}
+}
+function openSpintCatOv(){
+  document.getElementById('spintCatList').innerHTML=(S.lockerCategories||[]).map(c=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid var(--border)">
+    <span style="font-size:16px">${c.emoji||'📦'}</span>
+    <span style="flex:1;font-size:13px">${esc(c.label)}</span>
+    <button class="btn-s" style="font-size:11px;padding:2px 6px" onclick="openSpintCatForm('${c.id}')">✎</button>
+    <button class="btn-d" style="font-size:11px;padding:2px 6px" onclick="deleteSpintCat('${c.id}')">✕</button>
+  </div>`).join('')||'<div style="color:var(--di);font-size:12px;padding:8px 0">Noch keine Kategorien.</div>';
+  closeModal('spintOv');openModal('spintCatOv');
+}
+function openSpintCatForm(id){
+  const c=id?(S.lockerCategories||[]).find(x=>x.id===id):null;
+  document.getElementById('scFT2').textContent=c?'Kategorie bearbeiten':'Neue Kategorie';
+  document.getElementById('scId2').value=id||'';
+  document.getElementById('scLabel2').value=c?.label||'';
+  document.getElementById('scEmoji2').value=c?.emoji||'';
+  closeModal('spintCatOv');openModal('spintCatFormOv');
+}
+async function saveSpintCat(){
+  const id=document.getElementById('scId2').value;
+  const label=document.getElementById('scLabel2').value.trim();
+  if(!label)return toast('⚠️ Bezeichnung erforderlich','err');
+  const body={label,emoji:document.getElementById('scEmoji2').value.trim()};
+  try{
+    if(id) await api('PUT','/locker-categories/'+id,body);
+    else await api('POST','/locker-categories',body);
+    await fetchData();closeModal('spintCatFormOv');openSpintCatOv();toast(id?'✅ Aktualisiert!':'✅ Angelegt!');
+  }catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function deleteSpintCat(id){
+  if(!confirm('Kategorie löschen?'))return;
+  try{await api('DELETE','/locker-categories/'+id);await fetchData();openSpintCatOv();toast('✅ Gelöscht');}catch(e){toast('⚠️ '+e.message,'err');}
 }
 
 // ── DOKUMENTE / DATEIABLAGE ───────────────────────────────────────────────────

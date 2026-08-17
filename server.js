@@ -696,6 +696,11 @@ async function initDB() {
   updated_by TEXT,
   updated_at TIMESTAMPTZ DEFAULT NOW()
 )`,
+    `CREATE TABLE IF NOT EXISTS locker_categories (
+  id TEXT PRIMARY KEY, label TEXT NOT NULL, emoji TEXT DEFAULT '',
+  sort_order INTEGER NOT NULL DEFAULT 0, created_at TIMESTAMPTZ DEFAULT NOW()
+)`,
+    `ALTER TABLE lockers ADD COLUMN IF NOT EXISTS category_id TEXT REFERENCES locker_categories(id) ON DELETE SET NULL`,
     // ── Verzweigungen in Notfall-Checklisten ── ein Schritt vom Typ "branch"
     // stellt eine Entscheidung mit mehreren benannten Optionen dar (z.B.
     // "07-19 Uhr" / "19-07 Uhr"). Andere Schritte können optional einer
