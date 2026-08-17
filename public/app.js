@@ -4031,12 +4031,14 @@ const SOP_ITEM_TYPES=[{id:'check',label:'Checkbox'},{id:'text',label:'Texteingab
 // kein Rot/Grün (das wäre falsch/richtig-konnotiert, hier geht's nur um
 // "welcher Pfad"). Option 1 einer Verzweigung ist immer Farbe[0], Option 2
 // immer Farbe[1] usw. — konsistent über Editor, Durchlauf und Ausdruck.
+// Bewusst KEIN Rot/Grün (irritiert als vermeintliches Falsch/Richtig) —
+// nur Blau-/Lila-/Gelb-/Grautöne, klar voneinander unterscheidbar.
 const SOP_BRANCH_PALETTE=[
-  {bg:'#fde2e4',fg:'#9f1239'},  // rose
   {bg:'#e0f2fe',fg:'#0369a1'},  // sky
   {bg:'#ede9fe',fg:'#6d28d9'},  // violet
   {bg:'#fef3c7',fg:'#92400e'},  // amber
-  {bg:'#ccfbf1',fg:'#0f766e'},  // teal
+  {bg:'#fae8ff',fg:'#a21caf'},  // fuchsia
+  {bg:'#e0e7ff',fg:'#4338ca'},  // indigo
   {bg:'#e2e8f0',fg:'#334155'},  // slate
 ];
 function sopOptColor(allItems,optId){
@@ -4486,7 +4488,8 @@ function renderSopRun(runId){
     } else if(it.itemType==='contact'){
       control=sopContactCardHtml((S.contacts||[]).find(c=>c.id===it.contactId));
     } else if(it.itemType==='branch'){
-      control=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">`
+      control=`<div style="margin-top:2px;font-size:11px;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.3px">Bitte auswählen</div>`
+        +`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">`
         +(it.options||[]).map((o,oi)=>{const c=SOP_BRANCH_PALETTE[oi%SOP_BRANCH_PALETTE.length];const sel=ri.value===o.id;
           return `<button class="mb" ${disabled} onclick="sopRunChooseBranch('${run.id}','${it.id}','${o.id}')" style="background:${sel?c.fg:c.bg};color:${sel?'#fff':c.fg};border-color:${c.fg}">${esc(o.label)}</button>`;}).join('')
         +(!(it.options||[]).length?'<span style="font-size:11px;color:var(--di)">Keine Optionen hinterlegt</span>':'')
@@ -4494,20 +4497,20 @@ function renderSopRun(runId){
     }
     const isBranch=it.itemType==='branch';
     const branchTagRun=it.branchOptionId?(()=>{const c=sopOptColor(allItems,it.branchOptionId);return `<span style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:9px;background:${c.bg};color:${c.fg};margin-bottom:4px">↳ ${esc((()=>{for(const x of allItems){const o=(x.options||[]).find(y=>y.id===it.branchOptionId);if(o)return o.label;}return '?';})())}</span>`;})():'';
-    return `<div style="display:flex;align-items:flex-start;padding:14px 16px;border-bottom:1px solid var(--border);${ri.done?'opacity:.65':''}">
+    return `<div style="display:flex;align-items:flex-start;padding:14px 16px;border-bottom:1px solid var(--border);${ri.done?'opacity:.65':''}${isBranch?';background:rgba(99,102,241,.05)':''}">
       <div style="width:26px;flex-shrink:0;margin-top:2px;display:flex;justify-content:center">
         ${isBranch
           ?`<div style="font-size:22px">🔀</div>`
           :`<input type="checkbox" ${ri.done?'checked':''} ${disabled} onchange="sopRunToggle('${run.id}','${it.id}',this.checked)" style="width:26px;height:26px;cursor:${canEdit?'pointer':'default'};accent-color:#10b981">`}
       </div>
-      <div style="flex:1;min-width:0;margin-left:${8+indent}px;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
-        <div style="flex:1;min-width:200px">
+      <div style="min-width:0;margin-left:${8+indent}px;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+        <div style="flex:0 1 480px;min-width:200px">
           ${branchTagRun?`<div>${branchTagRun}</div>`:''}
           <div style="font-size:15px;font-weight:600;${ri.done&&!isBranch?'text-decoration:line-through':''}">${esc(it.text)}${it.required&&!isBranch?' <span style="color:#ef4444">*</span>':''}</div>
           ${it.hint?`<div style="font-size:12px;color:var(--mu);margin-top:2px">💡 ${esc(it.hint)}</div>`:''}
           ${control}
         </div>
-        <div style="width:260px;flex-shrink:0">
+        <div style="flex:0 1 260px;min-width:200px">
           <textarea placeholder="Dokumentation / Notiz…" ${disabled} onchange="sopRunSetNote('${run.id}','${it.id}',this.value)" rows="3" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--sf);color:var(--tx);box-sizing:border-box;font-size:12px;font-family:inherit;resize:vertical">${esc(ri.note||'')}</textarea>
           ${ri.updatedAt?`<div style="font-size:10px;color:var(--di);margin-top:4px">zuletzt ${fdt(ri.updatedAt)} von ${esc(getU(ri.updatedBy)?.name||'?')}</div>`:''}
         </div>
