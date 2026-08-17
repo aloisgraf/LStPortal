@@ -12,6 +12,9 @@ function showHelpSection(id){
 }
 
 const APP_VERSION='3.0.0';
+// PWA: ermöglicht "Zum Home-Bildschirm hinzufügen" auf iOS/Android — siehe
+// public/sw.js für die Cache-Strategie (App-Daten selbst werden nie gecacht).
+if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js').catch(()=>{});});}
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
@@ -226,7 +229,7 @@ function loginOK(){
   loadNews().then(function(){
     if(docLinkId&&(S.docs||[]).some(d=>d.id===docLinkId)){S._docHighlight=docLinkId;setView('docs');}
     else setView('home');
-  });startAutoRefresh();
+  });startAutoRefresh();startChatSync();
   // archivNav for all users
   const archivNav=document.getElementById('ni-news_archiv');
   if(archivNav)archivNav.style.display='block';
@@ -2801,6 +2804,27 @@ function startAutoRefresh(){
   _lastTkCount=S.tickets.filter(tk=>tk.status!=='closed'&&((S.tp.myDepts.includes(tk.department)&&!tk.assigneeId)||tk.assigneeId===S.currentUser)).length;
   _refreshTimer=setInterval(silentRefresh,30000);
 }
+// Eigener, deutlich schnellerer Poller NUR für Chat (leichter Endpoint,
+// /chat/sync statt des vollen /api/data) — damit Nachrichten beim
+// Gegenüber innerhalb weniger Sekunden ankommen, ohne dafür den ganzen
+// (teuren) Datensatz im selben Takt neu zu laden.
+let _chatSyncTimer=null;
+async function chatSync(){
+  if(!S.currentUser)return;
+  try{
+    const data=await api('GET','/chat/sync');
+    const prevMsgs=S.chatMessages||[];
+    S.chatThreads=data.chatThreads||[];
+    S.chatMessages=data.chatMessages||[];
+    updateBadges();
+    onChatMessagesChanged(prevMsgs);
+    if(S.view==='chat')renderChatList();
+  }catch(e){}
+}
+function startChatSync(){
+  if(_chatSyncTimer)clearInterval(_chatSyncTimer);
+  _chatSyncTimer=setInterval(chatSync,4000);
+}
 // ══════════════════════════════════════════
 // SECTION: Austrian Holidays
 // ══════════════════════════════════════════
@@ -4488,10 +4512,9 @@ function renderSopRun(runId){
     } else if(it.itemType==='contact'){
       control=sopContactCardHtml((S.contacts||[]).find(c=>c.id===it.contactId));
     } else if(it.itemType==='branch'){
-      control=`<div style="margin-top:2px;font-size:11px;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.3px">Bitte auswählen</div>`
-        +`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">`
+      control=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">`
         +(it.options||[]).map((o,oi)=>{const c=SOP_BRANCH_PALETTE[oi%SOP_BRANCH_PALETTE.length];const sel=ri.value===o.id;
-          return `<button class="mb" ${disabled} onclick="sopRunChooseBranch('${run.id}','${it.id}','${o.id}')" style="background:${sel?c.fg:c.bg};color:${sel?'#fff':c.fg};border-color:${c.fg}">${esc(o.label)}</button>`;}).join('')
+          return `<button class="mb" ${disabled} onclick="sopRunChooseBranch('${run.id}','${it.id}','${o.id}')" style="background:${sel?c.fg:c.bg};color:${sel?'#fff':c.fg};border-color:${c.fg};font-weight:700;font-size:13px;padding:9px 16px">Auswahl ${oi+1}: ${esc(o.label)}</button>`;}).join('')
         +(!(it.options||[]).length?'<span style="font-size:11px;color:var(--di)">Keine Optionen hinterlegt</span>':'')
         +`</div>`;
     }
@@ -4503,14 +4526,14 @@ function renderSopRun(runId){
           ?`<div style="font-size:22px">🔀</div>`
           :`<input type="checkbox" ${ri.done?'checked':''} ${disabled} onchange="sopRunToggle('${run.id}','${it.id}',this.checked)" style="width:26px;height:26px;cursor:${canEdit?'pointer':'default'};accent-color:#10b981">`}
       </div>
-      <div style="min-width:0;margin-left:${8+indent}px;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
-        <div style="flex:0 1 480px;min-width:200px">
+      <div style="min-width:0;margin-left:${8+indent}px;display:flex;gap:16px;flex-wrap:nowrap;align-items:flex-start;max-width:100%">
+        <div style="flex:3 1 0;min-width:0;max-width:480px">
           ${branchTagRun?`<div>${branchTagRun}</div>`:''}
           <div style="font-size:15px;font-weight:600;${ri.done&&!isBranch?'text-decoration:line-through':''}">${esc(it.text)}${it.required&&!isBranch?' <span style="color:#ef4444">*</span>':''}</div>
           ${it.hint?`<div style="font-size:12px;color:var(--mu);margin-top:2px">💡 ${esc(it.hint)}</div>`:''}
           ${control}
         </div>
-        <div style="flex:0 1 260px;min-width:200px">
+        <div style="flex:2 1 0;min-width:0;max-width:260px">
           <textarea placeholder="Dokumentation / Notiz…" ${disabled} onchange="sopRunSetNote('${run.id}','${it.id}',this.value)" rows="3" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--sf);color:var(--tx);box-sizing:border-box;font-size:12px;font-family:inherit;resize:vertical">${esc(ri.note||'')}</textarea>
           ${ri.updatedAt?`<div style="font-size:10px;color:var(--di);margin-top:4px">zuletzt ${fdt(ri.updatedAt)} von ${esc(getU(ri.updatedBy)?.name||'?')}</div>`:''}
         </div>
@@ -8349,7 +8372,7 @@ async function selectChatWindowUser(userId){
   try{
     const r=await api('POST','/chat/threads',{otherUserId:userId});
     closeChatWindow('__picker__');
-    await silentRefresh();
+    await chatSync();
     S._chatClosedThreads.delete(r.id);
     openChatWindow(r.id);
   }catch(e){toast('⚠️ '+e.message,'err');}
@@ -8395,7 +8418,7 @@ async function sendChatWinMessage(threadId){
   try{
     const r=await api('POST','/chat/threads/'+threadId+'/messages',{text});
     tempMsg.id=r.id;
-    silentRefresh();
+    chatSync();
   }catch(e){
     S.chatMessages=S.chatMessages.filter(m=>m!==tempMsg);
     renderChatWindows();
@@ -8423,19 +8446,25 @@ function onChatMessagesChanged(prevMsgs){
   if(!fresh.length)return;
   let changed=false;
   const freshThreadIds=[...new Set(fresh.map(m=>m.threadId))];
+  // Ist das Fenster für diesen Thread schon offen UND maximiert, sieht der
+  // Nutzer die Nachricht ohnehin sofort in der Konversation — kein Toast nötig.
+  const notifyThreadIds=[];
   freshThreadIds.forEach(threadId=>{
     const w=_chatWin(threadId);
     if(w){
-      if(!w.minimized)markChatThreadRead(threadId);
+      if(!w.minimized){markChatThreadRead(threadId);}
+      else notifyThreadIds.push(threadId);
       changed=true;
     } else if(!S._chatClosedThreads.has(threadId)){
       S._chatWindows.push({id:threadId,threadId,minimized:true});
+      notifyThreadIds.push(threadId);
       changed=true;
     }
   });
   if(changed)renderChatWindows();
-  const t=(S.chatThreads||[]).find(x=>x.id===freshThreadIds[0]);
+  if(!notifyThreadIds.length)return;
+  const t=(S.chatThreads||[]).find(x=>x.id===notifyThreadIds[0]);
   const ou=t?getU(t.otherUserId):null;
-  toast('💬 Neue Nachricht'+(ou?' von '+ou.name:'')+'!');
+  toast('💬 Neue Nachricht'+(ou?' von '+ou.name:'')+'!','chat');
 }
 
