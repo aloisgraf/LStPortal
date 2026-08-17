@@ -8307,13 +8307,17 @@ function renderChatWindows(){
   const row=document.getElementById('chatWinRow');
   if(!row)return;
   const wins=S._chatWindows||[];
-  if(!wins.length){row.innerHTML='';row.classList.remove('open');return;}
+  if(!wins.length){row.innerHTML='';row.classList.remove('open');document.getElementById('qaWrap')?.classList.remove('hide-for-chat');return;}
   row.classList.add('open');
   row.innerHTML=wins.map(w=>{
     if(w.id==='__picker__')return chatWinPickerHtml(w);
     return w.minimized?chatWinMinHtml(w):chatWinMaxHtml(w);
   }).join('');
-  if(!S._chatWindows.some(w=>!w.minimized)){/* nichts zu fokussieren */}
+  // Auf dem Handy überlappt der volle-Breite-Chat sonst den "+"-Schnell-
+  // zugriff-Button — solange ein Fenster maximiert (nicht nur als Leiste
+  // minimiert) offen ist, blenden wir ihn aus.
+  const anyMaximized=S._chatWindows.some(w=>!w.minimized);
+  document.getElementById('qaWrap')?.classList.toggle('hide-for-chat',anyMaximized);
   S._chatWindows.filter(w=>!w.minimized&&w.id!=='__picker__').forEach(w=>{
     const el=document.getElementById('chatWinMsgs_'+w.id);
     if(el)el.scrollTop=el.scrollHeight;
