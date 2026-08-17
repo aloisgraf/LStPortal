@@ -7224,8 +7224,11 @@ function renderTodos() {
   if (!el) return;
 
   const todos = S.todos;
-  // Abgeschlossen = alle Punkte erledigt (mind. 1 Punkt vorhanden)
-  const isTodoDone = t => t.items.length > 0 && t.items.every(i => i.is_done);
+  // Abgeschlossen = eigener Status des Todos ist "done" (per "✓ Abschließen"-
+  // Button gesetzt) — NICHT von den Punkten abgeleitet: ein Todo ganz ohne
+  // Punkte (z.B. "morgen XY anrufen") hat nie Punkte zum Abhaken und würde bei
+  // einer Punkte-basierten Ableitung nie als abgeschlossen erkannt werden.
+  const isTodoDone = t => t.status === 'done';
   const openTodos = todos.filter(t => !isTodoDone(t));
   const doneTodos = todos.filter(isTodoDone);
   const selId = S._selTodo;
