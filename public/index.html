@@ -13,6 +13,7 @@
 <body>
 
 <div class="loading-ov" id="loadingOv"><div class="spinner"></div></div>
+<div id="emojiPickerPopup" style="display:none;position:fixed;z-index:9999;background:var(--sf);border:1px solid var(--border);border-radius:8px;padding:6px;box-shadow:0 4px 16px rgba(0,0,0,.25);max-width:260px"></div>
 
 <!-- LOGIN -->
 <div class="ls open" id="LS">
@@ -296,7 +297,7 @@
     <div class="mb2">
       <input type="hidden" id="scId2">
       <div class="fg full"><label>Bezeichnung *</label><input type="text" id="scLabel2" placeholder="z.B. Groß"></div>
-      <div class="fg full"><label>Symbol (Emoji)</label><input type="text" id="scEmoji2" placeholder="z.B. 📦" maxlength="4"></div>
+      <div class="fg full"><label>Symbol (Emoji)</label><div style="display:flex;gap:6px"><input type="text" id="scEmoji2" placeholder="z.B. 📦" maxlength="4" style="flex:1"><button type="button" class="btn-s emoji-pick-btn" onclick="openEmojiPicker('scEmoji2',this)">😀</button></div></div>
     </div>
     <div class="mf"><button class="btn-s" onclick="closeModal('spintCatFormOv');openSpintCatOv()">Abbrechen</button><button class="btn-p" onclick="saveSpintCat()">&#128190; Speichern</button></div>
   </div>
@@ -310,7 +311,7 @@
       <input type="hidden" id="dpId">
       <div class="fg full"><label>Bezeichnung *</label><input type="text" id="dpLabel" placeholder="z.B. Logistik"></div>
       <div class="fr">
-        <div class="fg"><label>Symbol (Emoji)</label><input type="text" id="dpEmoji" placeholder="z.B. 🚚" maxlength="4"></div>
+        <div class="fg"><label>Symbol (Emoji)</label><div style="display:flex;gap:6px"><input type="text" id="dpEmoji" placeholder="z.B. 🚚" maxlength="4" style="flex:1"><button type="button" class="btn-s emoji-pick-btn" onclick="openEmojiPicker('dpEmoji',this)">😀</button></div></div>
         <div class="fg"><label>Farbe</label><input type="color" id="dpColor" style="width:100%;height:38px;padding:2px;cursor:pointer"></div>
       </div>
     </div>
@@ -597,7 +598,7 @@
   </div>
 </div>
 <div class="ov" id="ufOv"><div class="modal"><div class="mh"><h2 id="ufT">Benutzer</h2><button class="mc" onclick="backToAdmin('users')">&#10005;</button></div><div class="mb2"><input type="hidden" id="ufId"><div class="fr"><div class="fg"><label>Name *</label><input type="text" id="ufNm"></div><div class="fg"><label>K&#252;rzel *</label><input type="text" id="ufIn" maxlength="3"></div></div><div class="fg full"><label>Benutzername * (f&#252;r Login)</label><input type="text" id="ufUsername" autocomplete="username" placeholder="z.B. vorname.nachname"></div><div class="fg full"><label>Rollen</label><div class="role-chks" id="ufRoles"></div></div><div class="fg full"><label>Kategorie (z.B. Schichtleiter, Disponent Nord)</label><input type="text" id="uffCategory" placeholder="optional"></div><div class="fg full"><label>E-Mail (f&#252;r Ticket-Benachrichtigungen)</label><input type="email" id="ufEmail" placeholder="optional, z.B. name@gmx.at"></div><div class="fr"><div class="fg"><label>Eintrittsdatum *</label><input type="date" id="ufHireDate"></div><div class="fg"><label>Austrittsdatum</label><input type="date" id="ufTermDate"></div></div><div class="fg" id="ufPWRR" style="display:none"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="ufPWRst"> PW zur&#252;cksetzen auf <b>Passwort1</b></label></div><div class="fg"><label>Farbe</label><div class="cr" id="ufCR"></div></div><div id="ufErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div></div><div class="mf"><button class="btn-s" onclick="backToAdmin('users')">Abbrechen</button><button class="btn-p" onclick="saveUser()">&#128190; Speichern</button></div></div></div>
-<div class="ov" id="cfOv"><div class="modal sm"><div class="mh"><h2 id="cfT">Kategorie</h2><button class="mc" onclick="backToAdmin('cats')">&#10005;</button></div><div class="mb2"><input type="hidden" id="cfId"><div class="fr"><div class="fg"><label>Bezeichnung *</label><input type="text" id="cfLb"></div><div class="fg"><label>Emoji</label><input type="text" id="cfEm" maxlength="4"></div></div><div class="fg"><label>Farbe</label><div class="cr" id="cfCR"></div></div><div id="cfErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div></div><div class="mf"><button class="btn-s" onclick="backToAdmin('cats')">Abbrechen</button><button class="btn-p" onclick="saveCategory()">&#128190; Speichern</button></div></div></div>
+<div class="ov" id="cfOv"><div class="modal sm"><div class="mh"><h2 id="cfT">Kategorie</h2><button class="mc" onclick="backToAdmin('cats')">&#10005;</button></div><div class="mb2"><input type="hidden" id="cfId"><div class="fr"><div class="fg"><label>Bezeichnung *</label><input type="text" id="cfLb"></div><div class="fg"><label>Emoji</label><div style="display:flex;gap:6px"><input type="text" id="cfEm" maxlength="4" style="flex:1"><button type="button" class="btn-s emoji-pick-btn" onclick="openEmojiPicker('cfEm',this)">😀</button></div></div></div><div class="fg"><label>Farbe</label><div class="cr" id="cfCR"></div></div><div id="cfErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div></div><div class="mf"><button class="btn-s" onclick="backToAdmin('cats')">Abbrechen</button><button class="btn-p" onclick="saveCategory()">&#128190; Speichern</button></div></div></div>
 <div class="ov" id="tfOv"><div class="modal sm"><div class="mh"><h2 id="tfT">Tag</h2><button class="mc" onclick="backToAdmin('tags')">&#10005;</button></div><div class="mb2"><input type="hidden" id="tfId"><div class="fg"><label>Bezeichnung *</label><input type="text" id="tfLb"></div><div class="fg"><label>Farbe</label><div class="cr" id="tfCR"></div></div><div id="tfErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div></div><div class="mf"><button class="btn-s" onclick="backToAdmin('tags')">Abbrechen</button><button class="btn-p" onclick="saveTag()">&#128190; Speichern</button></div></div></div>
 
 

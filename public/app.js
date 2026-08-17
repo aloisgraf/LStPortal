@@ -2574,6 +2574,34 @@ async function setRightOverride(role,permission,granted){
     toast('\u2705 Recht aktualisiert');
   }catch(e){toast('\u26a0\ufe0f '+e.message,'err');}
 }
+// Wiederverwendbarer Emoji-Picker für alle "Symbol (Emoji)"-Textfelder in
+// der App (Kategorien, Fachbereiche, Spind-Kategorien, ...) — bisher musste
+// das Emoji per Hand eingegeben/eingefügt werden.
+const EMOJI_PALETTE=['🔧','⭐','📋','🎓','✅','🌐','🏢','📦','🚚','👕','🧤','⛑️','🧹','🔥','🚨','📞','💡','🔒','🔑','🧰','🛠️','⚡','🚿','🧯','🩹','📁','📂','🗂️','📌','📎','✏️','📝','🗒️','📅','⏰','✔️','❌','⚠️','ℹ️','❓','❗','🏥','🚑','🚒','🏫','🏭','🚻','👤','👥','🏆','🎯','📊','💻','🖨️','📷','☎️','📧','🚪','🧊','☀️','🌙','🍀','💧','🩺','🧪','🚦','🅿️','♿','🪑','🧴','🧽'];
+let _emojiPickerTarget=null;
+function openEmojiPicker(inputId,btn){
+  const pop=document.getElementById('emojiPickerPopup');
+  if(!pop)return;
+  if(pop.style.display==='block'&&_emojiPickerTarget===inputId){pop.style.display='none';return;}
+  _emojiPickerTarget=inputId;
+  pop.innerHTML=EMOJI_PALETTE.map(e=>`<span onclick="pickEmoji('${e}')" style="cursor:pointer;font-size:18px;padding:4px;display:inline-block;border-radius:4px" onmouseover="this.style.background='var(--sf2)'" onmouseout="this.style.background='none'">${e}</span>`).join('');
+  const r=btn.getBoundingClientRect();
+  pop.style.top=(r.bottom+4)+'px';
+  pop.style.left=Math.max(4,Math.min(r.left,window.innerWidth-270))+'px';
+  pop.style.display='block';
+  document.addEventListener('click',_emojiPickerOutsideClick,{capture:true});
+}
+function pickEmoji(e){
+  if(_emojiPickerTarget){const el=document.getElementById(_emojiPickerTarget);if(el){el.value=e;}}
+  document.getElementById('emojiPickerPopup').style.display='none';
+}
+function _emojiPickerOutsideClick(ev){
+  const pop=document.getElementById('emojiPickerPopup');
+  if(pop&&pop.style.display==='block'&&!pop.contains(ev.target)&&!ev.target.closest('.emoji-pick-btn')){
+    pop.style.display='none';
+    document.removeEventListener('click',_emojiPickerOutsideClick,{capture:true});
+  }
+}
 function buildCP(cid,sel,fn){document.getElementById(cid).innerHTML=pal().map(col=>`<div class="cp ${col===sel?'on':''}" style="background:${col}" onclick="${fn}('${col}','${cid}')"></div>`).join('');}
 function pickU(col,cid){S.ufColor=col;document.querySelectorAll('#'+cid+' .cp').forEach(el=>el.classList.toggle('on',el.style.backgroundColor===h2r(col)));}
 function pickC(col,cid){S.cfColor=col;document.querySelectorAll('#'+cid+' .cp').forEach(el=>el.classList.toggle('on',el.style.backgroundColor===h2r(col)));}
