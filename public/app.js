@@ -64,6 +64,7 @@ let S={
   _selSopTemplateId:null, _selSopRunId:null,
   lockers:[], _spintFilter:'',
   departments:[],
+  chatThreads:[], chatMessages:[],
   _dpPlanId:null, _dpMatrix:null, _dpStatsExpanded:false, _dpConfigTab:'shift-types', _dpSelection:new Set(),
   _dpQualLocalChanges:{}, _dpQualLocalPrefsChanges:{}, _dpReportExpanded: false,
   _dpQualWeightsExpanded:{}, _dpQualSearchQuery:'',
@@ -111,6 +112,8 @@ async function fetchData(){
       DEPTS=S.departments.map(d=>d.id);
       DEPT_LABELS={}; S.departments.forEach(d=>{DEPT_LABELS[d.id]=(d.emoji?d.emoji+' ':'')+d.label;});
     }
+    S.lockerCategories=data.lockerCategories||[];
+    S.chatThreads=data.chatThreads||[];S.chatMessages=data.chatMessages||[];
     S.currentUser=data.currentUser;S.p=data.permissions||{};
     const u=getU(S.currentUser);const roles=u?.roles||['standard'];
     const has=(...r)=>r.some(x=>roles.includes(x));
@@ -179,6 +182,8 @@ function updateBadges(){
   const newsBdg=document.getElementById('newsBdg');if(newsBdg){newsBdg.style.display=unreadNews?'flex':'none';newsBdg.textContent=unreadNews;}
   const pendingDt=(S.diensttausch||[]).filter(dt=>dt.isRelevant&&!dt.isSeen).length;
   const dtBdg=document.getElementById('dtBdg');if(dtBdg){dtBdg.style.display=pendingDt?'flex':'none';dtBdg.textContent=pendingDt;}
+  const unreadChat=(S.chatThreads||[]).reduce((n,t)=>n+chatUnreadCount(t.id),0);
+  const cb=document.getElementById('navChatBdg');if(cb){cb.style.display=unreadChat?'flex':'none';cb.textContent=unreadChat;}
 }
 // AUTH
 async function doLogin(){
@@ -305,7 +310,7 @@ function restoreNavSectionState() {
   }
 }
 // Alle Sidebar-Reiter (id="ni-<key>") — muss mit db.js NAV_TABS übereinstimmen.
-const NAV_TAB_IDS=['home','sop','docs','meetings','todos','contacts','schedule','allw','homeoffice','vacation','diensttausch','abrechnung','dienstplaene','zahnarzt','platz','links','tickets','tickets_closed','tickets_deleted','checklists','dp','dp-config','dp-christmas','dp-mine','messages','messages_sent','news','statistik','spint'];
+const NAV_TAB_IDS=['home','sop','docs','meetings','todos','contacts','schedule','allw','homeoffice','vacation','diensttausch','abrechnung','dienstplaene','zahnarzt','platz','links','tickets','tickets_closed','tickets_deleted','checklists','dp','dp-config','dp-christmas','dp-mine','messages','messages_sent','news','statistik','spint','chat'];
 // Zusätzlich zur (abschaltbaren) Reiter-Sichtbarkeit weiterhin hart verdrahtete
 // Mindestanforderungen für die Dienstplanungs-/Statistik-Reiter — ein Reiter
 // ist nur sichtbar, wenn BEIDES zutrifft.
@@ -366,6 +371,7 @@ function renderMain(){
   else if(S.view==='contacts')renderContacts();
   else if(S.view==='sop')renderSop();
   else if(S.view==='spint')renderSpint();
+  else if(S.view==='chat')renderChatList();
 }
 // HOME
 // ── ÜBERSICHT: Alt/Neu-Umschalter ─────────────────────────────────────────────
@@ -2470,7 +2476,7 @@ const RIGHTS_NAV_TABS=[
   {key:'tickets',label:'Tickets: Offene'},{key:'tickets_closed',label:'Tickets: Abgeschlossene'},{key:'tickets_deleted',label:'Tickets: Gel\u00f6schte'},{key:'checklists',label:'Checklisten'},
   {key:'dp',label:'Dienstplanung: Planerstellung'},{key:'dp-config',label:'Dienstplanung: Konfiguration'},{key:'dp-christmas',label:'Dienstplanung: Weihnachtsdienst'},{key:'dp-mine',label:'Dienstplanung: Mein Dienstplan'},
   {key:'messages',label:'Nachrichten: Eingang'},{key:'messages_sent',label:'Nachrichten: Gesendet'},{key:'news',label:'News'},{key:'statistik',label:'Statistik'},
-  {key:'spint',label:'Spindvergabe'},
+  {key:'spint',label:'Spindvergabe'},{key:'chat',label:'Chat'},
 ];
 function renderRightsMatrix(){
   const el=document.getElementById('rightsMatrix');if(!el)return;
@@ -2740,9 +2746,17 @@ function startAutoRefresh(){
         DEPTS=S.departments.map(d=>d.id);
         DEPT_LABELS={}; S.departments.forEach(d=>{DEPT_LABELS[d.id]=(d.emoji?d.emoji+' ':'')+d.label;});
       }
+      S.lockerCategories=data.lockerCategories||[];
+      const prevChatMsgCount=(S.chatMessages||[]).length;
+      S.chatThreads=data.chatThreads||[];S.chatMessages=data.chatMessages||[];
       updateBadges();
       if(_lastMsgCount>=0&&newMsgCount>_lastMsgCount)toast('\uD83D\uDCEC Neue Nachricht eingegangen!');
       if(_lastTkCount>=0&&newTkCount>_lastTkCount)toast('\uD83C\uDFAB Neues Ticket in deinem Bereich!');
+      if(S.chatMessages.length>prevChatMsgCount){
+        if(S._chatDockThreadId&&S._chatDockMode==='chat'){renderChatDockMessages();markChatThreadRead(S._chatDockThreadId);}
+        else if(prevChatMsgCount>0)toast('\uD83D\uDCAC Neue Chat-Nachricht!');
+        if(S.view==='chat')renderChatList();
+      }
       _lastMsgCount=newMsgCount;_lastTkCount=newTkCount;
       if(S.view==='home')renderHome();
       else if(S.view==='messages'||S.view==='messages_sent')renderMessages();
@@ -8150,5 +8164,128 @@ async function toggleTodoItemAssignee(todoId, itemId, userId, assign) {
     document.querySelector('[style*="position:fixed"][style*="z-index:1000"]')?.remove();
     openTodoItemAssignees(todoId, itemId);
   } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+
+// ── CHAT (1:1) ────────────────────────────────────────────────────────────
+// Eigenständig von der Broadcast-"Nachrichten"-Funktion oben (Ankündigung an
+// eine Zielgruppe) — hier geht es um echte Thread-basierte Unterhaltungen
+// zwischen zwei Mitarbeitern, mit einem unten angedockten Chatfenster.
+function chatUnreadCount(threadId){
+  const t=(S.chatThreads||[]).find(x=>x.id===threadId);
+  if(!t)return 0;
+  const since=t.myLastReadAt?new Date(t.myLastReadAt).getTime():0;
+  return (S.chatMessages||[]).filter(m=>m.threadId===threadId&&m.senderId!==S.currentUser&&new Date(m.createdAt).getTime()>since).length;
+}
+function chatLastMessage(threadId){
+  const msgs=(S.chatMessages||[]).filter(m=>m.threadId===threadId);
+  return msgs.length?msgs[msgs.length-1]:null;
+}
+function renderChatList(){
+  const threads=(S.chatThreads||[]).slice().sort((a,b)=>{
+    const la=chatLastMessage(a.id), lb=chatLastMessage(b.id);
+    const ta=la?new Date(la.createdAt).getTime():new Date(a.createdAt).getTime();
+    const tb=lb?new Date(lb.createdAt).getTime():new Date(b.createdAt).getTime();
+    return tb-ta;
+  });
+  const row=t=>{
+    const u=getU(t.otherUserId);
+    const last=chatLastMessage(t.id);
+    const unread=chatUnreadCount(t.id);
+    const preview=last?(last.senderId===S.currentUser?'Du: ':'')+esc(last.text.length>60?last.text.slice(0,60)+'…':last.text):'<span style="color:var(--di)">Noch keine Nachrichten</span>';
+    return `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="openChatDock('${t.id}')">
+      ${u?avHtml(u.initials,u.color,36,14,u.isOnline):'<div style="width:36px;height:36px;border-radius:50%;background:var(--sf2)"></div>'}
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:${unread?'700':'600'}">${esc(u?.name||'Unbekannt')}</div>
+        <div style="font-size:12px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${preview}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
+        ${last?`<div style="font-size:10px;color:var(--di)">${fdt(last.createdAt)}</div>`:''}
+        ${unread?`<span class="nbdg" style="display:flex">${unread}</span>`:''}
+      </div>
+    </div>`;
+  };
+  document.getElementById('main').innerHTML=`
+    <div class="ph"><div class="pt">💬 Chat</div><button class="btn-p" onclick="openChatPicker()">&#65291; Neuer Chat</button></div>
+    <div style="padding:0 20px 30px">
+      ${threads.length?threads.map(row).join(''):'<div class="empty">Noch keine Chats. Starte einen neuen!</div>'}
+    </div>`;
+}
+function openChatPicker(){
+  S._chatDockMode='picker';S._chatDockThreadId=null;
+  document.getElementById('chatDockTitle').textContent='Neuer Chat';
+  document.getElementById('chatDockAvatar').innerHTML='';
+  document.getElementById('chatDockPicker').style.display='block';
+  document.getElementById('chatDockBody').style.display='none';
+  document.getElementById('chatDockUserSearch').value='';
+  renderChatDockPicker();
+  document.getElementById('chatDock').style.display='flex';
+}
+function renderChatDockPicker(){
+  const search=(document.getElementById('chatDockUserSearch').value||'').toLowerCase().trim();
+  const users=S.users.filter(u=>u.id!==S.currentUser&&u.isActive!==false).sort(byLastName)
+    .filter(u=>!search||u.name.toLowerCase().includes(search));
+  document.getElementById('chatDockUserList').innerHTML=users.map(u=>
+    `<div style="display:flex;align-items:center;gap:8px;padding:6px 4px;cursor:pointer;border-radius:6px" onclick="selectChatUser('${u.id}')" onmouseover="this.style.background='var(--sf2)'" onmouseout="this.style.background='none'">
+      ${avHtml(u.initials,u.color,26,10,u.isOnline)}<span style="font-size:13px">${esc(u.name)}</span>
+    </div>`).join('')||'<div style="color:var(--di);font-size:12px;padding:8px 0">Keine Treffer.</div>';
+}
+async function selectChatUser(userId){
+  try{
+    const r=await api('POST','/chat/threads',{otherUserId:userId});
+    await fetchData();
+    openChatDock(r.id);
+  }catch(e){toast('⚠️ '+e.message,'err');}
+}
+function openChatDock(threadId){
+  const t=(S.chatThreads||[]).find(x=>x.id===threadId);
+  if(!t)return;
+  S._chatDockMode='chat';S._chatDockThreadId=threadId;
+  const u=getU(t.otherUserId);
+  document.getElementById('chatDockTitle').textContent=u?.name||'Unbekannt';
+  document.getElementById('chatDockAvatar').innerHTML=u?avHtml(u.initials,u.color,26,10,u.isOnline):'';
+  document.getElementById('chatDockPicker').style.display='none';
+  document.getElementById('chatDockBody').style.display='flex';
+  document.getElementById('chatDock').style.display='flex';
+  renderChatDockMessages();
+  markChatThreadRead(threadId);
+  setTimeout(()=>document.getElementById('chatDockInput')?.focus(),50);
+}
+function renderChatDockMessages(){
+  const threadId=S._chatDockThreadId;if(!threadId)return;
+  const el=document.getElementById('chatDockMessages');if(!el)return;
+  const msgs=(S.chatMessages||[]).filter(m=>m.threadId===threadId);
+  el.innerHTML=msgs.map(m=>{
+    const mine=m.senderId===S.currentUser;
+    return `<div style="align-self:${mine?'flex-end':'flex-start'};max-width:80%">
+      <div style="background:${mine?'var(--acc)':'var(--sf2)'};color:${mine?'var(--act)':'var(--tx)'};padding:7px 11px;border-radius:12px;${mine?'border-bottom-right-radius:2px':'border-bottom-left-radius:2px'};font-size:13px;white-space:pre-wrap;word-break:break-word">${esc(m.text)}</div>
+      <div style="font-size:9px;color:var(--di);margin-top:2px;text-align:${mine?'right':'left'}">${fdt(m.createdAt)}</div>
+    </div>`;
+  }).join('')||'<div style="color:var(--di);font-size:12px;text-align:center;padding:20px 0">Noch keine Nachrichten — schreib was!</div>';
+  el.scrollTop=el.scrollHeight;
+}
+async function sendChatDockMessage(){
+  const threadId=S._chatDockThreadId;if(!threadId)return;
+  const input=document.getElementById('chatDockInput');
+  const text=input.value.trim();if(!text)return;
+  input.value='';
+  try{
+    await api('POST','/chat/threads/'+threadId+'/messages',{text});
+    await fetchData();
+    renderChatDockMessages();
+    if(S.view==='chat')renderChatList();
+  }catch(e){toast('⚠️ '+e.message,'err');input.value=text;}
+}
+async function markChatThreadRead(threadId){
+  try{
+    await api('PUT','/chat/threads/'+threadId+'/read');
+    const t=(S.chatThreads||[]).find(x=>x.id===threadId);
+    if(t)t.myLastReadAt=new Date().toISOString();
+    updateBadges();
+    if(S.view==='chat')renderChatList();
+  }catch(e){}
+}
+function closeChatDock(){
+  const dock=document.getElementById('chatDock');if(dock)dock.style.display='none';
+  S._chatDockThreadId=null;S._chatDockMode='closed';
 }
 

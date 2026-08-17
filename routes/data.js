@@ -10,7 +10,7 @@ router.get('/', auth, async (req,res) => {
     const canManageDp = roles.some(r=>['admin','leitung','dienstplanung'].includes(r));
     const canManageSpint = roles.some(r=>['admin','leitung','technik'].includes(r));
     const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
-           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw,dpQualificationsRaw,dpShiftPrefsRaw,dpProtocolRaw,todosRaw,todoItemsRaw,todoAssigneesRaw,myDpPlanIdsRaw,todoNotificationsRaw,contactsRaw,sopTemplatesRaw,sopItemsRaw,sopRunsRaw,sopRunItemsRaw,lockersRaw,sopBranchOptionsRaw,departmentsRaw,lockerCategoriesRaw] = await Promise.all([
+           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw,dpQualificationsRaw,dpShiftPrefsRaw,dpProtocolRaw,todosRaw,todoItemsRaw,todoAssigneesRaw,myDpPlanIdsRaw,todoNotificationsRaw,contactsRaw,sopTemplatesRaw,sopItemsRaw,sopRunsRaw,sopRunItemsRaw,lockersRaw,sopBranchOptionsRaw,departmentsRaw,lockerCategoriesRaw,chatThreadsRaw,chatMessagesRaw,chatReadsRaw] = await Promise.all([
       q('SELECT id,name,initials,roles,color,must_change_pw,last_seen,category,email,username,hire_date,termination_date FROM users ORDER BY name'),
       q('SELECT * FROM categories ORDER BY sort_order,label'),
       q('SELECT * FROM tags ORDER BY label'),
@@ -81,6 +81,9 @@ router.get('/', auth, async (req,res) => {
       q('SELECT * FROM sop_checklist_item_branch_options ORDER BY item_id,sort_order').catch(()=>[]),
       q('SELECT * FROM departments ORDER BY sort_order,label').catch(()=>[]),
       q('SELECT * FROM locker_categories ORDER BY sort_order,label').catch(()=>[]),
+      q('SELECT * FROM chat_threads WHERE user1_id=$1 OR user2_id=$1',[uid]).catch(()=>[]),
+      q('SELECT cm.* FROM chat_messages cm JOIN chat_threads ct ON ct.id=cm.thread_id WHERE ct.user1_id=$1 OR ct.user2_id=$1 ORDER BY cm.created_at',[uid]).catch(()=>[]),
+      q('SELECT * FROM chat_reads WHERE user_id=$1',[uid]).catch(()=>[]),
     ]);
 
     const tkViewMap = new Map((tkViewsRaw||[]).map(v=>[v.ticket_id, v.viewed_at]));
@@ -321,6 +324,13 @@ router.get('/', auth, async (req,res) => {
       })),
       departments: (departmentsRaw||[]).map(d=>({
         id:d.id, label:d.label, emoji:d.emoji||'', color:d.color||'#64748b', sortOrder:d.sort_order,
+      })),
+      chatThreads: (chatThreadsRaw||[]).map(t=>({
+        id:t.id, otherUserId: t.user1_id===uid?t.user2_id:t.user1_id, createdAt:t.created_at,
+        myLastReadAt: (chatReadsRaw||[]).find(r=>r.thread_id===t.id)?.last_read_at || null,
+      })),
+      chatMessages: (chatMessagesRaw||[]).map(m=>({
+        id:m.id, threadId:m.thread_id, senderId:m.sender_id, text:m.text, createdAt:m.created_at,
       })),
     });
   } catch(e) { console.error('[/api/data FEHLER]', e.message, e.stack?.split('\n')[1]); bad(res,'Serverfehler',500); }

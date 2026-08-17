@@ -71,6 +71,7 @@ const NAV_TABS = [
   {key:'dp-mine', label:'Dienstplanung: Mein Dienstplan'},
   {key:'messages', label:'Nachrichten: Eingang'},
   {key:'messages_sent', label:'Nachrichten: Gesendet'},
+  {key:'chat', label:'Chat'},
   {key:'news', label:'News'},
   {key:'statistik', label:'Statistik'},
 ];

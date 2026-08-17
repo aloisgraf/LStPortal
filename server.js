@@ -701,6 +701,30 @@ async function initDB() {
   sort_order INTEGER NOT NULL DEFAULT 0, created_at TIMESTAMPTZ DEFAULT NOW()
 )`,
     `ALTER TABLE lockers ADD COLUMN IF NOT EXISTS category_id TEXT REFERENCES locker_categories(id) ON DELETE SET NULL`,
+    // ── 1:1-Chat ── eigenständig von der bestehenden Broadcast-"Nachrichten"-
+    // Funktion (Ankündigung an eine Zielgruppe, keine Threads). user1_id ist
+    // immer die (string-)kleinere der beiden User-IDs — so bleibt der
+    // UNIQUE-Index pro Personenpaar eindeutig, egal wer den Chat zuerst startet.
+    `CREATE TABLE IF NOT EXISTS chat_threads (
+  id TEXT PRIMARY KEY,
+  user1_id TEXT NOT NULL,
+  user2_id TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user1_id, user2_id)
+)`,
+    `CREATE TABLE IF NOT EXISTS chat_messages (
+  id TEXT PRIMARY KEY,
+  thread_id TEXT NOT NULL REFERENCES chat_threads(id) ON DELETE CASCADE,
+  sender_id TEXT NOT NULL,
+  text TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+)`,
+    `CREATE TABLE IF NOT EXISTS chat_reads (
+  thread_id TEXT NOT NULL REFERENCES chat_threads(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL,
+  last_read_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY(thread_id, user_id)
+)`,
     // ── Verzweigungen in Notfall-Checklisten ── ein Schritt vom Typ "branch"
     // stellt eine Entscheidung mit mehreren benannten Optionen dar (z.B.
     // "07-19 Uhr" / "19-07 Uhr"). Andere Schritte können optional einer
@@ -835,6 +859,7 @@ app.use('/api',   require('./routes/sop'));
 app.use('/api',   require('./routes/lockers'));
 app.use('/api',   require('./routes/departments'));
 app.use('/api',   require('./routes/email'));
+app.use('/api',   require('./routes/chat'));
 
 app.get('*', (req,res) => res.sendFile(path.join(__dirname,'public','index.html')));
 
