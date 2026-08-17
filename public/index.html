@@ -274,6 +274,22 @@
   </div>
 </div>
 
+<!-- FACHBEREICH -->
+<div class="ov" id="deptOv">
+  <div class="modal">
+    <div class="mh"><h2 id="dpFT">Neuer Fachbereich</h2><button class="mc" onclick="closeModal('deptOv')">&#10005;</button></div>
+    <div class="mb2">
+      <input type="hidden" id="dpId">
+      <div class="fg full"><label>Bezeichnung *</label><input type="text" id="dpLabel" placeholder="z.B. Logistik"></div>
+      <div class="fr">
+        <div class="fg"><label>Symbol (Emoji)</label><input type="text" id="dpEmoji" placeholder="z.B. 🚚" maxlength="4"></div>
+        <div class="fg"><label>Farbe</label><input type="color" id="dpColor" style="width:100%;height:38px;padding:2px;cursor:pointer"></div>
+      </div>
+    </div>
+    <div class="mf"><button class="btn-s" onclick="closeModal('deptOv')">Abbrechen</button><button class="btn-p" onclick="saveDept()">&#128190; Speichern</button></div>
+  </div>
+</div>
+
 <!-- TICKET FORM -->
 <div class="ov" id="tkFormOv">
   <div class="modal wide">

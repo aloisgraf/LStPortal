@@ -16,8 +16,12 @@ const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','A
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
 const ROLES=[{id:'admin',label:'Administrator',icon:'\uD83D\uDD11'},{id:'leitung',label:'Leitung',icon:'\u2B50'},{id:'dienstplanung',label:'Dienstplanung',icon:'\uD83D\uDCCB'},{id:'schichtleiter',label:'Schichtleiter',icon:'\uD83D\uDD06'},{id:'technik',label:'Technik',icon:'\uD83D\uDD27'},{id:'ausbildung',label:'Ausbildung',icon:'\uD83C\uDF93'},{id:'qm',label:'QM',icon:'\u2705'},{id:'standard',label:'Standard',icon:'\uD83D\uDC64'}];
-const DEPTS=['technik','leitung','dienstplanung','ausbildung','qm','frei'];
-const DEPT_LABELS={technik:'\uD83D\uDD27 Technik',leitung:'\u2B50 Leitung',dienstplanung:'\uD83D\uDCCB Dienstplanung',ausbildung:'\uD83C\uDF93 Ausbildung',qm:'\u2705 QM',frei:'\uD83C\uDF10 Frei'};
+// Fallback bis der erste fetchData()-Aufruf die echten (admin-verwaltbaren)
+// Fachbereiche aus S.departments geliefert hat \u2014 danach werden beide unten
+// in fetchData() neu aufgebaut, alle bestehenden Stellen, die DEPTS/
+// DEPT_LABELS verwenden, profitieren automatisch ohne \u00C4nderung.
+let DEPTS=['technik','leitung','dienstplanung','ausbildung','qm','frei'];
+let DEPT_LABELS={technik:'\uD83D\uDD27 Technik',leitung:'\u2B50 Leitung',dienstplanung:'\uD83D\uDCCB Dienstplanung',ausbildung:'\uD83C\uDF93 Ausbildung',qm:'\u2705 QM',frei:'\uD83C\uDF10 Frei'};
 const PRIORITIES=[{id:'low',label:'\uD83D\uDFE2 Gering',color:'#10b981'},{id:'medium',label:'\uD83D\uDFE1 Mittel',color:'#f59e0b'},{id:'high',label:'\uD83D\uDD34 Hoch',color:'#ef4444'}];
 const STATUSES=[{id:'open',label:'Offen'},{id:'in_progress',label:'In Bearbeitung'},{id:'on_hold',label:'Zur\u00fcckgestellt'},{id:'closed',label:'Abgeschlossen'}];
 const BUCKETS=[{id:'urgent',label:'\uD83D\uDEA8 Dringend'},{id:'week',label:'\uD83D\uDCC5 Diese Woche'},{id:'sched',label:'\uD83D\uDCCB Dienstplanung'},{id:'wait',label:'\u23F3 Wartet'},{id:'it',label:'\uD83D\uDCBB IT'},{id:'proj',label:'\uD83D\uDE80 Projekte'},{id:'org',label:'\uD83C\uDFE2 Organisation'},{id:'ideas',label:'\uD83D\uDCA1 Ideen'}];
@@ -59,6 +63,7 @@ let S={
   sopTemplates:[], sopRuns:[], _sopView:'overview', _sopSearch:'', _sopCatFilter:'',
   _selSopTemplateId:null, _selSopRunId:null,
   lockers:[], _spintFilter:'',
+  departments:[],
   _dpPlanId:null, _dpMatrix:null, _dpStatsExpanded:false, _dpConfigTab:'shift-types', _dpSelection:new Set(),
   _dpQualLocalChanges:{}, _dpQualLocalPrefsChanges:{}, _dpReportExpanded: false,
   _dpQualWeightsExpanded:{}, _dpQualSearchQuery:'',
@@ -101,6 +106,11 @@ async function fetchData(){
     S.contacts=data.contacts||[];
     S.sopTemplates=data.sopTemplates||[];S.sopRuns=data.sopRuns||[];
     S.lockers=data.lockers||[];
+    S.departments=data.departments||[];
+    if(S.departments.length){
+      DEPTS=S.departments.map(d=>d.id);
+      DEPT_LABELS={}; S.departments.forEach(d=>{DEPT_LABELS[d.id]=(d.emoji?d.emoji+' ':'')+d.label;});
+    }
     S.currentUser=data.currentUser;S.p=data.permissions||{};
     const u=getU(S.currentUser);const roles=u?.roles||['standard'];
     const has=(...r)=>r.some(x=>roles.includes(x));
@@ -122,7 +132,13 @@ const getCat=id=>S.categories.find(c=>c.id===id);
 const getTag=id=>S.tags.find(t=>t.id===id);
 const getTk=id=>S.tickets.find(t=>t.id===id);
 const getAllw=(uid,year,month)=>S.allowances.find(a=>a.userId===uid&&a.year===year&&a.month===month)||{nd:0,fd:0,fw:0,c10:0};
-const getRoleDef=r=>ROLES.find(x=>x.id===r)||ROLES[6];
+const getRoleDef=r=>{
+  const known=ROLES.find(x=>x.id===r);
+  if(known)return known;
+  const dep=(S.departments||[]).find(x=>x.id===r);
+  if(dep)return{id:dep.id,label:dep.label,icon:dep.emoji||'🏢'};
+  return ROLES[6];
+};
 const isAssignable=u=>{const r=u?.roles||['standard'];return !(r.length===0||r.every(x=>x==='standard'));}
 const fd=s=>{if(!s)return'\u2014';const p=s.split('T')[0].split('-');return`${p[2]}.${p[1]}.${p[0]}`;};
 
@@ -137,7 +153,8 @@ const avHtml=(init,color,sz=24,fs=10,online=false)=>`<div class="av" style="widt
 const roleBadges=uid=>((getU(uid)?.roles)||['standard']).map(r=>{const d=getRoleDef(r);return`<span class="rb rb-${r}">${d.icon} ${d.label}</span>`;}).join('');
 const prioBdg=p=>{const d=PRIORITIES.find(x=>x.id===p)||PRIORITIES[1];return`<span class="bdg pr-${p}">${d.label}</span>`;};
 const stBdg=s=>{const d=STATUSES.find(x=>x.id===s)||STATUSES[0];return`<span class="bdg st-${s}">${d.label}</span>`;};
-const deptBdg=d=>`<span class="bdg dp-${d}">${DEPT_LABELS[d]||d}</span>`;
+const deptColor=d=>{const dep=(S.departments||[]).find(x=>x.id===d);return dep?.color||{technik:'#0ea5e9',leitung:'#f59e0b',dienstplanung:'#3b6dd4',ausbildung:'#7c3aed',qm:'#10b981'}[d]||'#64748b';};
+const deptBdg=d=>{const c=deptColor(d);return `<span class="bdg" style="background:${c}1f;color:${c}">${DEPT_LABELS[d]||d}</span>`;};
 const tagChips=tgs=>(tgs||[]).map(tid=>{const t=getTag(tid);if(!t)return'';return`<span class="tag-chip" style="background:${t.color}1a;color:${t.color};border:1px solid ${t.color}30">${t.label}</span>`;}).join('');
 const dueBdg=tk=>{
   if(!tk.dueDate||tk.status==='closed')return'';
@@ -2107,6 +2124,9 @@ function openTkForm(id,parentId){
   document.getElementById('tkFId').value=tk?.id||'';
   document.getElementById('tkFNm').value=tk?.title||'';
   document.getElementById('tkFDesc').value=tk?.description||'';
+  // Auswahl aus dem aktuellen (admin-verwaltbaren) DEPTS-Stand neu aufbauen —
+  // statisches HTML kennt nur die 6 ursprünglichen Fachbereiche.
+  document.getElementById('tkFDept').innerHTML=DEPTS.map(d=>`<option value="${d}">${DEPT_LABELS[d]||d}</option>`).join('');
   document.getElementById('tkFDept').value=tk?.department||'frei';
   document.getElementById('tkFDept').disabled=false;
   document.getElementById('tkFPrio').value=tk?.priority||'medium';
@@ -2161,6 +2181,7 @@ function openClForm(id){
   const cl=id?S.checklists.find(c=>c.id===id):null;
   document.getElementById('clFT').textContent=cl?'Vorlage bearbeiten':'Neue Checkliste';
   document.getElementById('clFId').value=cl?.id||'';document.getElementById('clFNm').value=cl?.name||'';
+  document.getElementById('clFDept').innerHTML=DEPTS.filter(d=>d!=='frei').map(d=>`<option value="${d}">${DEPT_LABELS[d]||d}</option>`).join('');
   document.getElementById('clFDept').value=cl?.department||'technik';document.getElementById('clFErr').textContent='';
   _clItems=(cl?.items||[]).map(i=>({text:i.text,itemType:i.itemType||'check'}));
   renderClItems();openModal('clFormOv');
@@ -2455,7 +2476,40 @@ function renderRightsMatrix(){
     <div style="font-size:11px;color:var(--mu);margin-bottom:8px">Blendet den jeweiligen Reiter in der Seitenleiste f\u00fcr die Rolle aus \u2014 ersetzt keine serverseitige Zugriffssperre (z.B. Dienstplanung bleibt zus\u00e4tzlich auf berechtigte Rollen beschr\u00e4nkt).</div>
     ${permTable(RIGHTS_NAV_TABS, t=>'tab:'+t.key, ()=>true)}
     <div style="font-size:11px;color:var(--mu);margin-top:10px">\u2191/\u2193 = manuell \u00fcberschrieben \u00b7 \u00c4nderungen werden sofort gespeichert</div>
+    <div style="font-weight:700;font-size:13px;margin:20px 0 4px">Fachbereiche</div>
+    <div style="font-size:11px;color:var(--mu);margin-bottom:8px">Werden bei Tickets, Statistik und der Zuordnung von Mitarbeitern verwendet. Ein neuer Fachbereich muss einem Mitarbeiter zus\u00e4tzlich unter "Rollen" im Bearbeiten-Formular zugewiesen werden.</div>
+    <div>${(S.departments||[]).slice().sort((a,b)=>a.sortOrder-b.sortOrder).map(d=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid var(--border)">
+      <span style="font-size:16px">${d.emoji||'\ud83c\udfe2'}</span>
+      <span style="flex:1;font-size:13px">${esc(d.label)}</span>
+      <button class="btn-s" style="font-size:11px;padding:2px 6px" onclick="openDeptForm('${d.id}')">\u270e</button>
+      <button class="btn-d" style="font-size:11px;padding:2px 6px" onclick="deleteDept('${d.id}')">\u2715</button>
+    </div>`).join('')}</div>
+    <button class="btn-s" style="margin-top:8px" onclick="openDeptForm()">+ Fachbereich hinzuf\u00fcgen</button>
   </div>`;
+}
+function openDeptForm(id){
+  const d=id?(S.departments||[]).find(x=>x.id===id):null;
+  document.getElementById('dpFT').textContent=d?'Fachbereich bearbeiten':'Neuer Fachbereich';
+  document.getElementById('dpId').value=id||'';
+  document.getElementById('dpLabel').value=d?.label||'';
+  document.getElementById('dpEmoji').value=d?.emoji||'';
+  document.getElementById('dpColor').value=d?.color||'#64748b';
+  openModal('deptOv');
+}
+async function saveDept(){
+  const id=document.getElementById('dpId').value;
+  const label=document.getElementById('dpLabel').value.trim();
+  if(!label)return toast('\u26a0\ufe0f Bezeichnung erforderlich','err');
+  const body={label,emoji:document.getElementById('dpEmoji').value.trim(),color:document.getElementById('dpColor').value};
+  try{
+    if(id) await api('PUT','/departments/'+id,body);
+    else await api('POST','/departments',body);
+    await fetchData();closeModal('deptOv');renderRightsMatrix();toast(id?'\u2705 Aktualisiert!':'\u2705 Angelegt!');
+  }catch(e){toast('\u26a0\ufe0f '+e.message,'err');}
+}
+async function deleteDept(id){
+  if(!confirm('Fachbereich l\u00f6schen?'))return;
+  try{await api('DELETE','/departments/'+id);await fetchData();renderRightsMatrix();toast('\u2705 Gel\u00f6scht');}catch(e){toast('\u26a0\ufe0f '+e.message,'err');}
 }
 async function setRightOverride(role,permission,granted){
   try{
@@ -2479,7 +2533,13 @@ function openUF(id){
   document.getElementById('ufTermDate').value=u?.terminationDate||'';
   document.getElementById('ufPWRR').style.display=u?'block':'none';document.getElementById('ufPWRst').checked=false;
   document.getElementById('ufErr').textContent='';S.ufColor=u?.color||pal()[0];
-  document.getElementById('ufRoles').innerHTML=ROLES.map(r=>`<label class="rck"><input type="checkbox" value="${r.id}" ${(u?.roles||['standard']).includes(r.id)?'checked':''}><span>${r.icon} ${r.label}</span></label>`).join('');
+  // Neu vom Admin angelegte Fachbereiche (nicht 'frei' — das ist kein echter
+  // Mitarbeiter-Bereich, sondern "für alle offen") sind noch keine eigene
+  // Rolle in ROLES — als zusätzliche Checkboxen anhängen, sonst gibt es keine
+  // Möglichkeit, einen Mitarbeiter diesem Fachbereich zuzuordnen.
+  const extraDeptRoles=(S.departments||[]).filter(d=>d.id!=='frei'&&!ROLES.some(r=>r.id===d.id));
+  document.getElementById('ufRoles').innerHTML=ROLES.map(r=>`<label class="rck"><input type="checkbox" value="${r.id}" ${(u?.roles||['standard']).includes(r.id)?'checked':''}><span>${r.icon} ${r.label}</span></label>`).join('')
+    +extraDeptRoles.map(d=>`<label class="rck"><input type="checkbox" value="${d.id}" ${(u?.roles||['standard']).includes(d.id)?'checked':''}><span>${d.emoji||'🏢'} ${d.label}</span></label>`).join('');
   buildCP('ufCR',S.ufColor,'pickU');closeModal('admOv');openModal('ufOv');
 }
 async function saveUser(){
@@ -2591,6 +2651,11 @@ function startAutoRefresh(){
       S.stationSessions=data.stationSessions||[];S.stationShifts=data.stationShifts||[];S.stationOutages=data.stationOutages||[];S.links=data.portalLinks||[];S.docs=data.docs||[];S.docCategories=data.docCategories||[];S.rolePermissions=data.rolePermissions||[];S.meetings=data.meetings||[];S.contacts=data.contacts||[];
       S.sopTemplates=data.sopTemplates||[];S.sopRuns=data.sopRuns||[];
       S.lockers=data.lockers||[];
+      S.departments=data.departments||[];
+      if(S.departments.length){
+        DEPTS=S.departments.map(d=>d.id);
+        DEPT_LABELS={}; S.departments.forEach(d=>{DEPT_LABELS[d.id]=(d.emoji?d.emoji+' ':'')+d.label;});
+      }
       updateBadges();
       if(_lastMsgCount>=0&&newMsgCount>_lastMsgCount)toast('\uD83D\uDCEC Neue Nachricht eingegangen!');
       if(_lastTkCount>=0&&newTkCount>_lastTkCount)toast('\uD83C\uDFAB Neues Ticket in deinem Bereich!');
@@ -2731,7 +2796,9 @@ async function hoSaveConfig(){var date=document.getElementById('hoConfDate')?doc
 async function hoDeleteConfig(date){try{await api('PUT','/homeoffice/config',{date:date,maxSlots:-1});await fetchData();renderHomeoffice();}catch(e){toast('⚠️ '+e.message,'err');}}
 function renderSubcatAdmin(){
   const list=document.getElementById('subcatList');if(!list)return;
-  const DEPT_L={frei:'Frei',technik:'Technik',leitung:'Leitung',dienstplanung:'Dienstplanung',ausbildung:'Ausbildung',qm:'QM'};
+  const deptSel=document.getElementById('scFDept');
+  if(deptSel) deptSel.innerHTML=DEPTS.filter(d=>d!=='frei').map(d=>`<option value="${d}">${DEPT_LABELS[d]||d}</option>`).join('');
+  const DEPT_L=DEPT_LABELS;
   const grouped={};
   S.ticketSubcategories.forEach(s=>{(grouped[s.department]||(grouped[s.department]=[])).push(s);});
   if(!S.ticketSubcategories.length){list.innerHTML='<p style="font-size:12px;color:var(--mu)">Noch keine Unterkategorien vorhanden.</p>';return;}
@@ -7800,6 +7867,7 @@ function openConvertItemModal({kind, ids, title, priority, description}) {
   document.getElementById('ctiDescHint').style.display = kind==='meeting' ? '' : 'none';
   document.getElementById('ctiErr').textContent = '';
   document.getElementById('ctiPrio').value = priority || 'medium';
+  document.getElementById('ctiDept').innerHTML = DEPTS.map(d=>`<option value="${d}">${DEPT_LABELS[d]||d}</option>`).join('');
   document.getElementById('ctiAssignee').innerHTML = '<option value="">— niemand —</option>' +
     S.users.filter(isAssignable).map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join('');
   openModal('convertTodoOv');

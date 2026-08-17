@@ -709,6 +709,27 @@ async function initDB() {
   sort_order INTEGER NOT NULL DEFAULT 0
 )`,
     `ALTER TABLE sop_checklist_items ADD COLUMN IF NOT EXISTS branch_option_id TEXT REFERENCES sop_checklist_item_branch_options(id) ON DELETE SET NULL`,
+    // ── Fachbereiche ── bisher fest im Code verdrahtet (db.js DEPTS), jetzt vom
+    // Admin verwaltbar. id bleibt nach dem Anlegen unveränderlich (wird in
+    // tickets.department und user.roles referenziert) — nur label/emoji/color
+    // sind editierbar. Seed mit den bisherigen 6 Fachbereichen, damit
+    // bestehende Tickets/Rollen weiter funktionieren.
+    `CREATE TABLE IF NOT EXISTS departments (
+  id TEXT PRIMARY KEY,
+  label TEXT NOT NULL,
+  emoji TEXT DEFAULT '',
+  color TEXT DEFAULT '#64748b',
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+)`,
+    `INSERT INTO departments (id,label,emoji,color,sort_order) VALUES
+      ('technik','Technik','🔧','#0ea5e9',1),
+      ('leitung','Leitung','⭐','#f59e0b',2),
+      ('dienstplanung','Dienstplanung','📋','#3b6dd4',3),
+      ('ausbildung','Ausbildung','🎓','#7c3aed',4),
+      ('qm','QM','✅','#10b981',5),
+      ('frei','Frei','🌐','#64748b',6)
+    ON CONFLICT (id) DO NOTHING`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }
@@ -805,6 +826,7 @@ app.use('/api',   require('./routes/todos'));
 app.use('/api',   require('./routes/contacts'));
 app.use('/api',   require('./routes/sop'));
 app.use('/api',   require('./routes/lockers'));
+app.use('/api',   require('./routes/departments'));
 
 app.get('*', (req,res) => res.sendFile(path.join(__dirname,'public','index.html')));
 

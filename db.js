@@ -18,6 +18,23 @@ const getUser    = id => q1('SELECT * FROM users WHERE id=$1', [id]);
 const getUserByUsername = username => q1('SELECT * FROM users WHERE LOWER(username)=LOWER($1)', [username]);
 const DEPTS = ['technik','leitung','dienstplanung','ausbildung','qm','frei'];
 
+// Fachbereiche sind seit "Spindvergabe" nicht mehr fix im Code verdrahtet,
+// sondern in der Tabelle `departments` verwaltet (Admin kann welche
+// hinzufügen). DEPTS oben bleibt nur als Fallback, falls die Tabelle einmal
+// nicht erreichbar ist. Kurzer Cache analog zur role_permissions-Cache in
+// middleware.js, damit nicht bei jedem Request neu abgefragt wird.
+let _deptCache = null, _deptCacheTime = 0;
+async function getDepartmentIds() {
+  if (_deptCache && Date.now()-_deptCacheTime < 300000) return _deptCache;
+  try {
+    const rows = await q('SELECT id FROM departments');
+    _deptCache = rows.map(r => r.id);
+    _deptCacheTime = Date.now();
+    return _deptCache;
+  } catch(e) { return DEPTS; }
+}
+function invalidateDeptCache() { _deptCache = null; }
+
 // Re-export der zentralen, reinen (DB-freien) Aktiv-Ableitung aus lib/dp-rules.js
 // — dort liegt sie, damit sie ohne DB-Verbindung testbar ist (Vitest).
 const { isUserActive } = require('./lib/dp-rules');
@@ -113,9 +130,10 @@ async function getTP(uid, userObj=null) {
   const u = userObj || await getUser(uid);
   const roles = parseRoles(u?.roles);
   const has = (...r) => r.some(x => roles.includes(x));
+  const deptIds = await getDepartmentIds();
   return {
     seeAll: has('admin','leitung'), editAll: has('admin','leitung'),
-    myDepts: DEPTS.filter(d => roles.includes(d)),
+    myDepts: deptIds.filter(d => roles.includes(d)),
     canSetPublic: !has('standard'), canAssign: !has('standard'),
     canSeeSubcat: has('admin','leitung','schichtleiter','qm'),
     canEditSubcat: has('admin','leitung','schichtleiter','qm'),
@@ -175,4 +193,4 @@ async function logAct(uid, name, action, details={}) {
 
 module.exports = { pool, q, q1, newId, parseRoles, parseTags, getUser, getUserByUsername, DEPTS, logAct,
   getP, getTP, canSeeTk, canEditTk, nextTicketNumber, auditNote, createNotification,
-  parseMentions, isUserActive, NAV_TABS, getTabVisibility };
+  parseMentions, isUserActive, NAV_TABS, getTabVisibility, getDepartmentIds, invalidateDeptCache };
