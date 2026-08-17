@@ -15,25 +15,10 @@
 <div class="loading-ov" id="loadingOv"><div class="spinner"></div></div>
 <div id="emojiPickerPopup" style="display:none;position:fixed;z-index:9999;background:var(--sf);border:1px solid var(--border);border-radius:8px;padding:6px;box-shadow:0 4px 16px rgba(0,0,0,.25);max-width:260px"></div>
 
-<!-- CHAT-DOCK: unten angedocktes Chatfenster, erreichbar von der Chat-Übersicht -->
-<div id="chatDock" style="display:none;flex-direction:column;position:fixed;bottom:0;right:24px;width:340px;max-width:calc(100vw - 32px);height:440px;max-height:calc(100vh - 80px);background:var(--bg);border:1px solid var(--border);border-bottom:none;border-radius:10px 10px 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.25);z-index:600">
-  <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0">
-    <div id="chatDockAvatar"></div>
-    <div id="chatDockTitle" style="flex:1;font-weight:700;font-size:13px"></div>
-    <button class="mc" onclick="closeChatDock()" style="font-size:14px">&#10005;</button>
-  </div>
-  <div id="chatDockPicker" style="display:none;padding:10px 12px;flex:1;min-height:0;overflow-y:auto">
-    <input type="text" id="chatDockUserSearch" placeholder="Mitarbeiter suchen…" oninput="renderChatDockPicker()" style="width:100%;margin-bottom:8px;box-sizing:border-box">
-    <div id="chatDockUserList"></div>
-  </div>
-  <div id="chatDockBody" style="display:none;flex-direction:column;flex:1;min-height:0">
-    <div id="chatDockMessages" style="flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px"></div>
-    <div style="display:flex;gap:6px;padding:8px 10px;border-top:1px solid var(--border);flex-shrink:0">
-      <input type="text" id="chatDockInput" placeholder="Nachricht…" onkeydown="if(event.key==='Enter'){event.preventDefault();sendChatDockMessage();}" style="flex:1">
-      <button class="btn-p" onclick="sendChatDockMessage()">&#10148;</button>
-    </div>
-  </div>
-</div>
+<!-- CHAT-FENSTER: eine Reihe angedockter Chatfenster (mehrere gleichzeitig
+     möglich, je eines maximiert/minimiert), rechts unten aber mit Abstand
+     zum "+"-Schnellzugriff-Button (qaWrap, ebenfalls unten rechts). -->
+<div id="chatWinRow" style="display:none;position:fixed;bottom:0;right:92px;z-index:600;flex-direction:row-reverse;align-items:flex-end;gap:10px;max-width:calc(100vw - 100px)"></div>
 
 <!-- LOGIN -->
 <div class="ls open" id="LS">

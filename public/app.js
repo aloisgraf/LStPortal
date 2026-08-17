@@ -2583,29 +2583,48 @@ async function setRightOverride(role,permission,granted){
 // Wiederverwendbarer Emoji-Picker für alle "Symbol (Emoji)"-Textfelder in
 // der App (Kategorien, Fachbereiche, Spind-Kategorien, ...) — bisher musste
 // das Emoji per Hand eingegeben/eingefügt werden.
-const EMOJI_PALETTE=['🔧','⭐','📋','🎓','✅','🌐','🏢','📦','🚚','👕','🧤','⛑️','🧹','🔥','🚨','📞','💡','🔒','🔑','🧰','🛠️','⚡','🚿','🧯','🩹','📁','📂','🗂️','📌','📎','✏️','📝','🗒️','📅','⏰','✔️','❌','⚠️','ℹ️','❓','❗','🏥','🚑','🚒','🏫','🏭','🚻','👤','👥','🏆','🎯','📊','💻','🖨️','📷','☎️','📧','🚪','🧊','☀️','🌙','🍀','💧','🩺','🧪','🚦','🅿️','♿','🪑','🧴','🧽'];
-let _emojiPickerTarget=null;
-function openEmojiPicker(inputId,btn){
+const EMOJI_PALETTE=['😀','😂','😉','😊','😍','😘','😎','🤔','😅','😢','😭','😡','👍','👎','👏','🙏','💪','🎉','❤️','🔥','🔧','⭐','📋','🎓','✅','🌐','🏢','📦','🚚','👕','🧤','⛑️','🧹','🚨','📞','💡','🔒','🔑','🧰','🛠️','⚡','🚿','🧯','🩹','📁','📂','🗂️','📌','📎','✏️','📝','🗒️','📅','⏰','✔️','❌','⚠️','ℹ️','❓','❗','🏥','🚑','🚒','🏫','🏭','🚻','👤','👥','🏆','🎯','📊','💻','🖨️','📷','☎️','📧','🚪','🧊','☀️','🌙','🍀','💧','🩺','🧪','🚦','🅿️','♿','🪑','🧴','🧽'];
+let _emojiPickerTarget=null, _emojiPickerMode='replace';
+function openEmojiPicker(inputId,btn,mode){
   const pop=document.getElementById('emojiPickerPopup');
   if(!pop)return;
-  if(pop.style.display==='block'&&_emojiPickerTarget===inputId){pop.style.display='none';return;}
+  if(pop.style.display==='block'&&_emojiPickerTarget===inputId){closeEmojiPicker();return;}
   _emojiPickerTarget=inputId;
+  _emojiPickerMode=mode||'replace';
   pop.innerHTML=EMOJI_PALETTE.map(e=>`<span onclick="pickEmoji('${e}')" style="cursor:pointer;font-size:18px;padding:4px;display:inline-block;border-radius:4px" onmouseover="this.style.background='var(--sf2)'" onmouseout="this.style.background='none'">${e}</span>`).join('');
   const r=btn.getBoundingClientRect();
   pop.style.top=(r.bottom+4)+'px';
   pop.style.left=Math.max(4,Math.min(r.left,window.innerWidth-270))+'px';
   pop.style.display='block';
+  // vorher entfernen statt bedingt hinzuzufügen — sonst sammeln sich bei
+  // mehrfachem Öffnen ohne Schließen doppelte Listener an
+  document.removeEventListener('click',_emojiPickerOutsideClick,{capture:true});
   document.addEventListener('click',_emojiPickerOutsideClick,{capture:true});
 }
+function closeEmojiPicker(){
+  const pop=document.getElementById('emojiPickerPopup');
+  if(pop)pop.style.display='none';
+  document.removeEventListener('click',_emojiPickerOutsideClick,{capture:true});
+}
 function pickEmoji(e){
-  if(_emojiPickerTarget){const el=document.getElementById(_emojiPickerTarget);if(el){el.value=e;}}
-  document.getElementById('emojiPickerPopup').style.display='none';
+  if(_emojiPickerTarget){
+    const el=document.getElementById(_emojiPickerTarget);
+    if(el){
+      if(_emojiPickerMode==='insert'){
+        const start=el.selectionStart??el.value.length, end=el.selectionEnd??el.value.length;
+        el.value=el.value.slice(0,start)+e+el.value.slice(end);
+        el.focus();el.setSelectionRange(start+e.length,start+e.length);
+      } else {
+        el.value=e;
+      }
+    }
+  }
+  closeEmojiPicker();
 }
 function _emojiPickerOutsideClick(ev){
   const pop=document.getElementById('emojiPickerPopup');
   if(pop&&pop.style.display==='block'&&!pop.contains(ev.target)&&!ev.target.closest('.emoji-pick-btn')){
-    pop.style.display='none';
-    document.removeEventListener('click',_emojiPickerOutsideClick,{capture:true});
+    closeEmojiPicker();
   }
 }
 function buildCP(cid,sel,fn){document.getElementById(cid).innerHTML=pal().map(col=>`<div class="cp ${col===sel?'on':''}" style="background:${col}" onclick="${fn}('${col}','${cid}')"></div>`).join('');}
@@ -2717,14 +2736,14 @@ function startClock(){
   tick();
   setInterval(tick,1000);
 }
-function startAutoRefresh(){
-  if(_refreshTimer)clearInterval(_refreshTimer);
-  _lastMsgCount=S.messages.filter(m=>!m.isRead&&m.senderId!==S.currentUser).length;
-  _lastTkCount=S.tickets.filter(tk=>tk.status!=='closed'&&((S.tp.myDepts.includes(tk.department)&&!tk.assigneeId)||tk.assigneeId===S.currentUser)).length;
-  _refreshTimer=setInterval(async()=>{
-    if(!S.currentUser)return;
-    try{
-      const data=await api('GET','/data');
+// Leiser Hintergrund-Abgleich ohne den ganzseitigen Ladespinner von
+// fetchData() — für den 30s-Poller UND für Aktionen, die zwar frische Daten
+// brauchen, aber keine Vollbild-Unterbrechung rechtfertigen (z.B. eine
+// Chat-Nachricht senden soll sich nicht wie ein Seitenneuladen anfühlen).
+async function silentRefresh(){
+  if(!S.currentUser)return;
+  try{
+    const data=await api('GET','/data');
       const newMsgCount=(data.messages||[]).filter(m=>!m.isRead&&m.senderId!==S.currentUser).length;
       const myD=S.tp?.myDepts||[];
       const newTkCount=(data.tickets||[]).filter(tk=>{
@@ -2747,17 +2766,13 @@ function startAutoRefresh(){
         DEPT_LABELS={}; S.departments.forEach(d=>{DEPT_LABELS[d.id]=(d.emoji?d.emoji+' ':'')+d.label;});
       }
       S.lockerCategories=data.lockerCategories||[];
-      const prevChatMsgCount=(S.chatMessages||[]).length;
+      const prevChatMsgs=S.chatMessages||[];
       S.chatThreads=data.chatThreads||[];S.chatMessages=data.chatMessages||[];
       updateBadges();
       if(_lastMsgCount>=0&&newMsgCount>_lastMsgCount)toast('\uD83D\uDCEC Neue Nachricht eingegangen!');
       if(_lastTkCount>=0&&newTkCount>_lastTkCount)toast('\uD83C\uDFAB Neues Ticket in deinem Bereich!');
-      if(S.chatMessages.length>prevChatMsgCount){
-        if(S._chatDockThreadId&&S._chatDockMode==='chat'){renderChatDockMessages();markChatThreadRead(S._chatDockThreadId);}
-        else if(prevChatMsgCount>0)toast('\uD83D\uDCAC Neue Chat-Nachricht!');
-        if(S.view==='chat')renderChatList();
-      }
       _lastMsgCount=newMsgCount;_lastTkCount=newTkCount;
+      onChatMessagesChanged(prevChatMsgs);
       if(S.view==='home')renderHome();
       else if(S.view==='messages'||S.view==='messages_sent')renderMessages();
       else if(S.view==='tickets'||S.view==='tickets_closed'||S.view==='tickets_deleted')renderTickets();
@@ -2766,9 +2781,15 @@ function startAutoRefresh(){
       else if(S.view==='docs')renderDocs();
       else if(S.view==='meetings')renderMeetings();
       else if(S.view==='sop'&&(S._sopView==='run'||S._sopView==='runlist'))renderSop();
+      else if(S.view==='chat')renderChatList();
     var _rd=document.getElementById('lastRefreshDisplay');if(_rd){var _n=new Date();_rd.textContent='↻ '+_n.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit',second:'2-digit'});_rd.style.display='block';}
-    }catch(e){}
-  },30000);
+  }catch(e){}
+}
+function startAutoRefresh(){
+  if(_refreshTimer)clearInterval(_refreshTimer);
+  _lastMsgCount=S.messages.filter(m=>!m.isRead&&m.senderId!==S.currentUser).length;
+  _lastTkCount=S.tickets.filter(tk=>tk.status!=='closed'&&((S.tp.myDepts.includes(tk.department)&&!tk.assigneeId)||tk.assigneeId===S.currentUser)).length;
+  _refreshTimer=setInterval(silentRefresh,30000);
 }
 // ══════════════════════════════════════════
 // SECTION: Austrian Holidays
@@ -3507,6 +3528,7 @@ async function batchRestore(){
 function _qaItems(){
   const items=[];
   items.push({icon:'🎫',label:'Ticket erstellen',action:()=>openTkForm(null)});
+  items.push({icon:'💬',label:'Neuer Chat',action:()=>openChatWindowPicker()});
   if(S.p.canSendMessages)items.push({icon:'✉️',label:'Nachricht senden',action:()=>openMsgForm()});
   items.push({icon:'🏠',label:'Homeoffice eintragen',action:()=>setView('homeoffice')});
   items.push({icon:'📅',label:'Eintrag anlegen',action:()=>openEvtModal()});
@@ -8168,8 +8190,13 @@ async function toggleTodoItemAssignee(todoId, itemId, userId, assign) {
 
 // ── CHAT (1:1) ────────────────────────────────────────────────────────────
 // Eigenständig von der Broadcast-"Nachrichten"-Funktion oben (Ankündigung an
-// eine Zielgruppe) — hier geht es um echte Thread-basierte Unterhaltungen
-// zwischen zwei Mitarbeitern, mit einem unten angedockten Chatfenster.
+// eine Zielgruppe) — hier echte Thread-basierte Unterhaltungen zwischen zwei
+// Mitarbeitern, als mehrere unten angedockte Chatfenster (wie bei gängigen
+// Messengern): jedes offene Fenster ist entweder minimiert (schmale Leiste)
+// oder maximiert (volles Chatfenster) — es kann immer nur eines maximiert
+// sein, ein Klick auf ein minimiertes Fenster maximiert es und minimiert die
+// anderen. "X" schließt ein Fenster endgültig (kein Wieder-Aufpoppen bei
+// neuen Nachrichten, bis der Chat erneut aktiv geöffnet wird).
 function chatUnreadCount(threadId){
   const t=(S.chatThreads||[]).find(x=>x.id===threadId);
   if(!t)return 0;
@@ -8192,7 +8219,7 @@ function renderChatList(){
     const last=chatLastMessage(t.id);
     const unread=chatUnreadCount(t.id);
     const preview=last?(last.senderId===S.currentUser?'Du: ':'')+esc(last.text.length>60?last.text.slice(0,60)+'…':last.text):'<span style="color:var(--di)">Noch keine Nachrichten</span>';
-    return `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="openChatDock('${t.id}')">
+    return `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="openChatWindow('${t.id}')">
       ${u?avHtml(u.initials,u.color,36,14,u.isOnline):'<div style="width:36px;height:36px;border-radius:50%;background:var(--sf2)"></div>'}
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:${unread?'700':'600'}">${esc(u?.name||'Unbekannt')}</div>
@@ -8205,73 +8232,149 @@ function renderChatList(){
     </div>`;
   };
   document.getElementById('main').innerHTML=`
-    <div class="ph"><div class="pt">💬 Chat</div><button class="btn-p" onclick="openChatPicker()">&#65291; Neuer Chat</button></div>
+    <div class="ph"><div class="pt">💬 Chat</div><button class="btn-p" onclick="openChatWindowPicker()">&#65291; Neuer Chat</button></div>
     <div style="padding:0 20px 30px">
       ${threads.length?threads.map(row).join(''):'<div class="empty">Noch keine Chats. Starte einen neuen!</div>'}
     </div>`;
 }
-function openChatPicker(){
-  S._chatDockMode='picker';S._chatDockThreadId=null;
-  document.getElementById('chatDockTitle').textContent='Neuer Chat';
-  document.getElementById('chatDockAvatar').innerHTML='';
-  document.getElementById('chatDockPicker').style.display='block';
-  document.getElementById('chatDockBody').style.display='none';
-  document.getElementById('chatDockUserSearch').value='';
-  renderChatDockPicker();
-  document.getElementById('chatDock').style.display='flex';
+
+// S._chatWindows: [{id, threadId|null, minimized}] — id==='__picker__' für das
+// Fenster zur Mitarbeiterauswahl, sonst id===threadId.
+// S._chatClosedThreads: Set der Thread-IDs, die der Nutzer per "X" geschlossen
+// hat — für die poppt eine neue Nachricht das Fenster NICHT automatisch wieder auf.
+if(!S._chatWindows)S._chatWindows=[];
+if(!S._chatClosedThreads)S._chatClosedThreads=new Set();
+
+function _chatWin(id){ return (S._chatWindows||[]).find(w=>w.id===id); }
+function renderChatWindows(){
+  const row=document.getElementById('chatWinRow');
+  if(!row)return;
+  const wins=S._chatWindows||[];
+  if(!wins.length){row.innerHTML='';row.style.display='none';return;}
+  row.style.display='flex';
+  row.innerHTML=wins.map(w=>{
+    if(w.id==='__picker__')return chatWinPickerHtml(w);
+    return w.minimized?chatWinMinHtml(w):chatWinMaxHtml(w);
+  }).join('');
+  if(!S._chatWindows.some(w=>!w.minimized)){/* nichts zu fokussieren */}
+  S._chatWindows.filter(w=>!w.minimized&&w.id!=='__picker__').forEach(w=>{
+    const el=document.getElementById('chatWinMsgs_'+w.id);
+    if(el)el.scrollTop=el.scrollHeight;
+  });
 }
-function renderChatDockPicker(){
-  const search=(document.getElementById('chatDockUserSearch').value||'').toLowerCase().trim();
-  const users=S.users.filter(u=>u.id!==S.currentUser&&u.isActive!==false).sort(byLastName)
-    .filter(u=>!search||u.name.toLowerCase().includes(search));
-  document.getElementById('chatDockUserList').innerHTML=users.map(u=>
-    `<div style="display:flex;align-items:center;gap:8px;padding:6px 4px;cursor:pointer;border-radius:6px" onclick="selectChatUser('${u.id}')" onmouseover="this.style.background='var(--sf2)'" onmouseout="this.style.background='none'">
-      ${avHtml(u.initials,u.color,26,10,u.isOnline)}<span style="font-size:13px">${esc(u.name)}</span>
-    </div>`).join('')||'<div style="color:var(--di);font-size:12px;padding:8px 0">Keine Treffer.</div>';
+function chatWinMinHtml(w){
+  const t=(S.chatThreads||[]).find(x=>x.id===w.threadId);
+  const ou=t?getU(t.otherUserId):null;
+  const unread=w.threadId?chatUnreadCount(w.threadId):0;
+  return `<div style="width:220px;flex-shrink:0;background:var(--bg);border:1px solid var(--border);border-bottom:none;border-radius:10px 10px 0 0;box-shadow:0 -4px 16px rgba(0,0,0,.18);display:flex;align-items:center;gap:8px;padding:9px 10px;cursor:pointer" onclick="maximizeChatWindow('${w.id}')">
+    ${ou?avHtml(ou.initials,ou.color,26,10,ou.isOnline):'<div style="width:26px;height:26px;border-radius:50%;background:var(--sf2)"></div>'}
+    <div style="flex:1;min-width:0;font-size:12px;font-weight:${unread?'700':'600'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(ou?.name||'Chat')}</div>
+    ${unread?`<span class="nbdg" style="display:flex;flex-shrink:0">${unread}</span>`:''}
+    <button class="mc" title="Maximieren" style="font-size:12px;flex-shrink:0" onclick="event.stopPropagation();maximizeChatWindow('${w.id}')">&#9650;</button>
+    <button class="mc" title="Schließen" style="font-size:12px;flex-shrink:0" onclick="event.stopPropagation();closeChatWindow('${w.id}')">&#10005;</button>
+  </div>`;
 }
-async function selectChatUser(userId){
-  try{
-    const r=await api('POST','/chat/threads',{otherUserId:userId});
-    await fetchData();
-    openChatDock(r.id);
-  }catch(e){toast('⚠️ '+e.message,'err');}
-}
-function openChatDock(threadId){
-  const t=(S.chatThreads||[]).find(x=>x.id===threadId);
-  if(!t)return;
-  S._chatDockMode='chat';S._chatDockThreadId=threadId;
-  const u=getU(t.otherUserId);
-  document.getElementById('chatDockTitle').textContent=u?.name||'Unbekannt';
-  document.getElementById('chatDockAvatar').innerHTML=u?avHtml(u.initials,u.color,26,10,u.isOnline):'';
-  document.getElementById('chatDockPicker').style.display='none';
-  document.getElementById('chatDockBody').style.display='flex';
-  document.getElementById('chatDock').style.display='flex';
-  renderChatDockMessages();
-  markChatThreadRead(threadId);
-  setTimeout(()=>document.getElementById('chatDockInput')?.focus(),50);
-}
-function renderChatDockMessages(){
-  const threadId=S._chatDockThreadId;if(!threadId)return;
-  const el=document.getElementById('chatDockMessages');if(!el)return;
-  const msgs=(S.chatMessages||[]).filter(m=>m.threadId===threadId);
-  el.innerHTML=msgs.map(m=>{
+function chatWinMaxHtml(w){
+  const t=(S.chatThreads||[]).find(x=>x.id===w.threadId);
+  const ou=t?getU(t.otherUserId):null;
+  const msgs=(S.chatMessages||[]).filter(m=>m.threadId===w.threadId);
+  const msgsHtml=msgs.map(m=>{
     const mine=m.senderId===S.currentUser;
     return `<div style="align-self:${mine?'flex-end':'flex-start'};max-width:80%">
       <div style="background:${mine?'var(--acc)':'var(--sf2)'};color:${mine?'var(--act)':'var(--tx)'};padding:7px 11px;border-radius:12px;${mine?'border-bottom-right-radius:2px':'border-bottom-left-radius:2px'};font-size:13px;white-space:pre-wrap;word-break:break-word">${esc(m.text)}</div>
       <div style="font-size:9px;color:var(--di);margin-top:2px;text-align:${mine?'right':'left'}">${fdt(m.createdAt)}</div>
     </div>`;
   }).join('')||'<div style="color:var(--di);font-size:12px;text-align:center;padding:20px 0">Noch keine Nachrichten — schreib was!</div>';
-  el.scrollTop=el.scrollHeight;
+  return `<div style="width:320px;flex-shrink:0;height:440px;max-height:calc(100vh - 90px);background:var(--bg);border:1px solid var(--border);border-bottom:none;border-radius:10px 10px 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.25);display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0">
+      ${ou?avHtml(ou.initials,ou.color,26,10,ou.isOnline):''}
+      <div style="flex:1;font-weight:700;font-size:13px">${esc(ou?.name||'Chat')}</div>
+      <button class="mc" title="Minimieren" onclick="minimizeChatWindow('${w.id}')" style="font-size:14px">&#9660;</button>
+      <button class="mc" title="Schließen" onclick="closeChatWindow('${w.id}')" style="font-size:14px">&#10005;</button>
+    </div>
+    <div id="chatWinMsgs_${w.id}" style="flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px">${msgsHtml}</div>
+    <div style="display:flex;gap:6px;padding:8px 10px;border-top:1px solid var(--border);flex-shrink:0">
+      <button class="btn-s emoji-pick-btn" style="flex-shrink:0" onclick="openEmojiPicker('chatWinInput_${w.id}',this,'insert')">😀</button>
+      <input type="text" id="chatWinInput_${w.id}" placeholder="Nachricht…" onkeydown="if(event.key==='Enter'){event.preventDefault();sendChatWinMessage('${w.id}');}" style="flex:1">
+      <button class="btn-p" onclick="sendChatWinMessage('${w.id}')">&#10148;</button>
+    </div>
+  </div>`;
 }
-async function sendChatDockMessage(){
-  const threadId=S._chatDockThreadId;if(!threadId)return;
-  const input=document.getElementById('chatDockInput');
+function chatWinPickerHtml(w){
+  const search=(w._search||'').toLowerCase().trim();
+  const users=S.users.filter(u=>u.id!==S.currentUser&&u.isActive!==false).sort(byLastName)
+    .filter(u=>!search||u.name.toLowerCase().includes(search));
+  return `<div style="width:280px;flex-shrink:0;height:380px;max-height:calc(100vh - 90px);background:var(--bg);border:1px solid var(--border);border-bottom:none;border-radius:10px 10px 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.25);display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <div style="flex:1;font-weight:700;font-size:13px">Neuer Chat</div>
+      <button class="mc" onclick="closeChatWindow('__picker__')" style="font-size:14px">&#10005;</button>
+    </div>
+    <div style="padding:10px 12px;flex:1;min-height:0;overflow-y:auto">
+      <input type="text" value="${esc(w._search||'')}" placeholder="Mitarbeiter suchen…" oninput="onChatPickerSearch(this.value)" style="width:100%;margin-bottom:8px;box-sizing:border-box">
+      <div>${users.map(u=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 4px;cursor:pointer;border-radius:6px" onclick="selectChatWindowUser('${u.id}')" onmouseover="this.style.background='var(--sf2)'" onmouseout="this.style.background='none'">
+        ${avHtml(u.initials,u.color,26,10,u.isOnline)}<span style="font-size:13px">${esc(u.name)}</span>
+      </div>`).join('')||'<div style="color:var(--di);font-size:12px;padding:8px 0">Keine Treffer.</div>'}</div>
+    </div>
+  </div>`;
+}
+function onChatPickerSearch(val){
+  const w=_chatWin('__picker__');if(!w)return;
+  w._search=val;
+  const focused=document.activeElement?.id;
+  renderChatWindows();
+  if(focused){const el=document.getElementById(focused);if(el){el.focus();el.setSelectionRange(val.length,val.length);}}
+}
+function openChatWindowPicker(){
+  S._chatWindows.forEach(w=>w.minimized=true);
+  let w=_chatWin('__picker__');
+  if(!w){w={id:'__picker__',threadId:null,minimized:false,_search:''};S._chatWindows.push(w);}
+  else w.minimized=false;
+  renderChatWindows();
+}
+async function selectChatWindowUser(userId){
+  try{
+    const r=await api('POST','/chat/threads',{otherUserId:userId});
+    closeChatWindow('__picker__');
+    await silentRefresh();
+    S._chatClosedThreads.delete(r.id);
+    openChatWindow(r.id);
+  }catch(e){toast('⚠️ '+e.message,'err');}
+}
+function openChatWindow(threadId){
+  S._chatClosedThreads.delete(threadId);
+  S._chatWindows.forEach(w=>w.minimized=true);
+  let w=_chatWin(threadId);
+  if(!w){w={id:threadId,threadId,minimized:false};S._chatWindows.push(w);}
+  else w.minimized=false;
+  renderChatWindows();
+  markChatThreadRead(threadId);
+  setTimeout(()=>document.getElementById('chatWinInput_'+threadId)?.focus(),50);
+}
+function maximizeChatWindow(id){
+  S._chatWindows.forEach(w=>w.minimized=(w.id!==id));
+  renderChatWindows();
+  const w=_chatWin(id);
+  if(w&&w.threadId)markChatThreadRead(w.threadId);
+}
+function minimizeChatWindow(id){
+  const w=_chatWin(id);if(w)w.minimized=true;
+  renderChatWindows();
+}
+function closeChatWindow(id){
+  const w=_chatWin(id);
+  if(w&&w.threadId)S._chatClosedThreads.add(w.threadId);
+  S._chatWindows=S._chatWindows.filter(x=>x.id!==id);
+  renderChatWindows();
+}
+async function sendChatWinMessage(threadId){
+  const input=document.getElementById('chatWinInput_'+threadId);
+  if(!input)return;
   const text=input.value.trim();if(!text)return;
   input.value='';
   try{
     await api('POST','/chat/threads/'+threadId+'/messages',{text});
-    await fetchData();
-    renderChatDockMessages();
+    await silentRefresh();
+    renderChatWindows();
     if(S.view==='chat')renderChatList();
   }catch(e){toast('⚠️ '+e.message,'err');input.value=text;}
 }
@@ -8281,11 +8384,34 @@ async function markChatThreadRead(threadId){
     const t=(S.chatThreads||[]).find(x=>x.id===threadId);
     if(t)t.myLastReadAt=new Date().toISOString();
     updateBadges();
+    renderChatWindows();
     if(S.view==='chat')renderChatList();
   }catch(e){}
 }
-function closeChatDock(){
-  const dock=document.getElementById('chatDock');if(dock)dock.style.display='none';
-  S._chatDockThreadId=null;S._chatDockMode='closed';
+// Wird nach jedem silentRefresh() aufgerufen, sobald neue Chat-Nachrichten da
+// sind: offene maximierte Fenster aktualisieren + als gelesen markieren,
+// offene minimierte Fenster zeigen automatisch den Ungelesen-Zähler, und für
+// Threads, die weder offen noch vom Nutzer explizit geschlossen wurden, poppt
+// ein neues minimiertes Fenster mit Hinweis auf.
+function onChatMessagesChanged(prevMsgs){
+  const prevIds=new Set(prevMsgs.map(m=>m.id));
+  const fresh=(S.chatMessages||[]).filter(m=>!prevIds.has(m.id)&&m.senderId!==S.currentUser);
+  if(!fresh.length)return;
+  let changed=false;
+  const freshThreadIds=[...new Set(fresh.map(m=>m.threadId))];
+  freshThreadIds.forEach(threadId=>{
+    const w=_chatWin(threadId);
+    if(w){
+      if(!w.minimized)markChatThreadRead(threadId);
+      changed=true;
+    } else if(!S._chatClosedThreads.has(threadId)){
+      S._chatWindows.push({id:threadId,threadId,minimized:true});
+      changed=true;
+    }
+  });
+  if(changed)renderChatWindows();
+  const t=(S.chatThreads||[]).find(x=>x.id===freshThreadIds[0]);
+  const ou=t?getU(t.otherUserId):null;
+  toast('💬 Neue Nachricht'+(ou?' von '+ou.name:'')+'!');
 }
 
