@@ -20,6 +20,7 @@
     "mailparser": "^3.7.1",
     "nodemailer": "^9.0.3",
     "pg": "^8.11.3",
+    "web-push": "^3.6.7",
     "xlsx": "^0.18.5"
   },
   "engines": {

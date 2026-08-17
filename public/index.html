@@ -23,7 +23,7 @@
 <!-- CHAT-FENSTER: eine Reihe angedockter Chatfenster (mehrere gleichzeitig
      möglich, je eines maximiert/minimiert), rechts unten aber mit Abstand
      zum "+"-Schnellzugriff-Button (qaWrap, ebenfalls unten rechts). -->
-<div id="chatWinRow" style="display:none;position:fixed;bottom:0;right:92px;z-index:600;flex-direction:row-reverse;align-items:flex-end;gap:10px;max-width:calc(100vw - 100px)"></div>
+<div id="chatWinRow"></div>
 
 <!-- LOGIN -->
 <div class="ls open" id="LS">
@@ -174,6 +174,11 @@
       </div>
       <div style="border-top:1px solid var(--border);margin:4px 0 8px"></div>
       <div class="fg"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px"><input type="checkbox" id="setDueHeat" onchange="toggleDueHeatPref(this.checked)" style="width:16px;height:16px;cursor:pointer"> &#128293; F&#228;lligkeits-F&#228;rbung in der Ticketliste</label><div style="font-size:11px;color:var(--mu);margin-top:2px;margin-left:24px">F&#228;rbt Tickets ab 14 Tagen vor F&#228;lligkeit dezent orange bis r&#246;tlich ein.</div></div>
+      <div style="border-top:1px solid var(--border);margin:4px 0 8px"></div>
+      <div class="fg"><label>&#128276; Push-Benachrichtigungen</label>
+        <div style="font-size:11px;color:var(--mu);margin-bottom:6px">F&#252;r neue Chat-Nachrichten. Auf dem iPhone nur nutzbar, wenn die App zuvor &#252;ber "Zum Home-Bildschirm hinzuf&#252;gen" installiert wurde.</div>
+        <button class="btn-s" onclick="enablePushNotifications()">&#128276; Aktivieren</button>
+      </div>
       <div id="myLockersBlock" style="display:none">
         <div style="border-top:1px solid var(--border);margin:4px 0 8px"></div>
         <div class="fg"><label>&#128188; Meine Spinde</label><div id="myLockersList"></div></div>

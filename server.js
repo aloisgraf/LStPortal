@@ -725,6 +725,14 @@ async function initDB() {
   last_read_at TIMESTAMPTZ DEFAULT NOW(),
   PRIMARY KEY(thread_id, user_id)
 )`,
+    `CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  endpoint TEXT NOT NULL UNIQUE,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+)`,
     // ── Verzweigungen in Notfall-Checklisten ── ein Schritt vom Typ "branch"
     // stellt eine Entscheidung mit mehreren benannten Optionen dar (z.B.
     // "07-19 Uhr" / "19-07 Uhr"). Andere Schritte können optional einer
@@ -860,6 +868,7 @@ app.use('/api',   require('./routes/lockers'));
 app.use('/api',   require('./routes/departments'));
 app.use('/api',   require('./routes/email'));
 app.use('/api',   require('./routes/chat'));
+app.use('/api',   require('./routes/push').router);
 
 app.get('*', (req,res) => res.sendFile(path.join(__dirname,'public','index.html')));
 

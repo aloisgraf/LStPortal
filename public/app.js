@@ -15,6 +15,30 @@ const APP_VERSION='3.0.0';
 // PWA: ermöglicht "Zum Home-Bildschirm hinzufügen" auf iOS/Android — siehe
 // public/sw.js für die Cache-Strategie (App-Daten selbst werden nie gecacht).
 if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js').catch(()=>{});});}
+function _urlBase64ToUint8Array(base64String){
+  const padding='='.repeat((4-base64String.length%4)%4);
+  const base64=(base64String+padding).replace(/-/g,'+').replace(/_/g,'/');
+  const raw=atob(base64);
+  const arr=new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++)arr[i]=raw.charCodeAt(i);
+  return arr;
+}
+// Push-Benachrichtigungen (z.B. neue Chat-Nachricht) — auf iOS nur nutzbar,
+// wenn die App zum Home-Bildschirm hinzugefügt wurde (ab iOS 16.4), sonst
+// bricht requestPermission()/subscribe() einfach mit einer Fehlermeldung ab.
+async function enablePushNotifications(){
+  try{
+    if(!('serviceWorker' in navigator)||!('PushManager' in window)){toast('⚠️ Push wird von diesem Browser nicht unterstützt','err');return;}
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted'){toast('⚠️ Berechtigung nicht erteilt','err');return;}
+    const {publicKey}=await api('GET','/push/vapid-public-key');
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:_urlBase64ToUint8Array(publicKey)});
+    await api('POST','/push/subscribe', sub.toJSON());
+    toast('✅ Push-Benachrichtigungen aktiviert!');
+  }catch(e){toast('⚠️ '+(e.message||'Push konnte nicht aktiviert werden'),'err');}
+}
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
@@ -4526,14 +4550,14 @@ function renderSopRun(runId){
           ?`<div style="font-size:22px">🔀</div>`
           :`<input type="checkbox" ${ri.done?'checked':''} ${disabled} onchange="sopRunToggle('${run.id}','${it.id}',this.checked)" style="width:26px;height:26px;cursor:${canEdit?'pointer':'default'};accent-color:#10b981">`}
       </div>
-      <div style="min-width:0;margin-left:${8+indent}px;display:flex;gap:16px;flex-wrap:nowrap;align-items:flex-start;max-width:100%">
-        <div style="flex:3 1 0;min-width:0;max-width:480px">
+      <div class="sop-step-cols" style="min-width:0;margin-left:${8+indent}px">
+        <div style="min-width:0">
           ${branchTagRun?`<div>${branchTagRun}</div>`:''}
           <div style="font-size:15px;font-weight:600;${ri.done&&!isBranch?'text-decoration:line-through':''}">${esc(it.text)}${it.required&&!isBranch?' <span style="color:#ef4444">*</span>':''}</div>
           ${it.hint?`<div style="font-size:12px;color:var(--mu);margin-top:2px">💡 ${esc(it.hint)}</div>`:''}
           ${control}
         </div>
-        <div style="flex:2 1 0;min-width:0;max-width:260px">
+        <div style="min-width:0">
           <textarea placeholder="Dokumentation / Notiz…" ${disabled} onchange="sopRunSetNote('${run.id}','${it.id}',this.value)" rows="3" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--sf);color:var(--tx);box-sizing:border-box;font-size:12px;font-family:inherit;resize:vertical">${esc(ri.note||'')}</textarea>
           ${ri.updatedAt?`<div style="font-size:10px;color:var(--di);margin-top:4px">zuletzt ${fdt(ri.updatedAt)} von ${esc(getU(ri.updatedBy)?.name||'?')}</div>`:''}
         </div>
@@ -8283,8 +8307,8 @@ function renderChatWindows(){
   const row=document.getElementById('chatWinRow');
   if(!row)return;
   const wins=S._chatWindows||[];
-  if(!wins.length){row.innerHTML='';row.style.display='none';return;}
-  row.style.display='flex';
+  if(!wins.length){row.innerHTML='';row.classList.remove('open');return;}
+  row.classList.add('open');
   row.innerHTML=wins.map(w=>{
     if(w.id==='__picker__')return chatWinPickerHtml(w);
     return w.minimized?chatWinMinHtml(w):chatWinMaxHtml(w);
@@ -8299,7 +8323,7 @@ function chatWinMinHtml(w){
   const t=(S.chatThreads||[]).find(x=>x.id===w.threadId);
   const ou=t?getU(t.otherUserId):null;
   const unread=w.threadId?chatUnreadCount(w.threadId):0;
-  return `<div style="width:220px;flex-shrink:0;background:${unread?'rgba(239,68,68,.1)':'var(--bg)'};border:1px solid ${unread?'rgba(239,68,68,.4)':'var(--border)'};border-bottom:none;border-radius:10px 10px 0 0;box-shadow:0 -4px 16px rgba(0,0,0,.18);display:flex;align-items:center;gap:8px;padding:9px 10px;cursor:pointer" onclick="maximizeChatWindow('${w.id}')">
+  return `<div class="chat-win-min" style="background:${unread?'rgba(239,68,68,.1)':'var(--bg)'};border:1px solid ${unread?'rgba(239,68,68,.4)':'var(--border)'}" onclick="maximizeChatWindow('${w.id}')">
     ${ou?avHtml(ou.initials,ou.color,26,10,ou.isOnline):'<div style="width:26px;height:26px;border-radius:50%;background:var(--sf2)"></div>'}
     <div style="flex:1;min-width:0;font-size:12px;font-weight:${unread?'700':'600'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(ou?.name||'Chat')}</div>
     ${unread?`<span style="min-width:18px;height:18px;background:#ef4444;color:#fff;border-radius:9px;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;flex-shrink:0">${unread}</span>`:''}
@@ -8319,7 +8343,7 @@ function chatWinMaxHtml(w){
       <div style="font-size:9px;color:var(--di);margin-top:2px;text-align:${mine?'right':'left'}">${fdt(m.createdAt)}</div>
     </div>`;
   }).join('')||'<div style="color:var(--di);font-size:12px;text-align:center;padding:20px 0">Noch keine Nachrichten — schreib was!</div>';
-  return `<div style="width:320px;flex-shrink:0;height:440px;max-height:calc(100vh - 90px);background:var(--bg);border:1px solid var(--border);border-bottom:none;border-radius:10px 10px 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.25);display:flex;flex-direction:column">
+  return `<div class="chat-win-max">
     <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0">
       ${ou?avHtml(ou.initials,ou.color,26,10,ou.isOnline):''}
       <div style="flex:1;font-weight:700;font-size:13px">${esc(ou?.name||'Chat')}</div>
@@ -8329,7 +8353,7 @@ function chatWinMaxHtml(w){
     <div id="chatWinMsgs_${w.id}" style="flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px">${msgsHtml}</div>
     <div style="display:flex;gap:6px;padding:8px 10px;border-top:1px solid var(--border);flex-shrink:0">
       <button class="btn-s emoji-pick-btn" style="flex-shrink:0" onclick="openEmojiPicker('chatWinInput_${w.id}',this,'insert')">😀</button>
-      <input type="text" id="chatWinInput_${w.id}" placeholder="Nachricht…" onkeydown="if(event.key==='Enter'){event.preventDefault();sendChatWinMessage('${w.id}');}" style="flex:1">
+      <input type="text" id="chatWinInput_${w.id}" placeholder="Nachricht…" onkeydown="if(event.key==='Enter'){event.preventDefault();sendChatWinMessage('${w.id}');}" style="flex:1;font-size:16px">
       <button class="btn-p" onclick="sendChatWinMessage('${w.id}')">&#10148;</button>
     </div>
   </div>`;
@@ -8338,13 +8362,13 @@ function chatWinPickerHtml(w){
   const search=(w._search||'').toLowerCase().trim();
   const users=S.users.filter(u=>u.id!==S.currentUser&&u.isActive!==false).sort(byLastName)
     .filter(u=>!search||u.name.toLowerCase().includes(search));
-  return `<div style="width:280px;flex-shrink:0;height:380px;max-height:calc(100vh - 90px);background:var(--bg);border:1px solid var(--border);border-bottom:none;border-radius:10px 10px 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.25);display:flex;flex-direction:column">
+  return `<div class="chat-win-picker">
     <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0">
       <div style="flex:1;font-weight:700;font-size:13px">Neuer Chat</div>
       <button class="mc" onclick="closeChatWindow('__picker__')" style="font-size:14px">&#10005;</button>
     </div>
     <div style="padding:10px 12px;flex:1;min-height:0;overflow-y:auto">
-      <input type="text" value="${esc(w._search||'')}" placeholder="Mitarbeiter suchen…" oninput="onChatPickerSearch(this.value)" style="width:100%;margin-bottom:8px;box-sizing:border-box">
+      <input type="text" value="${esc(w._search||'')}" placeholder="Mitarbeiter suchen…" oninput="onChatPickerSearch(this.value)" style="width:100%;margin-bottom:8px;box-sizing:border-box;font-size:16px">
       <div>${users.map(u=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 4px;cursor:pointer;border-radius:6px" onclick="selectChatWindowUser('${u.id}')" onmouseover="this.style.background='var(--sf2)'" onmouseout="this.style.background='none'">
         ${avHtml(u.initials,u.color,26,10,u.isOnline)}<span style="font-size:13px">${esc(u.name)}</span>
       </div>`).join('')||'<div style="color:var(--di);font-size:12px;padding:8px 0">Keine Treffer.</div>'}</div>

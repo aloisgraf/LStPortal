@@ -2,6 +2,7 @@
 const router = require('express').Router();
 const { q, q1, newId, pool, getUser } = require('../db');
 const { auth, ok, bad } = require('../middleware');
+const { sendPushToUser } = require('./push');
 
 const pairIds = (a,b) => a < b ? [a,b] : [b,a];
 
@@ -65,6 +66,13 @@ router.post('/chat/threads/:id/messages', auth, async (req,res) => {
       `INSERT INTO chat_reads (thread_id,user_id,last_read_at) VALUES ($1,$2,NOW())
        ON CONFLICT (thread_id,user_id) DO UPDATE SET last_read_at=NOW()`,[thread.id,req.uid]);
     ok(res,{id});
+    const recipientId = thread.user1_id===req.uid ? thread.user2_id : thread.user1_id;
+    const sender = await getUser(req.uid);
+    sendPushToUser(recipientId, {
+      title: sender?.name || 'Neue Chat-Nachricht',
+      body: text.length>120?text.slice(0,120)+'…':text,
+      url: '/',
+    });
   } catch(e) { bad(res,'Serverfehler',500); }
 });
 
