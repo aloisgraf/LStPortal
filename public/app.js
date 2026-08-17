@@ -371,6 +371,20 @@ function renderHomeNew(){
   const u=getU(S.currentUser);
   const today=new Date(); today.setHours(0,0,0,0);
 
+  // ── Benachrichtigungen ("Dir wurde zugewiesen…", "Neues Ticket in…", Erwähnungen)
+  // — in der alten Übersicht schon vorhanden, hier bisher gefehlt.
+  const unreadNotif=S.notifications.filter(n=>!n.isRead&&n.type!=='event_added'&&n.type!=='event_changed'&&n.type!=='einspringer_rejected');
+  let notifCard='';
+  if(unreadNotif.length){
+    const notifIcon=n=>n.type==='mention'?'💬':n.type==='assigned'?'👤':'🎫';
+    const notifBody='<div style="padding:6px 14px 4px;text-align:right"><button class="btn-s" style="font-size:11px" onclick="readAllNotifs()">Alle gelesen</button></div>'
+      +unreadNotif.slice(0,8).map(n=>'<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="openNotif(\''+n.id+'\',\''+(n.ticketId||'')+'\')">'
+        +'<div style="font-size:16px;flex-shrink:0">'+notifIcon(n)+'</div>'
+        +'<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600">'+esc(n.title)+'</div><div style="font-size:10px;color:var(--mu)">'+fdt(n.createdAt)+'</div></div>'
+        +'</div>').join('');
+    notifCard=homeCardWrap('new_notif','🔔 Benachrichtigungen ('+unreadNotif.length+')',notifBody,'#f59e0b');
+  }
+
   // ── Tickets: Top 5 in Summe, zuerst nach Fälligkeit (offene Tickets ohne
   // Fälligkeitsdatum kommen danach), innerhalb dessen nach Priorität sortiert ──
   const openTks=S.tickets.filter(tk=>tk.status!=='closed'&&!tk.isDeleted);
@@ -508,6 +522,7 @@ function renderHomeNew(){
   document.getElementById('main').innerHTML=`
     <div class="ph"><div class="pt">&#128196; Übersicht <span>${u?.name||''}</span></div>${homeVersionToggleHtml()}</div>
     <div style="background:rgba(59,109,212,.06);border:1px solid rgba(59,109,212,.2);border-radius:var(--r);padding:8px 12px;margin-bottom:14px;font-size:11px;color:var(--mu)">&#x1F9EA; Neue Übersicht (Beta) &mdash; wird schrittweise ausgebaut. Mit "Alt" zur bisherigen Ansicht wechseln.</div>
+    ${notifCard}
     ${sopHomeBannerHtml()}
     ${ticketsCard}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">${todosCard}${meetingsCard}</div>
@@ -1984,6 +1999,9 @@ async function addNote(tkId){
     if(isClosing)await api('PUT','/tickets/'+tkId,{status:'closed'});
     inp.value='';if(todoSel)todoSel.value='';
     await fetchData();renderTkDetail();
+    // Liste im Hintergrund (unter dem Detail-Modal) sonst veraltet, bis Seite
+    // neu geladen wird \u2014 Ticket verschwindet erst nach Reload aus "Offen".
+    if(S.view==='tickets'||S.view==='tickets_closed'||S.view==='tickets_deleted')renderTickets();
     if(isClosing)toast('\u2705 Ticket abgeschlossen');
   }catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
 }
@@ -3758,7 +3776,20 @@ async function deleteContact(id){
 // Version als Entwurf angelegt, die alte bleibt bis zur Freigabe der neuen
 // unverändert aktiv (Nachvollziehbarkeit abgeschlossener Durchläufe).
 const SOP_CATEGORY_SUGGESTIONS=['Systemausfall Einsatzleitsystem','Ausfall Telefonanlage','Stromausfall','Schichtübergabe-Check','Großschadenslage'];
-const SOP_ITEM_TYPES=[{id:'check',label:'Checkbox'},{id:'text',label:'Texteingabe'},{id:'yesno',label:'Ja/Nein'},{id:'photo',label:'Foto-Upload'}];
+const SOP_ITEM_TYPES=[{id:'check',label:'Checkbox'},{id:'text',label:'Texteingabe'},{id:'yesno',label:'Ja/Nein'},{id:'photo',label:'Foto-Upload'},{id:'contact',label:'Kontakt'}];
+function sopContactCardHtml(c){
+  if(!c) return '<div style="font-size:11px;color:var(--di)">(Kontakt wurde gelöscht)</div>';
+  const lines=[];
+  if(c.company) lines.push('🏢 '+esc(c.company));
+  if(c.phone1) lines.push('📞 <a href="tel:'+esc(c.phone1)+'" style="color:inherit">'+esc(c.phone1)+'</a>');
+  if(c.phone2) lines.push('📞 <a href="tel:'+esc(c.phone2)+'" style="color:inherit">'+esc(c.phone2)+'</a>');
+  if(c.email) lines.push('✉️ <a href="mailto:'+esc(c.email)+'" style="color:inherit">'+esc(c.email)+'</a>');
+  if(c.availability) lines.push('🕐 '+esc(c.availability));
+  return '<div style="background:var(--sf2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:6px;font-size:12px">'
+    +'<div style="font-weight:600">'+esc(c.name)+(c.title?' &middot; '+esc(c.title):'')+'</div>'
+    +lines.map(l=>'<div style="margin-top:2px">'+l+'</div>').join('')
+    +'</div>';
+}
 function sopCategoryIcon(cat){
   const c=(cat||'').toLowerCase();
   if(c.includes('einsatzleitsystem')||c.includes('systemausfall')||c.includes('it'))return '💻';
@@ -3786,7 +3817,11 @@ function sopGroups(){
     versions.sort((a,b)=>b.version-a.version);
     const active=versions.find(v=>v.active&&v.status==='approved');
     const draft=versions.find(v=>v.status==='draft');
-    return {baseId:versions[0].baseId,versions,active,draft};
+    // Freigegebene, aber deaktivierte Version (z.B. durch "Deaktivieren" außer
+    // Betrieb genommen, ohne dass eine neuere Version freigegeben wurde) —
+    // ohne diese würde die Checkliste aus der Übersicht komplett verschwinden.
+    const latestApproved=versions.find(v=>v.status==='approved');
+    return {baseId:versions[0].baseId,versions,active,draft,latestApproved};
   });
 }
 function renderSop(){
@@ -3808,9 +3843,13 @@ function renderSopOverview(){
   };
   const activeGroups=groups.filter(g=>g.active&&matches(g.active));
   const draftGroups=canManage?groups.filter(g=>g.draft&&matches(g.draft)):[];
+  // Freigegeben, aber deaktiviert (und keine freigegebene aktive Version in
+  // dieser Reihe) — sonst für den technischen Leiter unauffindbar, sobald er
+  // eine Checkliste deaktiviert.
+  const inactiveGroups=canManage?groups.filter(g=>!g.active&&g.latestApproved&&matches(g.latestApproved)):[];
   const cats=[...new Set(groups.flatMap(g=>g.versions.map(v=>v.category)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'de'));
-  const tile=(t,isDraftOnly)=>`<div style="background:var(--sf);border:1px solid var(--border);border-radius:12px;padding:16px 18px;cursor:pointer;position:relative" onclick="sopOpenTemplate('${t.id}')">
-      ${isDraftOnly?'<span class="bdg" style="position:absolute;top:10px;right:10px;background:#f59e0b22;color:#f59e0b">Entwurf</span>':''}
+  const tile=(t,badge)=>`<div style="background:var(--sf);border:1px solid var(--border);border-radius:12px;padding:16px 18px;cursor:pointer;position:relative${badge==='Deaktiviert'?';opacity:.7':''}" onclick="sopOpenTemplate('${t.id}')">
+      ${badge?`<span class="bdg" style="position:absolute;top:10px;right:10px;background:${badge==='Entwurf'?'#f59e0b22':'var(--sf2)'};color:${badge==='Entwurf'?'#f59e0b':'var(--mu)'}">${badge}</span>`:''}
       <div style="font-size:26px;margin-bottom:6px">${sopCategoryIcon(t.category)}</div>
       <div style="font-size:14px;font-weight:600;margin-bottom:2px">${esc(t.title)}</div>
       <div style="font-size:11px;color:var(--acc);margin-bottom:6px">${esc(t.category||'Ohne Kategorie')}</div>
@@ -3832,14 +3871,18 @@ function renderSopOverview(){
     </div>
     ${draftGroups.length?`<div style="padding:0 20px 6px">
       <div style="font-size:12px;font-weight:700;color:var(--mu);margin-bottom:8px">📝 Entwürfe (Freigabe ausständig)</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-bottom:20px">${draftGroups.map(g=>tile(g.draft,true)).join('')}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-bottom:20px">${draftGroups.map(g=>tile(g.draft,'Entwurf')).join('')}</div>
     </div>`:''}
     <div style="padding:0 20px 20px">
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px">
-        ${activeGroups.map(g=>tile(g.active,false)).join('')}
+        ${activeGroups.map(g=>tile(g.active,null)).join('')}
         ${!activeGroups.length?'<div style="color:var(--di);font-size:13px;padding:20px">Keine freigegebenen Checklisten'+(search||catFilter?' gefunden.':canManage?'. Lege die erste an.':'.')+'</div>':''}
       </div>
-    </div>`;
+    </div>
+    ${inactiveGroups.length?`<div style="padding:0 20px 30px">
+      <div style="font-size:12px;font-weight:700;color:var(--mu);margin-bottom:8px">🚫 Deaktiviert</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">${inactiveGroups.map(g=>tile(g.latestApproved,'Deaktiviert')).join('')}</div>
+    </div>`:''}`;
 }
 function sopOpenTemplate(id){
   if(S.p.manageSop){S._selSopTemplateId=id;S._sopView='edit';renderSop();return;}
@@ -3869,6 +3912,7 @@ function renderSopEditor(id){
     <div style="flex:1">
       <div style="font-size:13px;font-weight:600">${i+1}. ${esc(it.text)} ${it.required?'<span style="color:#ef4444">*</span>':''} <span class="bdg" style="font-size:10px">${typeLabel(it.itemType)}</span></div>
       ${it.hint?`<div style="font-size:11px;color:var(--mu);margin-top:2px">💡 ${esc(it.hint)}</div>`:''}
+      ${it.itemType==='contact'?sopContactCardHtml((S.contacts||[]).find(c=>c.id===it.contactId)):''}
     </div>
     ${isDraft&&canManage?`<div style="display:flex;gap:4px;flex-shrink:0">
       <button class="btn-s" style="font-size:11px;padding:3px 8px" onclick="sopEditItem('${t.id}','${it.id}')">✎</button>
@@ -3947,7 +3991,19 @@ function openSopItemForm(tplId,itemId){
   document.getElementById('siRequired').checked=it?!!it.required:true;
   document.getElementById('siType').value=it?.itemType||'check';
   document.getElementById('siHint').value=it?.hint||'';
+  const contactSel=document.getElementById('siContact');
+  if(contactSel){
+    const sorted=(S.contacts||[]).slice().sort((a,b)=>a.name.localeCompare(b.name,'de'));
+    contactSel.innerHTML='<option value="">— Kontakt wählen —</option>'+sorted.map(c=>`<option value="${c.id}">${esc(c.name)}${c.company?' ('+esc(c.company)+')':''}</option>`).join('');
+    contactSel.value=it?.contactId||'';
+  }
+  sopToggleContactRow();
   openModal('sopItemOv');
+}
+function sopToggleContactRow(){
+  const row=document.getElementById('siContactRow');
+  const type=document.getElementById('siType')?.value;
+  if(row) row.style.display=(type==='contact')?'':'none';
 }
 function sopAddItem(tplId){openSopItemForm(tplId,null);}
 function sopEditItem(tplId,itemId){openSopItemForm(tplId,itemId);}
@@ -3956,7 +4012,9 @@ async function saveSopItem(){
   const itemId=document.getElementById('siItemId').value;
   const text=document.getElementById('siText').value.trim();
   if(!text)return toast('⚠️ Text erforderlich','err');
-  const body={text,required:document.getElementById('siRequired').checked,itemType:document.getElementById('siType').value,hint:document.getElementById('siHint').value.trim()};
+  const itemType=document.getElementById('siType').value;
+  if(itemType==='contact'&&!document.getElementById('siContact')?.value)return toast('⚠️ Bitte einen Kontakt wählen','err');
+  const body={text,required:document.getElementById('siRequired').checked,itemType,hint:document.getElementById('siHint').value.trim(),contactId:document.getElementById('siContact')?.value||''};
   try{
     if(itemId) await api('PUT','/sop/templates/'+tplId+'/items/'+itemId,body);
     else await api('POST','/sop/templates/'+tplId+'/items',body);
@@ -4047,6 +4105,8 @@ function renderSopRun(runId){
         ${ri.value?`<img src="${ri.value}" style="max-width:160px;max-height:160px;border-radius:8px;display:block;margin-bottom:6px">`:''}
         ${canEdit?`<input type="file" accept="image/*" onchange="sopRunPhotoUpload('${run.id}','${it.id}',this)">`:''}
       </div>`;
+    } else if(it.itemType==='contact'){
+      control=sopContactCardHtml((S.contacts||[]).find(c=>c.id===it.contactId));
     }
     return `<div style="display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-bottom:1px solid var(--border);${ri.done?'opacity:.65':''}">
       <input type="checkbox" ${ri.done?'checked':''} ${disabled} onchange="sopRunToggle('${run.id}','${it.id}',this.checked)" style="width:26px;height:26px;flex-shrink:0;margin-top:2px;cursor:${canEdit?'pointer':'default'}">
@@ -4054,6 +4114,7 @@ function renderSopRun(runId){
         <div style="font-size:15px;font-weight:600;${ri.done?'text-decoration:line-through':''}">${esc(it.text)}${it.required?' <span style="color:#ef4444">*</span>':''}</div>
         ${it.hint?`<div style="font-size:12px;color:var(--mu);margin-top:2px">💡 ${esc(it.hint)}</div>`:''}
         ${control}
+        <textarea placeholder="Dokumentation / Notiz…" ${disabled} onchange="sopRunSetNote('${run.id}','${it.id}',this.value)" rows="2" style="width:100%;max-width:400px;margin-top:6px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--sf);color:var(--tx);box-sizing:border-box;font-size:12px;font-family:inherit;resize:vertical">${esc(ri.note||'')}</textarea>
         ${ri.updatedAt?`<div style="font-size:10px;color:var(--di);margin-top:4px">zuletzt ${fdt(ri.updatedAt)} von ${esc(getU(ri.updatedBy)?.name||'?')}</div>`:''}
       </div>
     </div>`;
@@ -4074,14 +4135,13 @@ function renderSopRun(runId){
     <div style="padding:0 20px 30px">${items.map(stepRow).join('')}</div>`;
 }
 async function sopRunToggle(runId,itemId,done){
-  const run=S.sopRuns.find(r=>r.id===runId);
-  const ri=run?.items.find(x=>x.itemId===itemId);
-  try{await api('PUT','/sop/runs/'+runId+'/items/'+itemId,{done,value:ri?.value||''});await fetchData();renderSop();}catch(e){toast('⚠️ '+e.message,'err');}
+  try{await api('PUT','/sop/runs/'+runId+'/items/'+itemId,{done});await fetchData();renderSop();}catch(e){toast('⚠️ '+e.message,'err');}
 }
 async function sopRunSetValue(runId,itemId,value){
-  const run=S.sopRuns.find(r=>r.id===runId);
-  const ri=run?.items.find(x=>x.itemId===itemId);
-  try{await api('PUT','/sop/runs/'+runId+'/items/'+itemId,{done:ri?.done||false,value});await fetchData();if(S._sopView==='run')renderSop();}catch(e){toast('⚠️ '+e.message,'err');}
+  try{await api('PUT','/sop/runs/'+runId+'/items/'+itemId,{value});await fetchData();if(S._sopView==='run')renderSop();}catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function sopRunSetNote(runId,itemId,note){
+  try{await api('PUT','/sop/runs/'+runId+'/items/'+itemId,{note});await fetchData();if(S._sopView==='run')renderSop();}catch(e){toast('⚠️ '+e.message,'err');}
 }
 function sopRunPhotoUpload(runId,itemId,input){
   const file=input.files[0];if(!file)return;

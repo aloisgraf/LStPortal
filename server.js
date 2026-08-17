@@ -669,6 +669,14 @@ async function initDB() {
   updated_by TEXT,
   UNIQUE(run_id, item_id)
 )`,
+    // Schritt-Typ "Kontakt": verlinkt einen bestehenden Eintrag aus dem
+    // Kontakte-Modul (ON DELETE SET NULL, damit das Löschen eines Kontakts
+    // keine Checkliste kaputt macht — der Schritt bleibt bestehen, nur ohne
+    // Verknüpfung).
+    `ALTER TABLE sop_checklist_items ADD COLUMN IF NOT EXISTS contact_id TEXT REFERENCES contacts(id) ON DELETE SET NULL`,
+    // Dokumentations-Freitextfeld je Schritt — unabhängig vom typ-spezifischen
+    // "value" (z.B. bei Checkbox/Kontakt/Foto zusätzlich Platz für Notizen).
+    `ALTER TABLE sop_checklist_run_items ADD COLUMN IF NOT EXISTS note TEXT DEFAULT ''`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }

@@ -246,9 +246,10 @@
       <input type="hidden" id="siTplId"><input type="hidden" id="siItemId">
       <div class="fg full"><label>Text *</label><textarea id="siText" rows="2" placeholder="z.B. Ausweichsystem XY starten"></textarea></div>
       <div class="fr">
-        <div class="fg"><label>Typ</label><select id="siType"><option value="check">Checkbox</option><option value="text">Texteingabe</option><option value="yesno">Ja/Nein</option><option value="photo">Foto-Upload</option></select></div>
+        <div class="fg"><label>Typ</label><select id="siType" onchange="sopToggleContactRow()"><option value="check">Checkbox</option><option value="text">Texteingabe</option><option value="yesno">Ja/Nein</option><option value="photo">Foto-Upload</option><option value="contact">Kontakt</option></select></div>
         <div class="fg"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:22px"><input type="checkbox" id="siRequired" style="width:16px;height:16px;cursor:pointer" checked> Pflichtfeld</label></div>
       </div>
+      <div class="fg full" id="siContactRow" style="display:none"><label>Kontakt *</label><select id="siContact"></select></div>
       <div class="fg full"><label>Hinweistext</label><input type="text" id="siHint" placeholder="z.B. Telefonnummer, Kontaktperson, Link zur SOP"></div>
     </div>
     <div class="mf"><button class="btn-s" onclick="closeModal('sopItemOv')">Abbrechen</button><button class="btn-p" onclick="saveSopItem()">&#128190; Speichern</button></div>

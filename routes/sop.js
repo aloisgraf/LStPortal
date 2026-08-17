@@ -65,8 +65,8 @@ router.post('/sop/templates/:id/new-version', auth, async (req,res) => {
     const items = await q('SELECT * FROM sop_checklist_items WHERE template_id=$1 ORDER BY sort_order',[src.id]);
     for (const it of items) {
       await pool.query(
-        `INSERT INTO sop_checklist_items (id,template_id,sort_order,text,required,item_type,hint) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-        [newId(),id,it.sort_order,it.text,it.required,it.item_type,it.hint]);
+        `INSERT INTO sop_checklist_items (id,template_id,sort_order,text,required,item_type,hint,contact_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [newId(),id,it.sort_order,it.text,it.required,it.item_type,it.hint,it.contact_id]);
     }
     ok(res,{id});
   } catch(e) { bad(res,'Serverfehler',500); }
@@ -119,13 +119,13 @@ router.post('/sop/templates/:id/items', auth, async (req,res) => {
   try {
     if (!requireManage(req,res)) return;
     if (!(await assertDraft(res,req.params.id))) return;
-    const {text,required,itemType,hint} = req.body;
+    const {text,required,itemType,hint,contactId} = req.body;
     if (!text?.trim()) return bad(res,'Text erforderlich');
     const maxOrd = await q1('SELECT MAX(sort_order) m FROM sop_checklist_items WHERE template_id=$1',[req.params.id]);
     const id = newId();
     await pool.query(
-      `INSERT INTO sop_checklist_items (id,template_id,sort_order,text,required,item_type,hint) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-      [id,req.params.id,(parseInt(maxOrd.m)||0)+1,text.trim(),required!==false,itemType||'check',(hint||'').trim()]);
+      `INSERT INTO sop_checklist_items (id,template_id,sort_order,text,required,item_type,hint,contact_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [id,req.params.id,(parseInt(maxOrd.m)||0)+1,text.trim(),required!==false,itemType||'check',(hint||'').trim(),itemType==='contact'?(contactId||null):null]);
     ok(res,{id});
   } catch(e) { bad(res,'Serverfehler',500); }
 });
@@ -134,11 +134,11 @@ router.put('/sop/templates/:id/items/:itemId', auth, async (req,res) => {
   try {
     if (!requireManage(req,res)) return;
     if (!(await assertDraft(res,req.params.id))) return;
-    const {text,required,itemType,hint} = req.body;
+    const {text,required,itemType,hint,contactId} = req.body;
     if (!text?.trim()) return bad(res,'Text erforderlich');
     await pool.query(
-      `UPDATE sop_checklist_items SET text=$1,required=$2,item_type=$3,hint=$4 WHERE id=$5 AND template_id=$6`,
-      [text.trim(),required!==false,itemType||'check',(hint||'').trim(),req.params.itemId,req.params.id]);
+      `UPDATE sop_checklist_items SET text=$1,required=$2,item_type=$3,hint=$4,contact_id=$5 WHERE id=$6 AND template_id=$7`,
+      [text.trim(),required!==false,itemType||'check',(hint||'').trim(),itemType==='contact'?(contactId||null):null,req.params.itemId,req.params.id]);
     ok(res);
   } catch(e) { bad(res,'Serverfehler',500); }
 });
@@ -193,10 +193,17 @@ async function assertRunEditable(req,res) {
 router.put('/sop/runs/:id/items/:itemId', auth, async (req,res) => {
   try {
     if (!(await assertRunEditable(req,res))) return;
-    const {done,value} = req.body;
+    const {done,value,note} = req.body;
+    // COALESCE-artig: nur mitgeschickte Felder ändern — done/value (Checkbox/
+    // Eingabe) und note (Dokumentations-Freitext) werden vom Frontend
+    // unabhängig voneinander gespeichert (z.B. Checkbox-Klick vs. onBlur des
+    // Notizfelds), ein volles Überschreiben würde sonst das jeweils andere
+    // Feld mit einem veralteten Client-Stand zurücksetzen.
+    const current = await q1('SELECT * FROM sop_checklist_run_items WHERE run_id=$1 AND item_id=$2',[req.params.id,req.params.itemId]);
+    if (!current) return bad(res,'Nicht gefunden',404);
     await pool.query(
-      `UPDATE sop_checklist_run_items SET done=$1,value=$2,updated_at=NOW(),updated_by=$3 WHERE run_id=$4 AND item_id=$5`,
-      [!!done,value??'',req.uid,req.params.id,req.params.itemId]);
+      `UPDATE sop_checklist_run_items SET done=$1,value=$2,note=$3,updated_at=NOW(),updated_by=$4 WHERE run_id=$5 AND item_id=$6`,
+      [done!==undefined?!!done:current.done, value!==undefined?value:current.value, note!==undefined?note:current.note, req.uid, req.params.id, req.params.itemId]);
     ok(res);
   } catch(e) { bad(res,'Serverfehler',500); }
 });
@@ -257,7 +264,7 @@ router.get('/sop/templates/:id/stats', auth, async (req,res) => {
 // auch ohne Internetverbindung am Zielrechner: kein Client-JS, keine externen
 // Ressourcen, druckt über den nativen Browser-Druckdialog "Als PDF speichern") ──
 const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-const TYPE_LABELS = {check:'Checkbox',text:'Texteingabe',yesno:'Ja/Nein',photo:'Foto-Upload'};
+const TYPE_LABELS = {check:'Checkbox',text:'Texteingabe',yesno:'Ja/Nein',photo:'Foto-Upload',contact:'Kontakt'};
 function printCss() {
   return `body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:0;padding:24px}
   .sop-doc{max-width:800px;margin:0 auto 40px;page-break-after:always}
@@ -274,26 +281,42 @@ function printCss() {
   .hint{font-size:11px;color:#555;margin-top:2px}
   .fill-line{border-bottom:1px solid #999;display:inline-block;min-width:220px;height:14px;margin-top:4px}
   .time-note{font-size:10px;color:#777;margin-top:4px}
+  .note-line{border-bottom:1px solid #999;display:block;height:16px;margin-top:6px}
+  .contact-card{background:#f3f4f6;border:1px solid #ccc;border-radius:4px;padding:6px 8px;margin-top:4px;font-size:11px}
   @media print{.sop-doc{page-break-after:always}}
   `;
 }
-function renderSopDoc(tpl, items) {
+function renderSopDoc(tpl, items, contactsById) {
+  contactsById = contactsById || {};
   return `<div class="sop-doc">
     <h1>${esc(tpl.title)}</h1>
     <div class="meta">${esc(tpl.category||'Ohne Kategorie')} &middot; Version ${tpl.version} &middot; gedruckt am ${new Date().toLocaleString('de-AT')}</div>
     ${tpl.description?`<div class="desc">${esc(tpl.description)}</div>`:''}
     <ol>
-      ${items.map((it,i)=>`<li>
+      ${items.map((it,i)=>{
+        const c = it.item_type==='contact' ? contactsById[it.contact_id] : null;
+        return `<li>
         <div class="box"></div>
         <div class="txt">
           <div class="step-text">${i+1}. ${esc(it.text)}${it.required?' <span class="req">*</span>':''} <span style="font-size:10px;color:#888">(${TYPE_LABELS[it.item_type]||it.item_type})</span></div>
           ${it.hint?`<div class="hint">${esc(it.hint)}</div>`:''}
           ${it.item_type==='text'?`<div class="fill-line"></div>`:''}
+          ${c?`<div class="contact-card"><b>${esc(c.name)}</b>${c.title?' &middot; '+esc(c.title):''}${c.company?' &middot; '+esc(c.company):''}<br>${c.phone1?'Tel: '+esc(c.phone1)+' ':''}${c.phone2?'/ '+esc(c.phone2)+' ':''}${c.email?'&middot; '+esc(c.email):''}${c.availability?'<br>Erreichbar: '+esc(c.availability):''}</div>`:''}
+          ${it.item_type==='contact'&&it.contact_id&&!c?`<div class="hint">(Verknüpfter Kontakt wurde gelöscht)</div>`:''}
           <div class="time-note">Uhrzeit: ______________&nbsp;&nbsp;&nbsp;Erledigt von: ______________________</div>
+          <div class="hint" style="margin-top:6px">Dokumentation:</div>
+          <div class="note-line"></div>
         </div>
-      </li>`).join('')}
+      </li>`;}).join('')}
     </ol>
   </div>`;
+}
+async function loadContactsById(items) {
+  const ids = [...new Set(items.filter(it=>it.item_type==='contact'&&it.contact_id).map(it=>it.contact_id))];
+  if (!ids.length) return {};
+  const rows = await q('SELECT * FROM contacts WHERE id = ANY($1)',[ids]);
+  const map = {}; rows.forEach(c=>{map[c.id]={name:c.name,title:c.title,company:c.company,phone1:c.phone1,phone2:c.phone2,email:c.email,availability:c.availability};});
+  return map;
 }
 router.get('/sop/templates/:id/print', auth, async (req,res) => {
   try {
@@ -301,9 +324,10 @@ router.get('/sop/templates/:id/print', auth, async (req,res) => {
     if (!tpl) return res.status(404).send('Nicht gefunden');
     if (!req.p.manageSop && !(tpl.status==='approved'&&tpl.active)) return res.status(403).send('Keine Berechtigung');
     const items = await q('SELECT * FROM sop_checklist_items WHERE template_id=$1 ORDER BY sort_order',[req.params.id]);
+    const contactsById = await loadContactsById(items);
     pool.query('UPDATE sop_checklists SET last_printed_at=NOW() WHERE id=$1',[req.params.id]).catch(()=>{});
     res.set('Content-Type','text/html; charset=utf-8');
-    res.send(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(tpl.title)}</title><style>${printCss()}</style></head><body>${renderSopDoc(tpl,items)}</body></html>`);
+    res.send(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(tpl.title)}</title><style>${printCss()}</style></head><body>${renderSopDoc(tpl,items,contactsById)}</body></html>`);
   } catch(e) { res.status(500).send('Serverfehler'); }
 });
 
@@ -314,9 +338,10 @@ router.get('/sop/print-all', auth, async (req,res) => {
     const tpls = await q(`SELECT * FROM sop_checklists WHERE status='approved' AND active=true ORDER BY category,title`);
     const items = await q('SELECT * FROM sop_checklist_items WHERE template_id = ANY($1) ORDER BY sort_order',[tpls.map(t=>t.id)]);
     const byTpl = {}; items.forEach(it=>{(byTpl[it.template_id]=byTpl[it.template_id]||[]).push(it);});
+    const contactsById = await loadContactsById(items);
     await pool.query(`UPDATE sop_checklists SET last_printed_at=NOW() WHERE status='approved' AND active=true`).catch(()=>{});
     res.set('Content-Type','text/html; charset=utf-8');
-    res.send(`<!doctype html><html><head><meta charset="utf-8"><title>Notfall-Checklisten</title><style>${printCss()}</style></head><body>${tpls.map(t=>renderSopDoc(t,byTpl[t.id]||[])).join('')}</body></html>`);
+    res.send(`<!doctype html><html><head><meta charset="utf-8"><title>Notfall-Checklisten</title><style>${printCss()}</style></head><body>${tpls.map(t=>renderSopDoc(t,byTpl[t.id]||[],contactsById)).join('')}</body></html>`);
   } catch(e) { res.status(500).send('Serverfehler'); }
 });
 

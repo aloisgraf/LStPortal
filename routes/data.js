@@ -291,14 +291,14 @@ router.get('/', auth, async (req,res) => {
         lastPrintedAt:t.last_printed_at||null,
         items:(sopItemsRaw||[]).filter(i=>i.template_id===t.id).map(i=>({
           id:i.id, sortOrder:i.sort_order, text:i.text, required:i.required,
-          itemType:i.item_type, hint:i.hint||'',
+          itemType:i.item_type, hint:i.hint||'', contactId:i.contact_id||null,
         })),
       })),
       sopRuns: (sopRunsRaw||[]).map(r=>({
         id:r.id, templateId:r.template_id, startedBy:r.started_by, startedAt:r.started_at,
         completedAt:r.completed_at||null, status:r.status,
         items:(sopRunItemsRaw||[]).filter(ri=>ri.run_id===r.id).map(ri=>({
-          id:ri.id, itemId:ri.item_id, done:ri.done, value:ri.value||'',
+          id:ri.id, itemId:ri.item_id, done:ri.done, value:ri.value||'', note:ri.note||'',
           updatedAt:ri.updated_at||null, updatedBy:ri.updated_by||null,
         })),
       })),
