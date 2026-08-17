@@ -8276,10 +8276,7 @@ function renderChatList(){
 
 // S._chatWindows: [{id, threadId|null, minimized}] — id==='__picker__' für das
 // Fenster zur Mitarbeiterauswahl, sonst id===threadId.
-// S._chatClosedThreads: Set der Thread-IDs, die der Nutzer per "X" geschlossen
-// hat — für die poppt eine neue Nachricht das Fenster NICHT automatisch wieder auf.
 if(!S._chatWindows)S._chatWindows=[];
-if(!S._chatClosedThreads)S._chatClosedThreads=new Set();
 
 function _chatWin(id){ return (S._chatWindows||[]).find(w=>w.id===id); }
 function renderChatWindows(){
@@ -8373,12 +8370,10 @@ async function selectChatWindowUser(userId){
     const r=await api('POST','/chat/threads',{otherUserId:userId});
     closeChatWindow('__picker__');
     await chatSync();
-    S._chatClosedThreads.delete(r.id);
     openChatWindow(r.id);
   }catch(e){toast('⚠️ '+e.message,'err');}
 }
 function openChatWindow(threadId){
-  S._chatClosedThreads.delete(threadId);
   S._chatWindows.forEach(w=>w.minimized=true);
   let w=_chatWin(threadId);
   if(!w){w={id:threadId,threadId,minimized:false};S._chatWindows.push(w);}
@@ -8398,8 +8393,6 @@ function minimizeChatWindow(id){
   renderChatWindows();
 }
 function closeChatWindow(id){
-  const w=_chatWin(id);
-  if(w&&w.threadId)S._chatClosedThreads.add(w.threadId);
   S._chatWindows=S._chatWindows.filter(x=>x.id!==id);
   renderChatWindows();
 }
@@ -8454,12 +8447,14 @@ function onChatMessagesChanged(prevMsgs){
     if(w){
       if(!w.minimized){markChatThreadRead(threadId);}
       else notifyThreadIds.push(threadId);
-      changed=true;
-    } else if(!S._chatClosedThreads.has(threadId)){
+    } else {
+      // Auch ein zuvor per "X" geschlossenes Fenster poppt bei einer neuen
+      // Nachricht wieder minimiert auf — Schließen blendet nur den aktuellen
+      // Stand aus, deaktiviert aber keine künftigen Benachrichtigungen.
       S._chatWindows.push({id:threadId,threadId,minimized:true});
       notifyThreadIds.push(threadId);
-      changed=true;
     }
+    changed=true;
   });
   if(changed)renderChatWindows();
   if(!notifyThreadIds.length)return;
