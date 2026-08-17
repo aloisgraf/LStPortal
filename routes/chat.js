@@ -22,6 +22,30 @@ router.post('/chat/threads', auth, async (req,res) => {
   } catch(e) { bad(res,'Serverfehler',500); }
 });
 
+// Leichtgewichtiger Sync-Endpoint NUR für Chat-Threads/-Nachrichten des
+// eigenen Nutzers — der Frontend-Poller ruft ihn alle paar Sekunden auf,
+// damit Nachrichten beim Gegenüber schnell ankommen, ohne dafür (wie bisher)
+// den kompletten, schweren /api/data-Datensatz im selben Takt neu zu laden.
+router.get('/chat/sync', auth, async (req,res) => {
+  try {
+    const uid = req.uid;
+    const [threadsRaw, messagesRaw, readsRaw] = await Promise.all([
+      q('SELECT * FROM chat_threads WHERE user1_id=$1 OR user2_id=$1',[uid]),
+      q('SELECT cm.* FROM chat_messages cm JOIN chat_threads ct ON ct.id=cm.thread_id WHERE ct.user1_id=$1 OR ct.user2_id=$1 ORDER BY cm.created_at',[uid]),
+      q('SELECT * FROM chat_reads WHERE user_id=$1',[uid]),
+    ]);
+    ok(res, {
+      chatThreads: threadsRaw.map(t=>({
+        id:t.id, otherUserId: t.user1_id===uid?t.user2_id:t.user1_id, createdAt:t.created_at,
+        myLastReadAt: readsRaw.find(r=>r.thread_id===t.id)?.last_read_at || null,
+      })),
+      chatMessages: messagesRaw.map(m=>({
+        id:m.id, threadId:m.thread_id, senderId:m.sender_id, text:m.text, createdAt:m.created_at,
+      })),
+    });
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
 async function assertThreadMember(req,res) {
   const thread = await q1('SELECT * FROM chat_threads WHERE id=$1',[req.params.id]);
   if (!thread) { bad(res,'Nicht gefunden',404); return null; }
