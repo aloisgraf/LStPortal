@@ -356,6 +356,7 @@ router.delete('/discussion-items/:id', auth, async (req, res) => {
     if(existingItem2){
       const meetingOwner2 = await q1('SELECT created_by FROM meetings WHERE id=$1',[existingItem2.meeting_id]);
       if(!req.p.manageUsers && existingItem2.created_by!==req.uid && meetingOwner2?.created_by!==req.uid) return bad(res,'Keine Berechtigung',403);
+      if(existingItem2.status==='done') return bad(res,'Bereits besprochene Punkte können nicht gelöscht werden');
     }
     await pool.query('DELETE FROM discussion_items WHERE id=$1', [req.params.id]);
     ok(res, { deleted: true });

@@ -5260,7 +5260,7 @@ function openItemForm(instanceId, id=null) {
   const meeting = S.meetings.find(m=>m.instances.some(i=>i.id===instanceId));
   const canMng = meeting?._canManage||false;
   document.getElementById('itUnlinkBtn').style.display = (item && item.groupId && canMng) ? '' : 'none';
-  document.getElementById('itDeleteBtn').style.display = (item && canMng) ? '' : 'none';
+  document.getElementById('itDeleteBtn').style.display = (item && canMng && item.status!=='done') ? '' : 'none';
   const moreSel = document.getElementById('itMoreActions');
   const moreOpts = [];
   if (item && canMng) {
