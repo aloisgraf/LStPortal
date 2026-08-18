@@ -6,14 +6,28 @@ const { auth, ok, bad } = require('../middleware');
 // VAPID-Schlüsselpaar: einmalig generiert, gehört in die .env des Servers
 // (NICHT ins Repo). Ohne konfigurierte Schlüssel bleibt Push einfach
 // deaktiviert — kein Fehler, die App funktioniert unverändert weiter.
-const VAPID_PUBLIC = process.env.VAPID_PUBLIC_KEY;
-const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY;
+// .trim() schützt gegen den mit Abstand häufigsten Fehler: eine
+// Zeilenumbruch/Leerzeichen-Verunreinigung beim Reinkopieren des Schlüssels
+// in die .env — das würde sonst zu "Vapid private key should be 32 bytes
+// long when decoded" führen, obwohl der Schlüssel an sich korrekt ist.
+// Manche Hosting-Panels/Docker-Env-Dateien entfernen umschließende
+// Anführungszeichen NICHT (anders als dotenv) — daher zusätzlich strippen.
+const _cleanVapid = v => v?.trim().replace(/^['"]|['"]$/g,'');
+const VAPID_PUBLIC = _cleanVapid(process.env.VAPID_PUBLIC_KEY);
+const VAPID_PRIVATE = _cleanVapid(process.env.VAPID_PRIVATE_KEY);
 let webpush = null;
 if (VAPID_PUBLIC && VAPID_PRIVATE) {
   try {
     webpush = require('web-push');
-    webpush.setVapidDetails('mailto:admin@lstportal.local', VAPID_PUBLIC, VAPID_PRIVATE);
-  } catch(e) { console.error('[push] web-push nicht installiert — npm install ausführen', e.message); }
+  } catch(e) { console.error('[push] web-push nicht installiert — npm install ausführen:', e.message); }
+  if (webpush) {
+    try {
+      webpush.setVapidDetails('mailto:admin@lstportal.local', VAPID_PUBLIC, VAPID_PRIVATE);
+    } catch(e) {
+      console.error('[push] VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY ungültig — bitte exakt neu aus der .env kopieren, keine Anführungszeichen/Leerzeichen:', e.message);
+      webpush = null;
+    }
+  }
 }
 
 router.get('/push/vapid-public-key', auth, (req,res) => {
