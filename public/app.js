@@ -5006,10 +5006,11 @@ function renderMeetingDetail(m, canManage) {
       ${[...(m.instances||[])].sort((a,b)=>new Date(b.date)-new Date(a.date)).map(i=>{
         const open=(i.items||[]).filter(it=>it.status==='open'||it.status==='redo').length;
         const statusColor={planned:'#3b82f6',done:'#10b981',cancelled:'#ef4444'}[i.status]||'#64748b';
-        const titleLine=(i.title?esc(i.title):'')+(i.title&&i.date?' • ':'')+(i.date?fmtDate(i.date):(i.title?'':'Termin'))+(i.time?' '+i.time:'');
+        const titleLine=i.title?esc(i.title):'Termin';
         return`<div class="meetings-inst-tab${S._selInstance===i.id?' active':''}" style="position:relative">
           <div onclick="S._selInstance='${i.id}';renderMeetings()" style="cursor:pointer;${canManage?'padding-right:18px':''}">
             <div style="font-size:12px;font-weight:600">${titleLine}</div>
+            ${i.date?`<div style="font-size:11px;color:var(--mu);margin-top:1px">${fmtDate(i.date)}${i.time?' '+i.time:''}</div>`:''}
             <div style="display:flex;gap:4px;margin-top:2px;align-items:center;flex-wrap:wrap">
               ${!i.date?`<span style="font-size:10px;color:#f59e0b">Datum offen</span>`:''}
               <span style="font-size:10px;color:${statusColor}">${{planned:'Geplant',done:'Abgeschlossen',cancelled:'Abgesagt'}[i.status]||i.status}</span>
@@ -5029,7 +5030,6 @@ function renderInstanceDetail(inst, meeting, canManage) {
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div style="font-size:13px;color:var(--mu)">${inst.notes?`<span>${esc(inst.notes)}</span>`:''}</div>
       <div style="display:flex;gap:8px">
-        ${canManage?`<button class="btn-s" onclick="openInstanceForm('${meeting.id}','${inst.id}')">&#10002; Termin</button>`:''}
         ${canManage?`<button class="btn-add" onclick="openItemForm('${inst.id}')">+ Punkt</button>`:''}
         ${canManage&&inst.status==='planned'?`<button class="btn-s" style="background:#10b981;color:#fff" onclick="setInstanceStatus('${inst.id}','done')">&#10003; Abschließen</button>`:''}
         ${canManage&&inst.status==='done'?`<button class="btn-s" style="background:#f59e0b;color:#fff" onclick="setInstanceStatus('${inst.id}','planned')">↩ Wiederöffnen</button>`:''}
