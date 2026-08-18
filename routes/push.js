@@ -79,7 +79,13 @@ async function sendPushToUser(userId, payload) {
         console.log(`[push] gesendet an Endpoint ...${s.endpoint.slice(-24)}`);
       }).catch(async err => {
         console.error(`[push] Senden fehlgeschlagen (Endpoint ...${s.endpoint.slice(-24)}): ${err.statusCode||'?'} ${err.body||err.message}`);
-        if (err.statusCode === 404 || err.statusCode === 410) {
+        // 404/410 = Gerät/Abo existiert nicht mehr; 403 BadJwtToken = Abo hängt
+        // an einem VAPID-Key, der nicht mehr zum Server passt (z.B. nach einem
+        // Schlüsselwechsel) — in beiden Fällen wird es nie wieder funktionieren,
+        // also aufräumen statt bei jeder Nachricht erneut zu scheitern.
+        const permanentlyDead = err.statusCode===404 || err.statusCode===410
+          || (err.statusCode===403 && String(err.body||'').includes('BadJwtToken'));
+        if (permanentlyDead) {
           await pool.query('DELETE FROM push_subscriptions WHERE endpoint=$1',[s.endpoint]).catch(()=>{});
         }
       });
