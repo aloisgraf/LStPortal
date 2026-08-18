@@ -34,6 +34,9 @@ if (VAPID_PUBLIC && VAPID_PRIVATE) {
       webpush = null;
     }
   }
+  if (webpush) console.log('[push] Web Push aktiv (VAPID-Keys gültig)');
+} else {
+  console.log('[push] VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY nicht gesetzt — Push deaktiviert');
 }
 
 router.get('/push/vapid-public-key', auth, (req,res) => {
@@ -66,18 +69,22 @@ router.post('/push/unsubscribe', auth, async (req,res) => {
 // Subscriptions (Nutzer hat die App deinstalliert o.ä.) räumt sich dabei
 // selbst auf — der Push-Dienst antwortet in dem Fall mit 404/410.
 async function sendPushToUser(userId, payload) {
-  if (!webpush) return;
+  if (!webpush) { console.log('[push] sendPushToUser: webpush nicht konfiguriert, überspringe'); return; }
   try {
     const subs = await q('SELECT * FROM push_subscriptions WHERE user_id=$1',[userId]);
+    console.log(`[push] sende an user ${userId}: ${subs.length} Abo(s) gefunden`);
     for (const s of subs) {
       const sub = { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } };
-      webpush.sendNotification(sub, JSON.stringify(payload)).catch(async err => {
+      webpush.sendNotification(sub, JSON.stringify(payload)).then(() => {
+        console.log(`[push] gesendet an Endpoint ...${s.endpoint.slice(-24)}`);
+      }).catch(async err => {
+        console.error(`[push] Senden fehlgeschlagen (Endpoint ...${s.endpoint.slice(-24)}): ${err.statusCode||'?'} ${err.body||err.message}`);
         if (err.statusCode === 404 || err.statusCode === 410) {
           await pool.query('DELETE FROM push_subscriptions WHERE endpoint=$1',[s.endpoint]).catch(()=>{});
         }
       });
     }
-  } catch(e) {}
+  } catch(e) { console.error('[push] sendPushToUser Fehler:', e.message); }
 }
 
 module.exports = { router, sendPushToUser };
