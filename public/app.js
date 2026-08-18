@@ -106,10 +106,28 @@ async function api(method,path2,body){
   const opts={method,credentials:'include',headers:{}};
   if(body){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body);}
   const res=await fetch('/api'+path2,opts);
+  // 401 kommt ausschließlich von der auth-Middleware ("nicht angemeldet") —
+  // z.B. nach abgelaufener Session. Bisher landete das als x-beliebiger
+  // Fehler-Toast irgendwo im UI, ohne dass klar war, WARUM die Aktion
+  // fehlschlug — man tippte weiter, ohne zu merken, dass man ausgeloggt ist.
+  if(res.status===401){ _handleSessionExpired(); throw new Error('Sitzung abgelaufen'); }
   if(!res.ok&&res.headers.get('content-type')?.includes('text/html')){throw new Error('Server-Fehler '+res.status);}
   const data=await res.json();
   if(!data.success)throw new Error(data.error||'Fehler');
   return data.data;
+}
+let _sessionExpiredShown=false;
+function _handleSessionExpired(){
+  if(_sessionExpiredShown||!S.currentUser)return;
+  _sessionExpiredShown=true;
+  if(_refreshTimer)clearInterval(_refreshTimer);
+  if(_chatSyncTimer)clearInterval(_chatSyncTimer);
+  S.currentUser=null;
+  const hdr=document.getElementById('hdr');if(hdr)hdr.style.display='none';
+  const appEl=document.getElementById('APP');if(appEl)appEl.style.display='none';
+  const ls=document.getElementById('LS');if(ls)ls.classList.add('open');
+  const lerr=document.getElementById('lerr');
+  if(lerr){lerr.textContent='⏱️ Deine Sitzung ist abgelaufen — bitte erneut anmelden.';lerr.style.display='block';}
 }
 function loading(show){document.getElementById('loadingOv').classList.toggle('open',show);}
 async function fetchData(){
@@ -243,6 +261,7 @@ async function doForcePW(){
   catch(e){toast('\u26A0\uFE0F '+e.message);}finally{loading(false);}
 }
 function loginOK(){
+  _sessionExpiredShown=false;
   startClock();
   document.getElementById('LS').classList.remove('open');
   document.getElementById('hdr').style.display='flex';document.getElementById('APP').style.display='grid';
@@ -5063,6 +5082,7 @@ function renderMeetingItemsGrid(inst, canManage, search) {
             <div style="font-weight:600;font-size:13px;margin-bottom:4px">${esc(it.title)}</div>
             ${st==='done'?`<div style="font-size:11px;color:var(--mu);margin-bottom:4px">&#128197; Besprochen am: ${it.meetingDate?fmtDate(it.meetingDate):'ohne Datum'}</div>`:''}
             ${it.description?`<div style="font-size:12px;color:var(--mu);margin-bottom:4px">${esc(it.description.slice(0,80))}${it.description.length>80?'…':''}</div>`:''}
+            ${it.result?`<div style="${it.description?'border-top:1px solid var(--border);padding-top:4px;margin-top:4px;':''}font-size:12px;color:var(--mu);margin-bottom:4px"><span style="font-size:10px;font-weight:700;color:var(--di);text-transform:uppercase">Ergebnis</span> ${esc(it.result.slice(0,30))}${it.result.length>30?'…':''}</div>`:''}
             <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
               ${it.dueDate?`<span style="font-size:11px;color:${deadlineColor||'#64748b'};font-weight:${deadlineColor?'600':'400'}">&#128197; ${fmtDate(it.dueDate)}</span>`:''}
               ${it.delegatedTo?`<span style="font-size:11px;color:#7c3aed">→ ${esc(getU(it.delegatedTo)?.name||'?')}</span>`:''}
@@ -5240,6 +5260,7 @@ function openItemForm(instanceId, id=null) {
   const meeting = S.meetings.find(m=>m.instances.some(i=>i.id===instanceId));
   const canMng = meeting?._canManage||false;
   document.getElementById('itUnlinkBtn').style.display = (item && item.groupId && canMng) ? '' : 'none';
+  document.getElementById('itDeleteBtn').style.display = (item && canMng) ? '' : 'none';
   const moreSel = document.getElementById('itMoreActions');
   const moreOpts = [];
   if (item && canMng) {
@@ -5462,6 +5483,17 @@ async function unlinkItem() {
     closeModal('itemFormOv');
     await fetchData(); renderMeetings(); toast('Verknüpfung aufgehoben');
   } catch(e) { toast('Fehler','err'); }
+}
+
+async function deleteMeetingItem() {
+  const itemId = document.getElementById('itId').value;
+  if (!itemId) return;
+  if (!confirm('Besprechungspunkt endgültig löschen?')) return;
+  try {
+    await api('DELETE',`/discussion-items/${itemId}`);
+    closeModal('itemFormOv');
+    await fetchData(); renderMeetings(); toast('✅ Punkt gelöscht');
+  } catch(e) { toast('⚠️ '+e.message,'err'); }
 }
 
 // Returns a readable text color for a given hex background color

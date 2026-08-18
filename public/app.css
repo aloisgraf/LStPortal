@@ -186,7 +186,7 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
 .mention-opt{padding:8px 12px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px;transition:.1s}
 .mention-opt:hover,.mention-opt.active{background:var(--sf2)}
 .abr-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.toast{position:fixed;bottom:18px;right:18px;background:var(--sf);border:1px solid var(--ok);border-radius:var(--r);padding:9px 16px;font-size:13px;font-weight:500;z-index:999;animation:fup .3s ease;box-shadow:var(--sh2)}
+.toast{position:fixed;bottom:18px;right:18px;background:var(--sf);border:1px solid var(--ok);border-radius:var(--r);padding:9px 16px;font-size:13px;font-weight:500;z-index:1200;animation:fup .3s ease;box-shadow:var(--sh2)}
 .toast.err{border-color:var(--danger)}
 .toast.chat{bottom:auto;top:18px;right:18px;border-color:var(--acc)}
 .sop-step-cols{display:grid;grid-template-columns:460px 280px;gap:16px;align-items:start}
