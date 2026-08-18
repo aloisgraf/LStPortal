@@ -33,8 +33,13 @@ async function enablePushNotifications(){
     if(perm!=='granted'){toast('⚠️ Berechtigung nicht erteilt','err');return;}
     const {publicKey}=await api('GET','/push/vapid-public-key');
     const reg=await navigator.serviceWorker.ready;
-    let sub=await reg.pushManager.getSubscription();
-    if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:_urlBase64ToUint8Array(publicKey)});
+    // Eine bestehende Subscription ist fix an den VAPID-Key gebunden, mit dem
+    // sie erstellt wurde — bei jedem "Aktivieren" verwerfen und neu abonnieren,
+    // sonst bleibt sie nach einem Schlüsselwechsel auf dem Server hängen und
+    // der Push-Dienst lehnt mit "BadJwtToken" ab (Schlüssel passt nicht mehr).
+    const existing=await reg.pushManager.getSubscription();
+    if(existing) await existing.unsubscribe();
+    const sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:_urlBase64ToUint8Array(publicKey)});
     await api('POST','/push/subscribe', sub.toJSON());
     toast('✅ Push-Benachrichtigungen aktiviert!');
   }catch(e){toast('⚠️ '+(e.message||'Push konnte nicht aktiviert werden'),'err');}
