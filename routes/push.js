@@ -24,7 +24,13 @@ if (VAPID_PUBLIC && VAPID_PRIVATE) {
     try {
       webpush.setVapidDetails('mailto:admin@lstportal.local', VAPID_PUBLIC, VAPID_PRIVATE);
     } catch(e) {
-      console.error('[push] VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY ungültig — bitte exakt neu aus der .env kopieren, keine Anführungszeichen/Leerzeichen:', e.message);
+      // Byte-Längen mitloggen (nicht die Keys selbst) — public muss 65,
+      // private muss 32 Bytes ergeben. So lässt sich ohne den Wert
+      // preiszugeben sehen, ob z.B. ein Zeichen beim Kopieren verloren ging.
+      let pubLen = '?', privLen = '?';
+      try { pubLen = Buffer.from(VAPID_PUBLIC, 'base64url').length; } catch(e2) {}
+      try { privLen = Buffer.from(VAPID_PRIVATE, 'base64url').length; } catch(e2) {}
+      console.error(`[push] VAPID-Keys ungültig (public=${pubLen} Bytes, sollte 65 sein; private=${privLen} Bytes, sollte 32 sein). Länge der .env-Strings: public=${VAPID_PUBLIC.length} (sollte 87), private=${VAPID_PRIVATE.length} (sollte 43). Bitte exakt neu kopieren.`, e.message);
       webpush = null;
     }
   }
