@@ -2741,7 +2741,42 @@ function openTF(id){const t=id?getTag(id):null;document.getElementById('tfT').te
 async function saveTag(){const label=document.getElementById('tfLb').value.trim();const errEl=document.getElementById('tfErr');errEl.textContent='';if(!label){errEl.textContent='\u26A0\uFE0F Bezeichnung erforderlich!';return;}const id=document.getElementById('tfId').value;loading(true);try{if(id)await api('PUT','/tags/'+id,{label,color:S.tfColor});else await api('POST','/tags',{label,color:S.tfColor});await fetchData();backToAdmin('tags');toast('\u2705 Gespeichert!');}catch(e){errEl.textContent='\u26A0\uFE0F '+e.message;}finally{loading(false);}}
 async function delTag(id){if(!confirm('Tag l\u00f6schen?'))return;loading(true);try{await api('DELETE','/tags/'+id);await fetchData();backToAdmin('tags');}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}finally{loading(false);}}
 // UTILS
-function toggleTheme(){const dark=document.documentElement.getAttribute('data-theme')==='dark';document.documentElement.setAttribute('data-theme',dark?'light':'dark');document.getElementById('thBtn').textContent=dark?'\uD83C\uDF19':'\u2600\uFE0F';localStorage.setItem('lst_theme',dark?'light':'dark');}
+function toggleTheme(){
+  // Falls gerade der JARVIS-Modus aktiv ist, diesen erst sauber verlassen
+  // (sonst w\u00FCrde hier still auf "dark" umgeschaltet, w\u00E4hrend der JARVIS-
+  // Button noch "an" anzeigt \u2014 beide Zust\u00E4nde blieben inkonsistent).
+  if(document.documentElement.getAttribute('data-theme')==='jarvis'){_exitJarvis();}
+  const dark=document.documentElement.getAttribute('data-theme')==='dark';
+  document.documentElement.setAttribute('data-theme',dark?'light':'dark');
+  document.getElementById('thBtn').textContent=dark?'\uD83C\uDF19':'\u2600\uFE0F';
+  localStorage.setItem('lst_theme',dark?'light':'dark');
+}
+// JARVIS-Modus: zweites, rein visuelles Erscheinungsbild (siehe app.css) \u2014
+// unabh\u00E4ngig vom Hell/Dunkel-Umschalter, kehrt beim Verlassen zur zuletzt
+// gew\u00E4hlten Hell/Dunkel-Einstellung zur\u00FCck statt sie zu \u00FCberschreiben.
+function _exitJarvis(){
+  const prev=localStorage.getItem('lst_theme')||'light';
+  document.documentElement.setAttribute('data-theme',prev);
+  document.getElementById('thBtn').textContent=prev==='dark'?'\u2600\uFE0F':'\uD83C\uDF19';
+  document.getElementById('jarvisBtn')?.classList.remove('on');
+  localStorage.setItem('lst_jarvis','0');
+}
+function toggleJarvis(){
+  const isJarvis=document.documentElement.getAttribute('data-theme')==='jarvis';
+  if(isJarvis){_exitJarvis();return;}
+  document.documentElement.setAttribute('data-theme','jarvis');
+  document.getElementById('jarvisBtn')?.classList.add('on');
+  localStorage.setItem('lst_jarvis','1');
+  playJarvisBoot();
+}
+function playJarvisBoot(){
+  const el=document.getElementById('jarvisBoot');
+  if(!el)return;
+  el.classList.remove('play');
+  void el.offsetWidth; // Reflow erzwingen, damit die Animation bei erneutem Aktivieren neu startet
+  el.classList.add('play');
+  setTimeout(()=>el.classList.remove('play'),1150);
+}
 function openModal(id){document.getElementById(id)?.classList.add('open');}
 function closeModal(id){document.getElementById(id)?.classList.remove('open');}
 function eyeToggle(inputId,btn){const inp=document.getElementById(inputId);const show=inp.type==='password';inp.type=show?'text':'password';btn.textContent=show?'\uD83D\uDE48':'\uD83D\uDC41';}
@@ -3306,6 +3341,10 @@ function initPersistCards() {
   const theme=localStorage.getItem('lst_theme')||'light';
   document.documentElement.setAttribute('data-theme',theme);
   document.getElementById('thBtn').textContent=theme==='dark'?'\u2600\uFE0F':'\uD83C\uDF19';
+  if(localStorage.getItem('lst_jarvis')==='1'){
+    document.documentElement.setAttribute('data-theme','jarvis');
+    document.getElementById('jarvisBtn')?.classList.add('on');
+  }
   try{const me=await api('GET','/auth/me');if(me?.userId){S.currentUser=me.userId;loading(true);await fetchData();loading(false);loginOK();}}
   catch(e){loading(false);}
 })();

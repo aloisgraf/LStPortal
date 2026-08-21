@@ -12,10 +12,20 @@
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
 <link rel="icon" href="/icons/icon-192.png">
 <title>LSt Portal</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/app.css">
 </head>
 <body>
+
+<!-- JARVIS-Modus: rein dekorative Ambient-FX-Ebene (Grid/Scanline/Vignette),
+     interaktionslos (pointer-events:none), nur sichtbar bei
+     data-theme="jarvis" — beeinflusst keine bestehende Funktion. -->
+<div id="jarvisFx" aria-hidden="true">
+  <div class="jarvis-grid"></div>
+  <div class="jarvis-scan"></div>
+  <div class="jarvis-vignette"></div>
+</div>
+<div id="jarvisBoot" aria-hidden="true"><div class="jarvis-boot-text">J.A.R.V.I.S. <span>ONLINE</span></div></div>
 
 <div class="loading-ov" id="loadingOv"><div class="spinner"></div></div>
 <div id="emojiPickerPopup" style="display:none;position:fixed;z-index:9999;background:var(--sf);border:1px solid var(--border);border-radius:8px;padding:6px;box-shadow:0 4px 16px rgba(0,0,0,.25);max-width:260px"></div>
@@ -60,6 +70,7 @@
   <div class="hsp"></div>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;padding-right:4px"><div id="clockDisplay" style="font-size:11px;font-weight:600;color:var(--mu);white-space:nowrap;display:none"></div><div id="lastRefreshDisplay" style="font-size:10px;color:var(--di);white-space:nowrap;display:none">↻ —</div></div>
   <button class="ib2" id="thBtn" onclick="toggleTheme()">&#127769;</button>
+  <button class="ib2" id="jarvisBtn" onclick="toggleJarvis()" title="JARVIS-Modus">&#129302;</button>
   <button class="ib2" onclick="openModal('helpOv')" title="Hilfe / Anleitung" style="font-weight:700;font-size:13px">?</button>
   <button class="ib2" id="adminBtn" onclick="openAdminModal()" title="Administration" style="display:none">&#9881;&#65039;</button>
   <div class="ibw">
