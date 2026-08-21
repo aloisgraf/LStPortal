@@ -9,6 +9,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.120.0",
     "@kenjiuno/msgreader": "^1.24.1",
     "bcryptjs": "^2.4.3",
     "connect-pg-simple": "^9.0.1",

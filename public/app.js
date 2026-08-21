@@ -1978,7 +1978,10 @@ function renderTkDetail(){
       </div>
     </div>`:'';
   const detailsHtml=`
-    <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di);margin-bottom:6px">BESCHREIBUNG</div>
+    <div><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di)">BESCHREIBUNG</div>
+        <button class="btn-s" style="font-size:11px;padding:3px 9px" onclick="openAiSuggestions('Ticket',${JSON.stringify(tk.title)},${JSON.stringify(tk.description||'')},'${tk.id}')">🤖 KI-Vorschläge</button>
+      </div>
       <div style="font-size:13px;line-height:1.6;color:${tk.description?'var(--tx)':'var(--di)'};white-space:pre-wrap">${tk.description?esc(tk.description):'Keine Beschreibung.'}</div></div>
     ${subs.length||canEdit?`<div>
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di);margin-bottom:8px">UNTERTICKETS (${subs.length})</div>
@@ -2781,7 +2784,7 @@ function openModal(id){document.getElementById(id)?.classList.add('open');}
 function closeModal(id){document.getElementById(id)?.classList.remove('open');}
 function eyeToggle(inputId,btn){const inp=document.getElementById(inputId);const show=inp.type==='password';inp.type=show?'text':'password';btn.textContent=show?'\uD83D\uDE48':'\uD83D\uDC41';}
 function toast(msg,type='',dur=3200){const t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),dur);}
-const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOr','clFormOv','attachClOv','changelogOv','dpOv','rejectEinspOv','helpOv','msgFormOv','msgDetOv','gSearchOv','stLoginOv','docFormOv','docVerOv','docHistOv','docCatOv','dpReportModal','deptOv','spintCatOv','spintCatFormOv'];
+const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOr','clFormOv','attachClOv','changelogOv','dpOv','rejectEinspOv','helpOv','msgFormOv','msgDetOv','gSearchOv','stLoginOv','docFormOv','docVerOv','docHistOv','docCatOv','dpReportModal','deptOv','spintCatOv','spintCatFormOv','aiSuggestOv'];
 document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();openGSearch();return;}
   if(e.key==='Escape'){ALL_MODALS.forEach(closeModal);closeGSearch();}
@@ -5524,6 +5527,58 @@ async function unlinkItem() {
   } catch(e) { toast('Fehler','err'); }
 }
 
+// ── KI-VORSCHLÄGE ────────────────────────────────────────────────────────
+// Durchsucht bestehende Tickets nach ähnlichen, bereits gelösten Problemen
+// UND das Internet (Web-Suche serverseitig über die Anthropic-API) — jeder
+// Vorschlag kommt mit einer geprüften Quellenangabe zurück (Ticket-Nummer
+// oder echte URL), nichts wird ohne Beleg vorgeschlagen.
+async function openAiSuggestions(type,title,description,id){
+  openModal('aiSuggestOv');
+  const body=document.getElementById('aiSuggestBody');
+  body.innerHTML=`<div style="text-align:center;padding:30px 10px">
+    <div class="spinner" style="margin:0 auto 12px"></div>
+    <div style="font-size:13px;color:var(--mu)">Durchsuche alte Tickets und das Internet nach Lösungen…</div>
+  </div>`;
+  try{
+    const data=await api('POST','/ai/suggest',{type,title,description,id});
+    renderAiSuggestions(data);
+  }catch(e){
+    body.innerHTML=`<div style="color:var(--danger);font-size:13px;padding:12px">⚠️ ${esc(e.message)}</div>`;
+  }
+}
+function renderAiSuggestions(data){
+  const body=document.getElementById('aiSuggestBody');
+  const sugg=data.suggestions||[];
+  if(!sugg.length){
+    body.innerHTML=`<div style="color:var(--mu);font-size:13px;padding:12px">${esc(data.summary||'Keine Vorschläge gefunden.')}</div>`;
+    return;
+  }
+  body.innerHTML=(data.summary?`<div style="font-size:12px;color:var(--mu);margin-bottom:12px;padding:8px 10px;background:var(--sf2);border-radius:6px">${esc(data.summary)}</div>`:'')
+    +sugg.map(s=>{
+      const isTicket=/^Ticket\s/i.test(s.source||'');
+      const isNet=!isTicket&&(/internet/i.test(s.source||'')||s.sourceUrl);
+      const badgeColor=isTicket?'#3b6dd4':isNet?'#7c3aed':'#64748b';
+      const badgeText=isTicket?(s.source||'Ticket'):isNet?'Internet':(s.source||'Quelle unbekannt');
+      const srcLink=isNet&&s.sourceUrl?`<a href="${esc(s.sourceUrl)}" target="_blank" rel="noopener noreferrer" style="font-size:11px;color:${badgeColor};text-decoration:none;word-break:break-all">${esc(s.sourceUrl)}</a>`
+        :isTicket?`<a href="javascript:void(0)" onclick="_openTicketByNumber('${esc((s.source||'').replace(/^Ticket\s*/i,'').trim())}')" style="font-size:11px;color:${badgeColor};text-decoration:none">${esc(s.source)} öffnen →</a>`
+        :'';
+      return `<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px">
+          <div style="font-weight:600;font-size:13px">${esc(s.title||'Vorschlag')}</div>
+          <span class="bdg" style="font-size:10px;flex-shrink:0;background:${badgeColor}1f;color:${badgeColor}">${isNet?'🌐 ':isTicket?'🎫 ':'ℹ️ '}${esc(badgeText)}</span>
+        </div>
+        <div style="font-size:12px;color:var(--tx);line-height:1.5;white-space:pre-wrap">${esc(s.text||'')}</div>
+        ${srcLink?`<div style="margin-top:6px">${srcLink}</div>`:''}
+      </div>`;
+    }).join('');
+}
+function _openTicketByNumber(number){
+  const tk=(S.tickets||[]).find(t=>t.number===number);
+  if(!tk){toast('⚠️ Ticket '+number+' nicht gefunden (evtl. keine Berechtigung oder gelöscht)','err');return;}
+  closeModal('aiSuggestOv');
+  openTkDetail(tk.id);
+}
+
 async function deleteMeetingItem() {
   const itemId = document.getElementById('itId').value;
   if (!itemId) return;
@@ -8077,6 +8132,7 @@ function renderTodoDetail(t) {
         ${t.description ? `<div style="margin-top:8px;font-size:13px;color:var(--mu)">${esc(t.description)}</div>` : ''}
       </div>
       ${canManageTodo ? `<div style="display:flex;gap:6px;flex-shrink:0">
+        <button class="btn-s" onclick="openAiSuggestions('Todo',${JSON.stringify(t.title)},${JSON.stringify(t.description||'')},'${t.id}')">🤖 KI-Vorschläge</button>
         <button class="btn-s" onclick="openTodoForm('${t.id}')">✏️ Bearbeiten</button>
         ${t.status !== 'done' ? `<button class="btn-ok" onclick="setTodoStatus('${t.id}','done')">✓ Abschließen</button>` : `<button class="btn-warn" onclick="setTodoStatus('${t.id}','open')">↩ Wiederöffnen</button>`}
         <button class="btn-d" onclick="deleteTodo('${t.id}')">🗑</button>

@@ -869,6 +869,7 @@ app.use('/api',   require('./routes/departments'));
 app.use('/api',   require('./routes/email'));
 app.use('/api',   require('./routes/chat'));
 app.use('/api',   require('./routes/push').router);
+app.use('/api',   require('./routes/ai'));
 
 app.get('*', (req,res) => res.sendFile(path.join(__dirname,'public','index.html')));
 
