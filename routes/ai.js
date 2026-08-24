@@ -66,7 +66,7 @@ Falls keine sinnvollen Vorschläge existieren: {"suggestions":[],"summary":"kurz
         role: 'user',
         content: `Problem (Typ: ${type || 'Ticket'}): ${title}\n\nBeschreibung: ${description || '(keine)'}\n\n--- Ähnliche Tickets aus der Datenbank ---\n${ticketContext}`,
       }],
-    });
+    }, { timeout: 55000 });
 
     const textBlocks = response.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
     let parsed;
@@ -85,6 +85,7 @@ Falls keine sinnvollen Vorschläge existieren: {"suggestions":[],"summary":"kurz
     console.error('[ai/suggest]', e.message);
     if (e instanceof Anthropic.AuthenticationError) return bad(res, 'KI-Anfrage fehlgeschlagen: ungültiger API-Key', 500);
     if (e instanceof Anthropic.RateLimitError) return bad(res, 'KI ist gerade überlastet, bitte kurz erneut versuchen', 429);
+    if (e instanceof Anthropic.APIConnectionTimeoutError || /timeout/i.test(e.message || '')) return bad(res, 'KI-Suche hat zu lange gedauert (Zeitlimit 55s) — bitte erneut versuchen', 504);
     bad(res, 'KI-Anfrage fehlgeschlagen: ' + e.message, 500);
   }
 });

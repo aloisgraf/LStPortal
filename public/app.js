@@ -1980,7 +1980,7 @@ function renderTkDetail(){
   const detailsHtml=`
     <div><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di)">BESCHREIBUNG</div>
-        <button class="btn-s" style="font-size:11px;padding:3px 9px" onclick="openAiSuggestions('Ticket',${JSON.stringify(tk.title)},${JSON.stringify(tk.description||'')},'${tk.id}')">🤖 KI-Vorschläge</button>
+        <button class="btn-s" style="font-size:11px;padding:3px 9px" onclick="openAiSuggestionsFor('Ticket','${tk.id}')">🤖 KI-Vorschläge</button>
       </div>
       <div style="font-size:13px;line-height:1.6;color:${tk.description?'var(--tx)':'var(--di)'};white-space:pre-wrap">${tk.description?esc(tk.description):'Keine Beschreibung.'}</div></div>
     ${subs.length||canEdit?`<div>
@@ -5532,18 +5532,37 @@ async function unlinkItem() {
 // UND das Internet (Web-Suche serverseitig über die Anthropic-API) — jeder
 // Vorschlag kommt mit einer geprüften Quellenangabe zurück (Ticket-Nummer
 // oder echte URL), nichts wird ohne Beleg vorgeschlagen.
+// Für Ticket/Todo: Titel/Beschreibung sicher aus dem State per id nachschlagen
+// statt sie (per JSON.stringify) direkt in ein onclick-Attribut zu schreiben —
+// das hätte das Attribut an den ersten " in der Ausgabe abgeschnitten und
+// sowohl den Button als auch das benachbarte Beschreibungsfeld zerschossen.
+function openAiSuggestionsFor(type,id){
+  let item;
+  if(type==='Ticket') item=(S.tickets||[]).find(t=>t.id===id);
+  else if(type==='Todo') item=(S.todos||[]).find(t=>t.id===id);
+  if(!item){toast('⚠️ Eintrag nicht gefunden','err');return;}
+  openAiSuggestions(type,item.title,item.description||'',id);
+}
 async function openAiSuggestions(type,title,description,id){
   openModal('aiSuggestOv');
   const body=document.getElementById('aiSuggestBody');
   body.innerHTML=`<div style="text-align:center;padding:30px 10px">
     <div class="spinner" style="margin:0 auto 12px"></div>
-    <div style="font-size:13px;color:var(--mu)">Durchsuche alte Tickets und das Internet nach Lösungen…</div>
+    <div style="font-size:13px;color:var(--mu)">Durchsuche alte Tickets und das Internet nach Lösungen… (kann bis zu einer Minute dauern)</div>
   </div>`;
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(),60000);
   try{
-    const data=await api('POST','/ai/suggest',{type,title,description,id});
-    renderAiSuggestions(data);
+    const res=await fetch('/api/ai/suggest',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,title,description,id}),signal:ctrl.signal});
+    clearTimeout(timer);
+    if(res.status===401){_handleSessionExpired();throw new Error('Sitzung abgelaufen');}
+    const data=await res.json();
+    if(!data.success)throw new Error(data.error||'Fehler');
+    renderAiSuggestions(data.data);
   }catch(e){
-    body.innerHTML=`<div style="color:var(--danger);font-size:13px;padding:12px">⚠️ ${esc(e.message)}</div>`;
+    clearTimeout(timer);
+    const msg=e.name==='AbortError'?'KI-Suche hat zu lange gedauert (Zeitlimit 60s) — bitte erneut versuchen':e.message;
+    body.innerHTML=`<div style="color:var(--danger);font-size:13px;padding:12px">⚠️ ${esc(msg)}</div>`;
   }
 }
 function renderAiSuggestions(data){
@@ -8132,7 +8151,7 @@ function renderTodoDetail(t) {
         ${t.description ? `<div style="margin-top:8px;font-size:13px;color:var(--mu)">${esc(t.description)}</div>` : ''}
       </div>
       ${canManageTodo ? `<div style="display:flex;gap:6px;flex-shrink:0">
-        <button class="btn-s" onclick="openAiSuggestions('Todo',${JSON.stringify(t.title)},${JSON.stringify(t.description||'')},'${t.id}')">🤖 KI-Vorschläge</button>
+        <button class="btn-s" onclick="openAiSuggestionsFor('Todo','${t.id}')">🤖 KI-Vorschläge</button>
         <button class="btn-s" onclick="openTodoForm('${t.id}')">✏️ Bearbeiten</button>
         ${t.status !== 'done' ? `<button class="btn-ok" onclick="setTodoStatus('${t.id}','done')">✓ Abschließen</button>` : `<button class="btn-warn" onclick="setTodoStatus('${t.id}','open')">↩ Wiederöffnen</button>`}
         <button class="btn-d" onclick="deleteTodo('${t.id}')">🗑</button>
