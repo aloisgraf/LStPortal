@@ -4845,7 +4845,7 @@ function renderDocs(){
     <div class="docs-layout">
       <div class="docs-sidebar">
         <div class="docs-cat-item${filt==='all'?' active':''}" onclick="S._docFilter='all';renderDocs()">&#128193; Alle <span class="docs-cat-cnt">${docs.length}</span></div>
-        ${cats.map(c=>{const n=docs.filter(d=>d.categoryId===c.id).length;return`<div class="docs-cat-item${filt===c.id?' active':''}" onclick="S._docFilter='${c.id}';renderDocs()" style="${filt===c.id?'border-left-color:'+c.color:''}">${c.icon} ${c.name} <span class="docs-cat-cnt">${n}</span></div>`;}).join('')}
+        ${(()=>{const top=cats.filter(c=>!c.parentId);const item=(c,sub)=>{const n=docs.filter(d=>d.categoryId===c.id).length;return`<div class="docs-cat-item${filt===c.id?' active':''}" onclick="S._docFilter='${c.id}';renderDocs()" style="${filt===c.id?'border-left-color:'+c.color+';':''}${sub?'padding-left:28px':''}">${c.icon} ${c.name} <span class="docs-cat-cnt">${n}</span></div>`;};return top.flatMap(c=>[item(c,false),...cats.filter(ch=>ch.parentId===c.id).map(ch=>item(ch,true))]).join('');})()}
         <div class="docs-cat-item${filt==='__none__'?' active':''}" onclick="S._docFilter='__none__';renderDocs()">📎 Ohne Kat. <span class="docs-cat-cnt">${docs.filter(d=>!d.categoryId).length}</span></div>
       </div>
       <div class="docs-main">
@@ -4895,9 +4895,10 @@ function openDocForm(docId){
   document.getElementById('docFTitle').value=doc?.title||'';
   document.getElementById('docFDesc').value=doc?.description||'';
   const fw=document.getElementById('docFFileWrap');if(fw)fw.style.display=doc?'none':'';
+  const fileInp=document.getElementById('docFFile');if(fileInp)fileInp.value='';
   document.getElementById('docFBtn').textContent=doc?'Speichern':'Hochladen';
   const sel=document.getElementById('docFCat');
-  sel.innerHTML=`<option value="">— Keine Kategorie —</option>${(S.docCategories||[]).map(c=>`<option value="${c.id}"${doc?.categoryId===c.id?' selected':''}>${c.icon} ${c.name}</option>`).join('')}`;
+  sel.innerHTML=`<option value="">— Keine Kategorie —</option>${_docCatOptionsIndented()}`;
   if(doc?.categoryId)sel.value=doc.categoryId;
   openModal('docFormOv');
 }
@@ -4978,22 +4979,36 @@ async function showDocHistory(docId){
 function renderDocCatAdmin(){
   if(!S.p?.manageUsers)return;
   const list=document.getElementById('docCatList');if(!list)return;
-  list.innerHTML=(S.docCategories||[]).length?(S.docCategories||[]).map(c=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--sf2);border:1px solid var(--border);border-radius:7px;margin-bottom:6px">
-    <span style="font-size:18px">${c.icon}</span>
+  const cats=S.docCategories||[];
+  const top=cats.filter(c=>!c.parentId);
+  const parentSel=document.getElementById('docCatParent');
+  if(parentSel)parentSel.innerHTML=`<option value="">— Kein Unterordner —</option>${top.map(c=>`<option value="${c.id}">${c.icon} ${c.name}</option>`).join('')}`;
+  const row=c=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--sf2);border:1px solid var(--border);border-radius:7px;margin-bottom:6px${c.parentId?';margin-left:24px':''}">
+    <span style="font-size:18px">${c.parentId?'&#8618; ':''}${c.icon}</span>
     <span style="flex:1;font-size:13px">${c.name}</span>
     <span style="width:18px;height:18px;border-radius:50%;background:${c.color};flex-shrink:0;display:inline-block"></span>
     <button class="btn-d" style="padding:3px 8px;font-size:11px" onclick="deleteDocCat('${c.id}','${c.name.replace(/'/g,"\\'")}')">&#10005;</button>
-  </div>`).join(''):'<div style="color:var(--di);font-size:12px;padding:4px 0">Noch keine Kategorien.</div>';
+  </div>`;
+  const html=top.flatMap(c=>[row(c),...cats.filter(ch=>ch.parentId===c.id).map(row)]).join('')
+    +cats.filter(c=>c.parentId&&!top.some(t=>t.id===c.parentId)).map(row).join('');
+  list.innerHTML=cats.length?html:'<div style="color:var(--di);font-size:12px;padding:4px 0">Noch keine Kategorien.</div>';
+}
+function _docCatOptionsIndented(){
+  const cats=S.docCategories||[];
+  const top=cats.filter(c=>!c.parentId);
+  return top.flatMap(c=>[c,...cats.filter(ch=>ch.parentId===c.id)]).map(c=>`<option value="${c.id}">${c.parentId?'　↳ ':''}${c.icon} ${c.name}</option>`).join('');
 }
 async function addDocCat(){
   const name=document.getElementById('docCatName').value.trim();
   const icon=document.getElementById('docCatIcon').value.trim()||'📁';
+  const parentId=document.getElementById('docCatParent')?.value||null;
   if(!name){toast('⚠️ Name erforderlich','err');return;}
   try{
-    await api('POST','/doc-categories',{name,icon});
+    await api('POST','/doc-categories',{name,icon,parentId});
     document.getElementById('docCatName').value='';document.getElementById('docCatIcon').value='';
+    if(document.getElementById('docCatParent'))document.getElementById('docCatParent').value='';
     await fetchData();renderDocCatAdmin();
-    const sel=document.getElementById('docFCat');if(sel){sel.innerHTML=`<option value="">— Keine Kategorie —</option>${(S.docCategories||[]).map(c=>`<option value="${c.id}">${c.icon} ${c.name}</option>`).join('')}`;}
+    const sel=document.getElementById('docFCat');if(sel){sel.innerHTML=`<option value="">— Keine Kategorie —</option>${_docCatOptionsIndented()}`;}
     if(S.view==='docs')renderDocs();
   }catch(e){toast('⚠️ '+e.message,'err');}
 }

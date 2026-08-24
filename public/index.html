@@ -2111,9 +2111,12 @@
   <div class="modal sm">
     <div class="mh"><h2>&#128193; Kategorien verwalten</h2><button class="mc" onclick="closeModal('docCatOv')">&#10005;</button></div>
     <div class="mb2">
-      <div style="display:flex;gap:8px;margin-bottom:12px">
-        <input type="text" id="docCatName" placeholder="Name..." style="flex:1">
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <input type="text" id="docCatName" placeholder="Name..." style="flex:1;min-width:120px">
         <input type="text" id="docCatIcon" placeholder="&#128193;" style="width:50px;text-align:center">
+        <select id="docCatParent" style="min-width:150px">
+          <option value="">— Kein Unterordner —</option>
+        </select>
         <button class="btn-p" onclick="addDocCat()">+ Hinzuf&#252;gen</button>
       </div>
       <div id="docCatList"></div>

@@ -257,7 +257,7 @@ router.get('/', auth, async (req,res) => {
       noteTemplates: (noteTmplsRaw||[]).map(t=>({id:t.id,label:t.label,body:t.body})),
       stationShifts: (stShiftsRaw||[]).map(s=>({id:s.id,label:s.label,sortOrder:s.sort_order,serviceStart:s.service_start||'',serviceEnd:s.service_end||'',hasBreak:s.has_break!==false})),
       stationSessions: (stSessionsRaw||[]).map(s=>({id:s.id,stationName:s.station_name,userId:s.user_id,shiftId:s.shift_id,loggedInAt:s.logged_in_at,breakTime:s.break_time||null})),
-      docCategories: (docCatsRaw||[]).map(c=>({id:c.id,name:c.name,icon:c.icon,color:c.color,sortOrder:c.sort_order})),
+      docCategories: (docCatsRaw||[]).map(c=>({id:c.id,name:c.name,icon:c.icon,color:c.color,sortOrder:c.sort_order,parentId:c.parent_id||null})),
       docs: (docsRaw||[]).map(d=>({id:d.id,categoryId:d.category_id,title:d.title,description:d.description||'',originalName:d.original_name,mimeType:d.mime_type,sizeBytes:d.size_bytes,currentVersion:d.current_version,uploadedBy:d.uploaded_by,createdAt:d.created_at,updatedAt:d.updated_at})),
       portalLinks: (linksRaw||[]).map(l=>({id:l.id,label:l.label,url:l.url,icon:l.icon,description:l.description,sortOrder:l.sort_order})),
       stationOutages: (stOutagesRaw||[]).map(o=>({id:o.id,stationName:o.station_name,reason:o.reason,startAt:o.start_at,endAt:o.end_at,createdBy:o.created_by})),

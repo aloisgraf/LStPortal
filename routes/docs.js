@@ -37,13 +37,17 @@ router.get('/doc-categories', auth, async (req, res) => {
 
 router.post('/doc-categories', auth, async (req, res) => {
   if (!req.p.manageUsers) return bad(res, 'Keine Berechtigung', 403);
-  const { name, icon, color, sortOrder } = req.body;
+  const { name, icon, color, sortOrder, parentId } = req.body;
   if (!name) return bad(res, 'Name erforderlich', 400);
   try {
+    if (parentId) {
+      const parent = await q1('SELECT id FROM doc_categories WHERE id=$1', [parentId]);
+      if (!parent) return bad(res, 'Übergeordnete Kategorie nicht gefunden', 400);
+    }
     const id = newId();
     const row = await q1(
-      `INSERT INTO doc_categories (id,name,icon,color,sort_order,created_by) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [id, name, icon||'📁', color||'#3b6dd4', sortOrder||0, req.uid]
+      `INSERT INTO doc_categories (id,name,icon,color,sort_order,created_by,parent_id) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [id, name, icon||'📁', color||'#3b6dd4', sortOrder||0, req.uid, parentId||null]
     );
     ok(res, row);
   } catch(e) { bad(res, e.message, 500); }
@@ -51,12 +55,17 @@ router.post('/doc-categories', auth, async (req, res) => {
 
 router.put('/doc-categories/:id', auth, async (req, res) => {
   if (!req.p.manageUsers) return bad(res, 'Keine Berechtigung', 403);
-  const { name, icon, color } = req.body;
+  const { name, icon, color, parentId } = req.body;
   if (!name) return bad(res, 'Name erforderlich', 400);
+  if (parentId === req.params.id) return bad(res, 'Kategorie kann nicht ihr eigener Unterordner sein', 400);
   try {
+    if (parentId) {
+      const parent = await q1('SELECT id FROM doc_categories WHERE id=$1', [parentId]);
+      if (!parent) return bad(res, 'Übergeordnete Kategorie nicht gefunden', 400);
+    }
     const row = await q1(
-      `UPDATE doc_categories SET name=$1,icon=$2,color=$3 WHERE id=$4 RETURNING *`,
-      [name, icon||'📁', color||'#3b6dd4', req.params.id]
+      `UPDATE doc_categories SET name=$1,icon=$2,color=$3,parent_id=$4 WHERE id=$5 RETURNING *`,
+      [name, icon||'📁', color||'#3b6dd4', parentId||null, req.params.id]
     );
     if (!row) return bad(res, 'Nicht gefunden', 404);
     ok(res, row);
@@ -71,6 +80,8 @@ router.delete('/doc-categories/:id', auth, async (req, res) => {
       // Unlink instead of blocking — set category_id to null
       await q('UPDATE documents SET category_id=NULL WHERE category_id=$1', [req.params.id]);
     }
+    // Unterordner werden zu Top-Level-Kategorien statt mitgelöscht zu werden
+    await q('UPDATE doc_categories SET parent_id=NULL WHERE parent_id=$1', [req.params.id]);
     await q('DELETE FROM doc_categories WHERE id=$1', [req.params.id]);
     ok(res, { deleted: true });
   } catch(e) { bad(res, e.message, 500); }

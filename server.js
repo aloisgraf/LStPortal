@@ -262,6 +262,7 @@ async function initDB() {
       sort_order INTEGER DEFAULT 0,
       created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
     )`,
+    `ALTER TABLE doc_categories ADD COLUMN IF NOT EXISTS parent_id TEXT`,
     `CREATE TABLE IF NOT EXISTS documents (
       id TEXT PRIMARY KEY, category_id TEXT,
       title TEXT NOT NULL, description TEXT DEFAULT '',
