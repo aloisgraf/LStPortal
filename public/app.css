@@ -65,6 +65,28 @@
 .jarvis-vignette{position:absolute;inset:0;box-shadow:inset 0 0 220px rgba(0,0,0,.7)}
 #jarvisBtn.on{background:#00d9ff;border-color:#00d9ff;color:#001820;box-shadow:0 0 14px rgba(0,217,255,.6)}
 
+/* Radar-Sweep — dezentes rotierendes HUD-Element in der Ecke */
+.jarvis-radar{
+  position:absolute;right:-120px;bottom:-120px;width:340px;height:340px;border-radius:50%;
+  border:1px solid rgba(0,217,255,.15);opacity:.5;
+  background:
+    repeating-radial-gradient(circle,rgba(0,217,255,.06) 0 1px,transparent 1px 42px),
+    conic-gradient(from 0deg,rgba(0,217,255,.4),transparent 22%);
+  animation:jarvisRadarSpin 7s linear infinite;
+}
+@keyframes jarvisRadarSpin{to{transform:rotate(360deg)}}
+/* Partikel-Netzwerk (Canvas, JS-gezeichnet) — "neuronale" Verbindungslinien */
+#jarvisParticles{position:absolute;inset:0;width:100%;height:100%}
+
+/* HUD-Eckklammern an Modals, wie ein Zielerfassungs-Rahmen */
+[data-theme=jarvis] .modal{position:relative}
+[data-theme=jarvis] .modal::before,[data-theme=jarvis] .modal::after{
+  content:'';position:absolute;width:20px;height:20px;pointer-events:none;
+  border:2px solid rgba(0,217,255,.6);
+}
+[data-theme=jarvis] .modal::before{top:-2px;left:-2px;border-right:none;border-bottom:none}
+[data-theme=jarvis] .modal::after{bottom:-2px;right:-2px;border-left:none;border-top:none}
+
 /* Boot-Sequenz beim Einschalten — kurzer, nicht-blockierender Flash */
 #jarvisBoot{
   display:none;position:fixed;inset:0;z-index:9998;background:#00040a;
@@ -79,6 +101,11 @@
 }
 .jarvis-boot-text span{color:#fff}
 @keyframes jarvisBootPulse{from{opacity:.55}to{opacity:1}}
+.jarvis-boot-sub{
+  margin-top:10px;font-family:"Orbitron",sans-serif;font-size:11px;letter-spacing:2px;color:#5be8ff;
+  overflow:hidden;white-space:nowrap;width:0;animation:jarvisTypewriter 1s steps(28,end) .2s forwards;
+}
+@keyframes jarvisTypewriter{to{width:29ch}}
 
 /* Glow-Akzente auf Standard-Komponenten */
 [data-theme=jarvis] .btn-p{box-shadow:0 0 16px rgba(0,217,255,.35);border:1px solid rgba(0,217,255,.5)}
@@ -88,6 +115,12 @@
   outline:none;border-color:var(--acc);box-shadow:0 0 0 3px rgba(0,217,255,.18)
 }
 [data-theme=jarvis] .ni.active,[data-theme=jarvis] .ni:hover{box-shadow:inset 3px 0 0 var(--acc)}
+[data-theme=jarvis] .ni:hover{animation:jarvisGlitch .35s steps(2,end) 1}
+@keyframes jarvisGlitch{
+  0%{text-shadow:2px 0 #ff4d6a,-2px 0 #00d9ff}
+  50%{text-shadow:-2px 0 #ff4d6a,2px 0 #00d9ff}
+  100%{text-shadow:0 0 rgba(0,217,255,.35)}
+}
 [data-theme=jarvis] .modal{border:1px solid rgba(0,217,255,.25);box-shadow:0 0 60px rgba(0,217,255,.15),var(--sh2);
   background:linear-gradient(180deg,rgba(14,30,44,.97),rgba(10,21,32,.99));backdrop-filter:blur(14px)}
 [data-theme=jarvis] .sb{background:rgba(10,21,32,.85);backdrop-filter:blur(10px)}
@@ -100,7 +133,8 @@
 [data-theme=jarvis] ::-webkit-scrollbar-thumb{background:rgba(0,217,255,.35);border-radius:5px}
 [data-theme=jarvis] ::-webkit-scrollbar-thumb:hover{background:rgba(0,217,255,.6)}
 @media (prefers-reduced-motion: reduce){
-  .jarvis-grid,.jarvis-scan,.jarvis-boot-text{animation:none!important}
+  .jarvis-grid,.jarvis-scan,.jarvis-boot-text,.jarvis-radar,.jarvis-boot-sub,[data-theme=jarvis] .ni:hover{animation:none!important}
+  #jarvisParticles{display:none}
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:"Inter",system-ui,sans-serif;font-size:14px;background:var(--bg);color:var(--tx);min-height:100vh}

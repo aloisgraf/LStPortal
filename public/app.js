@@ -2764,6 +2764,7 @@ function _exitJarvis(){
   document.getElementById('thBtn').textContent=prev==='dark'?'\u2600\uFE0F':'\uD83C\uDF19';
   document.getElementById('jarvisBtn')?.classList.remove('on');
   localStorage.setItem('lst_jarvis','0');
+  stopJarvisParticles();
 }
 function toggleJarvis(){
   const isJarvis=document.documentElement.getAttribute('data-theme')==='jarvis';
@@ -2772,6 +2773,51 @@ function toggleJarvis(){
   document.getElementById('jarvisBtn')?.classList.add('on');
   localStorage.setItem('lst_jarvis','1');
   playJarvisBoot();
+  startJarvisParticles();
+}
+// Dezentes "neuronales" Partikel-Netzwerk im Hintergrund des JARVIS-Modus \u2014
+// leichtgewichtiges Canvas (kein externes Lib), pausiert automatisch sobald
+// der Modus verlassen wird oder der Nutzer reduzierte Bewegung bevorzugt.
+let _jarvisParticleRAF=null,_jarvisParticles=null,_jarvisResizeBound=false;
+function startJarvisParticles(){
+  const canvas=document.getElementById('jarvisParticles');
+  if(!canvas||_jarvisParticleRAF)return;
+  if(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
+  const ctx=canvas.getContext('2d');
+  let w,h;
+  const resize=()=>{w=canvas.width=innerWidth;h=canvas.height=innerHeight;};
+  resize();
+  if(!_jarvisResizeBound){window.addEventListener('resize',resize);_jarvisResizeBound=true;}
+  const N=Math.max(20,Math.min(60,Math.floor((innerWidth*innerHeight)/22000)));
+  _jarvisParticles=Array.from({length:N},()=>({x:Math.random()*w,y:Math.random()*h,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3}));
+  function tick(){
+    if(document.documentElement.getAttribute('data-theme')!=='jarvis'){_jarvisParticleRAF=null;return;}
+    ctx.clearRect(0,0,w,h);
+    for(const p of _jarvisParticles){
+      p.x+=p.vx;p.y+=p.vy;
+      if(p.x<0||p.x>w)p.vx*=-1;
+      if(p.y<0||p.y>h)p.vy*=-1;
+    }
+    ctx.fillStyle='rgba(0,217,255,.55)';
+    for(const p of _jarvisParticles){ctx.beginPath();ctx.arc(p.x,p.y,1.6,0,Math.PI*2);ctx.fill();}
+    ctx.strokeStyle='rgba(0,217,255,.14)';
+    for(let i=0;i<_jarvisParticles.length;i++){
+      for(let j=i+1;j<_jarvisParticles.length;j++){
+        const dx=_jarvisParticles[i].x-_jarvisParticles[j].x,dy=_jarvisParticles[i].y-_jarvisParticles[j].y;
+        const d=Math.hypot(dx,dy);
+        if(d<130){ctx.globalAlpha=1-d/130;ctx.beginPath();ctx.moveTo(_jarvisParticles[i].x,_jarvisParticles[i].y);ctx.lineTo(_jarvisParticles[j].x,_jarvisParticles[j].y);ctx.stroke();}
+      }
+    }
+    ctx.globalAlpha=1;
+    _jarvisParticleRAF=requestAnimationFrame(tick);
+  }
+  _jarvisParticleRAF=requestAnimationFrame(tick);
+}
+function stopJarvisParticles(){
+  if(_jarvisParticleRAF){cancelAnimationFrame(_jarvisParticleRAF);_jarvisParticleRAF=null;}
+  const canvas=document.getElementById('jarvisParticles');
+  const ctx=canvas?.getContext('2d');
+  if(ctx)ctx.clearRect(0,0,canvas.width,canvas.height);
 }
 function playJarvisBoot(){
   const el=document.getElementById('jarvisBoot');
@@ -3362,6 +3408,7 @@ function initPersistCards() {
   if(localStorage.getItem('lst_jarvis')==='1'){
     document.documentElement.setAttribute('data-theme','jarvis');
     document.getElementById('jarvisBtn')?.classList.add('on');
+    startJarvisParticles();
   }
   try{const me=await api('GET','/auth/me');if(me?.userId){S.currentUser=me.userId;loading(true);await fetchData();loading(false);loginOK();}}
   catch(e){loading(false);}

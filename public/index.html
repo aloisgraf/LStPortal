@@ -23,9 +23,14 @@
 <div id="jarvisFx" aria-hidden="true">
   <div class="jarvis-grid"></div>
   <div class="jarvis-scan"></div>
+  <div class="jarvis-radar"></div>
+  <canvas id="jarvisParticles"></canvas>
   <div class="jarvis-vignette"></div>
 </div>
-<div id="jarvisBoot" aria-hidden="true"><div class="jarvis-boot-text">J.A.R.V.I.S. <span>ONLINE</span></div></div>
+<div id="jarvisBoot" aria-hidden="true"><div style="display:flex;flex-direction:column;align-items:center">
+  <div class="jarvis-boot-text">J.A.R.V.I.S. <span>ONLINE</span></div>
+  <div class="jarvis-boot-sub">NEURAL INTERFACE SYNCHRONIZED</div>
+</div></div>
 
 <div class="loading-ov" id="loadingOv"><div class="spinner"></div></div>
 <div id="emojiPickerPopup" style="display:none;position:fixed;z-index:9999;background:var(--sf);border:1px solid var(--border);border-radius:8px;padding:6px;box-shadow:0 4px 16px rgba(0,0,0,.25);max-width:260px"></div>
