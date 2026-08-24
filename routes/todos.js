@@ -2,6 +2,7 @@
 const router = require('express').Router();
 const { q, q1, newId, pool, getUser, auditNote, nextTicketNumber } = require('../db');
 const { auth, ok, bad } = require('../middleware');
+const { triggerBackgroundAiSuggest } = require('./ai');
 
 // ── TODOS ─────────────────────────────────────────────────────────────────────
 
@@ -30,6 +31,7 @@ router.post('/todos', auth, async (req,res) => {
        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
       [newId(), title.trim(), description||'', priority||'medium', dueDate||null, assignedTo||null, req.uid]
     );
+    triggerBackgroundAiSuggest({table:'todos',id:row.id,type:'Todo',title:title.trim(),description:description||''});
     ok(res, {...row, items:[]});
   } catch(e) { bad(res,'Serverfehler',500); }
 });

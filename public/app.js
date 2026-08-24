@@ -1982,7 +1982,8 @@ function renderTkDetail(){
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di)">BESCHREIBUNG</div>
         <button class="btn-s" style="font-size:11px;padding:3px 9px" onclick="openAiSuggestionsFor('Ticket','${tk.id}')">🤖 KI-Vorschläge</button>
       </div>
-      <div style="font-size:13px;line-height:1.6;color:${tk.description?'var(--tx)':'var(--di)'};white-space:pre-wrap">${tk.description?esc(tk.description):'Keine Beschreibung.'}</div></div>
+      <div style="font-size:13px;line-height:1.6;color:${tk.description?'var(--tx)':'var(--di)'};white-space:pre-wrap">${tk.description?esc(tk.description):'Keine Beschreibung.'}</div>
+      ${aiInlinePanelHtml(tk)}</div>
     ${subs.length||canEdit?`<div>
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di);margin-bottom:8px">UNTERTICKETS (${subs.length})</div>
       <div class="subl">${subs.map(st=>`<div class="subi" onclick="S.currentTicketId='${st.id}';renderTkDetail()">\u21b8<span style="font-family:monospace;font-size:11px;color:var(--mu)">${st.number}</span><span style="flex:1;font-size:12px">${st.title}</span>${stBdg(st.status)}</div>`).join('')}
@@ -2856,7 +2857,7 @@ async function silentRefresh(){
       S.messages=data.messages||[];S.notifications=data.notifications||[];
       S.allowances=data.allowances||[];S.checklists=data.checklists||[];
       S.abrechnung=data.abrechnung||{einspringer:[],homeoffice:[]};S.dienstplaene=data.dienstplaene||[];S.diensttausch=data.diensttausch||[];S.homeoffice=data.homeoffice||{slots:[],config:[],boxes:[],dienste:[]};S.vacationConfig=data.vacationConfig||[];S.diensttausch=data.diensttausch||[];
-      S.stationSessions=data.stationSessions||[];S.stationShifts=data.stationShifts||[];S.stationOutages=data.stationOutages||[];S.links=data.portalLinks||[];S.docs=data.docs||[];S.docCategories=data.docCategories||[];S.rolePermissions=data.rolePermissions||[];S.meetings=data.meetings||[];S.contacts=data.contacts||[];
+      S.stationSessions=data.stationSessions||[];S.stationShifts=data.stationShifts||[];S.stationOutages=data.stationOutages||[];S.links=data.portalLinks||[];S.docs=data.docs||[];S.docCategories=data.docCategories||[];S.rolePermissions=data.rolePermissions||[];S.meetings=data.meetings||[];S.contacts=data.contacts||[];S.todos=data.todos||[];
       S.sopTemplates=data.sopTemplates||[];S.sopRuns=data.sopRuns||[];
       S.lockers=data.lockers||[];
       S.departments=data.departments||[];
@@ -2879,8 +2880,22 @@ async function silentRefresh(){
       else if(S.view==='links')renderLinks();
       else if(S.view==='docs')renderDocs();
       else if(S.view==='meetings')renderMeetings();
+      else if(S.view==='todos')renderTodos();
       else if(S.view==='sop'&&(S._sopView==='run'||S._sopView==='runlist'))renderSop();
       else if(S.view==='chat')renderChatList();
+      // Offene Ticket-/Besprechungspunkt-Detailansichten sind Modals (nicht
+      // Teil von S.view) und werden daher separat aktualisiert, damit das
+      // automatische KI-Ergebnis (pending → done) dort ohne Zutun erscheint.
+      if(document.getElementById('tkDetOv')?.classList.contains('open')&&S.currentTicketId)renderTkDetail();
+      if(document.getElementById('itemFormOv')?.classList.contains('open')){
+        const itId=document.getElementById('itId')?.value;
+        const itInstanceId=document.getElementById('itInstanceId')?.value;
+        if(itId&&itInstanceId){
+          const item=S.meetings.flatMap(m=>m.instances.flatMap(i=>i.items)).find(x=>x.id===itId);
+          const itAiPanel=document.getElementById('itAiPanel');
+          if(item&&itAiPanel)itAiPanel.innerHTML=aiInlinePanelHtml(item);
+        }
+      }
     var _rd=document.getElementById('lastRefreshDisplay');if(_rd){var _n=new Date();_rd.textContent='↻ '+_n.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit',second:'2-digit'});_rd.style.display='block';}
   }catch(e){}
 }
@@ -5293,6 +5308,8 @@ function openItemForm(instanceId, id=null) {
   document.getElementById('itResult').value = item?.result||'';
   document.getElementById('itLink').value = item?.link||'';
   document.getElementById('itDelegateTo').style.display = (item?.status)==='delegate'?'':'none';
+  const itAiPanel = document.getElementById('itAiPanel');
+  if (itAiPanel) itAiPanel.innerHTML = aiInlinePanelHtml(item);
   const delSel = document.getElementById('itDelegatedTo');
   delSel.innerHTML = S.users.map(u=>`<option value="${u.id}"${item?.delegatedTo===u.id?' selected':''}>${esc(u.name)}</option>`).join('');
   // Protokoll
@@ -5580,6 +5597,23 @@ async function openAiSuggestions(type,title,description,id){
     body.innerHTML=`<div style="color:var(--danger);font-size:13px;padding:12px">⚠️ ${esc(msg)}</div>`;
   }
 }
+function aiSuggestionCardHtml(s){
+  const isTicket=/^Ticket\s/i.test(s.source||'');
+  const isNet=!isTicket&&(/internet/i.test(s.source||'')||s.sourceUrl);
+  const badgeColor=isTicket?'#3b6dd4':isNet?'#7c3aed':'#64748b';
+  const badgeText=isTicket?(s.source||'Ticket'):isNet?'Internet':(s.source||'Quelle unbekannt');
+  const srcLink=isNet&&s.sourceUrl?`<a href="${esc(s.sourceUrl)}" target="_blank" rel="noopener noreferrer" style="font-size:11px;color:${badgeColor};text-decoration:none;word-break:break-all">${esc(s.sourceUrl)}</a>`
+    :isTicket?`<a href="javascript:void(0)" onclick="_openTicketByNumber('${esc((s.source||'').replace(/^Ticket\s*/i,'').trim())}')" style="font-size:11px;color:${badgeColor};text-decoration:none">${esc(s.source)} öffnen →</a>`
+    :'';
+  return `<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px">
+      <div style="font-weight:600;font-size:13px">${esc(s.title||'Vorschlag')}</div>
+      <span class="bdg" style="font-size:10px;flex-shrink:0;background:${badgeColor}1f;color:${badgeColor}">${isNet?'🌐 ':isTicket?'🎫 ':'ℹ️ '}${esc(badgeText)}</span>
+    </div>
+    <div style="font-size:12px;color:var(--tx);line-height:1.5;white-space:pre-wrap">${esc(s.text||'')}</div>
+    ${srcLink?`<div style="margin-top:6px">${srcLink}</div>`:''}
+  </div>`;
+}
 function renderAiSuggestions(data){
   const body=document.getElementById('aiSuggestBody');
   const sugg=data.suggestions||[];
@@ -5588,23 +5622,31 @@ function renderAiSuggestions(data){
     return;
   }
   body.innerHTML=(data.summary?`<div style="font-size:12px;color:var(--mu);margin-bottom:12px;padding:8px 10px;background:var(--sf2);border-radius:6px">${esc(data.summary)}</div>`:'')
-    +sugg.map(s=>{
-      const isTicket=/^Ticket\s/i.test(s.source||'');
-      const isNet=!isTicket&&(/internet/i.test(s.source||'')||s.sourceUrl);
-      const badgeColor=isTicket?'#3b6dd4':isNet?'#7c3aed':'#64748b';
-      const badgeText=isTicket?(s.source||'Ticket'):isNet?'Internet':(s.source||'Quelle unbekannt');
-      const srcLink=isNet&&s.sourceUrl?`<a href="${esc(s.sourceUrl)}" target="_blank" rel="noopener noreferrer" style="font-size:11px;color:${badgeColor};text-decoration:none;word-break:break-all">${esc(s.sourceUrl)}</a>`
-        :isTicket?`<a href="javascript:void(0)" onclick="_openTicketByNumber('${esc((s.source||'').replace(/^Ticket\s*/i,'').trim())}')" style="font-size:11px;color:${badgeColor};text-decoration:none">${esc(s.source)} öffnen →</a>`
-        :'';
-      return `<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px">
-          <div style="font-weight:600;font-size:13px">${esc(s.title||'Vorschlag')}</div>
-          <span class="bdg" style="font-size:10px;flex-shrink:0;background:${badgeColor}1f;color:${badgeColor}">${isNet?'🌐 ':isTicket?'🎫 ':'ℹ️ '}${esc(badgeText)}</span>
-        </div>
-        <div style="font-size:12px;color:var(--tx);line-height:1.5;white-space:pre-wrap">${esc(s.text||'')}</div>
-        ${srcLink?`<div style="margin-top:6px">${srcLink}</div>`:''}
-      </div>`;
-    }).join('');
+    +sugg.map(aiSuggestionCardHtml).join('');
+}
+// Zeigt das Ergebnis der automatischen Hintergrundsuche (ausgelöst beim
+// Anlegen) direkt im jeweiligen Formular/Detail an — akzeptiert sowohl
+// camelCase (Ticket/Besprechungspunkt) als auch die rohen snake_case-Felder
+// (Todo, da dessen Datensatz ungemappt durchgereicht wird).
+function aiInlinePanelHtml(item){
+  const status=item?.aiStatus||item?.ai_status||null;
+  const result=item?.aiResult||item?.ai_result||null;
+  if(!status) return '';
+  if(status==='pending') return `<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--sf2);border:1px solid var(--border);border-radius:8px;margin-top:10px">
+    <div class="spinner" style="width:16px;height:16px;flex-shrink:0"></div>
+    <div style="font-size:12px;color:var(--mu)">🤖 KI durchsucht automatisch nach Lösungen…</div>
+  </div>`;
+  if(status==='error') return `<div style="padding:10px 12px;background:var(--sf2);border:1px solid var(--border);border-radius:8px;margin-top:10px;font-size:12px;color:var(--danger)">⚠️ ${esc(result?.error||'KI-Suche fehlgeschlagen')}</div>`;
+  if(status==='done'){
+    const sugg=result?.suggestions||[];
+    if(!sugg.length) return `<div style="padding:10px 12px;background:var(--sf2);border:1px solid var(--border);border-radius:8px;margin-top:10px;font-size:12px;color:var(--mu)">🤖 ${esc(result?.summary||'Keine passenden Vorschläge gefunden.')}</div>`;
+    return `<div style="margin-top:10px">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di);margin-bottom:6px">🤖 KI-VORSCHLÄGE</div>
+      ${result.summary?`<div style="font-size:12px;color:var(--mu);margin-bottom:8px;padding:8px 10px;background:var(--sf2);border-radius:6px">${esc(result.summary)}</div>`:''}
+      ${sugg.map(aiSuggestionCardHtml).join('')}
+    </div>`;
+  }
+  return '';
 }
 function _openTicketByNumber(number){
   const tk=(S.tickets||[]).find(t=>t.number===number);
@@ -8164,6 +8206,7 @@ function renderTodoDetail(t) {
           ${creator ? `<span style="font-size:12px;color:var(--di)">erstellt von ${esc(creator.name)}</span>` : ''}
         </div>
         ${t.description ? `<div style="margin-top:8px;font-size:13px;color:var(--mu)">${esc(t.description)}</div>` : ''}
+        ${aiInlinePanelHtml(t)}
       </div>
       ${canManageTodo ? `<div style="display:flex;gap:6px;flex-shrink:0">
         <button class="btn-s" onclick="openAiSuggestionsFor('Todo','${t.id}')">🤖 KI-Vorschläge</button>

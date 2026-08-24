@@ -2,6 +2,7 @@
 const router = require('express').Router();
 const { q, q1, newId, pool, getUser, auditNote, nextTicketNumber } = require('../db');
 const { auth, ok, bad } = require('../middleware');
+const { triggerBackgroundAiSuggest } = require('./ai');
 
 // ── MEETINGS ──────────────────────────────────────────────────────────────────
 
@@ -178,6 +179,7 @@ router.post('/meeting-instances/:id/items', auth, async (req, res) => {
       }
     }
     const row = await q1('SELECT * FROM discussion_items WHERE id=$1', [id]);
+    triggerBackgroundAiSuggest({table:'discussion_items',id,type:'Besprechungspunkt',title,description:description||''});
     ok(res, row);
   } catch (e) { bad(res, 'Serverfehler', 500); }
 });

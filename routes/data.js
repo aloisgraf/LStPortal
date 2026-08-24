@@ -98,7 +98,7 @@ router.get('/', auth, async (req,res) => {
     const partMap={};
     (partRaw||[]).forEach(p=>{if(!partMap[p.item_id])partMap[p.item_id]=[];partMap[p.item_id].push({id:p.id,userId:p.user_id,role:p.role});});
     const itemMap={};
-    (itemsRaw||[]).forEach(it=>{if(!itemMap[it.instance_id])itemMap[it.instance_id]=[];itemMap[it.instance_id].push({id:it.id,instanceId:it.instance_id,title:it.title,description:it.description,status:it.status,dueDate:it.due_date,meetingDate:it.meeting_date,parentId:it.parent_id,delegatedTo:it.delegated_to,result:it.result,sortOrder:it.sort_order,createdBy:it.created_by,createdAt:it.created_at,groupId:it.group_id||null,link:it.link||null,convertedTicketId:it.converted_ticket_id||null,convertedAt:it.converted_at||null,convertedBy:it.converted_by||null,protokoll:(()=>{try{return JSON.parse(it.protokoll||'[]');}catch{return [];}})(),participants:partMap[it.id]||[]});});
+    (itemsRaw||[]).forEach(it=>{if(!itemMap[it.instance_id])itemMap[it.instance_id]=[];itemMap[it.instance_id].push({id:it.id,instanceId:it.instance_id,title:it.title,description:it.description,status:it.status,dueDate:it.due_date,meetingDate:it.meeting_date,parentId:it.parent_id,delegatedTo:it.delegated_to,result:it.result,sortOrder:it.sort_order,createdBy:it.created_by,createdAt:it.created_at,groupId:it.group_id||null,link:it.link||null,convertedTicketId:it.converted_ticket_id||null,convertedAt:it.converted_at||null,convertedBy:it.converted_by||null,protokoll:(()=>{try{return JSON.parse(it.protokoll||'[]');}catch{return [];}})(),participants:partMap[it.id]||[],aiStatus:it.ai_status||null,aiResult:(()=>{try{return it.ai_result?JSON.parse(it.ai_result):null;}catch{return null;}})()});});
     const instMap={};
     (instancesRaw||[]).forEach(inst=>{if(!instMap[inst.meeting_id])instMap[inst.meeting_id]=[];instMap[inst.meeting_id].push({id:inst.id,meetingId:inst.meeting_id,date:inst.date,time:inst.time||'',title:inst.title||null,status:inst.status,notes:inst.notes||'',createdBy:inst.created_by,createdAt:inst.created_at,items:itemMap[inst.id]||[]});});
     // Meetings: find which meetings the user has assigned items in
@@ -198,6 +198,7 @@ router.get('/', auth, async (req,res) => {
         mentionedUsers:[...new Set((noteMap[tk.id]||[]).flatMap(n=>n.mentionedUsers||[]))].filter(Boolean),
         participants:(()=>{try{return JSON.parse(tk.participants||'[]');}catch{return [];}})(),
         notes:noteMap[tk.id]||[], checklists:tkClMap[tk.id]||[], files:tkFileMap[tk.id]||[],
+        aiStatus:tk.ai_status||null, aiResult:(()=>{try{return tk.ai_result?JSON.parse(tk.ai_result):null;}catch{return null;}})(),
         _canEdit:canEditTk(tp,tk,uid),
       })),
       allowances: allwRaw.map(a=>({id:a.id,userId:a.user_id,year:a.year,month:a.month,nd:a.nd,fd:a.fd,fw:a.fw,c10:a.c10})),
@@ -281,7 +282,8 @@ router.get('/', auth, async (req,res) => {
         const protokoll=(()=>{try{return JSON.parse(t.protokoll||'[]');}catch{return [];}})();
         const items=(todoItemsRaw||[]).filter(i=>i.todo_id===t.id).map(i=>({...i,_canEdit:canMng||todoItemIsAssignedToMe.has(i.id),assignees:(todoAssigneesRaw||[]).filter(a=>a.item_id===i.id)}));
         const hasUnread = items.some(i=>todoNotifSet.has(i.id));
-        return {...t,_canManage:canMng,protokoll,_hasUnreadNotifications:hasUnread,items};
+        const aiResult=(()=>{try{return t.ai_result?JSON.parse(t.ai_result):null;}catch{return null;}})();
+        return {...t,_canManage:canMng,protokoll,_hasUnreadNotifications:hasUnread,items,ai_result:aiResult};
       }),
       contacts: (contactsRaw||[]).map(c=>({
         id:c.id, title:c.title||'', name:c.name, email:c.email||'',

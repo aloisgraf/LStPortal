@@ -6,6 +6,7 @@ const { q, q1, newId, pool, getUser, logAct, canSeeTk, canEditTk, nextTicketNumb
 const { auth, ok, bad } = require('../middleware');
 const { sanitizeFilename, validateMime, assertUnderDir } = require('../fileutil');
 const { mailUser } = require('../lib/mailer');
+const { triggerBackgroundAiSuggest } = require('./ai');
 
 const UPLOAD_DIR = path.resolve(__dirname, '..', 'uploads', 'ticket-files');
 try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch(e) {}
@@ -53,6 +54,7 @@ router.post('/', auth, async (req,res) => {
     // Eigene Tickets direkt als gesehen markieren
     await pool.query(`INSERT INTO ticket_views (ticket_id,user_id,viewed_at) VALUES ($1,$2,NOW()) ON CONFLICT (ticket_id,user_id) DO UPDATE SET viewed_at=NOW()`,
       [id,req.uid]).catch(()=>{});
+    triggerBackgroundAiSuggest({table:'tickets',id,type:'Ticket',title:title.trim(),description:description||''});
     ok(res,{id,number});
   } catch(e) { bad(res,'Serverfehler',500); }
 });

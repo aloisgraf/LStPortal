@@ -263,6 +263,12 @@ async function initDB() {
       created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
     )`,
     `ALTER TABLE doc_categories ADD COLUMN IF NOT EXISTS parent_id TEXT`,
+    `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS ai_status TEXT`,
+    `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS ai_result TEXT`,
+    `ALTER TABLE todos ADD COLUMN IF NOT EXISTS ai_status TEXT`,
+    `ALTER TABLE todos ADD COLUMN IF NOT EXISTS ai_result TEXT`,
+    `ALTER TABLE discussion_items ADD COLUMN IF NOT EXISTS ai_status TEXT`,
+    `ALTER TABLE discussion_items ADD COLUMN IF NOT EXISTS ai_result TEXT`,
     `CREATE TABLE IF NOT EXISTS documents (
       id TEXT PRIMARY KEY, category_id TEXT,
       title TEXT NOT NULL, description TEXT DEFAULT '',
