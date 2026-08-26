@@ -1836,8 +1836,23 @@ function openTkDetail(id){
     tk.lastViewedAt=new Date().toISOString();
     if(S.view==='tickets'||S.view==='tickets_closed')renderTickets();
     if(S.view==='home')renderHome();
+    _maybeAutoAiCheck('tickets','Ticket',tk);
   }
   api('PUT','/tickets/'+id+'/view').catch(()=>{});
+}
+// Stößt beim Öffnen eines Tickets/Todos/Besprechungspunkts einmalig eine
+// KI-Hintergrundsuche an, falls noch keine vorliegt (z.B. weil der Eintrag
+// vor Einführung dieser Funktion angelegt wurde). Läuft pro Sitzung nur
+// einmal je Eintrag, damit nicht bei jedem erneuten Öffnen erneut angefragt
+// wird — sobald ein Ergebnis da ist, greift stattdessen aiInlinePanelHtml().
+const _aiRecheckedIds=new Set();
+async function _maybeAutoAiCheck(table,type,item){
+  if(!item)return;
+  const status=item.aiStatus||item.ai_status;
+  if(status||_aiRecheckedIds.has(item.id))return;
+  _aiRecheckedIds.add(item.id);
+  try{await api('POST','/ai/recheck',{table,id:item.id,type,title:item.title,description:item.description||''});}
+  catch(e){}
 }
 function highlightMentions(text){return esc(text).replace(/@(\S+)/g,(match,name)=>{const u=S.users.find(u=>u.name.toLowerCase()===name.toLowerCase());return u?`<span class="mention">@${esc(u.name)}</span>`:match;});}
 // ── Ticket Feed Renderer ──
@@ -5357,6 +5372,7 @@ function openItemForm(instanceId, id=null) {
   document.getElementById('itDelegateTo').style.display = (item?.status)==='delegate'?'':'none';
   const itAiPanel = document.getElementById('itAiPanel');
   if (itAiPanel) itAiPanel.innerHTML = aiInlinePanelHtml(item);
+  if (item) _maybeAutoAiCheck('discussion_items','Besprechungspunkt',item);
   const delSel = document.getElementById('itDelegatedTo');
   delSel.innerHTML = S.users.map(u=>`<option value="${u.id}"${item?.delegatedTo===u.id?' selected':''}>${esc(u.name)}</option>`).join('');
   // Protokoll
@@ -8166,6 +8182,7 @@ function renderTodos() {
 }
 
 function renderTodoDetail(t) {
+  _maybeAutoAiCheck('todos','Todo',t);
   // Mark notifications as read when opening todo
   if(t._hasUnreadNotifications){
     api('POST',`/todos/${t.id}/mark-read`).catch(()=>{});

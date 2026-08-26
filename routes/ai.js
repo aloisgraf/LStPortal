@@ -50,6 +50,10 @@ async function runAiSuggest(type, title, description, excludeId) {
   const response = await client.messages.create({
     model: 'claude-opus-5',
     max_tokens: 4000,
+    // Niedriger Effort reicht für diese Hintergrund-Recherche völlig aus und
+    // hält die Anfrage klar innerhalb des 55s-Zeitlimits (weniger Denkzeit,
+    // ohne das adaptive Thinking selbst abzuschalten — siehe claude-api-Skill).
+    output_config: { effort: 'low' },
     system: `Du bist ein Assistent für ein Betriebs-/IT-Ticketsystem einer Leitstelle. Ein Mitarbeiter beschreibt ein Problem (aus einem Ticket, Todo oder Besprechungspunkt). Deine Aufgabe:
 1. Prüfe die mitgelieferten, bereits vorhandenen ähnlichen Tickets aus der Datenbank auf eine passende Lösung.
 2. Nutze zusätzlich die Websuche, um im Internet nach Lösungen für dieses konkrete Problem zu suchen.
@@ -60,7 +64,7 @@ WICHTIG: Jeder Vorschlag MUSS eine Quelle nennen — entweder "Ticket <Nummer>" 
 Antworte AUSSCHLIESSLICH mit einem JSON-Objekt, kein Text davor oder danach, exakt in diesem Format:
 {"suggestions":[{"title":"Kurzer Titel des Vorschlags","text":"Konkrete Lösung in 2-4 Sätzen","source":"Ticket TK-123 ODER Internet","sourceUrl":"https://... (nur bei Internet, sonst leerer String)"}],"summary":"Ein Satz Gesamteinschätzung"}
 Falls keine sinnvollen Vorschläge existieren: {"suggestions":[],"summary":"kurze ehrliche Begründung"}`,
-    tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 5 }],
+    tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 3 }],
     messages: [{
       role: 'user',
       content: `Problem (Typ: ${type || 'Ticket'}): ${title}\n\nBeschreibung: ${description || '(keine)'}\n\n--- Ähnliche Tickets aus der Datenbank ---\n${ticketContext}`,
@@ -116,6 +120,22 @@ function triggerBackgroundAiSuggest({ table, id, type, title, description }) {
     })
     .catch(() => {});
 }
+
+// Client-seitig ausgelöster Nachtrag: wenn beim Öffnen eines Tickets/Todos/
+// Besprechungspunkts noch kein KI-Ergebnis vorliegt (z.B. weil der Eintrag
+// vor Einführung dieser Funktion angelegt wurde), stößt das Frontend hiermit
+// einmalig die Hintergrundsuche an. `table` ist strikt auf die drei
+// erlaubten Tabellen begrenzt, da er sonst roh in SQL interpoliert würde.
+const AI_TABLES = new Set(['tickets', 'todos', 'discussion_items']);
+router.post('/ai/recheck', auth, async (req, res) => {
+  try {
+    const { table, id, type, title, description } = req.body;
+    if (!AI_TABLES.has(table)) return bad(res, 'Ungültige Tabelle', 400);
+    if (!id || !title?.trim()) return bad(res, 'Titel erforderlich', 400);
+    triggerBackgroundAiSuggest({ table, id, type, title, description: description || '' });
+    ok(res, { triggered: true });
+  } catch (e) { bad(res, 'Serverfehler', 500); }
+});
 
 module.exports = router;
 module.exports.triggerBackgroundAiSuggest = triggerBackgroundAiSuggest;

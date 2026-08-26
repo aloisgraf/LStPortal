@@ -66,6 +66,10 @@ router.put('/todos/:id', auth, async (req,res) => {
        status=COALESCE($6,status), updated_at=NOW() WHERE id=$7 RETURNING *`,
       [title||null, description||null, priority||null, dueDate||null, assignedTo||null, status||null, req.params.id]
     );
+    if ((title!==undefined&&title!==old.title)||(description!==undefined&&description!==old.description)) {
+      triggerBackgroundAiSuggest({table:'todos',id:req.params.id,type:'Todo',
+        title:row.title, description:row.description});
+    }
     ok(res, row);
   } catch(e) { bad(res,'Serverfehler',500); }
 });

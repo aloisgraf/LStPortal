@@ -160,6 +160,13 @@ router.put('/:id', auth, async (req,res) => {
     await pool.query(`INSERT INTO ticket_views (ticket_id,user_id,viewed_at) VALUES ($1,$2,NOW()) ON CONFLICT (ticket_id,user_id) DO UPDATE SET viewed_at=NOW()`,
       [req.params.id,req.uid]).catch(()=>{});
 
+    // KI-Suche erneut anstoßen, wenn sich Titel/Beschreibung inhaltlich
+    // geändert haben — bei reinen Statuswechseln o.ä. unnötig teuer.
+    if ((b.title!==undefined&&b.title!==tk.title)||(b.description!==undefined&&b.description!==tk.description)) {
+      triggerBackgroundAiSuggest({table:'tickets',id:req.params.id,type:'Ticket',
+        title:b.title!==undefined?b.title:tk.title, description:b.description!==undefined?b.description:tk.description});
+    }
+
     // Fachbereich-Änderung an bestehende Kindtickets weiterreichen, damit die
     // Zuordnung konsistent bleibt (Kind folgt immer dem Elternticket)
     if (b.department!==undefined) {

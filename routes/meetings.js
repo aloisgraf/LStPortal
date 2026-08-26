@@ -245,6 +245,10 @@ router.put('/discussion-items/:id', auth, async (req, res) => {
     }
 
     const row = await q1('SELECT * FROM discussion_items WHERE id=$1', [req.params.id]);
+    if ((title&&title!==existingItem.title)||(description!==undefined&&description!==existingItem.description)) {
+      triggerBackgroundAiSuggest({table:'discussion_items',id:req.params.id,type:'Besprechungspunkt',
+        title:row.title, description:row.description});
+    }
     ok(res, row);
   } catch (e) { bad(res, 'Serverfehler', 500); }
 });
