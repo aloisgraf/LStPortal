@@ -5240,7 +5240,7 @@ function renderProtocolInstanceDetail(inst, meeting, canManage) {
           ${p.location?`<span>&#128205; ${esc(p.location)}</span>`:''}
         </div>
         ${(p.attendees||[]).length?`<div style="display:flex;gap:3px;margin-top:6px;flex-wrap:wrap">${p.attendees.map(uid=>{const u=getU(uid);return u?`<span class="av-sm" style="background:${u.color}" title="${esc(u.name)}">${esc(u.initials)}</span>`:''}).join('')}</div>`:''}
-        ${p.body?`<div style="font-size:12px;color:var(--tx);margin-top:8px;white-space:pre-wrap;border-top:1px solid var(--border);padding-top:8px">${esc(p.body.slice(0,400))}${p.body.length>400?'…':''}</div>`:''}
+        ${p.body?`<div style="font-size:12px;color:var(--tx);margin-top:8px;white-space:pre-wrap;border-top:1px solid var(--border);padding-top:8px;max-height:240px;overflow-y:auto">${esc(p.body)}</div>`:''}
       </div>`).join('')}
     </div>
   </div>`;
@@ -5353,6 +5353,7 @@ function openInstanceForm(meetingId, id=null) {
   kindProtocol.checked = inst?.kind==='protocol';
   kindPoints.disabled = kindProtocol.disabled = !!inst;
   document.getElementById('ifKindWrap').style.opacity = inst?'.55':'1';
+  onIfKindChange();
   const dateOpen = inst && !inst.date;
   const cb = document.getElementById('ifDateOpen');
   cb.checked = dateOpen;
@@ -5363,14 +5364,22 @@ function openInstanceForm(meetingId, id=null) {
   openModal('instanceFormOv');
 }
 
+// Bei Protokollterminen werden Datum/Uhrzeit pro Protokoll-Eintrag erfasst,
+// nicht am Termin selbst — Felder ausblenden und die Datumspflicht dafür
+// aufheben.
+function onIfKindChange() {
+  const isProtocol = document.getElementById('ifKindProtocol').checked;
+  document.getElementById('ifDateTimeWrap').style.display = isProtocol ? 'none' : '';
+}
 async function submitInstanceForm() {
   const id = document.getElementById('ifId').value;
   const meetingId = document.getElementById('ifMeetingId').value;
+  const isProtocol = document.getElementById('ifKindProtocol').checked;
   const dateOpen = document.getElementById('ifDateOpen').checked;
   const date = document.getElementById('ifDate').value;
-  if (!dateOpen && !date) return toast('Datum erforderlich oder "Datum noch offen" aktivieren','err');
-  const body = { date: dateOpen ? null : date, time: document.getElementById('ifTime').value, notes: document.getElementById('ifNotes').value, title: document.getElementById('ifTitle').value };
-  if (!id) body.kind = document.getElementById('ifKindProtocol').checked ? 'protocol' : 'points';
+  if (!isProtocol && !dateOpen && !date) return toast('Datum erforderlich oder "Datum noch offen" aktivieren','err');
+  const body = { date: (isProtocol||dateOpen) ? null : date, time: isProtocol ? '' : document.getElementById('ifTime').value, notes: document.getElementById('ifNotes').value, title: document.getElementById('ifTitle').value };
+  if (!id) body.kind = isProtocol ? 'protocol' : 'points';
   try {
     if (id) await api('PUT','/meeting-instances/'+id, body);
     else await api('POST','/meetings/'+meetingId+'/instances', body);
