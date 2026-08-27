@@ -50,21 +50,19 @@ async function runAiSuggest(type, title, description, excludeId) {
   const response = await client.messages.create({
     model: 'claude-opus-5',
     max_tokens: 4000,
-    // Niedriger Effort reicht für diese Hintergrund-Recherche völlig aus und
-    // hält die Anfrage klar innerhalb des 55s-Zeitlimits (weniger Denkzeit,
-    // ohne das adaptive Thinking selbst abzuschalten — siehe claude-api-Skill).
+    // Niedriger Effort reicht für diese Recherche völlig aus und hält die
+    // Anfrage klar innerhalb des 55s-Zeitlimits (weniger Denkzeit, ohne das
+    // adaptive Thinking selbst abzuschalten — siehe claude-api-Skill).
     output_config: { effort: 'low' },
     system: `Du bist ein Assistent für ein Betriebs-/IT-Ticketsystem einer Leitstelle. Ein Mitarbeiter beschreibt ein Problem (aus einem Ticket, Todo oder Besprechungspunkt). Deine Aufgabe:
-1. Prüfe die mitgelieferten, bereits vorhandenen ähnlichen Tickets aus der Datenbank auf eine passende Lösung.
-2. Nutze zusätzlich die Websuche, um im Internet nach Lösungen für dieses konkrete Problem zu suchen.
-3. Gib konkrete, umsetzbare Lösungsvorschläge — keine allgemeinen Plattitüden.
+1. Prüfe AUSSCHLIESSLICH die mitgelieferten, bereits vorhandenen ähnlichen Tickets aus der Datenbank auf eine passende Lösung. Keine Websuche, keine allgemeinen Ratschläge ohne Bezug zu einem konkreten Ticket.
+2. Gib maximal die 3 bestpassenden, konkreten Lösungsvorschläge zurück — nach Relevanz sortiert, keine allgemeinen Plattitüden.
 
-WICHTIG: Jeder Vorschlag MUSS eine Quelle nennen — entweder "Ticket <Nummer>" (wenn aus der Datenbank übernommen) oder "Internet" mit der genauen, echten URL der Fundstelle. Erfinde niemals eine Quelle oder URL. Wenn du nichts Passendes findest, sag das ehrlich statt zu spekulieren.
+WICHTIG: Jeder Vorschlag MUSS eine Quelle nennen — immer "Ticket <Nummer>" aus der Datenbank. Erfinde niemals eine Quelle. Wenn du nichts Passendes findest, sag das ehrlich statt zu spekulieren.
 
-Antworte AUSSCHLIESSLICH mit einem JSON-Objekt, kein Text davor oder danach, exakt in diesem Format:
-{"suggestions":[{"title":"Kurzer Titel des Vorschlags","text":"Konkrete Lösung in 2-4 Sätzen","source":"Ticket TK-123 ODER Internet","sourceUrl":"https://... (nur bei Internet, sonst leerer String)"}],"summary":"Ein Satz Gesamteinschätzung"}
+Antworte AUSSCHLIESSLICH mit einem JSON-Objekt, kein Text davor oder danach, exakt in diesem Format (maximal 3 Einträge in suggestions):
+{"suggestions":[{"title":"Kurzer Titel des Vorschlags","text":"Konkrete Lösung in 2-4 Sätzen","source":"Ticket TK-123"}],"summary":"Ein Satz Gesamteinschätzung"}
 Falls keine sinnvollen Vorschläge existieren: {"suggestions":[],"summary":"kurze ehrliche Begründung"}`,
-    tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 3 }],
     messages: [{
       role: 'user',
       content: `Problem (Typ: ${type || 'Ticket'}): ${title}\n\nBeschreibung: ${description || '(keine)'}\n\n--- Ähnliche Tickets aus der Datenbank ---\n${ticketContext}`,
@@ -77,10 +75,10 @@ Falls keine sinnvollen Vorschläge existieren: {"suggestions":[],"summary":"kurz
     const jsonMatch = textBlocks.match(/\{[\s\S]*\}/);
     parsed = JSON.parse(jsonMatch ? jsonMatch[0] : textBlocks);
   } catch (e) {
-    parsed = { suggestions: [{ title: 'Antwort der KI', text: textBlocks.trim() || 'Keine verwertbare Antwort erhalten.', source: 'KI', sourceUrl: '' }], summary: '' };
+    parsed = { suggestions: [{ title: 'Antwort der KI', text: textBlocks.trim() || 'Keine verwertbare Antwort erhalten.', source: 'KI' }], summary: '' };
   }
   return {
-    suggestions: parsed.suggestions || [],
+    suggestions: (parsed.suggestions || []).slice(0, 3),
     summary: parsed.summary || '',
     similarTickets: similar.map(t => ({ number: t.number, title: t.title, id: t.id })),
   };

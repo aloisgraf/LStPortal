@@ -1844,7 +1844,6 @@ function openTkDetail(id){
     tk.lastViewedAt=new Date().toISOString();
     if(S.view==='tickets'||S.view==='tickets_closed')renderTickets();
     if(S.view==='home')renderHome();
-    _maybeAutoAiCheck('tickets','Ticket',tk);
   }
   api('PUT','/tickets/'+id+'/view').catch(()=>{});
 }
@@ -2296,7 +2295,7 @@ async function saveTicket(withAi){
   const nm=document.getElementById('tkFNm').value.trim();if(!nm){toast('\u26A0\uFE0F Name erforderlich!');return;}
   const id=document.getElementById('tkFId').value;
   const tags=Array.from(document.getElementById('tkFTags').selectedOptions).map(o=>o.value);
-  const body={title:nm,reporter:document.getElementById('tkFReporter').value.trim(),description:document.getElementById('tkFDesc').value.trim(),department:document.getElementById('tkFDept').value,subcategory:document.getElementById('tkFSubcat')?.value||'',priority:document.getElementById('tkFPrio').value,status:document.getElementById('tkFSt').value,bucket:document.getElementById('tkFBkt').value,tags,assigneeId:document.getElementById('tkFAsgn').value||null,parentTicketId:document.getElementById('tkFPar').value||null,dueDate:document.getElementById('tkFDue')?.value||null};
+  const body={title:nm,reporter:document.getElementById('tkFReporter').value.trim(),description:document.getElementById('tkFDesc').value.trim(),department:document.getElementById('tkFDept').value,subcategory:document.getElementById('tkFSubcat')?.value||'',priority:document.getElementById('tkFPrio').value,status:document.getElementById('tkFSt').value,bucket:document.getElementById('tkFBkt').value,tags,assigneeId:document.getElementById('tkFAsgn').value||null,parentTicketId:document.getElementById('tkFPar').value||null,dueDate:document.getElementById('tkFDue')?.value||null,aiSearch:!!withAi};
   try{
     let savedId=id;
     if(id)await api('PUT','/tickets/'+id,body);

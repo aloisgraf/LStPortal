@@ -14,7 +14,7 @@ try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch(e) {}
 
 router.post('/', auth, async (req,res) => {
   try {
-    const {title,description,subcategory,tags,priority,status,bucket,assigneeId,parentTicketId,dueDate,reporter} = req.body;
+    const {title,description,subcategory,tags,priority,status,bucket,assigneeId,parentTicketId,dueDate,reporter,aiSearch} = req.body;
     let {department} = req.body;
     if (!title?.trim()) return bad(res,'Titel erforderlich');
     // Kindticket übernimmt IMMER den Fachbereich des Elterntickets — verhindert
@@ -54,7 +54,9 @@ router.post('/', auth, async (req,res) => {
     // Eigene Tickets direkt als gesehen markieren
     await pool.query(`INSERT INTO ticket_views (ticket_id,user_id,viewed_at) VALUES ($1,$2,NOW()) ON CONFLICT (ticket_id,user_id) DO UPDATE SET viewed_at=NOW()`,
       [id,req.uid]).catch(()=>{});
-    triggerBackgroundAiSuggest({table:'tickets',id,type:'Ticket',title:title.trim(),description:description||''});
+    // Läuft NUR, wenn explizit über den "Speichern mit KI-Suche"-Button
+    // ausgelöst (aiSearch===true) — nicht bei jeder normalen Anlage.
+    if (aiSearch) triggerBackgroundAiSuggest({table:'tickets',id,type:'Ticket',title:title.trim(),description:description||''});
     ok(res,{id,number});
   } catch(e) { bad(res,'Serverfehler',500); }
 });
@@ -160,9 +162,10 @@ router.put('/:id', auth, async (req,res) => {
     await pool.query(`INSERT INTO ticket_views (ticket_id,user_id,viewed_at) VALUES ($1,$2,NOW()) ON CONFLICT (ticket_id,user_id) DO UPDATE SET viewed_at=NOW()`,
       [req.params.id,req.uid]).catch(()=>{});
 
-    // KI-Suche erneut anstoßen, wenn sich Titel/Beschreibung inhaltlich
-    // geändert haben — bei reinen Statuswechseln o.ä. unnötig teuer.
-    if ((b.title!==undefined&&b.title!==tk.title)||(b.description!==undefined&&b.description!==tk.description)) {
+    // KI-Suche läuft NUR, wenn explizit über den "Speichern mit KI-Suche"-
+    // Button ausgelöst (aiSearch===true) — nicht bei jeder normalen
+    // Ticketänderung (Status, Priorität, Zuständigkeit usw.).
+    if (b.aiSearch) {
       triggerBackgroundAiSuggest({table:'tickets',id:req.params.id,type:'Ticket',
         title:b.title!==undefined?b.title:tk.title, description:b.description!==undefined?b.description:tk.description});
     }
