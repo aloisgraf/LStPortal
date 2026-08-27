@@ -2949,6 +2949,9 @@ async function silentRefresh(){
       if(_lastTkCount>=0&&newTkCount>_lastTkCount)toast('\uD83C\uDFAB Neues Ticket in deinem Bereich!');
       _lastMsgCount=newMsgCount;_lastTkCount=newTkCount;
       onChatMessagesChanged(prevChatMsgs);
+      // Online-Punkt in offenen Chatfenstern auch ohne neue Nachricht
+      // auffrischen (isOnline kommt aus S.users, das hier oben neu gesetzt wurde).
+      if((S._chatWindows||[]).length)renderChatWindows();
       if(S.view==='home')renderHome();
       else if(S.view==='messages'||S.view==='messages_sent')renderMessages();
       else if(S.view==='tickets'||S.view==='tickets_closed'||S.view==='tickets_deleted')renderTickets();
