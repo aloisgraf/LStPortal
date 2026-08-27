@@ -402,13 +402,13 @@
         <div class="fg"><label>&#128197; F&#228;lligkeit</label><input type="date" id="tkFDue"></div>
       </div>
     </div>
-    <div class="mf"><button class="btn-s" onclick="closeModal('tkFormOv')">Abbrechen</button><button class="btn-p" onclick="saveTicket()">&#128190; Speichern</button></div>
+    <div class="mf"><button class="btn-s" onclick="closeModal('tkFormOv')">Abbrechen</button><button class="btn-s" onclick="saveTicket(true)">&#129302; Speichern mit KI-Suche</button><button class="btn-p" onclick="saveTicket()">&#128190; Speichern</button></div>
   </div>
 </div>
 
 <!-- TICKET DETAIL -->
 <div class="ov" id="tkDetOv">
-  <div class="modal xl">
+  <div class="modal xl" id="tkDetModal">
     <div class="mh" id="tkDetHdr">
       <div style="display:flex;align-items:center;gap:10px;flex:1;flex-wrap:wrap;min-width:0">
         <span id="tkDetNum" style="font-size:12px;font-weight:700;color:var(--mu);font-family:monospace;flex-shrink:0"></span>
@@ -420,7 +420,8 @@
         <button class="mc" onclick="closeModal('tkDetOv')">&#10005;</button>
       </div>
     </div>
-    <div class="tk-body">
+    <div class="tk-body" id="tkDetBody">
+      <div class="tk-ai" id="tkDetAi"></div>
       <div class="tk-main" id="tkDetMain"></div>
       <div class="tk-sb" id="tkDetSB"></div>
     </div>

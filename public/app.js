@@ -1997,8 +1997,7 @@ function renderTkDetail(){
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di)">BESCHREIBUNG</div>
         <button class="btn-s" style="font-size:11px;padding:3px 9px" onclick="openAiSuggestionsFor('Ticket','${tk.id}')">🤖 KI-Vorschläge</button>
       </div>
-      <div style="font-size:13px;line-height:1.6;color:${tk.description?'var(--tx)':'var(--di)'};white-space:pre-wrap">${tk.description?esc(tk.description):'Keine Beschreibung.'}</div>
-      ${aiInlinePanelHtml(tk)}</div>
+      <div style="font-size:13px;line-height:1.6;color:${tk.description?'var(--tx)':'var(--di)'};white-space:pre-wrap">${tk.description?esc(tk.description):'Keine Beschreibung.'}</div></div>
     ${subs.length||canEdit?`<div>
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di);margin-bottom:8px">UNTERTICKETS (${subs.length})</div>
       <div class="subl">${subs.map(st=>`<div class="subi" onclick="S.currentTicketId='${st.id}';renderTkDetail()">\u21b8<span style="font-family:monospace;font-size:11px;color:var(--mu)">${st.number}</span><span style="flex:1;font-size:12px">${st.title}</span>${stBdg(st.status)}</div>`).join('')}
@@ -2122,6 +2121,14 @@ function renderTkDetail(){
     ${canEdit?`<div class="tkdiv"></div>
     <button class="btn-s" style="width:100%;justify-content:center;font-size:12px" onclick="openAttachCl('${tk.id}')">&#9745;&#65039; Checkliste anh\u00e4ngen</button>
     ${tk.status!=='closed'?`<button class="btn-ok" style="width:100%;justify-content:center;margin-top:4px" onclick="updateTkField('${tk.id}','status','closed')">\u2713 Abschlie\u00dfen</button>`:''}`:''}`;
+  // KI-Ergebnisse bekommen eine eigene, breitere Spalte links im Fenster
+  // statt unter der Beschreibung eingebettet zu sein \u2014 Fenster wird daf\u00fcr
+  // automatisch breiter (siehe .modal.xl.wide-ai).
+  const hasAi=!!(tk.aiStatus||tk.ai_status);
+  document.getElementById('tkDetModal')?.classList.toggle('wide-ai',hasAi);
+  document.getElementById('tkDetBody')?.classList.toggle('has-ai',hasAi);
+  const aiCol=document.getElementById('tkDetAi');
+  if(aiCol)aiCol.innerHTML=hasAi?`<div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di);margin-bottom:8px">\ud83e\udd16 KI-L\u00d6SUNGEN</div>${aiInlinePanelHtml(tk)}`:'';
 }
 let _mentionActive=false;
 function onNoteKey(e,tkId){
@@ -2277,14 +2284,22 @@ function openTkForm(id,parentId){
   const dueFld=document.getElementById('tkFDue');if(dueFld)dueFld.value=tk?.dueDate||'';
   closeModal('tkDetOv');openModal('tkFormOv');
 }
-async function saveTicket(){
+async function saveTicket(withAi){
   const nm=document.getElementById('tkFNm').value.trim();if(!nm){toast('\u26A0\uFE0F Name erforderlich!');return;}
   const id=document.getElementById('tkFId').value;
   const tags=Array.from(document.getElementById('tkFTags').selectedOptions).map(o=>o.value);
   const body={title:nm,reporter:document.getElementById('tkFReporter').value.trim(),description:document.getElementById('tkFDesc').value.trim(),department:document.getElementById('tkFDept').value,subcategory:document.getElementById('tkFSubcat')?.value||'',priority:document.getElementById('tkFPrio').value,status:document.getElementById('tkFSt').value,bucket:document.getElementById('tkFBkt').value,tags,assigneeId:document.getElementById('tkFAsgn').value||null,parentTicketId:document.getElementById('tkFPar').value||null,dueDate:document.getElementById('tkFDue')?.value||null};
   try{
-    if(id)await api('PUT','/tickets/'+id,body);else await api('POST','/tickets',body);
-    await fetchData();closeModal('tkFormOv');renderMain();toast(id?'\u2705 Aktualisiert!':'\u2705 Erstellt!');
+    let savedId=id;
+    if(id)await api('PUT','/tickets/'+id,body);
+    else{const created=await api('POST','/tickets',body);savedId=created.id;}
+    await fetchData();closeModal('tkFormOv');renderMain();
+    if(withAi&&savedId){
+      toast('\u2705 Gespeichert \u2014 KI durchsucht im Hintergrund\u2026');
+      openTkDetail(savedId);
+    }else{
+      toast(id?'\u2705 Aktualisiert!':'\u2705 Erstellt!');
+    }
   }catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
 }
 // CHECKLISTS

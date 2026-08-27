@@ -200,6 +200,7 @@ td{padding:7px 12px;font-size:13px;vertical-align:middle}
 .ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(3px)}.ov.open{display:flex}
 .modal{background:var(--sf);border:1px solid var(--border);border-radius:12px;width:520px;max-width:96vw;max-height:90vh;overflow-y:auto;box-shadow:var(--sh2);animation:fup .2s ease}
 .modal.wide{width:860px}.modal.xl{width:940px;max-height:92vh}.modal.sm{width:400px}.modal.lg{width:640px}
+.modal.xl.wide-ai{width:1280px}
 @keyframes fup{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}
 .mh{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--sf);z-index:1}
 .mh h2{font-size:15px;font-weight:700}
@@ -238,6 +239,9 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
 .tk-body{display:grid;grid-template-columns:1fr 270px;min-height:0}
 .tk-main{padding:18px;border-right:1px solid var(--border);overflow-y:auto;max-height:calc(92vh - 110px);display:flex;flex-direction:column;gap:14px}
 .tk-sb{padding:14px;overflow-y:auto;max-height:calc(92vh - 110px);display:flex;flex-direction:column;gap:10px}
+.tk-ai{display:none;padding:14px;border-right:1px solid var(--border);overflow-y:auto;max-height:calc(92vh - 110px)}
+.tk-body.has-ai{grid-template-columns:300px 1fr 270px}
+.tk-body.has-ai .tk-ai{display:block}
 .tkf{display:flex;flex-direction:column;gap:4px}.tkf label{font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--di)}.tkf .val{font-size:13px;font-weight:500}
 .tkdiv{height:1px;background:var(--border);margin:4px 0}
 .nfeed{display:flex;flex-direction:column;gap:0}
@@ -336,13 +340,14 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
   .app{grid-template-columns:1fr}
   .sb{position:fixed;top:var(--hdr);left:-250px;width:250px;height:calc(100vh - var(--hdr));transition:left .25s;z-index:50}
   .sb.open{left:0;box-shadow:var(--sh2)}.sb-overlay.open{display:block}
-  .sr{grid-template-columns:1fr 1fr}.tk-body{grid-template-columns:1fr}
+  .sr{grid-template-columns:1fr 1fr}.tk-body{grid-template-columns:1fr}.tk-body.has-ai{grid-template-columns:1fr}
   .tk-sb{border-top:1px solid var(--border);border-right:none;max-height:none}.tk-main{max-height:none;overflow-y:visible}
+  .tk-ai{border-right:none;border-bottom:1px solid var(--border);max-height:none}
   .dash-grid{grid-template-columns:1fr}.abr-grid{grid-template-columns:1fr}
   main{padding:12px 10px}
   /* Modals: fast vollbild auf Mobile */
   .ov{align-items:flex-end;padding:0}
-  .modal,.modal.wide,.modal.xl,.modal.lg,.modal.sm{width:100%;max-width:100%;max-height:92vh;border-radius:16px 16px 0 0;margin:0}
+  .modal,.modal.wide,.modal.xl,.modal.lg,.modal.sm,.modal.xl.wide-ai{width:100%;max-width:100%;max-height:92vh;border-radius:16px 16px 0 0;margin:0}
   .mh{position:sticky;top:0;z-index:2}
   /* Admin-Sidebar → horizontal oben */
   .adm-layout{flex-direction:column}
