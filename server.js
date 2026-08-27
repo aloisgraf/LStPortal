@@ -265,10 +265,6 @@ async function initDB() {
     `ALTER TABLE doc_categories ADD COLUMN IF NOT EXISTS parent_id TEXT`,
     `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS ai_status TEXT`,
     `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS ai_result TEXT`,
-    `ALTER TABLE todos ADD COLUMN IF NOT EXISTS ai_status TEXT`,
-    `ALTER TABLE todos ADD COLUMN IF NOT EXISTS ai_result TEXT`,
-    `ALTER TABLE discussion_items ADD COLUMN IF NOT EXISTS ai_status TEXT`,
-    `ALTER TABLE discussion_items ADD COLUMN IF NOT EXISTS ai_result TEXT`,
     `CREATE TABLE IF NOT EXISTS documents (
       id TEXT PRIMARY KEY, category_id TEXT,
       title TEXT NOT NULL, description TEXT DEFAULT '',
@@ -776,6 +772,26 @@ async function initDB() {
       ('qm','QM','✅','#10b981',5),
       ('frei','Frei','🌐','#64748b',6)
     ON CONFLICT (id) DO NOTHING`,
+    // Diese ALTERs stehen bewusst hier am Ende (nach den CREATE TABLEs für
+    // todos/discussion_items weiter oben in diesem Array) — auf einer
+    // brandneuen Datenbank würden sie sonst vor der Tabellenerstellung
+    // laufen und stillschweigend fehlschlagen (jede Migration läuft in
+    // try/catch, siehe Aufrufstelle).
+    `ALTER TABLE todos ADD COLUMN IF NOT EXISTS ai_status TEXT`,
+    `ALTER TABLE todos ADD COLUMN IF NOT EXISTS ai_result TEXT`,
+    `ALTER TABLE discussion_items ADD COLUMN IF NOT EXISTS ai_status TEXT`,
+    `ALTER TABLE discussion_items ADD COLUMN IF NOT EXISTS ai_result TEXT`,
+    // Besprechungen: Termine können entweder Punkte (wie bisher) oder
+    // Protokolle enthalten.
+    `ALTER TABLE meeting_instances ADD COLUMN IF NOT EXISTS kind TEXT DEFAULT 'points'`,
+    `CREATE TABLE IF NOT EXISTS meeting_protocols (
+      id TEXT PRIMARY KEY,
+      instance_id TEXT NOT NULL REFERENCES meeting_instances(id) ON DELETE CASCADE,
+      title TEXT NOT NULL DEFAULT '', date DATE, time TEXT DEFAULT '',
+      location TEXT DEFAULT '', attendees TEXT DEFAULT '[]', body TEXT DEFAULT '',
+      created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }

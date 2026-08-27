@@ -2861,7 +2861,7 @@ function openModal(id){document.getElementById(id)?.classList.add('open');}
 function closeModal(id){document.getElementById(id)?.classList.remove('open');}
 function eyeToggle(inputId,btn){const inp=document.getElementById(inputId);const show=inp.type==='password';inp.type=show?'text':'password';btn.textContent=show?'\uD83D\uDE48':'\uD83D\uDC41';}
 function toast(msg,type='',dur=3200){const t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),dur);}
-const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOr','clFormOv','attachClOv','changelogOv','dpOv','rejectEinspOv','helpOv','msgFormOv','msgDetOv','gSearchOv','stLoginOv','docFormOv','docVerOv','docHistOv','docCatOv','dpReportModal','deptOv','spintCatOv','spintCatFormOv','aiSuggestOv'];
+const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOr','clFormOv','attachClOv','changelogOv','dpOv','rejectEinspOv','helpOv','msgFormOv','msgDetOv','gSearchOv','stLoginOv','docFormOv','docVerOv','docHistOv','docCatOv','dpReportModal','deptOv','spintCatOv','spintCatFormOv','aiSuggestOv','protoFormOv'];
 document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();openGSearch();return;}
   if(e.key==='Escape'){ALL_MODALS.forEach(closeModal);closeGSearch();}
@@ -5127,7 +5127,10 @@ function renderMeetings() {
     <div class="meetings-list">
       ${S.meetings.length===0?`<div style="color:var(--mu);font-size:13px;padding:12px">Keine Besprechungen</div>`:''}
       ${S.meetings.map(mt=>{
-        const open=(mt.instances||[]).reduce((s,i)=>(i.items||[]).filter(it=>it.status==='open'||it.status==='redo').length+s,0);
+        const insts=mt.instances||[];
+        const open=insts.reduce((s,i)=>(i.items||[]).filter(it=>it.status==='open'||it.status==='redo').length+s,0);
+        const pointsCount=insts.filter(i=>i.kind!=='protocol').length;
+        const protoCount=insts.reduce((s,i)=>s+(i.protocols||[]).length,0);
         const typeBadge={einmalig:'Einmalig',jour_fixe:'Jour Fixe',ad_hoc:'Ad hoc',ungeplant:'Ungeplant'}[mt.type]||mt.type;
         const canMng=mt._canManage||false;
         return`<div class="meetings-item${S._selMeeting===mt.id?' active':''}" onclick="S._selMeeting='${mt.id}';S._selInstance=null;renderMeetings()">
@@ -5138,11 +5141,12 @@ function renderMeetings() {
               <button class="btn-s btn-danger" style="padding:4px 8px;font-size:12px;border-radius:4px;transition:all .2s" title="Löschen" onclick="deleteMeeting('${mt.id}')">🗑</button>
             </div>`:''}
           </div>
-          <div style="display:flex;gap:6px;align-items:center;margin-top:3px">
+          <div style="display:flex;gap:6px;align-items:center;margin-top:3px;flex-wrap:wrap">
             <span style="font-size:11px;background:var(--bg2);padding:1px 6px;border-radius:10px;color:var(--mu)">${typeBadge}</span>
             ${mt.type==='jour_fixe'&&mt.rhythm?`<span style="font-size:11px;color:var(--mu)">${{weekly:'wöchentlich',biweekly:'2-wöchentlich',monthly:'monatlich',daily:'täglich'}[mt.rhythm]||''} ${mt.rhythmTime||''}</span>`:''}
-            ${open>0?`<span style="font-size:11px;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:10px">${open} offen</span>`:''}
           </div>
+          ${insts.length?`<div style="font-size:11px;color:var(--mu);margin-top:3px">${insts.length} Termine (${pointsCount} Punkttermine, ${protoCount} Protokolle)</div>`:''}
+          ${open>0?`<div style="margin-top:3px"><span style="font-size:11px;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:10px">${open} offene Punkte</span></div>`:''}
         </div>`;
       }).join('')}
     </div>
@@ -5177,7 +5181,7 @@ function renderMeetingDetail(m, canManage) {
         const titleLine=i.title?esc(i.title):'Termin';
         return`<div class="meetings-inst-tab${S._selInstance===i.id?' active':''}" style="position:relative">
           <div onclick="S._selInstance='${i.id}';renderMeetings()" style="cursor:pointer;${canManage?'padding-right:18px':''}">
-            <div style="font-size:12px;font-weight:600">${titleLine}</div>
+            <div style="font-size:12px;font-weight:600">${i.kind==='protocol'?'📝 ':'📋 '}${titleLine}</div>
             ${i.date?`<div style="font-size:11px;color:var(--mu);margin-top:1px">${fmtDate(i.date)}${i.time?' '+i.time:''}</div>`:''}
             <div style="display:flex;gap:4px;margin-top:2px;align-items:center;flex-wrap:wrap">
               ${!i.date?`<span style="font-size:10px;color:#f59e0b">Datum offen</span>`:''}
@@ -5194,6 +5198,7 @@ function renderMeetingDetail(m, canManage) {
 }
 
 function renderInstanceDetail(inst, meeting, canManage) {
+  if (inst.kind==='protocol') return renderProtocolInstanceDetail(inst, meeting, canManage);
   return`<div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div style="font-size:13px;color:var(--mu)">${inst.notes?`<span>${esc(inst.notes)}</span>`:''}</div>
@@ -5206,6 +5211,38 @@ function renderInstanceDetail(inst, meeting, canManage) {
     </div>
     <input class="srch" type="text" id="meetingItemSearch" placeholder="🔍 Punkte durchsuchen …" value="${esc(S._meetingItemSearch||'')}" oninput="filterMeetingItems(this.value)" style="width:100%;margin-bottom:12px;box-sizing:border-box">
     <div id="meetingItemsGrid">${renderMeetingItemsGrid(inst, canManage, S._meetingItemSearch||'')}</div>
+  </div>`;
+}
+function renderProtocolInstanceDetail(inst, meeting, canManage) {
+  const protos=[...(inst.protocols||[])].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  return`<div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-size:13px;color:var(--mu)">${inst.notes?`<span>${esc(inst.notes)}</span>`:''}</div>
+      <div style="display:flex;gap:8px">
+        ${canManage?`<button class="btn-add" onclick="openProtocolForm('${inst.id}')">+ Protokoll</button>`:''}
+        ${canManage&&inst.status==='planned'?`<button class="btn-s" style="background:#10b981;color:#fff" onclick="setInstanceStatus('${inst.id}','done')">&#10003; Abschließen</button>`:''}
+        ${canManage&&inst.status==='done'?`<button class="btn-s" style="background:#f59e0b;color:#fff" onclick="setInstanceStatus('${inst.id}','planned')">↩ Wiederöffnen</button>`:''}
+        ${canManage?`<button class="btn-d" style="padding:4px 8px" onclick="deleteInstance('${inst.id}')">&#128465;</button>`:''}
+      </div>
+    </div>
+    ${protos.length===0?`<div style="color:var(--mu);font-size:13px;padding:16px 0;text-align:center">Noch keine Protokolle.</div>`:''}
+    <div style="display:flex;flex-direction:column;gap:10px">
+      ${protos.map(p=>`<div class="meetings-card" style="cursor:default">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div style="font-weight:600;font-size:13px">${esc(p.title)}</div>
+          ${canManage?`<div style="display:flex;gap:4px;flex-shrink:0">
+            <button class="btn-e" style="padding:2px 6px;font-size:11px" onclick="openProtocolForm('${inst.id}','${p.id}')">&#9998;</button>
+            <button class="btn-d" style="padding:2px 6px;font-size:11px" onclick="deleteProtocol('${p.id}')">&#10005;</button>
+          </div>`:''}
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;font-size:11px;color:var(--mu)">
+          ${p.date?`<span>&#128197; ${fmtDate(p.date)}${p.time?' '+p.time:''}</span>`:''}
+          ${p.location?`<span>&#128205; ${esc(p.location)}</span>`:''}
+        </div>
+        ${(p.attendees||[]).length?`<div style="display:flex;gap:3px;margin-top:6px;flex-wrap:wrap">${p.attendees.map(uid=>{const u=getU(uid);return u?`<span class="av-sm" style="background:${u.color}" title="${esc(u.name)}">${esc(u.initials)}</span>`:''}).join('')}</div>`:''}
+        ${p.body?`<div style="font-size:12px;color:var(--tx);margin-top:8px;white-space:pre-wrap;border-top:1px solid var(--border);padding-top:8px">${esc(p.body.slice(0,400))}${p.body.length>400?'…':''}</div>`:''}
+      </div>`).join('')}
+    </div>
   </div>`;
 }
 function renderMeetingItemsGrid(inst, canManage, search) {
@@ -5309,6 +5346,13 @@ function openInstanceForm(meetingId, id=null) {
   document.getElementById('ifId').value = inst?.id||'';
   document.getElementById('ifMeetingId').value = meetingId;
   document.getElementById('ifTitle').value = inst?.title||'';
+  // Art (Punkte/Protokoll) wird bei Neuanlage gewählt und ist danach fix,
+  // da sich beide Ansichten strukturell unterscheiden (Punkte vs. Protokolle).
+  const kindPoints=document.getElementById('ifKindPoints'), kindProtocol=document.getElementById('ifKindProtocol');
+  kindPoints.checked = (inst?.kind||'points')==='points';
+  kindProtocol.checked = inst?.kind==='protocol';
+  kindPoints.disabled = kindProtocol.disabled = !!inst;
+  document.getElementById('ifKindWrap').style.opacity = inst?'.55':'1';
   const dateOpen = inst && !inst.date;
   const cb = document.getElementById('ifDateOpen');
   cb.checked = dateOpen;
@@ -5326,6 +5370,7 @@ async function submitInstanceForm() {
   const date = document.getElementById('ifDate').value;
   if (!dateOpen && !date) return toast('Datum erforderlich oder "Datum noch offen" aktivieren','err');
   const body = { date: dateOpen ? null : date, time: document.getElementById('ifTime').value, notes: document.getElementById('ifNotes').value, title: document.getElementById('ifTitle').value };
+  if (!id) body.kind = document.getElementById('ifKindProtocol').checked ? 'protocol' : 'points';
   try {
     if (id) await api('PUT','/meeting-instances/'+id, body);
     else await api('POST','/meetings/'+meetingId+'/instances', body);
@@ -5537,6 +5582,51 @@ async function deleteInstance(instanceId) {
     S._selInstance = null;
     await fetchData(); renderMeetings(); toast('Termin gelöscht');
   } catch(e) { toast('Fehler','err'); }
+}
+
+// ── PROTOKOLLE (Protokolltermine) ────────────────────────────────────────────
+function openProtocolForm(instanceId, id=null) {
+  const inst = S.meetings.flatMap(m=>m.instances).find(i=>i.id===instanceId);
+  const proto = id ? (inst?.protocols||[]).find(p=>p.id===id) : null;
+  document.getElementById('protoFormTitle').textContent = proto ? 'Protokoll bearbeiten' : 'Neues Protokoll';
+  document.getElementById('pfId').value = proto?.id||'';
+  document.getElementById('pfInstanceId').value = instanceId;
+  document.getElementById('pfTitle').value = proto?.title||'';
+  document.getElementById('pfDate').value = proto?.date?.slice?.(0,10)||'';
+  document.getElementById('pfTime').value = proto?.time||'';
+  document.getElementById('pfLocation').value = proto?.location||'';
+  document.getElementById('pfBody').value = proto?.body||'';
+  const attSel = document.getElementById('pfAttendees');
+  attSel.innerHTML = S.users.slice().sort(byLastName).map(u=>`<option value="${u.id}"${(proto?.attendees||[]).includes(u.id)?' selected':''}>${esc(u.name)}</option>`).join('');
+  document.getElementById('protoDeleteBtn').style.display = proto ? '' : 'none';
+  openModal('protoFormOv');
+}
+async function submitProtocolForm() {
+  const id = document.getElementById('pfId').value;
+  const instanceId = document.getElementById('pfInstanceId').value;
+  const title = document.getElementById('pfTitle').value.trim();
+  if (!title) return toast('⚠️ Überschrift erforderlich','err');
+  const attendees = Array.from(document.getElementById('pfAttendees').selectedOptions).map(o=>o.value);
+  const body = {
+    title, date: document.getElementById('pfDate').value || null, time: document.getElementById('pfTime').value,
+    location: document.getElementById('pfLocation').value.trim(), attendees, body: document.getElementById('pfBody').value,
+  };
+  try {
+    if (id) await api('PUT','/meeting-protocols/'+id, body);
+    else await api('POST','/meeting-instances/'+instanceId+'/protocols', body);
+    closeModal('protoFormOv');
+    await fetchData(); renderMeetings(); toast('✅ Protokoll gespeichert');
+  } catch(e) { toast('⚠️ '+e.message,'err'); }
+}
+async function deleteProtocol(id) {
+  id = id || document.getElementById('pfId').value;
+  if (!id) return;
+  if (!confirm('Protokoll löschen?')) return;
+  try {
+    await api('DELETE','/meeting-protocols/'+id);
+    closeModal('protoFormOv');
+    await fetchData(); renderMeetings(); toast('✅ Protokoll gelöscht');
+  } catch(e) { toast('⚠️ '+e.message,'err'); }
 }
 
 function handleItemMoreAction(action) {

@@ -10,7 +10,7 @@ router.get('/', auth, async (req,res) => {
     const canManageDp = roles.some(r=>['admin','leitung','dienstplanung'].includes(r));
     const canManageSpint = roles.some(r=>['admin','leitung','technik'].includes(r));
     const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
-           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw,dpQualificationsRaw,dpShiftPrefsRaw,dpProtocolRaw,todosRaw,todoItemsRaw,todoAssigneesRaw,myDpPlanIdsRaw,todoNotificationsRaw,contactsRaw,sopTemplatesRaw,sopItemsRaw,sopRunsRaw,sopRunItemsRaw,lockersRaw,sopBranchOptionsRaw,departmentsRaw,lockerCategoriesRaw,chatThreadsRaw,chatMessagesRaw,chatReadsRaw] = await Promise.all([
+           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw,dpQualificationsRaw,dpShiftPrefsRaw,dpProtocolRaw,todosRaw,todoItemsRaw,todoAssigneesRaw,myDpPlanIdsRaw,todoNotificationsRaw,contactsRaw,sopTemplatesRaw,sopItemsRaw,sopRunsRaw,sopRunItemsRaw,lockersRaw,sopBranchOptionsRaw,departmentsRaw,lockerCategoriesRaw,chatThreadsRaw,chatMessagesRaw,chatReadsRaw,protocolsRaw] = await Promise.all([
       q('SELECT id,name,initials,roles,color,must_change_pw,last_seen,category,email,username,hire_date,termination_date FROM users ORDER BY name'),
       q('SELECT * FROM categories ORDER BY sort_order,label'),
       q('SELECT * FROM tags ORDER BY label'),
@@ -84,6 +84,7 @@ router.get('/', auth, async (req,res) => {
       q('SELECT * FROM chat_threads WHERE user1_id=$1 OR user2_id=$1',[uid]).catch(()=>[]),
       q('SELECT cm.* FROM chat_messages cm JOIN chat_threads ct ON ct.id=cm.thread_id WHERE ct.user1_id=$1 OR ct.user2_id=$1 ORDER BY cm.created_at',[uid]).catch(()=>[]),
       q('SELECT * FROM chat_reads WHERE user_id=$1',[uid]).catch(()=>[]),
+      q('SELECT * FROM meeting_protocols ORDER BY date DESC,created_at DESC').catch(()=>[]),
     ]);
 
     const tkViewMap = new Map((tkViewsRaw||[]).map(v=>[v.ticket_id, v.viewed_at]));
@@ -99,8 +100,10 @@ router.get('/', auth, async (req,res) => {
     (partRaw||[]).forEach(p=>{if(!partMap[p.item_id])partMap[p.item_id]=[];partMap[p.item_id].push({id:p.id,userId:p.user_id,role:p.role});});
     const itemMap={};
     (itemsRaw||[]).forEach(it=>{if(!itemMap[it.instance_id])itemMap[it.instance_id]=[];itemMap[it.instance_id].push({id:it.id,instanceId:it.instance_id,title:it.title,description:it.description,status:it.status,dueDate:it.due_date,meetingDate:it.meeting_date,parentId:it.parent_id,delegatedTo:it.delegated_to,result:it.result,sortOrder:it.sort_order,createdBy:it.created_by,createdAt:it.created_at,groupId:it.group_id||null,link:it.link||null,convertedTicketId:it.converted_ticket_id||null,convertedAt:it.converted_at||null,convertedBy:it.converted_by||null,protokoll:(()=>{try{return JSON.parse(it.protokoll||'[]');}catch{return [];}})(),participants:partMap[it.id]||[],aiStatus:it.ai_status||null,aiResult:(()=>{try{return it.ai_result?JSON.parse(it.ai_result):null;}catch{return null;}})()});});
+    const protoMap={};
+    (protocolsRaw||[]).forEach(pr=>{if(!protoMap[pr.instance_id])protoMap[pr.instance_id]=[];protoMap[pr.instance_id].push({id:pr.id,instanceId:pr.instance_id,title:pr.title,date:pr.date,time:pr.time||'',location:pr.location||'',attendees:(()=>{try{return JSON.parse(pr.attendees||'[]');}catch{return [];}})(),body:pr.body||'',createdBy:pr.created_by,createdAt:pr.created_at,updatedAt:pr.updated_at});});
     const instMap={};
-    (instancesRaw||[]).forEach(inst=>{if(!instMap[inst.meeting_id])instMap[inst.meeting_id]=[];instMap[inst.meeting_id].push({id:inst.id,meetingId:inst.meeting_id,date:inst.date,time:inst.time||'',title:inst.title||null,status:inst.status,notes:inst.notes||'',createdBy:inst.created_by,createdAt:inst.created_at,items:itemMap[inst.id]||[]});});
+    (instancesRaw||[]).forEach(inst=>{if(!instMap[inst.meeting_id])instMap[inst.meeting_id]=[];instMap[inst.meeting_id].push({id:inst.id,meetingId:inst.meeting_id,date:inst.date,time:inst.time||'',title:inst.title||null,status:inst.status,notes:inst.notes||'',kind:inst.kind||'points',createdBy:inst.created_by,createdAt:inst.created_at,items:itemMap[inst.id]||[],protocols:protoMap[inst.id]||[]});});
     // Meetings: find which meetings the user has assigned items in
     const assignedMeetingIds = new Set();
     const itemIsAssignedToMe = new Set(); // item ids where user is participant

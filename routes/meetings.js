@@ -57,12 +57,12 @@ router.delete('/meetings/:id', auth, async (req, res) => {
 // POST create instance for meeting
 router.post('/meetings/:id/instances', auth, async (req, res) => {
   try {
-    const { date, time, notes, title } = req.body;
+    const { date, time, notes, title, kind } = req.body;
     const id = newId();
     await pool.query(
-      `INSERT INTO meeting_instances (id, meeting_id, date, time, notes, title, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-      [id, req.params.id, date||null, time || '', notes || '', title || null, req.uid]
+      `INSERT INTO meeting_instances (id, meeting_id, date, time, notes, title, kind, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [id, req.params.id, date||null, time || '', notes || '', title || null, kind==='protocol'?'protocol':'points', req.uid]
     );
     const row = await q1('SELECT * FROM meeting_instances WHERE id=$1', [id]);
     ok(res, row);
@@ -150,6 +150,52 @@ router.put('/meeting-instances/:id', auth, async (req, res) => {
 router.delete('/meeting-instances/:id', auth, async (req, res) => {
   try {
     await pool.query('DELETE FROM meeting_instances WHERE id=$1', [req.params.id]);
+    ok(res, { deleted: true });
+  } catch (e) { bad(res, 'Serverfehler', 500); }
+});
+
+// ── PROTOKOLLE (Protokolltermine) ────────────────────────────────────────────
+// Alternative zu Punkte-Terminen: ein Termin vom Typ "protocol" kann mehrere
+// eigenständige Protokoll-Einträge enthalten (je mit eigenem Titel, Datum,
+// Uhrzeit, Ort und Teilnehmern), statt einzelner Besprechungspunkte.
+
+router.post('/meeting-instances/:id/protocols', auth, async (req, res) => {
+  try {
+    const { title, date, time, location, attendees, body } = req.body;
+    if (!title?.trim()) return bad(res, 'Titel erforderlich', 400);
+    const id = newId();
+    await pool.query(
+      `INSERT INTO meeting_protocols (id, instance_id, title, date, time, location, attendees, body, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [id, req.params.id, title.trim(), date || null, time || '', location || '', JSON.stringify(attendees || []), body || '', req.uid]
+    );
+    const row = await q1('SELECT * FROM meeting_protocols WHERE id=$1', [id]);
+    ok(res, row);
+  } catch (e) { bad(res, 'Serverfehler', 500); }
+});
+
+router.put('/meeting-protocols/:id', auth, async (req, res) => {
+  try {
+    const existing = await q1('SELECT * FROM meeting_protocols WHERE id=$1', [req.params.id]);
+    if (!existing) return bad(res, 'Nicht gefunden', 404);
+    const { title, date, time, location, attendees, body } = req.body;
+    if (title !== undefined && !title.trim()) return bad(res, 'Titel erforderlich', 400);
+    await pool.query(
+      `UPDATE meeting_protocols SET title=COALESCE($1,title), date=$2, time=COALESCE($3,time),
+       location=COALESCE($4,location), attendees=COALESCE($5,attendees), body=COALESCE($6,body), updated_at=NOW()
+       WHERE id=$7`,
+      [title?.trim() || null, date !== undefined ? (date || null) : existing.date, time !== undefined ? time : null,
+       location !== undefined ? location : null, attendees !== undefined ? JSON.stringify(attendees) : null,
+       body !== undefined ? body : null, req.params.id]
+    );
+    const row = await q1('SELECT * FROM meeting_protocols WHERE id=$1', [req.params.id]);
+    ok(res, row);
+  } catch (e) { bad(res, 'Serverfehler', 500); }
+});
+
+router.delete('/meeting-protocols/:id', auth, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM meeting_protocols WHERE id=$1', [req.params.id]);
     ok(res, { deleted: true });
   } catch (e) { bad(res, 'Serverfehler', 500); }
 });

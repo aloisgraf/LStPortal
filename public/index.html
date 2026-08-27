@@ -1628,6 +1628,12 @@
     <div class="mb2">
       <input type="hidden" id="ifId">
       <input type="hidden" id="ifMeetingId">
+      <div class="fg" id="ifKindWrap"><label>Art des Termins</label>
+        <div style="display:flex;gap:14px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:400;cursor:pointer"><input type="radio" name="ifKind" value="points" id="ifKindPoints" checked>&#128203; Punktetermin</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:400;cursor:pointer"><input type="radio" name="ifKind" value="protocol" id="ifKindProtocol">&#128221; Protokolltermin</label>
+        </div>
+      </div>
       <div class="fg"><label>Titel (optional)</label><input type="text" id="ifTitle" placeholder="z.B. Kick-off"></div>
       <div class="fg">
         <label>Datum</label>
@@ -1643,6 +1649,26 @@
       <div class="fg"><label>Notizen</label><textarea id="ifNotes" rows="2"></textarea></div>
     </div>
     <div class="mf"><button class="btn" onclick="submitInstanceForm()">&#10003; Speichern</button></div>
+  </div>
+</div>
+
+<!-- PROTOKOLL FORM MODAL -->
+<div class="ov" id="protoFormOv">
+  <div class="modal sm">
+    <div class="mh"><h2 id="protoFormTitle">Protokoll</h2><div style="display:flex;gap:4px"><button class="mc" id="protoDeleteBtn" onclick="deleteProtocol()" style="display:none" title="Löschen">&#128465;&#65039;</button><button class="mc" onclick="closeModal('protoFormOv')">&#10005;</button></div></div>
+    <div class="mb2">
+      <input type="hidden" id="pfId">
+      <input type="hidden" id="pfInstanceId">
+      <div class="fg"><label>&#220;berschrift *</label><input type="text" id="pfTitle" placeholder="z.B. Wochenbesprechung KW 12"></div>
+      <div style="display:flex;gap:12px">
+        <div class="fg" style="flex:1"><label>Datum</label><input type="date" id="pfDate"></div>
+        <div class="fg" style="flex:1"><label>Uhrzeit</label><input type="time" id="pfTime"></div>
+      </div>
+      <div class="fg"><label>Ort</label><input type="text" id="pfLocation" placeholder="z.B. Besprechungsraum 1"></div>
+      <div class="fg"><label>Teilnehmer</label><select id="pfAttendees" multiple size="5"></select></div>
+      <div class="fg"><label>Protokolltext</label><textarea id="pfBody" rows="8"></textarea></div>
+    </div>
+    <div class="mf"><button class="btn" onclick="submitProtocolForm()">&#10003; Speichern</button></div>
   </div>
 </div>
 
