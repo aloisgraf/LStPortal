@@ -202,7 +202,15 @@ function fmtDateShort(s) {
   return p[2]+'.'+p[1]+'.'+p[0];
 }
 const fdt=s=>{if(!s)return'\u2014';const d=new Date(s);if(isNaN(d))return String(s||'');if(typeof s==='string'&&s.length<=10)return fd(s);return`${fd(d.toISOString())} ${d.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'})}`;};
-const avHtml=(init,color,sz=24,fs=10,online=false)=>`<div class="av" style="width:${sz}px;height:${sz}px;font-size:${fs}px;background:${color}22;color:${color}">${init}${online?'<div class="online-dot"></div>':''}</div>`;
+// online: true → grüner Punkt, false → grauer Kreis mit X (offline), nicht
+// angegeben (null/undefined, Standardfall bei allen nicht-Chat-Avataren) →
+// gar kein Status-Indikator.
+const avHtml=(init,color,sz=24,fs=10,online=null)=>{
+  const dot=online===true?'<div class="online-dot"></div>'
+    :online===false?'<div class="offline-dot"><svg viewBox="0 0 10 10" width="7" height="7"><circle cx="5" cy="5" r="3.6" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M3.1 3.1L6.9 6.9M6.9 3.1L3.1 6.9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg></div>'
+    :'';
+  return `<div class="av" style="width:${sz}px;height:${sz}px;font-size:${fs}px;background:${color}22;color:${color}">${init}${dot}</div>`;
+};
 const roleBadges=uid=>((getU(uid)?.roles)||['standard']).map(r=>{const d=getRoleDef(r);return`<span class="rb rb-${r}">${d.icon} ${d.label}</span>`;}).join('');
 const prioBdg=p=>{const d=PRIORITIES.find(x=>x.id===p)||PRIORITIES[1];return`<span class="bdg pr-${p}">${d.label}</span>`;};
 const stBdg=s=>{const d=STATUSES.find(x=>x.id===s)||STATUSES[0];return`<span class="bdg st-${s}">${d.label}</span>`;};
