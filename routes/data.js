@@ -204,7 +204,7 @@ router.get('/', auth, async (req,res) => {
         aiStatus:tk.ai_status||null, aiResult:(()=>{try{return tk.ai_result?JSON.parse(tk.ai_result):null;}catch{return null;}})(),
         _canEdit:canEditTk(tp,tk,uid),
       })),
-      allowances: allwRaw.map(a=>({id:a.id,userId:a.user_id,year:a.year,month:a.month,nd:a.nd,fd:a.fd,fw:a.fw,c10:a.c10})),
+      allowances: allwRaw.map(a=>({id:a.id,userId:a.user_id,year:a.year,month:a.month,nd:a.nd,fd:a.fd,fw:a.fw,c10:a.c10,rkt:a.rkt||0})),
       checklists: clTmpls.map(t=>({id:t.id,name:t.name,department:t.department,createdBy:t.created_by,items:clItemMap[t.id]||[]})),
       messages: msgsRaw.filter(m=>{
         if(!m.sender_id) return true;             // alte Nachrichten → alle sehen

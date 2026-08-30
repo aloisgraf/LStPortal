@@ -184,7 +184,7 @@ const byLastName=(a,b)=>lastNameOf(a.name).localeCompare(lastNameOf(b.name),'de'
 const getCat=id=>S.categories.find(c=>c.id===id);
 const getTag=id=>S.tags.find(t=>t.id===id);
 const getTk=id=>S.tickets.find(t=>t.id===id);
-const getAllw=(uid,year,month)=>S.allowances.find(a=>a.userId===uid&&a.year===year&&a.month===month)||{nd:0,fd:0,fw:0,c10:0};
+const getAllw=(uid,year,month)=>S.allowances.find(a=>a.userId===uid&&a.year===year&&a.month===month)||{nd:0,fd:0,fw:0,c10:0,rkt:0};
 // Ein-/Austrittsdatum-Sichtbarkeit: ein Mitarbeiter soll in einer für einen
 // bestimmten Monat/Jahr angezeigten Liste nur auftauchen, wenn er in diesem
 // Zeitraum tatsächlich (zumindest teilweise) im Dienstverhältnis war —
@@ -1214,7 +1214,7 @@ async function deleteEvt(id){
 }
 // ALLOWANCES
 function getPeriodMonths(){if(S.allwPeriod==='month')return[S.allwMonth];if(S.allwPeriod==='h1')return[1,2,3,4,5,6];if(S.allwPeriod==='h2')return[7,8,9,10,11,12];return[1,2,3,4,5,6,7,8,9,10,11,12];}
-function sumAllw(uid,year,months){return months.reduce((a,m)=>{const r=getAllw(uid,year,m);return{nd:a.nd+r.nd,fd:a.fd+r.fd,fw:a.fw+r.fw,c10:a.c10+r.c10};},{nd:0,fd:0,fw:0,c10:0});}
+function sumAllw(uid,year,months){return months.reduce((a,m)=>{const r=getAllw(uid,year,m);return{nd:a.nd+r.nd,fd:a.fd+r.fd,fw:a.fw+r.fw,c10:a.c10+r.c10,rkt:a.rkt+(r.rkt||0)};},{nd:0,fd:0,fw:0,c10:0,rkt:0});}
 function numCell(n,color){if(!n)return`<td style="text-align:center;color:var(--di)">\u2013</td>`;return`<td style="text-align:center"><span class="anum" style="background:${color}18;color:${color}">${n}</span></td>`;}
 
 
@@ -1355,7 +1355,7 @@ function renderAllw(){
   const grouped={};
   showUsers.forEach(u=>{const cat=u.category||'(ohne Kategorie)';(grouped[cat]=grouped[cat]||[]).push(u);});
   const sortedCats=Object.keys(grouped).sort((a,b)=>(catOrder[a]??9999)-(catOrder[b]??9999)||a.localeCompare(b,'de'));
-  const ALLW_CATS=[['nd','Nacht','#3b6dd4'],['fd','Feiertag','#10b981'],['fw','WE','#f59e0b'],['c10','C10','#7c3aed']];
+  const ALLW_CATS=[['nd','Nacht','#3b6dd4'],['fd','Feiertag','#10b981'],['fw','WE','#f59e0b'],['c10','C10','#7c3aed'],['rkt','RKT','#14b8a6']];
 
   const allwCells=u=>{
     if(!isBulk){const sv=sumAllw(u.id,yr,months);return ALLW_CATS.map(([f,,color])=>numCell(sv[f],color)).join('');}
@@ -1369,7 +1369,7 @@ function renderAllw(){
     const catId='allwcat_'+cat.replace(/\W/g,'_');
     const isExpanded=S._allwCategoryExpanded?.[catId]??true;
     allwBodyRows+='<tr style="cursor:pointer;background:var(--sf2);font-weight:600" onclick="S._allwCategoryExpanded=S._allwCategoryExpanded||{};S._allwCategoryExpanded[\''+catId+'\']=!S._allwCategoryExpanded[\''+catId+'\'];renderMain()">'
-      +'<td colspan="5" style="padding:8px 12px">'+(isExpanded?'▼':'▶')+' '+esc(cat)+' ('+empList.length+')</td></tr>';
+      +'<td colspan="6" style="padding:8px 12px">'+(isExpanded?'▼':'▶')+' '+esc(cat)+' ('+empList.length+')</td></tr>';
     if(isExpanded)allwBodyRows+=empList.map(allwEmpRow).join('');
   });
 
@@ -1388,15 +1388,16 @@ function renderAllw(){
       <div style="overflow-x:auto"><table><thead><tr><th>Mitarbeiter</th>
         <th style="text-align:center">&#127769; Nacht</th><th style="text-align:center">&#127881; Feiertag</th>
         <th style="text-align:center">&#127958;&#65039; WE</th><th style="text-align:center">&#128203; C10</th>
+        <th style="text-align:center">&#128663; RKT</th>
       </tr></thead>
       <tbody>${allwBodyRows}
       ${(()=>{
         // Durchschnitt nur für Dienstplanung (seeAllAllw) bei mehr als 1 User
         if(!S.p.seeAllAllw||showUsers.length<2)return '';
         const n=showUsers.length;
-        const tot=showUsers.reduce((a,u)=>{const sv=sumAllw(u.id,yr,months);return{nd:a.nd+sv.nd,fd:a.fd+sv.fd,fw:a.fw+sv.fw,c10:a.c10+sv.c10};},{nd:0,fd:0,fw:0,c10:0});
+        const tot=showUsers.reduce((a,u)=>{const sv=sumAllw(u.id,yr,months);return{nd:a.nd+sv.nd,fd:a.fd+sv.fd,fw:a.fw+sv.fw,c10:a.c10+sv.c10,rkt:a.rkt+sv.rkt};},{nd:0,fd:0,fw:0,c10:0,rkt:0});
         const div=S.allwPeriod==='month'?1:S.allwPeriod==='h1'||S.allwPeriod==='h2'?6:12;
-        const avg={nd:tot.nd/n,fd:tot.fd/n,fw:tot.fw/n,c10:tot.c10/n};
+        const avg={nd:tot.nd/n,fd:tot.fd/n,fw:tot.fw/n,c10:tot.c10/n,rkt:tot.rkt/n};
         const fmt=v=>(v%1===0?v:v.toFixed(1));
         return`<tr style="background:rgba(59,109,212,.06);font-weight:700;border-top:2px solid var(--border)">
           <td style="font-size:11px;color:var(--mu)">&#216; Durchschnitt pro MA</td>
@@ -1404,6 +1405,7 @@ function renderAllw(){
           <td style="text-align:center;color:#10b981">${fmt(avg.fd)}</td>
           <td style="text-align:center;color:#f59e0b">${fmt(avg.fw)}</td>
           <td style="text-align:center;color:#7c3aed">${fmt(avg.c10)}</td>
+          <td style="text-align:center;color:#14b8a6">${fmt(avg.rkt)}</td>
         </tr>
         <tr style="background:rgba(59,109,212,.03);border-bottom:2px solid var(--border)">
           <td style="font-size:11px;color:var(--di)">&#216; pro Monat (Periode)</td>
@@ -1411,6 +1413,7 @@ function renderAllw(){
           <td style="text-align:center;font-size:11px;color:var(--mu)">${fmt(avg.fd/div)}</td>
           <td style="text-align:center;font-size:11px;color:var(--mu)">${fmt(avg.fw/div)}</td>
           <td style="text-align:center;font-size:11px;color:var(--mu)">${fmt(avg.c10/div)}</td>
+          <td style="text-align:center;font-size:11px;color:var(--mu)">${fmt(avg.rkt/div)}</td>
         </tr>`;
       })()}
       </tbody></table></div>
@@ -1421,7 +1424,7 @@ function renderAllw(){
 async function allwCounterClick(e,uid,field,delta){
   e.preventDefault();
   const a=getAllw(uid,S.allwYear,S.allwMonth);
-  const body={userId:uid,year:S.allwYear,month:S.allwMonth,nd:a.nd||0,fd:a.fd||0,fw:a.fw||0,c10:a.c10||0};
+  const body={userId:uid,year:S.allwYear,month:S.allwMonth,nd:a.nd||0,fd:a.fd||0,fw:a.fw||0,c10:a.c10||0,rkt:a.rkt||0};
   body[field]=Math.max(0,(a[field]||0)+delta);
   try{
     await api('PUT','/allowances',body);
