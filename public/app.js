@@ -1318,10 +1318,36 @@ function renderAllw(){
   const pLbl=S.allwPeriod==='month'?MONTHS[S.allwMonth-1]:S.allwPeriod==='h1'?'1. Halbjahr':S.allwPeriod==='h2'?'2. Halbjahr':'Gesamtjahr';
   const showUsers=S.p.editAllw?S.users.filter(u=>!(u.roles||[]).includes('admin')):[getU(S.currentUser)].filter(Boolean);
   const isBulk=S.p.editAllw&&S.allwPeriod==='month';
+
+  // Gruppierung nach Mitarbeiter-Kategorie, wie in der Planerstellung
+  // (dieselbe Sortierlogik: dpEmpCategories.sort_order, unbekannte
+  // Kategorien ans Ende).
+  const catOrder={};
+  (S.dpEmpCategories||[]).forEach((c,i)=>{catOrder[c.name]=c.sort_order??i;});
+  catOrder['(ohne Kategorie)']=99999;
+  const grouped={};
+  showUsers.forEach(u=>{const cat=u.category||'(ohne Kategorie)';(grouped[cat]=grouped[cat]||[]).push(u);});
+  const sortedCats=Object.keys(grouped).sort((a,b)=>(catOrder[a]??9999)-(catOrder[b]??9999)||a.localeCompare(b,'de'));
+  const ALLW_CATS=[['nd','Nacht','#3b6dd4'],['fd','Feiertag','#10b981'],['fw','WE','#f59e0b'],['c10','C10','#7c3aed']];
+
+  const allwCells=u=>{
+    if(!isBulk){const sv=sumAllw(u.id,yr,months);return ALLW_CATS.map(([f,,color])=>numCell(sv[f],color)).join('');}
+    const a=getAllw(u.id,yr,S.allwMonth);
+    return ALLW_CATS.map(([f,,color])=>'<td style="text-align:center"><button type="button" class="allw-cnt" style="background:'+color+'18;color:'+color+'" onclick="allwCounterClick(event,\''+u.id+'\',\''+f+'\',1)" oncontextmenu="allwCounterClick(event,\''+u.id+'\',\''+f+'\',-1);return false" title="Linksklick: +1, Rechtsklick: -1">'+(a[f]||0)+'</button></td>').join('');
+  };
+  const allwEmpRow=u=>'<tr><td><div style="display:flex;align-items:center;gap:6px">'+avHtml(u.initials,u.color,22,9)+'<span>'+esc(u.name)+'</span></div></td>'+allwCells(u)+'</tr>';
+  let allwBodyRows='';
+  sortedCats.forEach(cat=>{
+    const empList=grouped[cat].slice().sort((a,b)=>lastNameOf(a.name).localeCompare(lastNameOf(b.name),'de'));
+    const catId='allwcat_'+cat.replace(/\W/g,'_');
+    const isExpanded=S._allwCategoryExpanded?.[catId]??true;
+    allwBodyRows+='<tr style="cursor:pointer;background:var(--sf2);font-weight:600" onclick="S._allwCategoryExpanded=S._allwCategoryExpanded||{};S._allwCategoryExpanded[\''+catId+'\']=!S._allwCategoryExpanded[\''+catId+'\'];renderMain()">'
+      +'<td colspan="5" style="padding:8px 12px">'+(isExpanded?'▼':'▶')+' '+esc(cat)+' ('+empList.length+')</td></tr>';
+    if(isExpanded)allwBodyRows+=empList.map(allwEmpRow).join('');
+  });
+
   document.getElementById('main').innerHTML=`
-    <div class="ph"><div class="pt">Zulagendienste <span>${pLbl} ${yr}</span></div>
-      ${isBulk?`<button class="btn-p" onclick="saveAllBulk()">&#128190; Alle speichern</button>`:''}
-    </div>
+    <div class="ph"><div class="pt">Zulagendienste <span>${pLbl} ${yr}</span></div></div>
     <div class="fbar" style="flex-wrap:wrap;gap:6px;align-items:center">
       <div class="yr-row" style="margin:0"><button class="yb" onclick="S.allwYear--;renderMain()">&lsaquo;</button><span class="yv">${yr}</span><button class="yb" onclick="S.allwYear++;renderMain()">&rsaquo;</button></div>
       <div style="display:flex;gap:4px;flex-wrap:wrap">
@@ -1330,24 +1356,13 @@ function renderAllw(){
       ${S.allwPeriod==='month'?`<div style="display:flex;gap:4px;flex-wrap:wrap">${MONTHS.map((m,i)=>`<button class="mb ${S.allwMonth===i+1?'on':''}" style="padding:4px 8px;font-size:12px" onclick="S.allwMonth=${i+1};renderMain()">${m.slice(0,3)}</button>`).join('')}</div>`:''}
     </div>
     ${!S.p.editAllw?`<div class="ib3" style="margin-bottom:12px">&#8505;&#65039; Nur Lesezugriff &ndash; Eintr&#228;ge k&#246;nnen nur von Dienstplanung/Leitung/Admin bearbeitet werden.</div>`:''}
+    ${isBulk?`<div class="ib3" style="margin-bottom:12px">\ud83d\uddb1\ufe0f Linksklick auf eine Zahl z\u00e4hlt hoch, Rechtsklick z\u00e4hlt runter \u2013 jeder Klick wird sofort gespeichert.</div>`:''}
     <div class="tw"><div class="tt"><h2>\u00dcbersicht</h2></div>
       <div style="overflow-x:auto"><table><thead><tr><th>Mitarbeiter</th>
         <th style="text-align:center">&#127769; Nacht</th><th style="text-align:center">&#127881; Feiertag</th>
         <th style="text-align:center">&#127958;&#65039; WE</th><th style="text-align:center">&#128203; C10</th>
-        ${isBulk?'<th></th>':''}
       </tr></thead>
-      <tbody>${showUsers.map(u=>{
-        if(isBulk){const a=getAllw(u.id,yr,S.allwMonth);return`<tr>
-          <td><div style="display:flex;align-items:center;gap:6px">${avHtml(u.initials,u.color,22,9)}<span>${u.name}</span></div></td>
-          <td style="text-align:center"><input type="number" min="0" class="bulk-nd" data-uid="${u.id}" value="${a.nd||0}" style="width:60px;text-align:center;font-size:12px;padding:4px"></td>
-          <td style="text-align:center"><input type="number" min="0" class="bulk-fd" data-uid="${u.id}" value="${a.fd||0}" style="width:60px;text-align:center;font-size:12px;padding:4px"></td>
-          <td style="text-align:center"><input type="number" min="0" class="bulk-fw" data-uid="${u.id}" value="${a.fw||0}" style="width:60px;text-align:center;font-size:12px;padding:4px"></td>
-          <td style="text-align:center"><input type="number" min="0" class="bulk-c10" data-uid="${u.id}" value="${a.c10||0}" style="width:60px;text-align:center;font-size:12px;padding:4px"></td>
-          <td></td>
-        </tr>`;}
-        const sv=sumAllw(u.id,yr,months);
-        return`<tr><td><div style="display:flex;align-items:center;gap:6px">${avHtml(u.initials,u.color,22,9)}<span>${u.name}</span></div></td>${numCell(sv.nd,'#3b6dd4')}${numCell(sv.fd,'#10b981')}${numCell(sv.fw,'#f59e0b')}${numCell(sv.c10,'#7c3aed')}</tr>`;
-      }).join('')}
+      <tbody>${allwBodyRows}
       ${(()=>{
         // Durchschnitt nur für Dienstplanung (seeAllAllw) bei mehr als 1 User
         if(!S.p.seeAllAllw||showUsers.length<2)return '';
@@ -1372,21 +1387,19 @@ function renderAllw(){
         </tr>`;
       })()}
       </tbody></table></div>
-      ${isBulk?`<div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;justify-content:flex-end"><button class="btn-p" onclick="saveAllBulk()">&#128190; Alle speichern</button></div>`:''}
     </div>`;
 }
-async function saveAllBulk(){
-  loading(true);
+// Zulagendienste: Linksklick +1, Rechtsklick -1 \u2013 speichert sofort, analog
+// zum Klick-Zyklus bei der Weihnachtsdienst-Rotation.
+async function allwCounterClick(e,uid,field,delta){
+  e.preventDefault();
+  const a=getAllw(uid,S.allwYear,S.allwMonth);
+  const body={userId:uid,year:S.allwYear,month:S.allwMonth,nd:a.nd||0,fd:a.fd||0,fw:a.fw||0,c10:a.c10||0};
+  body[field]=Math.max(0,(a[field]||0)+delta);
   try{
-    const saves=[];
-    document.querySelectorAll('.bulk-nd').forEach(inp=>{
-      const uid=inp.dataset.uid;
-      const nd=+inp.value||0,fd=+document.querySelector(`.bulk-fd[data-uid="${uid}"]`)?.value||0;
-      const fw=+document.querySelector(`.bulk-fw[data-uid="${uid}"]`)?.value||0,c10=+document.querySelector(`.bulk-c10[data-uid="${uid}"]`)?.value||0;
-      saves.push(api('PUT','/allowances',{userId:uid,year:S.allwYear,month:S.allwMonth,nd,fd,fw,c10}));
-    });
-    await Promise.all(saves);await fetchData();renderMain();toast('\u2705 Alle Zulagen gespeichert!');
-  }catch(e){toast('\u26A0\uFE0F '+e.message,'err');}finally{loading(false);}
+    await api('PUT','/allowances',body);
+    await fetchData();renderMain();
+  }catch(err){toast('\u26A0\uFE0F '+err.message,'err');}
 }
 function openAllwM(uid,year,month){
   const u=getU(uid),a=getAllw(uid,year,month);
