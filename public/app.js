@@ -1361,9 +1361,12 @@ function getEmpParamsAt(uid,dateStr){
 }
 function renderAllw(){
   if(!S._allwCategoryExpanded)S._allwCategoryExpanded=_loadAllwCatState();
-  if(!S.dpEmpParams){
-    S.dpEmpParams=[];
-    api('GET','/dp/employee-params').then(d=>{S.dpEmpParams=d||[];if(S.view==='allw')renderAllw();}).catch(()=>{});
+  // S.dpEmpParams startet als [] (siehe globaler State) — ein Truthy-Check
+  // darauf würde den Fetch nie auslösen, da ein leeres Array truthy ist.
+  // Eigenes Lade-Flag statt dessen.
+  if(!S._dpEmpParamsLoaded){
+    S._dpEmpParamsLoaded=true;
+    api('GET','/dp/employee-params').then(d=>{S.dpEmpParams=d||[];if(S.view==='allw')renderAllw();}).catch(()=>{S._dpEmpParamsLoaded=false;});
   }
   const months=getPeriodMonths(),yr=S.allwYear;
   const pLbl=S.allwPeriod==='month'?MONTHS[S.allwMonth-1]:S.allwPeriod==='h1'?'1. Halbjahr':S.allwPeriod==='h2'?'2. Halbjahr':'Gesamtjahr';
@@ -6886,6 +6889,7 @@ async function renderDPConfigAbsenceTypes() {
 }
 
 async function renderDPConfigEmpParams() {
+  S._dpEmpParamsLoaded=true;
   let empParams = [];
   try { empParams = await api('GET', '/dp/employee-params'); } catch(e) {}
   S.dpEmpParams = empParams;
