@@ -184,7 +184,7 @@ const byLastName=(a,b)=>lastNameOf(a.name).localeCompare(lastNameOf(b.name),'de'
 const getCat=id=>S.categories.find(c=>c.id===id);
 const getTag=id=>S.tags.find(t=>t.id===id);
 const getTk=id=>S.tickets.find(t=>t.id===id);
-const getAllw=(uid,year,month)=>S.allowances.find(a=>a.userId===uid&&a.year===year&&a.month===month)||{nd:0,fd:0,fw:0,c10:0,rkt:0};
+const getAllw=(uid,year,month)=>S.allowances.find(a=>a.userId===uid&&a.year===year&&a.month===month)||{nd:0,fd:0,fw:0,c10:0,rkt:0,buero:0};
 // Ein-/Austrittsdatum-Sichtbarkeit: ein Mitarbeiter soll in einer für einen
 // bestimmten Monat/Jahr angezeigten Liste nur auftauchen, wenn er in diesem
 // Zeitraum tatsächlich (zumindest teilweise) im Dienstverhältnis war —
@@ -1214,7 +1214,7 @@ async function deleteEvt(id){
 }
 // ALLOWANCES
 function getPeriodMonths(){if(S.allwPeriod==='month')return[S.allwMonth];if(S.allwPeriod==='h1')return[1,2,3,4,5,6];if(S.allwPeriod==='h2')return[7,8,9,10,11,12];return[1,2,3,4,5,6,7,8,9,10,11,12];}
-function sumAllw(uid,year,months){return months.reduce((a,m)=>{const r=getAllw(uid,year,m);return{nd:a.nd+r.nd,fd:a.fd+r.fd,fw:a.fw+r.fw,c10:a.c10+r.c10,rkt:a.rkt+(r.rkt||0)};},{nd:0,fd:0,fw:0,c10:0,rkt:0});}
+function sumAllw(uid,year,months){return months.reduce((a,m)=>{const r=getAllw(uid,year,m);return{nd:a.nd+r.nd,fd:a.fd+r.fd,fw:a.fw+r.fw,c10:a.c10+r.c10,rkt:a.rkt+(r.rkt||0),buero:a.buero+(r.buero||0)};},{nd:0,fd:0,fw:0,c10:0,rkt:0,buero:0});}
 function numCell(n,color){if(!n)return`<td style="text-align:center;color:var(--di)">\u2013</td>`;return`<td style="text-align:center"><span class="anum" style="background:${color}18;color:${color}">${n}</span></td>`;}
 
 
@@ -1333,8 +1333,26 @@ async function deleteDt(id) {
 }
 
 
+// Mitarbeiter mit Teilzeit-Bürotätigkeit (z.B. 50% Leitstelle / 50% Büro):
+// dp_employee_params (Dienstplanung → Konfiguration → Mitarbeiterparameter)
+// liefert Monatsstunden + gültig-ab je Mitarbeiter — hier wird für einen
+// Stichtag der zuletzt gültige Eintrag gesucht, analog zur Backend-Logik
+// (ORDER BY valid_from DESC NULLS LAST). Wird nur einmal geladen und dann
+// aus S.dpEmpParams wiederverwendet, damit ein Zähler-Klick nicht erneut
+// nachlädt.
+function getEmpParamsAt(uid,dateStr){
+  const list=(S.dpEmpParams||[]).filter(p=>p.employee_id===uid);
+  const dated=list.filter(p=>p.valid_from&&String(p.valid_from).slice(0,10)<=dateStr)
+    .sort((a,b)=>String(b.valid_from).localeCompare(String(a.valid_from)));
+  if(dated.length)return dated[0];
+  return list.find(p=>!p.valid_from)||null;
+}
 function renderAllw(){
   if(!S._allwCategoryExpanded)S._allwCategoryExpanded=_loadAllwCatState();
+  if(!S.dpEmpParams){
+    S.dpEmpParams=[];
+    api('GET','/dp/employee-params').then(d=>{S.dpEmpParams=d||[];if(S.view==='allw')renderAllw();}).catch(()=>{});
+  }
   const months=getPeriodMonths(),yr=S.allwYear;
   const pLbl=S.allwPeriod==='month'?MONTHS[S.allwMonth-1]:S.allwPeriod==='h1'?'1. Halbjahr':S.allwPeriod==='h2'?'2. Halbjahr':'Gesamtjahr';
   // Nur Mitarbeiter zeigen, die im gewählten Zeitraum (mind. teilweise) im
@@ -1358,22 +1376,34 @@ function renderAllw(){
   const sortedCats=Object.keys(grouped).sort((a,b)=>(catOrder[a]??9999)-(catOrder[b]??9999)||a.localeCompare(b,'de'));
   // Feiertagsdienste gibt es auch als halbe Tage — daher 0,5er-Schritt nur
   // bei "fd", alle anderen Kategorien zählen ganzzahlig.
-  const ALLW_CATS=[['nd','Nacht','#3b6dd4',1],['fd','Feiertag','#10b981',0.5],['fw','WE','#f59e0b',1],['c10','C10','#7c3aed',1],['rkt','RKT','#14b8a6',1]];
+  const ALLW_CATS=[['nd','Nacht','#3b6dd4',1],['fd','Feiertag','#10b981',0.5],['fw','WE','#f59e0b',1],['c10','C10','#7c3aed',1],['rkt','RKT','#14b8a6',1],['buero','B','#ec4899',1]];
   const fmtAllw=v=>Number.isInteger(v)?String(v):v.toFixed(1);
+  const monthDateStr=`${yr}-${String(S.allwMonth||1).padStart(2,'0')}-01`;
 
   const allwCells=u=>{
     if(!isBulk){const sv=sumAllw(u.id,yr,months);return ALLW_CATS.map(([f,,color])=>numCell(sv[f],color)).join('');}
     const a=getAllw(u.id,yr,S.allwMonth);
     return ALLW_CATS.map(([f,,color,step])=>'<td style="text-align:center"><button type="button" class="allw-cnt" style="background:'+color+'18;color:'+color+'" onclick="allwCounterClick(event,\''+u.id+'\',\''+f+'\','+step+')" oncontextmenu="allwCounterClick(event,\''+u.id+'\',\''+f+'\',-'+step+');return false" title="Linksklick: +'+step+', Rechtsklick: -'+step+'">'+fmtAllw(a[f]||0)+'</button></td>').join('');
   };
-  const allwEmpRow=u=>'<tr><td><div style="display:flex;align-items:center;gap:6px">'+avHtml(u.initials,u.color,22,9)+'<span>'+esc(lastNameFirst(u.name))+'</span></div></td>'+allwCells(u)+'</tr>';
+  // Soll-Stunden Leitstelle = Monatsstunden (aus Dienstplanung-Konfiguration)
+  // minus 8h je Bürodienst — nur im Monats-Zeitraum sinnvoll, da sich
+  // Monatsstunden je Monat ändern können.
+  const allwSollCell=u=>{
+    if(S.allwPeriod!=='month')return'<td style="text-align:center;color:var(--di);font-size:11px">–</td>';
+    const ep=getEmpParamsAt(u.id,monthDateStr);
+    if(!ep?.monthly_hours)return'<td style="text-align:center;color:var(--di);font-size:11px">–</td>';
+    const b=(isBulk?getAllw(u.id,yr,S.allwMonth):sumAllw(u.id,yr,months)).buero||0;
+    const soll=ep.monthly_hours-b*8;
+    return'<td style="text-align:center;font-size:12px" title="'+ep.monthly_hours+'h Monatssoll'+(b?' − '+b+'×8h Büro':'')+'">'+soll+'h'+(b?'<div style="font-size:10px;color:var(--di)">von '+ep.monthly_hours+'h</div>':'')+'</td>';
+  };
+  const allwEmpRow=u=>'<tr><td><div style="display:flex;align-items:center;gap:6px">'+avHtml(u.initials,u.color,22,9)+'<span>'+esc(lastNameFirst(u.name))+'</span></div></td>'+allwCells(u)+allwSollCell(u)+'</tr>';
   let allwBodyRows='';
   sortedCats.forEach(cat=>{
     const empList=grouped[cat].slice().sort((a,b)=>lastNameOf(a.name).localeCompare(lastNameOf(b.name),'de'));
     const catId='allwcat_'+cat.replace(/\W/g,'_');
     const isExpanded=S._allwCategoryExpanded?.[catId]??true;
     allwBodyRows+='<tr style="cursor:pointer;background:var(--sf2);font-weight:600" onclick="toggleAllwCat(\''+catId+'\')">'
-      +'<td colspan="6" style="padding:8px 12px">'+(isExpanded?'▼':'▶')+' '+esc(cat)+' ('+empList.length+')</td></tr>';
+      +'<td colspan="8" style="padding:8px 12px">'+(isExpanded?'▼':'▶')+' '+esc(cat)+' ('+empList.length+')</td></tr>';
     if(isExpanded)allwBodyRows+=empList.map(allwEmpRow).join('');
   });
 
@@ -1403,16 +1433,17 @@ function renderAllw(){
       <div style="overflow-x:auto"><table><thead><tr><th>Mitarbeiter</th>
         <th style="text-align:center">&#127769; Nacht</th><th style="text-align:center">&#127881; Feiertag</th>
         <th style="text-align:center">&#127958;&#65039; WE</th><th style="text-align:center">&#128203; C10</th>
-        <th style="text-align:center">&#128663; RKT</th>
+        <th style="text-align:center">&#128663; RKT</th><th style="text-align:center" title="Bürodienste">&#127970; B</th>
+        <th style="text-align:center" title="Monatssoll minus 8h je Bürodienst — nur bei Monatsansicht">&#128337; Soll LS</th>
       </tr></thead>
       <tbody>${allwBodyRows}
       ${(()=>{
         // Durchschnitt nur für Dienstplanung (seeAllAllw) bei mehr als 1 User
         if(!S.p.seeAllAllw||showUsers.length<2)return '';
         const n=showUsers.length;
-        const tot=showUsers.reduce((a,u)=>{const sv=sumAllw(u.id,yr,months);return{nd:a.nd+sv.nd,fd:a.fd+sv.fd,fw:a.fw+sv.fw,c10:a.c10+sv.c10,rkt:a.rkt+sv.rkt};},{nd:0,fd:0,fw:0,c10:0,rkt:0});
+        const tot=showUsers.reduce((a,u)=>{const sv=sumAllw(u.id,yr,months);return{nd:a.nd+sv.nd,fd:a.fd+sv.fd,fw:a.fw+sv.fw,c10:a.c10+sv.c10,rkt:a.rkt+sv.rkt,buero:a.buero+sv.buero};},{nd:0,fd:0,fw:0,c10:0,rkt:0,buero:0});
         const div=S.allwPeriod==='month'?1:S.allwPeriod==='h1'||S.allwPeriod==='h2'?6:12;
-        const avg={nd:tot.nd/n,fd:tot.fd/n,fw:tot.fw/n,c10:tot.c10/n,rkt:tot.rkt/n};
+        const avg={nd:tot.nd/n,fd:tot.fd/n,fw:tot.fw/n,c10:tot.c10/n,rkt:tot.rkt/n,buero:tot.buero/n};
         const fmt=v=>(v%1===0?v:v.toFixed(1));
         return`<tr style="background:rgba(59,109,212,.06);font-weight:700;border-top:2px solid var(--border)">
           <td style="font-size:11px;color:var(--mu)">&#216; Durchschnitt pro MA</td>
@@ -1421,6 +1452,8 @@ function renderAllw(){
           <td style="text-align:center;color:#f59e0b">${fmt(avg.fw)}</td>
           <td style="text-align:center;color:#7c3aed">${fmt(avg.c10)}</td>
           <td style="text-align:center;color:#14b8a6">${fmt(avg.rkt)}</td>
+          <td style="text-align:center;color:#ec4899">${fmt(avg.buero)}</td>
+          <td></td>
         </tr>
         <tr style="background:rgba(59,109,212,.03);border-bottom:2px solid var(--border)">
           <td style="font-size:11px;color:var(--di)">&#216; pro Monat (Periode)</td>
@@ -1429,6 +1462,8 @@ function renderAllw(){
           <td style="text-align:center;font-size:11px;color:var(--mu)">${fmt(avg.fw/div)}</td>
           <td style="text-align:center;font-size:11px;color:var(--mu)">${fmt(avg.c10/div)}</td>
           <td style="text-align:center;font-size:11px;color:var(--mu)">${fmt(avg.rkt/div)}</td>
+          <td style="text-align:center;font-size:11px;color:var(--mu)">${fmt(avg.buero/div)}</td>
+          <td></td>
         </tr>`;
       })()}
       </tbody></table></div>
@@ -1450,7 +1485,7 @@ function toggleAllwCat(catId){
 async function allwCounterClick(e,uid,field,delta){
   e.preventDefault();
   const a=getAllw(uid,S.allwYear,S.allwMonth);
-  const body={userId:uid,year:S.allwYear,month:S.allwMonth,nd:a.nd||0,fd:a.fd||0,fw:a.fw||0,c10:a.c10||0,rkt:a.rkt||0};
+  const body={userId:uid,year:S.allwYear,month:S.allwMonth,nd:a.nd||0,fd:a.fd||0,fw:a.fw||0,c10:a.c10||0,rkt:a.rkt||0,buero:a.buero||0};
   body[field]=Math.max(0,Math.round(((a[field]||0)+Number(delta))*10)/10);
   try{
     const updated=await api('PUT','/allowances',body);

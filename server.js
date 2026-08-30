@@ -264,6 +264,10 @@ async function initDB() {
     )`,
     `ALTER TABLE doc_categories ADD COLUMN IF NOT EXISTS parent_id TEXT`,
     `ALTER TABLE allowances ADD COLUMN IF NOT EXISTS rkt INTEGER DEFAULT 0`,
+    // Bürodienste (z.B. bei Mitarbeitern mit Teilzeit-Bürotätigkeit) — je
+    // Eintrag werden 8h vom Monatssoll (aus dp_employee_params) abgezogen,
+    // um das effektive Leitstellen-Sollstunden zu ermitteln.
+    `ALTER TABLE allowances ADD COLUMN IF NOT EXISTS buero INTEGER DEFAULT 0`,
     // Feiertagsdienste gibt es auch als halbe Tage (0,5-Schritte) — daher NUMERIC statt INTEGER.
     `ALTER TABLE allowances ALTER COLUMN fd TYPE NUMERIC(6,1) USING fd::numeric(6,1)`,
     `ALTER TABLE allowances ALTER COLUMN fd SET DEFAULT 0`,
