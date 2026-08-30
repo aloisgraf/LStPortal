@@ -1208,7 +1208,9 @@ function renderDiensttausch() {
   const list = S.diensttausch;
   function dtCard(dt) {
     const isNew = !dt.isSeen && dt.isRelevant;
-    const creator = getU(dt.createdBy);
+    // Bei bereits gelöschten Mitarbeitern liefert getU() nichts mehr — der
+    // beim Anlegen zusätzlich gespeicherte Name (createdByName) greift dann.
+    const creatorName = getU(dt.createdBy)?.name || dt.createdByName || 'Ehemaliger Mitarbeiter';
     const decider = dt.decidedBy ? getU(dt.decidedBy) : null;
     const accent = dt.status==='approved'?'var(--ok)':dt.status==='rejected'?'var(--danger)':'var(--warn)';
     const stBadge = dt.status==='pending'
@@ -1220,7 +1222,7 @@ function renderDiensttausch() {
       <div style="width:3px;align-self:stretch;background:${accent};border-radius:2px;flex-shrink:0"></div>
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:2px">
-          ${isNew?'<span class="tk-new-badge" style="margin-right:4px">NEU</span>':''}${creator?.name||'?'}
+          ${isNew?'<span class="tk-new-badge" style="margin-right:4px">NEU</span>':''}${esc(creatorName)}
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--mu);margin-bottom:6px">
           <span>${fdt(dt.createdAt)}</span>

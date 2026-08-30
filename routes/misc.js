@@ -289,9 +289,12 @@ router.post('/diensttausch', auth, async (req,res) => {
     const { text } = req.body;
     if (!text?.trim()) return bad(res,'Text erforderlich');
     const id = newId();
+    // Name zusätzlich denormalisiert speichern — Admins können Mitarbeiter
+    // hart löschen (DELETE /users/:id), wonach ein reiner ID-Lookup (getU)
+    // ins Leere liefe und der Ersteller-Name als "?" angezeigt würde.
     await pool.query(
-      `INSERT INTO diensttausch (id,text,created_by,status) VALUES ($1,$2,$3,'pending')`,
-      [id, text.trim(), req.uid]
+      `INSERT INTO diensttausch (id,text,created_by,created_by_name,status) VALUES ($1,$2,$3,$4,'pending')`,
+      [id, text.trim(), req.uid, req.user?.name || '']
     );
     ok(res, { id });
   } catch(e) { bad(res,'Serverfehler',500); }

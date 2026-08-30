@@ -250,7 +250,7 @@ router.get('/', auth, async (req,res) => {
         if (myNameForDt && dt.text.toLowerCase().includes('@'+myNameForDt)) return true;
         return false;
       }).map(dt => ({
-        id:dt.id, text:dt.text, createdBy:dt.created_by, createdAt:dt.created_at,
+        id:dt.id, text:dt.text, createdBy:dt.created_by, createdByName:dt.created_by_name||'', createdAt:dt.created_at,
         status:dt.status, decidedBy:dt.decided_by, decidedAt:dt.decided_at,
         rejectReason:dt.reject_reason, isSeen:dtSeenSet.has(dt.id),
         isRelevant: dt.created_by===uid ||

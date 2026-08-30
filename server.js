@@ -777,6 +777,7 @@ async function initDB() {
     // brandneuen Datenbank würden sie sonst vor der Tabellenerstellung
     // laufen und stillschweigend fehlschlagen (jede Migration läuft in
     // try/catch, siehe Aufrufstelle).
+    `ALTER TABLE diensttausch ADD COLUMN IF NOT EXISTS created_by_name TEXT`,
     `ALTER TABLE todos ADD COLUMN IF NOT EXISTS ai_status TEXT`,
     `ALTER TABLE todos ADD COLUMN IF NOT EXISTS ai_result TEXT`,
     `ALTER TABLE discussion_items ADD COLUMN IF NOT EXISTS ai_status TEXT`,
