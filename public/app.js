@@ -295,7 +295,7 @@ function loginOK(){
   document.getElementById('hdr').style.display='flex';document.getElementById('APP').style.display='grid';
   const vb=document.getElementById('versionBadge');if(vb)vb.textContent='v'+APP_VERSION;
   const u=getU(S.currentUser);
-  document.getElementById('pillNm').textContent=u?.name||'?';
+  document.getElementById('pillNm').textContent=u?lastNameFirst(u.name):'?';
   const pa=document.getElementById('pillAv');pa.textContent=u?.initials||'?';pa.style.background=(u?.color||'#888')+'22';pa.style.color=u?.color||'#888';
   const ab=document.getElementById('adminBtn');if(ab)ab.style.display=S.p.manageUsers?'flex':'none';
   const dpNavEl=document.getElementById('ni-dp');if(dpNavEl)dpNavEl.style.display=S.p.canManageDp?'flex':'none';
@@ -309,7 +309,7 @@ function loginOK(){
   // archivNav for all users
   const archivNav=document.getElementById('ni-news_archiv');
   if(archivNav)archivNav.style.display='block';
-  toast('\uD83D\uDC4B Willkommen, '+(u?.name||'')+'!');
+  toast('\uD83D\uDC4B Willkommen, '+(u?lastNameFirst(u.name):'')+'!');
 }
 async function logout(){
   loading(true);
@@ -558,7 +558,7 @@ function renderHomeNew(){
     return '<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="openTkDetail(\''+tk.id+'\')">'
       +'<div style="width:3px;align-self:stretch;background:'+(overdue?'#ef4444':'#ea580c')+';border-radius:2px;flex-shrink:0"></div>'
       +'<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+tk.number+': '+esc(tk.title)+'</div>'
-      +'<div style="font-size:10px;color:var(--mu)">'+dueBdg(tk)+' &middot; '+(asn?esc(asn.name):'nicht zugewiesen')+'</div></div>'+prioBdg(tk.priority)+'</div>';
+      +'<div style="font-size:10px;color:var(--mu)">'+dueBdg(tk)+' &middot; '+(asn?esc(lastNameFirst(asn.name)):'nicht zugewiesen')+'</div></div>'+prioBdg(tk.priority)+'</div>';
   };
   const ticketsBody=(focusTks.length?focusTks.map(ticketRow).join(''):'<div style="color:var(--di);font-size:12px;padding:8px 14px">Keine offenen Tickets &#127881;</div>')
     +'<div style="padding:8px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--mu)">'+openTks.length+' offen insgesamt &middot; '+overdueTks.length+' überfällig'
@@ -683,7 +683,7 @@ function renderHomeNew(){
     ? '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">'+notifCard+ticketsCard+'</div>'
     : ticketsCard;
   document.getElementById('main').innerHTML=`
-    <div class="ph"><div class="pt">&#128196; Übersicht <span>${u?.name||''}</span></div>${homeVersionToggleHtml()}</div>
+    <div class="ph"><div class="pt">&#128196; Übersicht <span>${u?lastNameFirst(u.name):''}</span></div>${homeVersionToggleHtml()}</div>
     <div style="background:rgba(59,109,212,.06);border:1px solid rgba(59,109,212,.2);border-radius:var(--r);padding:8px 12px;margin-bottom:14px;font-size:11px;color:var(--mu)">&#x1F9EA; Neue Übersicht (Beta) &mdash; wird schrittweise ausgebaut. Mit "Alt" zur bisherigen Ansicht wechseln.</div>
     ${sopHomeBannerHtml()}
     ${topRow}
@@ -776,8 +776,8 @@ function renderHomeOld(){
 
   // Online
   var _onlineHtml='<div class="online-list" style="flex-wrap:wrap;padding-top:8px">';
-  _onlineHtml+='<div class="online-user">'+avHtml(u?u.initials:'?',u?u.color:'#888',22,9,true)+'<span>'+(u?u.name:'')+'<span style="color:var(--mu);font-size:10px"> (du)</span></span></div>';
-  online.forEach(function(x){_onlineHtml+='<div class="online-user">'+avHtml(x.initials,x.color,22,9,true)+'<span>'+x.name+'</span></div>';});
+  _onlineHtml+='<div class="online-user">'+avHtml(u?u.initials:'?',u?u.color:'#888',22,9,true)+'<span>'+(u?lastNameFirst(u.name):'')+'<span style="color:var(--mu);font-size:10px"> (du)</span></span></div>';
+  online.forEach(function(x){_onlineHtml+='<div class="online-user">'+avHtml(x.initials,x.color,22,9,true)+'<span>'+lastNameFirst(x.name)+'</span></div>';});
   _onlineHtml+='</div>';
 
   // Meine Einträge
@@ -812,7 +812,7 @@ function renderHomeOld(){
       _dueFaelligHtml+='<div style="width:3px;align-self:stretch;background:#ea580c;border-radius:2px;flex-shrink:0"></div>';
       _dueFaelligHtml+='<div style="flex:1;min-width:0">';
       _dueFaelligHtml+='<div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+tk.number+': '+esc(tk.title)+'</div>';
-      _dueFaelligHtml+='<div style="font-size:10px;color:var(--mu)">'+dueBdg(tk)+(asn?' · '+asn.name:' · nicht zugewiesen')+'</div>';
+      _dueFaelligHtml+='<div style="font-size:10px;color:var(--mu)">'+dueBdg(tk)+(asn?' · '+lastNameFirst(asn.name):' · nicht zugewiesen')+'</div>';
       _dueFaelligHtml+='</div></div>';
     });
   })();
@@ -835,7 +835,7 @@ function renderHomeOld(){
           tkBadgeHtml(tk)+
           '<span style="font-family:monospace;font-size:11px;color:var(--mu)">'+tk.number+'</span> '+esc(tk.title)+
           ' <span class="bdg" style="font-size:10px;background:rgba(124,58,237,.12);color:#7c3aed">'+esc(tk.subcategory)+'</span></div>';
-        _beschwerdenHtml+='<div style="font-size:10px;color:var(--mu)">'+deptBdg(tk.department)+(asn?' · '+asn.name:' · nicht zugewiesen')+' · '+fd(tk.createdAt)+'</div>';
+        _beschwerdenHtml+='<div style="font-size:10px;color:var(--mu)">'+deptBdg(tk.department)+(asn?' · '+lastNameFirst(asn.name):' · nicht zugewiesen')+' · '+fd(tk.createdAt)+'</div>';
         _beschwerdenHtml+='</div>';
         _beschwerdenHtml+=prioBdg(tk.priority);
         _beschwerdenHtml+='</div>';
@@ -865,13 +865,13 @@ function renderHomeOld(){
     _ticketsHtml='<div style="color:var(--mu);font-size:12px">Keine relevanten Tickets</div>';
   }
     document.getElementById('main').innerHTML=`
-    <div class="ph"><div class="pt">&#128196; \u00dcbersicht <span>${u?.name||''}</span></div>${homeVersionToggleHtml()}</div>
+    <div class="ph"><div class="pt">&#128196; \u00dcbersicht <span>${u?lastNameFirst(u.name):''}</span></div>${homeVersionToggleHtml()}</div>
     ${pinnedMsg.length?_ccWrap('pinned_msgs','&#128204; Angepinnte Nachrichten ('+pinnedMsg.length+')','<div class="card-rows">'+
       pinnedMsg.map(m=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="openMsg('${m.id}')">
         <div style="width:3px;align-self:stretch;background:#f59e0b;border-radius:2px;flex-shrink:0"></div>
         <div style="flex:1;min-width:0">
           <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">&#128204; ${m.title}</div>
-          <div style="font-size:11px;color:var(--mu)">von ${getU(m.senderId)?.name||'?'}</div>
+          <div style="font-size:11px;color:var(--mu)">von ${getU(m.senderId)?lastNameFirst(getU(m.senderId).name):'?'}</div>
         </div>
         <button class="btn-s" style="font-size:10px;padding:2px 8px;flex-shrink:0" onclick="event.stopPropagation();toggleMsgPinDirect('${m.id}',true)">Lospinnen</button>
       </div>`).join('')+'</div>'
@@ -879,7 +879,7 @@ function renderHomeOld(){
     ${unreadMsg.length?`<div style="background:rgba(239,68,68,0.05));border:1px solid rgba(239,68,68,.20);border-radius:var(--r);padding:14px;margin-bottom:14px">
       <div style="font-size:13px;font-weight:700;color:var(--danger);margin-bottom:10px">&#128276; ${unreadMsg.length} ungelesene Nachricht${unreadMsg.length>1?'en':''}</div>
       ${unreadMsg.map(m=>`<div style="padding:8px 12px;background:var(--sf);border-radius:6px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-        <div><div style="font-weight:600;font-size:13px">${m.title}</div><div style="font-size:11px;color:var(--mu)">von ${getU(m.senderId)?.name||'?'} &middot; ${fdt(m.createdAt)}</div></div>
+        <div><div style="font-weight:600;font-size:13px">${m.title}</div><div style="font-size:11px;color:var(--mu)">von ${getU(m.senderId)?lastNameFirst(getU(m.senderId).name):'?'} &middot; ${fdt(m.createdAt)}</div></div>
         <button class="btn-p" onclick="openMsg('${m.id}')">&#128279; Lesen &amp; Bestätigen</button>
       </div>`).join('')}
     </div>`:''}
@@ -1046,7 +1046,7 @@ function renderSchedule(){
         ${MONTHS.map((m,i)=>`<button class="mb ${S.month===i?'on':''}" onclick="S._calSelectedDate=null;S.month=${i};renderMain()" style="padding:4px 8px;font-size:12px">${m.slice(0,3)}</button>`).join('')}
       </div>
       ${S.p.seeAllEntries?`<select class="flt" style="width:auto;min-width:140px" onchange="S.filterUser=this.value||null;renderMain()"><option value="">Alle Mitarbeiter</option>${S.users.filter(u=>!(u.roles||[]).includes('admin')).slice().sort(byLastName).map(u=>`<option value="${u.id}"${S.filterUser===u.id?'selected':''}>${lastNameFirst(u.name)}</option>`).join('')}</select>`:''}
-      ${filterU?`<span class="filter-hint">&#128100; ${filterU.name}</span>`:''}
+      ${filterU?`<span class="filter-hint">&#128100; ${lastNameFirst(filterU.name)}</span>`:''}
     </div>
     ${mode==='calendar'?calHtml:mode==='list'?listHtml:calHtml+'<div style="margin-top:24px">'+listHtml+'</div>'}`;
 }
@@ -1230,7 +1230,7 @@ function renderDiensttausch() {
     const isNew = !dt.isSeen && dt.isRelevant;
     // Bei bereits gelöschten Mitarbeitern liefert getU() nichts mehr — der
     // beim Anlegen zusätzlich gespeicherte Name (createdByName) greift dann.
-    const creatorName = getU(dt.createdBy)?.name || dt.createdByName || 'Ehemaliger Mitarbeiter';
+    const creatorName = getU(dt.createdBy)?.name ? lastNameFirst(getU(dt.createdBy).name) : (dt.createdByName ? lastNameFirst(dt.createdByName) : 'Ehemaliger Mitarbeiter');
     const decider = dt.decidedBy ? getU(dt.decidedBy) : null;
     const accent = dt.status==='approved'?'var(--ok)':dt.status==='rejected'?'var(--danger)':'var(--warn)';
     const stBadge = dt.status==='pending'
@@ -1250,7 +1250,7 @@ function renderDiensttausch() {
         </div>
         <div style="font-size:12px;line-height:1.5;white-space:pre-wrap;color:var(--tx)">${highlightMentions(dt.text||'')}</div>
         ${dt.rejectReason?`<div style="margin-top:6px;font-size:11px;color:var(--danger);background:rgba(239,68,68,.08);padding:4px 8px;border-radius:4px">&#128680; Grund: ${dt.rejectReason}</div>`:''}
-        ${dt.decidedAt?`<div style="font-size:10px;color:var(--mu);margin-top:4px">Entschieden von ${decider?.name||'?'} am ${fdt(dt.decidedAt)}</div>`:''}
+        ${dt.decidedAt?`<div style="font-size:10px;color:var(--mu);margin-top:4px">Entschieden von ${decider?lastNameFirst(decider.name):'?'} am ${fdt(dt.decidedAt)}</div>`:''}
       </div>
       <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end;flex-shrink:0" onclick="event.stopPropagation()">
         ${canDecide&&dt.status==='pending'?`
@@ -1362,7 +1362,7 @@ function renderAllw(){
     const a=getAllw(u.id,yr,S.allwMonth);
     return ALLW_CATS.map(([f,,color])=>'<td style="text-align:center"><button type="button" class="allw-cnt" style="background:'+color+'18;color:'+color+'" onclick="allwCounterClick(event,\''+u.id+'\',\''+f+'\',1)" oncontextmenu="allwCounterClick(event,\''+u.id+'\',\''+f+'\',-1);return false" title="Linksklick: +1, Rechtsklick: -1">'+(a[f]||0)+'</button></td>').join('');
   };
-  const allwEmpRow=u=>'<tr><td><div style="display:flex;align-items:center;gap:6px">'+avHtml(u.initials,u.color,22,9)+'<span>'+esc(u.name)+'</span></div></td>'+allwCells(u)+'</tr>';
+  const allwEmpRow=u=>'<tr><td><div style="display:flex;align-items:center;gap:6px">'+avHtml(u.initials,u.color,22,9)+'<span>'+esc(lastNameFirst(u.name))+'</span></div></td>'+allwCells(u)+'</tr>';
   let allwBodyRows='';
   sortedCats.forEach(cat=>{
     const empList=grouped[cat].slice().sort((a,b)=>lastNameOf(a.name).localeCompare(lastNameOf(b.name),'de'));
@@ -1430,7 +1430,7 @@ async function allwCounterClick(e,uid,field,delta){
 }
 function openAllwM(uid,year,month){
   const u=getU(uid),a=getAllw(uid,year,month);
-  document.getElementById('allwT').textContent=`${u?.name} \u2013 ${MONTHS[month-1]} ${year}`;
+  document.getElementById('allwT').textContent=`${u?lastNameFirst(u.name):''} \u2013 ${MONTHS[month-1]} ${year}`;
   document.getElementById('allwInfo').textContent=`Zulagen f\u00fcr ${MONTHS[month-1]} ${year}`;
   ['aUid','aYr','aMo'].forEach((id,i)=>document.getElementById(id).value=[uid,year,month][i]);
   document.getElementById('aND').value=a.nd||'';document.getElementById('aFD').value=a.fd||'';
@@ -1460,7 +1460,7 @@ function renderAbrechnung(){
         <button class="mb ${!mo?'on':''}" style="padding:4px 8px;font-size:12px" onclick="S.abrMonth=null;renderMain()">Alle</button>
         ${MONTHS.map((m,i)=>`<button class="mb ${mo===i+1?'on':''}" style="padding:4px 8px;font-size:12px" onclick="S.abrMonth=${i+1};renderMain()">${m.slice(0,3)}</button>`).join('')}
       </div>
-      ${canSeeAll?`<select class="flt" onchange="S.abrUser=this.value||null;renderMain()"><option value="">Alle Mitarbeiter</option>${S.users.filter(u=>!(u.roles||[]).includes('admin')).sort((a,b)=>a.name.localeCompare(b.name,'de')).map(u=>`<option value="${u.id}"${S.abrUser===u.id?'selected':''}>${u.name}</option>`).join('')}</select>`:''}
+      ${canSeeAll?`<select class="flt" onchange="S.abrUser=this.value||null;renderMain()"><option value="">Alle Mitarbeiter</option>${S.users.filter(u=>!(u.roles||[]).includes('admin')).sort((a,b)=>a.name.localeCompare(b.name,'de')).map(u=>`<option value="${u.id}"${S.abrUser===u.id?'selected':''}>${lastNameFirst(u.name)}</option>`).join('')}</select>`:''}
     </div>
     <div class="abr-grid">
       <div>
@@ -1498,7 +1498,7 @@ function renderAbrechnung(){
               <div style="width:3px;align-self:stretch;background:${rej?'var(--danger)':'var(--ok)'};border-radius:2px;flex-shrink:0"></div>
               <div style="flex:1;min-width:0">
                 <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
-                  ${avHtml(u?.initials||'?',u?.color||'#888',18,7)}<span style="font-size:13px;font-weight:600">${u?.name||'?'}</span>
+                  ${avHtml(u?.initials||'?',u?.color||'#888',18,7)}<span style="font-size:13px;font-weight:600">${u?lastNameFirst(u.name):'?'}</span>
                   ${rej?`<span class="bdg pr-high" style="font-size:10px" title="${e.rejectedReason||''}">\u2717 Abgelehnt</span>`:'<span class="bdg ap-bdg-approved" style="font-size:10px">\u2713</span>'}
                 </div>
                 <div style="font-size:11px;color:var(--mu)">${fd(e.date)}${e.note?' &middot; '+e.note:''}</div>
@@ -1531,7 +1531,7 @@ function renderAbrechnung(){
           ${allHO.length?`<div>${allHO.map(h=>{const u=getU(h.userId);return`<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-top:1px solid var(--border)">
               <div style="width:3px;align-self:stretch;background:#0ea5e9;border-radius:2px;flex-shrink:0"></div>
               <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0">
-                ${avHtml(u?.initials||'?',u?.color||'#888',18,7)}<span style="font-size:12px;font-weight:600">${u?.name||'?'}</span>
+                ${avHtml(u?.initials||'?',u?.color||'#888',18,7)}<span style="font-size:12px;font-weight:600">${u?lastNameFirst(u.name):'?'}</span>
                 <span style="font-size:11px;color:var(--mu)">${MONTHS[h.month-1].slice(0,3)} ${h.year}</span>
               </div>
               <span style="font-size:13px;font-weight:700;color:#0ea5e9">${h.days} Tage</span>
@@ -1604,7 +1604,7 @@ function renderDienstplaene(){
           <div style="width:3px;align-self:stretch;background:var(--acc);border-radius:2px;flex-shrink:0"></div>
           <div style="flex:1;min-width:0">
             <div style="font-size:13px;font-weight:700">${MONTHS[d.month-1]} ${d.year} <span class="bdg st-open" style="margin-left:4px;font-size:10px">v${d.version}</span></div>
-            <div style="font-size:11px;color:var(--mu);margin-top:2px">${d.label} &middot; ${fdt(d.createdAt)} &middot; ${getU(d.createdBy)?.name||'?'}</div>
+            <div style="font-size:11px;color:var(--mu);margin-top:2px">${d.label} &middot; ${fdt(d.createdAt)} &middot; ${getU(d.createdBy)?lastNameFirst(getU(d.createdBy).name):'?'}</div>
           </div>
           <div style="display:flex;gap:5px;flex-shrink:0">
             <button class="btn-ok" style="font-size:11px;padding:4px 8px" onclick="showPdf('/api/dienstplaene/${d.id}/file','${MONTHS[d.month-1]} ${d.year}')">&#128065; &#214;ffnen</button>
@@ -1757,7 +1757,7 @@ function renderTickets(){
         ${preview?`<div style="font-size:11px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px">${preview}</div>`:''}
         <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--mu);align-items:center">
           ${showDept?deptBdg(tk.department):''}${prioBdg(tk.priority)}${stBdg(tk.status)}${dueBdg(tk)}${snoozeBdg(tk)}${tagChips(tk.tags)}
-          ${asn?`<div style="display:flex;align-items:center;gap:3px">${avHtml(asn.initials,asn.color,14,6)}<span>${asn.name}</span></div>`:''}
+          ${asn?`<div style="display:flex;align-items:center;gap:3px">${avHtml(asn.initials,asn.color,14,6)}<span>${lastNameFirst(asn.name)}</span></div>`:''}
           ${isChild&&par?`<span style="color:var(--di);font-size:10px">&#x2191; ${par.number}</span>`:''}
           ${nc?`<span>💬 ${nc}</span>`:''}${tkOpenTodoHtml(tk)}
           <span style="color:var(--di)">Erstellt: ${fd(tk.createdAt)}${tk.updatedAt&&fd(tk.updatedAt)!==fd(tk.createdAt)?' · Letzte Änderung: '+fd(tk.updatedAt):''}${tk.dueDate?' · Fällig: '+fd(tk.dueDate):''}</span>
@@ -1796,7 +1796,7 @@ function renderTickets(){
           <td>${prioBdg(tk.priority)}</td>
           <td>${stBdg(tk.status)}</td>
           <td style="max-width:140px">${tagChips(tk.tags)}${dueBdg(tk)}</td>
-          <td style="font-size:12px">${asn?`<div style="display:flex;align-items:center;gap:3px">${avHtml(asn.initials,asn.color,16,7)}<span>${asn.name}</span></div>`:'-'}</td>
+          <td style="font-size:12px">${asn?`<div style="display:flex;align-items:center;gap:3px">${avHtml(asn.initials,asn.color,16,7)}<span>${lastNameFirst(asn.name)}</span></div>`:'-'}</td>
           <td style="font-size:11px;color:var(--mu);white-space:nowrap">Erstellt: ${fd(tk.createdAt)}${tk.updatedAt&&fd(tk.updatedAt)!==fd(tk.createdAt)?`<br>Geändert: ${fd(tk.updatedAt)}`:''}${tk.dueDate?`<br>Fällig: ${fd(tk.dueDate)}`:''}</td>
         </tr>`;
       }).join('')}
@@ -1854,7 +1854,7 @@ function renderTickets(){
     ${S.tkBatchMode&&S.tkBatchSel.size?`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px;background:rgba(59,109,212,.06);border:1px solid rgba(59,109,212,.2);border-radius:var(--r);margin-bottom:10px">
       <span style="font-size:13px;font-weight:600;color:var(--acc)">${S.tkBatchSel.size} ausgewählt</span>
       ${!deleted?`<select id="batchStatus" class="flt" style="font-size:12px"><option value="">Status ändern…</option>${STATUSES.map(s=>`<option value="${s.id}">${s.label}</option>`).join('')}</select>
-      <select id="batchAssignee" class="flt" style="font-size:12px"><option value="">Zuständig ändern…</option><option value="__none__">— niemand —</option>${S.users.filter(isAssignable).map(u=>`<option value="${u.id}">${u.name}</option>`).join('')}</select>
+      <select id="batchAssignee" class="flt" style="font-size:12px"><option value="">Zuständig ändern…</option><option value="__none__">— niemand —</option>${S.users.filter(isAssignable).map(u=>`<option value="${u.id}">${lastNameFirst(u.name)}</option>`).join('')}</select>
       <button class="btn-p" style="font-size:12px" onclick="batchApply()">&#10003; Anwenden</button>
       <button class="btn-d" style="font-size:12px" onclick="batchDelete()">&#128465; Löschen</button>`
       :`<button class="btn-ok" style="font-size:12px" onclick="batchRestore()">&#9851; Wiederherstellen</button>`}
@@ -1866,7 +1866,7 @@ function renderTickets(){
       <select class="flt" onchange="S.tkFiltDept=this.value;renderMain()"><option value="">Alle Bereiche</option>${myD.map(d=>`<option value="${d}"${S.tkFiltDept===d?' selected':''}>${DEPT_LABELS[d]}</option>`).join('')}</select>
       <select class="flt" onchange="S.tkFiltPrio=this.value;renderMain()"><option value="">Alle Priorit\u00e4ten</option>${PRIORITIES.map(p2=>`<option value="${p2.id}"${S.tkFiltPrio===p2.id?' selected':''}>${p2.label}</option>`).join('')}</select>
       <select class="flt" onchange="S.tkFiltTag=this.value;renderMain()"><option value="">Alle Tags</option>${S.tags.map(t=>`<option value="${t.id}"${S.tkFiltTag===t.id?' selected':''}>${t.label}</option>`).join('')}</select>
-      <select class="flt" onchange="S.tkFiltAssignee=this.value;renderMain()"><option value="">Alle Bearbeiter</option>${S.users.filter(isAssignable).map(u=>`<option value="${u.id}"${S.tkFiltAssignee===u.id?' selected':''}>${u.name}</option>`).join('')}</select>
+      <select class="flt" onchange="S.tkFiltAssignee=this.value;renderMain()"><option value="">Alle Bearbeiter</option>${S.users.filter(isAssignable).map(u=>`<option value="${u.id}"${S.tkFiltAssignee===u.id?' selected':''}>${lastNameFirst(u.name)}</option>`).join('')}</select>
       ${canSeeSubcat?`<select class="flt" onchange="S.tkFiltSubcat=this.value;renderMain()"><option value="">Alle Unterkategorien</option><option value="__none__"${S.tkFiltSubcat==='__none__'?' selected':''}>&mdash; ohne Unterkategorie &mdash;</option>${[...new Set(S.ticketSubcategories.map(s=>s.label))].map(l=>`<option value="${l}"${S.tkFiltSubcat===l?' selected':''}>${l}</option>`).join('')}</select>`:''}
       ${canSeeSubcat?`<select class="flt" onchange="S.tkGroupBy=this.value;renderMain()" title="Gruppierung der Liste"><option value="dept"${groupMode==='dept'?' selected':''}>Gruppierung: Fachbereich</option><option value="subcat"${groupMode==='subcat'?' selected':''}>Gruppierung: Unterkategorie</option></select>`:''}
     </div>
@@ -1955,7 +1955,7 @@ function _renderFeed(notes,tkId,canEdit,filter){
             <span style="font-size:12px;font-weight:600;color:var(--acc);word-break:break-word">${esc(parsed.to)}</span>
           </div>`:`<div style="font-size:12px;color:var(--mu);white-space:pre-wrap">${esc(n.text)}</div>`}
           <div style="font-size:10px;color:var(--di);margin-top:2px">
-            ${a?`${avHtml(a.initials,a.color,12,5)} ${a.name} · `:''}${fdt(n.createdAt)}
+            ${a?`${avHtml(a.initials,a.color,12,5)} ${lastNameFirst(a.name)} · `:''}${fdt(n.createdAt)}
           </div>
         </div>
       </div>`;
@@ -1986,7 +1986,7 @@ function _renderFeed(notes,tkId,canEdit,filter){
         </div>
         <div style="background:${todoBg};border:1px solid ${todoBorder};border-radius:8px;padding:9px 12px;flex:1;min-width:0;margin-bottom:${isLast?'0':'10px'}">
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
-            <span style="font-size:12px;font-weight:700">${a?.name||'?'}</span>
+            <span style="font-size:12px;font-weight:700">${a?lastNameFirst(a.name):'?'}</span>
             <span style="font-size:10px;color:var(--di)">${fdt(n.createdAt)}</span>
             ${todoLabel}
             <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
@@ -2067,7 +2067,7 @@ function renderTkDetail(){
           <div class="cl-item-row">
             <input type="checkbox" ${it.completedBy?'checked':''} onchange="toggleClItem('${tk.id}','${cl.id}','${it.id}',this.checked)">
             <span class="cl-item-text">${it.text}</span>
-            ${it.completedBy?`<span class="cl-done-by">&#128100; ${getU(it.completedBy)?.name||'?'}</span>`:''}
+            ${it.completedBy?`<span class="cl-done-by">&#128100; ${getU(it.completedBy)?lastNameFirst(getU(it.completedBy).name):'?'}</span>`:''}
           </div>
           ${it.itemType==='check_text'?`<div class="cl-user-note"><input type="text" placeholder="Notiz \u2026" value="${(it.userNote||'').replace(/"/g,'&quot;')}" onchange="saveClItemNote('${tk.id}','${cl.id}','${it.id}',this.value)"></div>`:''}
         </div>`).join('')}</div>
@@ -2106,7 +2106,7 @@ function renderTkDetail(){
           <div class="tk-file-icon">${fileIcon(f.mimeType)}</div>
           <div class="tk-file-info">
             <a href="/api/tickets/${tk.id}/files/${f.id}" target="_blank" rel="noopener" class="tk-file-name">${f.originalName}</a>
-            <div class="tk-file-meta">${fmtBytes(f.sizeBytes)} &bull; ${getU(f.uploadedBy)?.name||'?'} &bull; ${fdt(f.createdAt)}</div>
+            <div class="tk-file-meta">${fmtBytes(f.sizeBytes)} &bull; ${getU(f.uploadedBy)?lastNameFirst(getU(f.uploadedBy).name):'?'} &bull; ${fdt(f.createdAt)}</div>
             ${f.mimeType.startsWith('image/')?`<div class="tk-file-thumb"><img src="/api/tickets/${tk.id}/files/${f.id}" alt="${f.originalName}" loading="lazy"></div>`:''}
           </div>
           ${canEdit?`<button class="btn-d tk-file-del" onclick="deleteTkFile('${tk.id}','${f.id}','${f.originalName.replace(/'/g,"\\'")}')">&#128465;</button>`:''}
@@ -2130,7 +2130,7 @@ function renderTkDetail(){
     ${S.tp.canSeeSubcat?`<div class="tkf"><label>Unterkategorie</label><select onchange="updateTkField('${tk.id}','subcategory',this.value)"><option value="">— keine —</option>${(()=>{const opts=S.ticketSubcategories.filter(s=>s.department===tk.department).map(s=>s.label);if(tk.subcategory&&!opts.includes(tk.subcategory))opts.unshift(tk.subcategory);return opts.map(l=>`<option value="${l}"${tk.subcategory===l?' selected':''}>${l}</option>`).join('');})()}</select></div>`:''}
     <div class="tkf"><label>Bucket</label><select onchange="updateTkField('${tk.id}','bucket',this.value)"><option value="">\u2014</option>${BUCKETS.map(b=>`<option value="${b.id}"${tk.bucket===b.id?' selected':''}>${b.label}</option>`).join('')}</select></div>
     <div class="tkf"><label>Zust\u00e4ndig</label><div style="display:flex;gap:5px">
-      <select onchange="updateTkField('${tk.id}','assigneeId',this.value||null)" style="flex:1"><option value="">\u2014</option>${S.users.filter(isAssignable).map(u=>`<option value="${u.id}"${tk.assigneeId===u.id?' selected':''}>${u.name}</option>`).join('')}</select>
+      <select onchange="updateTkField('${tk.id}','assigneeId',this.value||null)" style="flex:1"><option value="">\u2014</option>${S.users.filter(isAssignable).map(u=>`<option value="${u.id}"${tk.assigneeId===u.id?' selected':''}>${lastNameFirst(u.name)}</option>`).join('')}</select>
       ${S.tp.canAssign&&tk.assigneeId!==S.currentUser?`<button class="btn-ok" onclick="updateTkField('${tk.id}','assigneeId','${S.currentUser}')">Ich</button>`:''}
     </div></div>
     ${S.tp.canSetPublic?`<div class="tkf"><label>Sichtbarkeit</label><button class="bdg ${tk.isPublic?'pub-on':'pub-off'}" onclick="updateTkField('${tk.id}','isPublic',${!tk.isPublic})" style="cursor:pointer;padding:5px 10px;border-radius:6px;font-size:12px">${tk.isPublic?'&#127760; \u00d6ffentlich':'&#128274; Privat'}</button></div>`:''}
@@ -2145,7 +2145,7 @@ function renderTkDetail(){
     <div class="tkf"><label>Priorit\u00e4t</label><div class="val">${prioBdg(tk.priority)}</div></div>
     <div class="tkf"><label>Fachbereich</label><div class="val">${deptBdg(tk.department)}</div></div>
     ${S.tp.canSeeSubcat&&tk.subcategory?`<div class="tkf"><label>Unterkategorie</label><div class="val"><span class="bdg" style="font-size:11px;background:rgba(124,58,237,.12);color:#7c3aed">${tk.subcategory}</span></div></div>`:''}
-    <div class="tkf"><label>Zust\u00e4ndig</label><div class="val">${getU(tk.assigneeId)?`<div style="display:flex;align-items:center;gap:5px">${avHtml(getU(tk.assigneeId).initials,getU(tk.assigneeId).color,18,8)}<span style="font-size:12px">${getU(tk.assigneeId).name}</span></div>`:'\u2014'}</div></div>
+    <div class="tkf"><label>Zust\u00e4ndig</label><div class="val">${getU(tk.assigneeId)?`<div style="display:flex;align-items:center;gap:5px">${avHtml(getU(tk.assigneeId).initials,getU(tk.assigneeId).color,18,8)}<span style="font-size:12px">${lastNameFirst(getU(tk.assigneeId).name)}</span></div>`:'\u2014'}</div></div>
     ${tk.reporter?`<div class="tkf"><label>&#128100; Einmelder</label><div class="val" style="font-size:12px">${esc(tk.reporter)}</div></div>`:''}`}
     <div class="tkdiv"></div>
     <div class="tkf"><label>Tags</label><div>${tagChips(tk.tags)||'<span style="color:var(--di);font-size:11px">\u2014</span>'}</div></div>
@@ -2157,11 +2157,11 @@ function renderTkDetail(){
       </div>`:
       `<div style="font-size:12px;color:var(--mu)">${tk.snoozedUntil?'bis '+new Date(tk.snoozedUntil).toLocaleDateString('de-DE'):'\u2014'}</div>`}
     </div>
-    <div class="tkf"><label>Erstellt von</label><div style="font-size:12px">${getU(tk.createdBy)?.name||'?'}</div></div>
+    <div class="tkf"><label>Erstellt von</label><div style="font-size:12px">${getU(tk.createdBy)?lastNameFirst(getU(tk.createdBy).name):'?'}</div></div>
     <div class="tkf"><label>Erstellt am</label><div style="font-size:11px;color:var(--mu)">${fdt(tk.createdAt)}</div></div>
     <div class="tkf"><label>&#128101; Teilnehmer</label>
       <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:${canEdit?'4px':'0'}">
-        ${(tk.participants||[]).map(pid=>{const pu=getU(pid);if(!pu)return'';return `<span class="bdg" style="display:inline-flex;align-items:center;gap:4px;padding:2px 6px;background:var(--sf2)" title="${esc(pu.name)}">${avHtml(pu.initials,pu.color,16,7)}<span style="font-size:11px">${esc(lastNameFirst(pu.name))}</span>${canEdit?`<button onclick="removeTkParticipant('${tk.id}','${pid}')" title="Entfernen" style="border:none;background:none;cursor:pointer;color:var(--danger);font-size:11px;padding:0;margin-left:2px">&#10005;</button>`:''}</span>`;}).join('')}
+        ${(tk.participants||[]).map(pid=>{const pu=getU(pid);if(!pu)return'';return `<span class="bdg" style="display:inline-flex;align-items:center;gap:4px;padding:2px 6px;background:var(--sf2)" title="${esc(lastNameFirst(pu.name))}">${avHtml(pu.initials,pu.color,16,7)}<span style="font-size:11px">${esc(lastNameFirst(pu.name))}</span>${canEdit?`<button onclick="removeTkParticipant('${tk.id}','${pid}')" title="Entfernen" style="border:none;background:none;cursor:pointer;color:var(--danger);font-size:11px;padding:0;margin-left:2px">&#10005;</button>`:''}</span>`;}).join('')}
         ${!(tk.participants||[]).length?'<span style="font-size:11px;color:var(--di)">— keine —</span>':''}
       </div>
       ${canEdit?`<select onchange="if(this.value){addTkParticipant('${tk.id}',this.value);}this.value='';" style="width:100%;font-size:12px"><option value="">+ Teilnehmer hinzufügen…</option>${S.users.filter(u=>isAssignable(u)&&u.id!==tk.createdBy&&u.id!==tk.assigneeId&&!(tk.participants||[]).includes(u.id)).slice().sort(byLastName).map(u=>`<option value="${u.id}">${lastNameFirst(u.name)}</option>`).join('')}</select>`:''}
@@ -2189,7 +2189,7 @@ function onNoteKey(e,tkId){
     const q=match[1].toLowerCase();
     const sugs=S.users.filter(u=>u.name.toLowerCase().includes(q)&&u.id!==S.currentUser).slice(0,5);
     const sug=document.getElementById('mentionSug');
-    if(sugs.length){sug.innerHTML=sugs.map((u,i)=>`<div class="mention-opt${i===0?' active':''}" onclick="insertMention('${u.name}')">${avHtml(u.initials,u.color,20,8)} ${u.name}</div>`).join('');sug.classList.add('open');_mentionActive=true;}
+    if(sugs.length){sug.innerHTML=sugs.map((u,i)=>`<div class="mention-opt${i===0?' active':''}" onclick="insertMention('${u.name}')">${avHtml(u.initials,u.color,20,8)} ${lastNameFirst(u.name)}</div>`).join('');sug.classList.add('open');_mentionActive=true;}
     else{sug.classList.remove('open');_mentionActive=false;}
   }else{document.getElementById('mentionSug')?.classList.remove('open');_mentionActive=false;}
 }
@@ -2326,7 +2326,7 @@ function openTkForm(id,parentId){
   if(advRow)advRow.style.display=isStd?'none':'flex';
   document.getElementById('tkFBkt').innerHTML='<option value="">\u2014</option>'+BUCKETS.map(b=>`<option value="${b.id}"${tk?.bucket===b.id?' selected':''}>${b.label}</option>`).join('');
   document.getElementById('tkFTags').innerHTML=S.tags.map(t=>`<option value="${t.id}"${tk?.tags?.includes(t.id)?' selected':''}>${t.label}</option>`).join('');
-  document.getElementById('tkFAsgn').innerHTML='<option value="">\u2014 niemand \u2014</option>'+S.users.filter(isAssignable).map(u=>`<option value="${u.id}"${tk?.assigneeId===u.id?' selected':''}>${u.name}</option>`).join('');
+  document.getElementById('tkFAsgn').innerHTML='<option value="">\u2014 niemand \u2014</option>'+S.users.filter(isAssignable).map(u=>`<option value="${u.id}"${tk?.assigneeId===u.id?' selected':''}>${lastNameFirst(u.name)}</option>`).join('');
   const pid=parentId||tk?.parentTicketId||'';
   document.getElementById('tkFPar').innerHTML='<option value="">\u2014</option>'+S.tickets.filter(t=>!id||t.id!==id).map(t=>`<option value="${t.id}"${t.id===pid?' selected':''}>${t.number}: ${t.title.slice(0,35)}</option>`).join('');
   onTkParentChange();
@@ -2360,7 +2360,7 @@ function renderChecklists(){
       ${visible.length?visible.map(cl=>`<div style="padding:12px 15px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:10px">
         <div style="flex:1">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px"><span style="font-weight:700;font-size:13px">${cl.name}</span>${deptBdg(cl.department)}</div>
-          <div style="font-size:11px;color:var(--mu);margin-bottom:6px">${cl.items.length} Punkte &middot; ${getU(cl.createdBy)?.name||'?'}</div>
+          <div style="font-size:11px;color:var(--mu);margin-bottom:6px">${cl.items.length} Punkte &middot; ${getU(cl.createdBy)?lastNameFirst(getU(cl.createdBy).name):'?'}</div>
           <div style="display:flex;flex-wrap:wrap;gap:3px">${cl.items.map(it=>`<span style="font-size:11px;background:var(--sf2);border:1px solid var(--border);border-radius:4px;padding:2px 7px">${it.itemType==='check_text'?'&#128065;&#65039;':'&#9745;&#65039;'} ${it.text}</span>`).join('')}</div>
         </div>
         <div style="display:flex;gap:5px;flex-shrink:0">
@@ -2477,7 +2477,7 @@ function renderMessages(){
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${isPinned?'&#128204; ':''}${isUnread?'&#128276; ':''}${m.title}</div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--mu);align-items:center">
-          ${isSent?`<span>An: <strong>${toUser?toUser.name:'Alle Mitarbeiter'}</strong></span>`:`<span>Von: <strong>${from?.name||'?'}</strong></span>`}
+          ${isSent?`<span>An: <strong>${toUser?lastNameFirst(toUser.name):'Alle Mitarbeiter'}</strong></span>`:`<span>Von: <strong>${from?lastNameFirst(from.name):'?'}</strong></span>`}
           <span>${fdt(m.createdAt)}</span>
           <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">${m.body.slice(0,80)}${m.body.length>80?'&#8230;':''}</span>
         </div>
@@ -2506,7 +2506,7 @@ function openMsg(id){
   _currentMsgId=id;
   const from=getU(m.senderId);const toUser=m.targetType==='user'?getU(m.targetValue):null;
   document.getElementById('msgDetTitle').textContent=m.title;
-  document.getElementById('msgDetMeta').innerHTML=`Von: <strong>${from?.name||'?'}</strong> &middot; ${fdt(m.createdAt)} &middot; An: <strong>${m.targetType==='all'?'Alle Mitarbeiter':toUser?.name||m.targetValue}</strong>`;
+  document.getElementById('msgDetMeta').innerHTML=`Von: <strong>${from?lastNameFirst(from.name):'?'}</strong> &middot; ${fdt(m.createdAt)} &middot; An: <strong>${m.targetType==='all'?'Alle Mitarbeiter':toUser?lastNameFirst(toUser.name):m.targetValue}</strong>`;
   document.getElementById('msgDetBody').textContent=m.body;
   const pinBtn=document.getElementById('msgDetPinBtn');
   pinBtn.textContent=m.pinned?'&#128204; Lospinnen':'&#128204; Anpinnen';
@@ -2540,7 +2540,7 @@ async function deleteMsg(id){
 }
 function openMsgForm(){
   const sel=document.getElementById('msgTo');
-  if(sel)sel.innerHTML='<option value="">Alle Mitarbeiter</option>'+S.users.filter(u=>u.id!==S.currentUser).map(u=>`<option value="${u.id}">${u.name}</option>`).join('');
+  if(sel)sel.innerHTML='<option value="">Alle Mitarbeiter</option>'+S.users.filter(u=>u.id!==S.currentUser).map(u=>`<option value="${u.id}">${lastNameFirst(u.name)}</option>`).join('');
   const t=document.getElementById('msgTitle');if(t)t.value='';
   const b=document.getElementById('msgBody');if(b)b.value='';
   const e=document.getElementById('msgErr');if(e)e.textContent='';
@@ -2595,7 +2595,7 @@ function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt
 function openAdminModal(){renderUsrList();renderCatList();renderTagList();renderRightsMatrix();openModal('admOv');}
 function swTab(t){['users','cats','tags','stats','rights','depts','subcats','notetpls','log','ho','shifts','links'].forEach(x=>{document.getElementById('atb-'+x)?.classList.toggle('on',x===t);document.getElementById('atp-'+x)?.classList.toggle('on',x===t);});if(t==='ho')renderHoAdmin();if(t==='subcats')renderSubcatAdmin();if(t==='notetpls')renderNoteTplAdmin();if(t==='stats')renderStatsPanel();if(t==='shifts')renderShiftsAdmin();if(t==='links')renderLinksAdmin();if(t==='rights')renderRightsMatrix();if(t==='depts')renderDeptsAdmin();}
 function backToAdmin(tab='users'){['ufOv','cfOv','tfOv','deptOv'].forEach(closeModal);openAdminModal();swTab(tab);}
-function renderUsrList(){document.getElementById('usrList').innerHTML=S.users.map(u=>`<div class="ai"${u.isActive===false?' style="opacity:.45;font-style:italic"':''}>${avHtml(u.initials,u.color,34,13,u.isOnline)}<div class="aii"><div class="ain">${u.name} ${u.isActive===false?'\uD83D\uDEAB inaktiv \u00B7 ':''}${roleBadges(u.id)}${u.isOnline?'<span style="font-size:10px;color:var(--ok)">\u25cf online</span>':''}</div><div class="ais">${u.mustChangePW?'\u26A0\uFE0F PW ausstehend':'\u2713 Aktiv'}${u.hireDate?' \u00B7 seit '+u.hireDate.split('-').reverse().join('.'):''}${u.terminationDate?' \u00B7 bis '+u.terminationDate.split('-').reverse().join('.'):''}</div></div><div class="aia"><button class="btn-e" onclick="openUF('${u.id}')">\u270e</button>${S.users.length>1&&u.id!==S.currentUser?`<button class="btn-d" onclick="delUser('${u.id}')">\u2715</button>`:''}</div></div>`).join('');}
+function renderUsrList(){document.getElementById('usrList').innerHTML=S.users.map(u=>`<div class="ai"${u.isActive===false?' style="opacity:.45;font-style:italic"':''}>${avHtml(u.initials,u.color,34,13,u.isOnline)}<div class="aii"><div class="ain">${lastNameFirst(u.name)} ${u.isActive===false?'\uD83D\uDEAB inaktiv \u00B7 ':''}${roleBadges(u.id)}${u.isOnline?'<span style="font-size:10px;color:var(--ok)">\u25cf online</span>':''}</div><div class="ais">${u.mustChangePW?'\u26A0\uFE0F PW ausstehend':'\u2713 Aktiv'}${u.hireDate?' \u00B7 seit '+u.hireDate.split('-').reverse().join('.'):''}${u.terminationDate?' \u00B7 bis '+u.terminationDate.split('-').reverse().join('.'):''}</div></div><div class="aia"><button class="btn-e" onclick="openUF('${u.id}')">\u270e</button>${S.users.length>1&&u.id!==S.currentUser?`<button class="btn-d" onclick="delUser('${u.id}')">\u2715</button>`:''}</div></div>`).join('');}
 function renderCatList(){document.getElementById('catList').innerHTML=S.categories.map(c=>`<div class="ai"><div style="width:14px;height:14px;border-radius:3px;background:${c.color};flex-shrink:0"></div><div class="aii"><div class="ain">${c.emoji} ${c.label}</div></div><div class="aia"><button class="btn-e" onclick="openCF('${c.id}')">\u270e</button>${S.categories.length>1?`<button class="btn-d" onclick="delCat('${c.id}')">\u2715</button>`:''}</div></div>`).join('');}
 function renderTagList(){document.getElementById('tagList').innerHTML=S.tags.map(t=>`<div class="ai"><div style="width:14px;height:14px;border-radius:3px;background:${t.color};flex-shrink:0"></div><div class="aii"><div class="ain"><span class="tag-chip" style="background:${t.color}1a;color:${t.color}">${t.label}</span></div></div><div class="aia"><button class="btn-e" onclick="openTF('${t.id}')">\u270e</button>${S.tags.length>1?`<button class="btn-d" onclick="delTag('${t.id}')">\u2715</button>`:''}</div></div>`).join('');}
 const RIGHTS_ROLES_LIST=['admin','leitung','dienstplanung','schichtleiter','technik','qm','standard'];
@@ -3127,14 +3127,14 @@ function renderHomeoffice() {
     var bg=rowBg(day),bl=rowBl(day);
     var label=(day.isHol?'&#127877; ':'')+fmtDay(day.iso);
     var isMine=!!day.mySlot;
-    var slotHtml=day.slots.map(function(s){var u=getU(s.userId);var clr=u&&u.color?u.color:'var(--acc)';return '<span style="background:'+clr+'22;color:'+clr+';border-radius:4px;padding:1px 7px;font-size:11px;font-weight:600;margin-right:4px;cursor:default" title="'+(u?u.name:'?')+(s.box?' / '+s.box:'')+(s.dienst?' · '+s.dienst:'')+'">'+( u?u.initials:'?')+(s.box?' / '+s.box:'')+(s.dienst?' · '+s.dienst:'')+'</span>';}).join('');
+    var slotHtml=day.slots.map(function(s){var u=getU(s.userId);var clr=u&&u.color?u.color:'var(--acc)';return '<span style="background:'+clr+'22;color:'+clr+';border-radius:4px;padding:1px 7px;font-size:11px;font-weight:600;margin-right:4px;cursor:default" title="'+(u?lastNameFirst(u.name):'?')+(s.box?' / '+s.box:'')+(s.dienst?' · '+s.dienst:'')+'">'+( u?u.initials:'?')+(s.box?' / '+s.box:'')+(s.dienst?' · '+s.dienst:'')+'</span>';}).join('');
     h+='<tr data-date="'+day.iso+'" style="background:'+bg+';'+bl+'">';
     h+='<td style="white-space:nowrap;font-weight:'+(isMine?700:400)+';font-size:12px">'+label+'</td>';
     h+='<td style="text-align:center"><span style="font-size:12px;font-weight:700;color:'+(day.free>0?'var(--ok)':'var(--danger)')+'">'+day.free+'/'+day.maxS+'</span></td>';
     h+='<td>'+(slotHtml||'<span style="color:var(--di);font-size:11px">—</span>')+'</td>';
     h+='<td style="white-space:nowrap">';
     if(day.free>0)h+='<button class="btn-ok" style="font-size:11px;padding:2px 8px;margin-right:3px" onclick="hoEintragen(\''+day.iso+'\')">&#43; Eintragen</button>';
-    if(canManage&&day.slots.length>0){day.slots.forEach(function(sl){var u=getU(sl.userId);h+='<button class="btn-d" style="font-size:10px;padding:1px 5px;margin:1px" onclick="hoAustragen(\''+sl.id+'\')\" title="'+(u?u.name:'?')+'">&#10005; '+(u?u.initials:'?')+'</button>';});}
+    if(canManage&&day.slots.length>0){day.slots.forEach(function(sl){var u=getU(sl.userId);h+='<button class="btn-d" style="font-size:10px;padding:1px 5px;margin:1px" onclick="hoAustragen(\''+sl.id+'\')\" title="'+(u?lastNameFirst(u.name):'?')+'">&#10005; '+(u?u.initials:'?')+'</button>';});}
     else if(day.mySlot)h+='<button class="btn-d" style="font-size:11px;padding:2px 6px" onclick="hoAustragen(\''+day.mySlot.id+'\')">"&#10005;</button>';
     h+='</td></tr>';
   });
@@ -3329,7 +3329,7 @@ function renderHoAdmin(){
 // SECTION: Diensttausch @Mention
 // ══════════════════════════════════════════
 var _dtMentionAt=-1;
-function dtMentionInput(ta){var val=ta.value,pos=ta.selectionStart,before=val.slice(0,pos),atIdx=before.lastIndexOf('@'),box=document.getElementById('dtMentionBox');if(atIdx<0){box.style.display='none';_dtMentionAt=-1;return;}var query=before.slice(atIdx+1);if(query.includes(' ')&&query.length>0){box.style.display='none';_dtMentionAt=-1;return;}_dtMentionAt=atIdx;var q2=query.toLowerCase();var matches=(S.users||[]).filter(function(u){return u.name.toLowerCase().startsWith(q2)&&u.id!==S.currentUser;}).slice(0,8);if(!matches.length){box.style.display='none';return;}box.innerHTML=matches.map(function(u,i){return '<div class="mention-item'+(i===0?' active':'')+'" data-name="'+u.name+'" onclick="dtPickMention('+JSON.stringify(u.name)+')">'+'<span style="background:'+(u.color||'var(--acc)')+';color:#fff;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0">'+u.initials+'</span>'+'<span>'+u.name+'</span></div>';}).join('');box.style.display='block';}
+function dtMentionInput(ta){var val=ta.value,pos=ta.selectionStart,before=val.slice(0,pos),atIdx=before.lastIndexOf('@'),box=document.getElementById('dtMentionBox');if(atIdx<0){box.style.display='none';_dtMentionAt=-1;return;}var query=before.slice(atIdx+1);if(query.includes(' ')&&query.length>0){box.style.display='none';_dtMentionAt=-1;return;}_dtMentionAt=atIdx;var q2=query.toLowerCase();var matches=(S.users||[]).filter(function(u){return u.name.toLowerCase().startsWith(q2)&&u.id!==S.currentUser;}).slice(0,8);if(!matches.length){box.style.display='none';return;}box.innerHTML=matches.map(function(u,i){return '<div class="mention-item'+(i===0?' active':'')+'" data-name="'+u.name+'" onclick="dtPickMention('+JSON.stringify(u.name)+')">'+'<span style="background:'+(u.color||'var(--acc)')+';color:#fff;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0">'+u.initials+'</span>'+'<span>'+lastNameFirst(u.name)+'</span></div>';}).join('');box.style.display='block';}
 function dtPickMention(name){var ta=document.getElementById('dtText');if(!ta)return;var val=ta.value,endIdx=_dtMentionAt+1;while(endIdx<val.length&&val[endIdx]!==' '&&val[endIdx]!=='\n')endIdx++;var before=val.slice(0,_dtMentionAt),after=val.slice(endIdx);ta.value=before+'@'+name+' '+after;var np=before.length+name.length+2;ta.focus();ta.setSelectionRange(np,np);var box=document.getElementById('dtMentionBox');if(box)box.style.display='none';_dtMentionAt=-1;}
 function dtMentionKey(e){var box=document.getElementById('dtMentionBox');if(!box||box.style.display==='none')return;var items=box.querySelectorAll('.mention-item'),active=box.querySelector('.mention-item.active'),idx=Array.from(items).indexOf(active);if(e.key==='ArrowDown'){e.preventDefault();items[idx]&&items[idx].classList.remove('active');items[Math.min(idx+1,items.length-1)]&&items[Math.min(idx+1,items.length-1)].classList.add('active');}else if(e.key==='ArrowUp'){e.preventDefault();items[idx]&&items[idx].classList.remove('active');items[Math.max(idx-1,0)]&&items[Math.max(idx-1,0)].classList.add('active');}else if(e.key==='Enter'||e.key==='Tab'){var act=box.querySelector('.mention-item.active');if(act){e.preventDefault();dtPickMention(act.dataset.name);}}else if(e.key==='Escape'){box.style.display='none';}}
 
@@ -3366,7 +3366,7 @@ function renderNews(){
     h+='<div style="flex:1;min-width:0">';
     h+='<div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:2px">'+badges+escHtml(n.title)+'</div>';
     h+='<div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--mu)">';
-    h+='<span>Von: <strong>'+(getU(n.createdBy)?.name||'?')+'</strong></span>';
+    h+='<span>Von: <strong>'+(getU(n.createdBy)?lastNameFirst(getU(n.createdBy).name):'?')+'</strong></span>';
     if(n.fromDate)h+='<span>Ab: '+fmtDate(n.fromDate)+'</span>';
     if(n.toDate)h+='<span>Bis: '+fmtDate(n.toDate)+'</span>';
     h+='</div>';
@@ -3450,7 +3450,7 @@ function renderVacation(){
     var cc=day.vacEntries.length===0?'var(--di)':full?'var(--danger)':'var(--warn)';
     var users=day.vacEntries.map(function(ev){
       if(ev._anonymized)return '<span style="background:var(--sf2);color:var(--mu);border-radius:4px;padding:1px 6px;font-size:11px;font-weight:600;margin-right:3px" title="Anonymisiert">&#128274;</span>';
-      var u=getU(ev.userId);return u?'<span style="background:'+(u.color||'var(--acc)')+'22;color:'+(u.color||'var(--acc)')+';border-radius:4px;padding:1px 6px;font-size:11px;font-weight:600;margin-right:3px" title="'+u.name+'">'+u.initials+'</span>':'';
+      var u=getU(ev.userId);return u?'<span style="background:'+(u.color||'var(--acc)')+'22;color:'+(u.color||'var(--acc)')+';border-radius:4px;padding:1px 6px;font-size:11px;font-weight:600;margin-right:3px" title="'+lastNameFirst(u.name)+'">'+u.initials+'</span>':'';
     }).join('');
     var label=pad(day.day)+'. '+moName+' '+year+' ('+day.dayName+')';
     h+='<tr style="'+(day.isWe?'opacity:.7':'')+(full?';border-left:3px solid var(--danger)':'')+'">';
@@ -3856,12 +3856,12 @@ function renderGSearch(){
   });
   // Nachrichten
   (S.messages||[]).filter(m=>((m.title||'')+(m.body||'')).toLowerCase().includes(q)).slice(0,4).forEach(m=>{
-    results.push({type:'msg',icon:'✉️',label:m.title||'(kein Betreff)',sub:'von '+(getU(m.senderId)?.name||'?')+' · '+fdt(m.createdAt),action:()=>{closeGSearch();setView('messages');setTimeout(()=>openMsg(m.id),100);},accent:'#10b981'});
+    results.push({type:'msg',icon:'✉️',label:m.title||'(kein Betreff)',sub:'von '+(getU(m.senderId)?lastNameFirst(getU(m.senderId).name):'?')+' · '+fdt(m.createdAt),action:()=>{closeGSearch();setView('messages');setTimeout(()=>openMsg(m.id),100);},accent:'#10b981'});
   });
   // Mitarbeiter
   S.users.filter(u=>(u.name||'').toLowerCase().includes(q)).slice(0,4).forEach(u=>{
     const roles=(u.roles||[]).map(r=>ROLES.find(x=>x.id===r)?.label||r).join(', ');
-    results.push({type:'user',icon:'👤',label:u.name,sub:roles||'',action:()=>{closeGSearch();if(S.p.manageUsers)openUF(u.id);},accent:'#f59e0b'});
+    results.push({type:'user',icon:'👤',label:lastNameFirst(u.name),sub:roles||'',action:()=>{closeGSearch();if(S.p.manageUsers)openUF(u.id);},accent:'#f59e0b'});
   });
   // News
   (S.news||[]).filter(n=>(n.title+(n.body||'')).toLowerCase().includes(q)).slice(0,3).forEach(n=>{
@@ -3935,10 +3935,10 @@ function renderPlatz(){
           <div style="text-align:center;margin:8px 0">
             <div style="font-size:28px">⏸️</div>
             <div style="font-size:13px;font-weight:700;color:#f59e0b;margin-top:4px">PAUSE</div>
-            <div style="font-size:11px;color:var(--mu);margin-top:2px">${u?.name||'?'} · ${sess.breakTime} Uhr</div>
+            <div style="font-size:11px;color:var(--mu);margin-top:2px">${u?lastNameFirst(u.name):'?'} · ${sess.breakTime} Uhr</div>
           </div>
         `:`
-          <div class="elp-urow">${avHtml(u?.initials||'?',u?.color||'#888',32,12,true)}<div><div class="elp-uname">${u?.name||'?'}</div>${shift?`<div class="elp-sch">${shift.label}</div>`:''}</div></div>
+          <div class="elp-urow">${avHtml(u?.initials||'?',u?.color||'#888',32,12,true)}<div><div class="elp-uname">${u?lastNameFirst(u.name):'?'}</div>${shift?`<div class="elp-sch">${shift.label}</div>`:''}</div></div>
           <div class="elp-badge ${mine?'elp-badge-me':'elp-badge-occ'}">${mine?'● Du bist hier':'● Besetzt'}</div>
           ${mine&&sess.breakTime?`<div style="font-size:10px;color:var(--mu);margin-top:4px">⏸️ Pause: ${sess.breakTime} Uhr</div>`:''}
         `}
@@ -4001,7 +4001,7 @@ function onStLoginShiftChange(){
   const obDiv=document.getElementById('stLoginOtherBreaks');
   if(others.length){
     obDiv.style.display='';
-    obDiv.innerHTML='<div style="font-size:11px;font-weight:700;margin-bottom:4px;color:var(--mu)">Pausen anderer Mitarbeiter heute:</div>'+others.map(s=>`<div style="display:flex;gap:6px;align-items:center;font-size:12px"><span>⏸️ ${getU(s.userId)?.name||'?'}</span><span style="font-weight:600">${s.breakTime} Uhr</span></div>`).join('');
+    obDiv.innerHTML='<div style="font-size:11px;font-weight:700;margin-bottom:4px;color:var(--mu)">Pausen anderer Mitarbeiter heute:</div>'+others.map(s=>`<div style="display:flex;gap:6px;align-items:center;font-size:12px"><span>⏸️ ${getU(s.userId)?lastNameFirst(getU(s.userId).name):'?'}</span><span style="font-weight:600">${s.breakTime} Uhr</span></div>`).join('');
   } else { obDiv.style.display='none'; }
 }
 async function confirmStationLogin(){
@@ -4125,7 +4125,7 @@ async function renderStatistik(){
     <div style="overflow-x:auto"><table class="rm-table" style="font-size:12px">
       <thead><tr><th style="text-align:left">Mitarbeiter</th><th>Gesamt</th>${DEPTS.map(d=>`<th>${DEPT_LABELS[d]||d}</th>`).join('')}</tr></thead>
       <tbody>${S.users.filter(u=>userStats[u.id]?.created>0).sort((a,b)=>(userStats[b.id]?.created||0)-(userStats[a.id]?.created||0)).map(u=>`
-        <tr><td style="text-align:left;font-weight:600">${avHtml(u.initials,u.color,18,8)} ${u.name}</td>
+        <tr><td style="text-align:left;font-weight:600">${avHtml(u.initials,u.color,18,8)} ${lastNameFirst(u.name)}</td>
         <td><span class="anum" style="background:rgba(59,109,212,.1);color:var(--acc)">${userStats[u.id].created}</span></td>
         ${DEPTS.map(d=>`<td>${userStats[u.id].byDept[d]||'—'}</td>`).join('')}</tr>`).join('')}
       </tbody>
@@ -4137,7 +4137,7 @@ async function renderStatistik(){
     <div style="overflow-x:auto"><table class="rm-table" style="font-size:12px">
       <thead><tr><th style="text-align:left">Mitarbeiter</th><th>Zugewiesen</th><th>Abgeschl.</th>${DEPTS.map(d=>`<th>${DEPT_LABELS[d]||d}</th>`).join('')}</tr></thead>
       <tbody>${S.users.filter(u=>userStats[u.id]?.assigned>0).sort((a,b)=>(userStats[b.id]?.closed||0)-(userStats[a.id]?.closed||0)).map(u=>`
-        <tr><td style="text-align:left;font-weight:600">${avHtml(u.initials,u.color,18,8)} ${u.name}</td>
+        <tr><td style="text-align:left;font-weight:600">${avHtml(u.initials,u.color,18,8)} ${lastNameFirst(u.name)}</td>
         <td><span class="anum" style="background:rgba(59,109,212,.1);color:var(--acc)">${userStats[u.id].assigned}</span></td>
         <td><span class="anum" style="background:rgba(16,185,129,.1);color:var(--ok)">${userStats[u.id].closed}</span></td>
         ${DEPTS.map(d=>`<td>${userStats[u.id].closedByDept[d]||'—'}</td>`).join('')}</tr>`).join('')}
@@ -4158,7 +4158,7 @@ async function renderStatistik(){
     <h3 style="margin-bottom:12px">🔑 Portal-Anmeldungen pro Mitarbeiter</h3>
     <div style="display:flex;flex-direction:column;gap:8px">
       ${S.users.slice().sort((a,b)=>(loginMap[b.id]||0)-(loginMap[a.id]||0)).map(u=>{const cnt=loginMap[u.id]||0;const maxL=Math.max(...Object.values(loginMap),1);return`<div style="display:flex;align-items:center;gap:10px">
-        <div style="display:flex;align-items:center;gap:6px;min-width:130px">${avHtml(u.initials,u.color,20,9)}<span style="font-size:12px;font-weight:600">${u.name}</span></div>
+        <div style="display:flex;align-items:center;gap:6px;min-width:130px">${avHtml(u.initials,u.color,20,9)}<span style="font-size:12px;font-weight:600">${lastNameFirst(u.name)}</span></div>
         ${bar(cnt,maxL,'var(--info)')}
       </div>`;}).join('')}
     </div>
@@ -4539,7 +4539,7 @@ function renderSopEditor(id){
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
         <span class="bdg" style="background:${t.status==='approved'?'#10b98122':'#f59e0b22'};color:${t.status==='approved'?'#10b981':'#f59e0b'}">${t.status==='approved'?'✓ Freigegeben':'📝 Entwurf'}</span>
         ${t.status==='approved'&&!t.active?'<span class="bdg" style="background:var(--sf2);color:var(--mu)">Deaktiviert / durch neuere Version ersetzt</span>':''}
-        <span style="font-size:11px;color:var(--mu)">Version ${t.version} &middot; ${esc(t.category||'Ohne Kategorie')} &middot; erstellt von ${esc(getU(t.createdBy)?.name||'?')}${t.lastPrintedAt?' &middot; zuletzt gedruckt '+fdt(t.lastPrintedAt):''}</span>
+        <span style="font-size:11px;color:var(--mu)">Version ${t.version} &middot; ${esc(t.category||'Ohne Kategorie')} &middot; erstellt von ${esc(getU(t.createdBy)?lastNameFirst(getU(t.createdBy).name):'?')}${t.lastPrintedAt?' &middot; zuletzt gedruckt '+fdt(t.lastPrintedAt):''}</span>
       </div>
       ${t.description?`<div style="font-size:13px;color:var(--tx);margin-bottom:10px">${esc(t.description)}</div>`:''}
       ${canManage&&isDraft?`<div style="margin-bottom:10px"><button class="btn-s" onclick="sopEditMeta('${t.id}')">✎ Titel/Kategorie/Beschreibung</button></div>`:''}
@@ -4769,7 +4769,7 @@ function renderSopRun(runId){
         </div>
         <div style="min-width:0">
           <textarea placeholder="Dokumentation / Notiz…" ${disabled} onchange="sopRunSetNote('${run.id}','${it.id}',this.value)" rows="3" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--sf);color:var(--tx);box-sizing:border-box;font-size:12px;font-family:inherit;resize:vertical">${esc(ri.note||'')}</textarea>
-          ${ri.updatedAt?`<div style="font-size:10px;color:var(--di);margin-top:4px">zuletzt ${fdt(ri.updatedAt)} von ${esc(getU(ri.updatedBy)?.name||'?')}</div>`:''}
+          ${ri.updatedAt?`<div style="font-size:10px;color:var(--di);margin-top:4px">zuletzt ${fdt(ri.updatedAt)} von ${esc(getU(ri.updatedBy)?lastNameFirst(getU(ri.updatedBy).name):'?')}</div>`:''}
         </div>
       </div>
     </div>`;
@@ -4785,7 +4785,7 @@ function renderSopRun(runId){
     </div>
     ${run.isTest?`<div style="margin:0 20px 10px;padding:8px 12px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.25);border-radius:var(--r);font-size:12px;color:#7c3aed">🧪 Testdurchlauf — zum Ausprobieren des Entwurfs, zählt nicht in der Statistik und wird beim Beenden wieder gelöscht.</div>`:''}
     <div style="padding:0 20px">
-      <div style="font-size:11px;color:var(--mu);margin-bottom:4px">Gestartet von ${esc(getU(run.startedBy)?.name||'?')} um ${fdt(run.startedAt)}${run.status!=='running'?' &middot; Status: '+(run.status==='completed'?'✓ Abgeschlossen':'✗ Abgebrochen'):''}</div>
+      <div style="font-size:11px;color:var(--mu);margin-bottom:4px">Gestartet von ${esc(getU(run.startedBy)?lastNameFirst(getU(run.startedBy).name):'?')} um ${fdt(run.startedAt)}${run.status!=='running'?' &middot; Status: '+(run.status==='completed'?'✓ Abgeschlossen':'✗ Abgebrochen'):''}</div>
       <div style="background:var(--sf2);border-radius:10px;height:10px;overflow:hidden;margin-bottom:4px"><div style="background:${pct===100?'#10b981':'#3b6dd4'};height:100%;width:${pct}%;transition:.2s"></div></div>
       <div style="font-size:11px;color:var(--mu);margin-bottom:10px">${doneCount}/${items.length} erledigt (${pct}%)</div>
     </div>
@@ -4836,7 +4836,7 @@ function renderSopRunList(){
         return `<div style="background:var(--sf);border:1px solid var(--border);border-radius:10px;padding:12px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px" onclick="S._selSopRunId='${r.id}';S._sopView='run';renderSop()">
           <div style="min-width:0">
             <div style="font-size:13px;font-weight:600">${esc(t?.title||'?')}</div>
-            <div style="font-size:11px;color:var(--mu)">${esc(getU(r.startedBy)?.name||'?')} &middot; ${fdt(r.startedAt)} &middot; ${doneCount}/${items.length} (${pct}%)</div>
+            <div style="font-size:11px;color:var(--mu)">${esc(getU(r.startedBy)?lastNameFirst(getU(r.startedBy).name):'?')} &middot; ${fdt(r.startedAt)} &middot; ${doneCount}/${items.length} (${pct}%)</div>
           </div>
           <span class="bdg" style="background:${statusColor[r.status]}22;color:${statusColor[r.status]};flex-shrink:0">${statusLabel[r.status]||r.status}</span>
         </div>`;
@@ -4854,7 +4854,7 @@ function renderSpint(){
   const lockers=(S.lockers||[]).slice().sort((a,b)=>a.number.localeCompare(b.number,'de',{numeric:true}));
   const search=(S._spintFilter||'').toLowerCase().trim();
   const catFilter=S._spintCatFilter||'';
-  const assigneeText=l=>l.assigneeType==='user'?(getU(l.assigneeUserId)?.name||'Unbekannt'):l.assigneeType==='general'?l.assigneeLabel:'';
+  const assigneeText=l=>l.assigneeType==='user'?(getU(l.assigneeUserId)?lastNameFirst(getU(l.assigneeUserId).name):'Unbekannt'):l.assigneeType==='general'?l.assigneeLabel:'';
   let filtered=lockers;
   if(catFilter) filtered=filtered.filter(l=>(l.categoryId||'')===catFilter);
   if(search) filtered=filtered.filter(l=>[l.number,assigneeText(l),l.note].some(v=>(v||'').toLowerCase().includes(search)));
@@ -4863,7 +4863,7 @@ function renderSpint(){
   const assignedGeneral=lockers.filter(l=>l.assigneeType==='general').length;
   const free=lockers.filter(l=>l.assigneeType==='none').length;
   const row=l=>{
-    const label=l.assigneeType==='user'?('👤 '+esc(getU(l.assigneeUserId)?.name||'Unbekannt'))
+    const label=l.assigneeType==='user'?('👤 '+esc(getU(l.assigneeUserId)?lastNameFirst(getU(l.assigneeUserId).name):'Unbekannt'))
       :l.assigneeType==='general'?('🏷️ '+esc(l.assigneeLabel||'—'))
       :'<span style="color:var(--di)">— frei —</span>';
     return '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid var(--border)">'
@@ -5005,7 +5005,7 @@ function renderDocs(){
                 ${d.currentVersion>1?`<span class="doc-ver-badge">v${d.currentVersion}</span>`:''}
               </div>
               ${d.description?`<div class="doc-desc">${d.description}</div>`:''}
-              <div class="doc-meta">${d.originalName} &bull; ${fmtBytes(d.sizeBytes||0)} &bull; ${getU(d.uploadedBy)?.name||'?'} &bull; ${fdt(d.createdAt)}${d.currentVersion>1?` &bull; <a href="#" onclick="showDocHistory('${d.id}');return false" style="color:var(--acc)">${d.currentVersion} Versionen &#9660;</a>`:''}</div>
+              <div class="doc-meta">${d.originalName} &bull; ${fmtBytes(d.sizeBytes||0)} &bull; ${getU(d.uploadedBy)?lastNameFirst(getU(d.uploadedBy).name):'?'} &bull; ${fdt(d.createdAt)}${d.currentVersion>1?` &bull; <a href="#" onclick="showDocHistory('${d.id}');return false" style="color:var(--acc)">${d.currentVersion} Versionen &#9660;</a>`:''}</div>
             </div>
             <div class="doc-actions">
               <button class="btn-s" style="font-size:11px;padding:4px 9px" onclick="copyDocLink('${d.id}')" title="Link für andere Portal-Nutzer kopieren">&#128279;</button>
@@ -5291,7 +5291,7 @@ function renderProtocolInstanceDetail(inst, meeting, canManage) {
           ${p.date?`<span>&#128197; ${fmtDate(p.date)}${p.time?' '+p.time:''}</span>`:''}
           ${p.location?`<span>&#128205; ${esc(p.location)}</span>`:''}
         </div>
-        ${(p.attendees||[]).length?`<div style="display:flex;gap:3px;margin-top:6px;flex-wrap:wrap">${p.attendees.map(uid=>{const u=getU(uid);return u?`<span class="av-sm" style="background:${u.color}" title="${esc(u.name)}">${esc(u.initials)}</span>`:''}).join('')}</div>`:''}
+        ${(p.attendees||[]).length?`<div style="display:flex;gap:3px;margin-top:6px;flex-wrap:wrap">${p.attendees.map(uid=>{const u=getU(uid);return u?`<span class="av-sm" style="background:${u.color}" title="${esc(lastNameFirst(u.name))}">${esc(u.initials)}</span>`:''}).join('')}</div>`:''}
         ${p.body?`<div style="font-size:12px;color:var(--tx);margin-top:8px;white-space:pre-wrap;border-top:1px solid var(--border);padding-top:8px;max-height:240px;overflow-y:auto">${esc(p.body)}</div>`:''}
       </div>`).join('')}
     </div>
@@ -5323,8 +5323,8 @@ function renderMeetingItemsGrid(inst, canManage, search) {
             ${it.result?`<div style="${it.description?'border-top:1px solid var(--border);padding-top:4px;margin-top:4px;':''}font-size:12px;color:var(--mu);margin-bottom:4px"><span style="font-size:10px;font-weight:700;color:var(--di);text-transform:uppercase">Ergebnis</span> ${esc(it.result.slice(0,30))}${it.result.length>30?'…':''}</div>`:''}
             <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
               ${it.dueDate?`<span style="font-size:11px;color:${deadlineColor||'#64748b'};font-weight:${deadlineColor?'600':'400'}">&#128197; ${fmtDate(it.dueDate)}</span>`:''}
-              ${it.delegatedTo?`<span style="font-size:11px;color:#7c3aed">→ ${esc(getU(it.delegatedTo)?.name||'?')}</span>`:''}
-              ${(it.participants||[]).slice(0,4).map(p=>{const u=getU(p.userId);return u?`<span class="av-sm" style="background:${u.color}" title="${esc(u.name)}">${esc(u.initials)}</span>`:''}).join('')}
+              ${it.delegatedTo?`<span style="font-size:11px;color:#7c3aed">→ ${esc(getU(it.delegatedTo)?lastNameFirst(getU(it.delegatedTo).name):'?')}</span>`:''}
+              ${(it.participants||[]).slice(0,4).map(p=>{const u=getU(p.userId);return u?`<span class="av-sm" style="background:${u.color}" title="${esc(lastNameFirst(u.name))}">${esc(u.initials)}</span>`:''}).join('')}
               ${(it.participants||[]).length>4?`<span style="font-size:11px;color:var(--mu)">+${it.participants.length-4}</span>`:''}
             </div>
             ${it.link?`<div style="margin-top:4px;font-size:11px"><a href="${esc(it.link)}" target="_blank" rel="noopener noreferrer" style="color:#3b6dd4;text-decoration:none;display:inline-flex;align-items:center;gap:3px"><span>🔗</span><span>${esc(it.link.slice(0,30))}${it.link.length>30?'…':''}</span></a></div>`:''}
@@ -5495,14 +5495,14 @@ function openItemForm(instanceId, id=null) {
   if (itAiPanel) itAiPanel.innerHTML = aiInlinePanelHtml(item);
   if (item) _maybeAutoAiCheck('discussion_items','Besprechungspunkt',item);
   const delSel = document.getElementById('itDelegatedTo');
-  delSel.innerHTML = S.users.map(u=>`<option value="${u.id}"${item?.delegatedTo===u.id?' selected':''}>${esc(u.name)}</option>`).join('');
+  delSel.innerHTML = S.users.map(u=>`<option value="${u.id}"${item?.delegatedTo===u.id?' selected':''}>${esc(lastNameFirst(u.name))}</option>`).join('');
   // Protokoll
   const protoSection = document.getElementById('itProtokollSection');
   const protoEl = document.getElementById('itProtokoll');
   if (item && (item.protokoll||[]).length>0) {
     protoSection.style.display='';
     protoEl.innerHTML = [...(item.protokoll||[])].reverse().map(e=>{
-      const u=getU(e.by); const uName=u?.name||'?'; const ts=String(e.ts||'').slice(0,16).replace('T',' ');
+      const u=getU(e.by); const uName=u?lastNameFirst(u.name):'?'; const ts=String(e.ts||'').slice(0,16).replace('T',' ');
       if(e.type==='status') return `<div style="margin-bottom:2px">📝 ${ts} · <b>${uName}</b>: Status geändert → <b>${ITEM_STATUS_LABEL[e.to]||e.to}</b></div>`;
       if(e.type==='linked_status') return `<div style="margin-bottom:2px">🔗 ${ts} · <b>${uName}</b>: In <i>${esc(e.fromMeeting)}</i> Status → <b>${ITEM_STATUS_LABEL[e.to]||e.to}</b></div>`;
       if(e.type==='moved') return `<div style="margin-bottom:2px">➡️ ${ts} · <b>${uName}</b>: Verschoben von <i>${e.fromDate}</i> auf <i>${e.toDate}</i></div>`;
@@ -5533,11 +5533,11 @@ function openItemForm(instanceId, id=null) {
     const tk = getTk(item.convertedTicketId);
     const byUser = item.convertedBy ? getU(item.convertedBy) : null;
     convertedInfo.style.display = '';
-    convertedInfo.innerHTML = `🎫 Umgewandelt in Ticket ${tk?`<a href="javascript:void(0)" onclick="openTkDetail('${item.convertedTicketId}')" style="font-weight:600">${tk.number}</a>`:'(nicht einsehbar)'}${byUser?` von ${esc(byUser.name)}`:''}${item.convertedAt?' · '+String(item.convertedAt).slice(0,16).replace('T',' '):''}`;
+    convertedInfo.innerHTML = `🎫 Umgewandelt in Ticket ${tk?`<a href="javascript:void(0)" onclick="openTkDetail('${item.convertedTicketId}')" style="font-weight:600">${tk.number}</a>`:'(nicht einsehbar)'}${byUser?` von ${esc(lastNameFirst(byUser.name))}`:''}${item.convertedAt?' · '+String(item.convertedAt).slice(0,16).replace('T',' '):''}`;
   } else {
     convertedInfo.style.display = 'none';
   }
-  document.getElementById('itPartUser').innerHTML = S.users.map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('');
+  document.getElementById('itPartUser').innerHTML = S.users.map(u=>`<option value="${u.id}">${esc(lastNameFirst(u.name))}</option>`).join('');
   renderItemParticipants(item?.participants||[]);
   const fbtn = document.getElementById('itFollowupBtn');
   fbtn.style.display = (item && item.status==='done') ? '' : 'none';
@@ -5553,7 +5553,7 @@ function renderItemParticipants(parts) {
   document.getElementById('itParticipantsList').innerHTML = parts.map(p=>{
     const u=getU(p.userId); if(!u) return '';
     return`<span style="display:inline-flex;align-items:center;gap:4px;background:var(--bg2);border-radius:12px;padding:2px 8px;font-size:12px" data-user-id="${p.userId}" data-role="${p.role}">
-      <span class="av-sm" style="background:${u.color}">${esc(u.initials)}</span>${esc(u.name)}
+      <span class="av-sm" style="background:${u.color}">${esc(u.initials)}</span>${esc(lastNameFirst(u.name))}
       <span style="color:var(--mu);font-size:10px">${roleLabel[p.role]||p.role}</span>
       <button style="border:none;background:none;cursor:pointer;color:var(--mu);padding:0 2px;font-size:13px" onclick="removeItemParticipantForm('${p.userId}')">&#215;</button>
     </span>`;
@@ -5572,7 +5572,7 @@ function addItemParticipantForm() {
   span.style.cssText='display:inline-flex;align-items:center;gap:4px;background:var(--bg2);border-radius:12px;padding:2px 8px;font-size:12px';
   span.dataset.userId = userId;
   span.dataset.role = role;
-  span.innerHTML=`<span class="av-sm" style="background:${u.color}">${esc(u.initials)}</span>${esc(u.name)}<span style="color:var(--mu);font-size:10px">${roleLabel[role]||role}</span><button style="border:none;background:none;cursor:pointer;color:var(--mu);padding:0 2px;font-size:13px" onclick="this.parentElement.remove()">&#215;</button>`;
+  span.innerHTML=`<span class="av-sm" style="background:${u.color}">${esc(u.initials)}</span>${esc(lastNameFirst(u.name))}<span style="color:var(--mu);font-size:10px">${roleLabel[role]||role}</span><button style="border:none;background:none;cursor:pointer;color:var(--mu);padding:0 2px;font-size:13px" onclick="this.parentElement.remove()">&#215;</button>`;
   list.appendChild(span);
 }
 
@@ -5658,7 +5658,7 @@ function openProtocolForm(instanceId, id=null) {
   document.getElementById('pfLocation').value = proto?.location||'';
   document.getElementById('pfBody').value = proto?.body||'';
   const attSel = document.getElementById('pfAttendees');
-  attSel.innerHTML = S.users.slice().sort(byLastName).map(u=>`<option value="${u.id}"${(proto?.attendees||[]).includes(u.id)?' selected':''}>${esc(u.name)}</option>`).join('');
+  attSel.innerHTML = S.users.slice().sort(byLastName).map(u=>`<option value="${u.id}"${(proto?.attendees||[]).includes(u.id)?' selected':''}>${esc(lastNameFirst(u.name))}</option>`).join('');
   document.getElementById('protoDeleteBtn').style.display = proto ? '' : 'none';
   openModal('protoFormOv');
 }
@@ -6122,7 +6122,7 @@ function renderDPMatrix(data) {
       <td class="dp-row-label">
         <div style="display:flex;align-items:center;gap:6px">
           <span class="av-sm" style="background:${emp.color}">${esc(emp.initials)}</span>
-          <span>${esc(emp.name)}</span>
+          <span>${esc(lastNameFirst(emp.name))}</span>
         </div>
       </td>
       ${cells}${basicStats}${extraStats}
@@ -6210,7 +6210,7 @@ function renderDPMatrix(data) {
         ${report.warnungen.map(w => `<div style="font-size:12px;padding:2px 0"><strong>${esc(w.kategorie||'')}:</strong> ${esc(w.details||'')}${
           (w.betroffene||[]).length ? '<br><span style="color:var(--mu)">Betroffen: '+w.betroffene.map(b=>{
             const u = S.users.find(x=>x.id===b.empId);
-            return esc((u?.name||b.empId)+' ('+b.anteilProzent+'%)');
+            return esc((u?lastNameFirst(u.name):b.empId)+' ('+b.anteilProzent+'%)');
           }).join(', ')+'</span>' : ''
         }</div>`).join('')}
       </div>` : ''}
@@ -6221,7 +6221,7 @@ function renderDPMatrix(data) {
           const u = S.users.find(x=>x.id===v.empId);
           const dd = v.date.slice(8)+'.'+v.date.slice(5,7)+'.';
           return `<div style="display:flex;align-items:center;gap:8px;font-size:12px;padding:3px 0">
-            <span style="flex:1"><strong>${esc(u?.name||v.empId)}</strong> — ${esc(v.code)} am ${dd} (${v.hours}h)</span>
+            <span style="flex:1"><strong>${esc(u?lastNameFirst(u.name):v.empId)}</strong> — ${esc(v.code)} am ${dd} (${v.hours}h)</span>
             ${canEdit ? `<button class="btn-s" style="padding:2px 10px;font-size:11px" onclick="dpAcceptSuggestion('${v.empId}','${v.date}','${v.shiftTypeId}')">✓ Übernehmen</button>` : ''}
           </div>`;
         }).join('')}
@@ -6378,7 +6378,7 @@ function openDpCellMenu(empId, date, evt) {
   const dayWD = new Date(date).getDay();
   const dateDisplay = date.slice(8)+'.'+date.slice(5,7)+'. ('+WD_SHORT[dayWD]+')';
 
-  let html = `<div class="dp-menu-hdr">${esc(u?.name||empId)} · ${dateDisplay}</div>`;
+  let html = `<div class="dp-menu-hdr">${esc(u?lastNameFirst(u.name):empId)} · ${dateDisplay}</div>`;
 
   if (assign) {
     const st = shiftTypes.find(x=>x.id===assign.shift_type_id);
@@ -6801,7 +6801,7 @@ async function renderDPConfigEmpParams() {
     if (!userParams.length) {
       return `<div class="dp-cfg-row" style="flex-wrap:wrap;gap:6px;align-items:center">
         <span class="av-sm" style="background:${u.color}">${esc(u.initials)}</span>
-        <span class="dp-cfg-label">${esc(u.name)}</span>
+        <span class="dp-cfg-label">${esc(lastNameFirst(u.name))}</span>
         <span style="font-size:11px;color:var(--mu)">Nicht konfiguriert</span>
         <button class="btn-s" onclick="openDpEmpParamFormNew('${u.id}')">+ Einrichten</button>
       </div>`;
@@ -6835,7 +6835,7 @@ async function renderDPConfigEmpParams() {
     return `<div class="dp-cfg-row" style="flex-direction:column;align-items:flex-start;gap:2px">
       <div style="display:flex;align-items:center;gap:8px;width:100%">
         <span class="av-sm" style="background:${u.color}">${esc(u.initials)}</span>
-        <span class="dp-cfg-label">${esc(u.name)}</span>
+        <span class="dp-cfg-label">${esc(lastNameFirst(u.name))}</span>
         ${addRuleBtn}
         <button class="btn-s" style="margin-left:auto;font-size:11px" onclick="openDpEmpParamFormNew('${u.id}')">+ Neue Version</button>
       </div>
@@ -6998,7 +6998,7 @@ function renderDPConfigEmpCategories() {
         ondragstart="dpCatDragStart(event,'${u.id}')"
         style="display:flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:4px 10px;cursor:grab;font-size:12px;margin-bottom:4px">
         <span class="av-sm" style="background:${u.color};width:20px;height:20px;font-size:9px;flex-shrink:0">${esc(u.initials)}</span>
-        <span>${esc(u.name)}</span>
+        <span>${esc(lastNameFirst(u.name))}</span>
         <button onclick="dpCatAssign('${u.id}',null)" style="border:none;background:none;cursor:pointer;color:var(--mu);font-size:11px;padding:0 0 0 4px" title="Aus Kategorie entfernen">✕</button>
       </div>`).join('');
 
@@ -7021,7 +7021,7 @@ function renderDPConfigEmpCategories() {
       ondragstart="dpCatDragStart(event,'${u.id}')"
       style="display:inline-flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:4px 10px;cursor:grab;font-size:12px;margin:2px">
       <span class="av-sm" style="background:${u.color};width:20px;height:20px;font-size:9px;flex-shrink:0">${esc(u.initials)}</span>
-      <span>${esc(u.name)}</span>
+      <span>${esc(lastNameFirst(u.name))}</span>
     </div>`).join('');
 
   return `<div class="dp-cfg-card">
@@ -7409,7 +7409,7 @@ async function renderDPConfigQualifications() {
     return `<div style="margin-bottom:16px;padding:12px;background:var(--sf2);border-radius:6px;border:1px solid var(--border)">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
         <span class="av-sm" style="background:${u.color}">${esc(u.initials)}</span>
-        <span style="font-weight:600;flex:1">${esc(u.name)}</span>
+        <span style="font-weight:600;flex:1">${esc(lastNameFirst(u.name))}</span>
         ${hasChanges?'<span style="font-size:11px;color:var(--acc);font-weight:600">● ungespeichert</span>':''}
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${chips}</div>
@@ -7672,7 +7672,7 @@ function openDpEmpParamForm(paramId) {
   if (!p) return toast('Parameter nicht gefunden','err');
   const empId = p.employee_id;
   const empSel = document.getElementById('dpEpfEmp');
-  empSel.innerHTML = S.users.map(u=>`<option value="${u.id}"${u.id===empId?' selected':''}>${esc(u.name)}</option>`).join('');
+  empSel.innerHTML = S.users.map(u=>`<option value="${u.id}"${u.id===empId?' selected':''}>${esc(lastNameFirst(u.name))}</option>`).join('');
   empSel.disabled = true;
   document.getElementById('dpEpfEmpId').value = empId;
   document.getElementById('dpEpfParamId').value = p.id;
@@ -7707,7 +7707,7 @@ function openDpEmpParamFormNew(empId) {
     return String(b.valid_from).localeCompare(String(a.valid_from));
   })[0] || null;
   const empSel = document.getElementById('dpEpfEmp');
-  empSel.innerHTML = S.users.map(u=>`<option value="${u.id}"${u.id===empId?' selected':''}>${esc(u.name)}</option>`).join('');
+  empSel.innerHTML = S.users.map(u=>`<option value="${u.id}"${u.id===empId?' selected':''}>${esc(lastNameFirst(u.name))}</option>`).join('');
   empSel.disabled = true;
   document.getElementById('dpEpfEmpId').value = empId;
   document.getElementById('dpEpfParamId').value = '';
@@ -8029,7 +8029,7 @@ function renderXmasProposalCards(proposal) {
           const work = d.employees.filter(e => e.recommendation==='work_suggested');
           const off = d.employees.filter(e => e.recommendation!=='work_suggested');
           const empRow = e => { const b = xmasRecBadge(e); return `<div style="display:flex;align-items:center;gap:6px;font-size:11px;padding:3px 6px;border-radius:4px;background:${b.bg}">
-            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(e.name)}">${esc(lastNameFirst(e.name))}${e.wish?` <span style="opacity:.6">(Wunsch ${e.wish})</span>`:''}</span>
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(lastNameFirst(e.name))}">${esc(lastNameFirst(e.name))}${e.wish?` <span style="opacity:.6">(Wunsch ${e.wish})</span>`:''}</span>
             <span style="color:var(--mu);font-variant-numeric:tabular-nums" title="Score für diesen Tag">${xmasFmtScore(e.score)}</span>
             <span class="bdg" style="font-size:10px;background:${b.bg};color:${b.fg}">${b.text}</span>
           </div>`; };
@@ -8100,7 +8100,7 @@ function renderXmasMatrix(employees, histYears, history, scores, wishes, year, c
         const rowStyle = (excluded||inactive) ? 'opacity:.45;font-style:italic' : '';
         const titleParts = [excluded?'Von der Weihnachtsdienst-Rotation ausgenommen (Mitarbeiterverwaltung)':'', inactive?'Kein aktuelles Dienstverhältnis (inaktiv)':''].filter(Boolean);
         return `<tr style="${rowStyle}" title="${titleParts.join(' · ')}">
-        <td style="${XMAS_NAME_CELL}${(excluded||inactive)?';background:var(--sf2)':''}" title="${esc(emp.name)}">${esc(lastNameFirst(emp.name))}${excluded?' 🚫':''}${inactive?' ⏸':''}</td>
+        <td style="${XMAS_NAME_CELL}${(excluded||inactive)?';background:var(--sf2)':''}" title="${esc(lastNameFirst(emp.name))}">${esc(lastNameFirst(emp.name))}${excluded?' 🚫':''}${inactive?' ⏸':''}</td>
         ${histYears.map(y => XMAS_CALENDAR_DAY_KEYS.map((dk,i) => {
           const locked = xmasCellLocked(emp, y, dk);
           const st = histMap[`${emp.id}|${y}|${dk}`] || '';
@@ -8376,14 +8376,14 @@ function renderTodoDetail(t) {
     const assignees = item.assignees || [];
     const assigneeNames = assignees.map(a => {
       const u = getU(a.user_id);
-      return u ? u.name : '?';
+      return u ? lastNameFirst(u.name) : '?';
     }).join(', ');
     const canEditItem = item._canEdit || false;
     const itemDeadlineColor = getDeadlineColor(item.due_date);
     const convertedTk = item.converted_ticket_id ? getTk(item.converted_ticket_id) : null;
     const convertedBy = item.converted_by ? getU(item.converted_by) : null;
     const convertedHtml = item.converted_ticket_id
-      ? `<div class="todo-ci-meta">🎫 Umgewandelt in Ticket ${convertedTk?`<a href="javascript:void(0)" onclick="openTkDetail('${item.converted_ticket_id}')" style="font-weight:600">${convertedTk.number}</a>`:'(nicht einsehbar)'}${convertedBy?` von ${esc(convertedBy.name)}`:''}${item.converted_at?' · '+String(item.converted_at).slice(0,16).replace('T',' '):''}</div>`
+      ? `<div class="todo-ci-meta">🎫 Umgewandelt in Ticket ${convertedTk?`<a href="javascript:void(0)" onclick="openTkDetail('${item.converted_ticket_id}')" style="font-weight:600">${convertedTk.number}</a>`:'(nicht einsehbar)'}${convertedBy?` von ${esc(lastNameFirst(convertedBy.name))}`:''}${item.converted_at?' · '+String(item.converted_at).slice(0,16).replace('T',' '):''}</div>`
       : '';
     return `<div class="todo-ci${item.is_done?' done-item':''}" id="todo-ci-${item.id}"${itemDeadlineColor?` style="border-left:4px solid ${itemDeadlineColor}"`:''}>
       <input type="checkbox" ${item.is_done?'checked':''} ${canEditItem?'':'disabled'} onchange="toggleTodoItem('${t.id}','${item.id}',this.checked)">
@@ -8394,7 +8394,7 @@ function renderTodoDetail(t) {
         </div>
         <textarea id="todo-comment-${item.id}" class="todo-ci-textarea" rows="1" placeholder="Kommentar…" ${canEditItem?`onblur="saveTodoItemComment('${t.id}','${item.id}')"`:''} ${canEditItem?'':'readonly'}>${esc(item.comment||'')}</textarea>
         ${assigneeNames ? `<div class="todo-ci-meta">👤 ${assigneeNames}</div>` : ''}
-        ${item.is_done && doneUser ? `<div class="todo-ci-meta">Erledigt von ${esc(doneUser.name)} · ${item.done_at?String(item.done_at).slice(0,16).replace('T',' '):''}</div>` : ''}
+        ${item.is_done && doneUser ? `<div class="todo-ci-meta">Erledigt von ${esc(lastNameFirst(doneUser.name))} · ${item.done_at?String(item.done_at).slice(0,16).replace('T',' '):''}</div>` : ''}
         ${convertedHtml}
       </div>
       <div class="todo-ci-actions">
@@ -8409,7 +8409,7 @@ function renderTodoDetail(t) {
   }).join('');
 
   const protokollHtml = (t.protokoll||[]).length > 0 ? [...(t.protokoll||[])].reverse().map(e=>{
-    const u=getU(e.by); const uName=u?.name||'?'; const ts=String(e.ts||'').slice(0,16).replace('T',' ');
+    const u=getU(e.by); const uName=u?lastNameFirst(u.name):'?'; const ts=String(e.ts||'').slice(0,16).replace('T',' ');
     let html = `<div style="margin-bottom:8px;padding:8px;background:var(--bg2);border-radius:6px;font-size:12px">`;
     if(e.type==='updated') {
       const changes = e.changes||{};
@@ -8417,10 +8417,10 @@ function renderTodoDetail(t) {
       html += `<div style="font-weight:600;margin-bottom:4px">📝 ${ts} · ${uName}</div>${changeLines}</div>`;
     } else if(e.type==='assignee_added') {
       const aUser = getU(e.userId);
-      html += `<div style="font-weight:600">👤 ${ts} · ${uName}</div><div style="margin-left:8px;color:var(--mu)">Zugewiesen an <b>${esc(aUser?.name||'?')}</b></div></div>`;
+      html += `<div style="font-weight:600">👤 ${ts} · ${uName}</div><div style="margin-left:8px;color:var(--mu)">Zugewiesen an <b>${esc(aUser?lastNameFirst(aUser.name):'?')}</b></div></div>`;
     } else if(e.type==='assignee_removed') {
       const aUser = getU(e.userId);
-      html += `<div style="font-weight:600">👤 ${ts} · ${uName}</div><div style="margin-left:8px;color:var(--mu)">Zuordnung von <b>${esc(aUser?.name||'?')}</b> entfernt</div></div>`;
+      html += `<div style="font-weight:600">👤 ${ts} · ${uName}</div><div style="margin-left:8px;color:var(--mu)">Zuordnung von <b>${esc(aUser?lastNameFirst(aUser.name):'?')}</b> entfernt</div></div>`;
     } else if(e.type==='converted_to_ticket') {
       const tk=getTk(e.ticketId);
       html += `<div style="font-weight:600">🎫 ${ts} · ${uName}</div><div style="margin-left:8px;color:var(--mu)">Punkt „<b>${esc(e.itemTitle||'?')}</b>“ in Ticket ${tk?`<a href="javascript:void(0)" onclick="openTkDetail('${e.ticketId}')" style="font-weight:600">${tk.number}</a>`:esc(e.ticketNumber||'?')} umgewandelt</div></div>`;
@@ -8440,8 +8440,8 @@ function renderTodoDetail(t) {
         <div style="display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap">
           <span style="font-size:12px">${prio.dot} ${prio.label}</span>
           <span style="font-size:12px;color:${statusColor};font-weight:600">${statusLabel}</span>
-          ${assignee ? `<span style="font-size:12px;color:var(--mu)">👤 ${esc(assignee.name)}</span>` : ''}
-          ${creator ? `<span style="font-size:12px;color:var(--di)">erstellt von ${esc(creator.name)}</span>` : ''}
+          ${assignee ? `<span style="font-size:12px;color:var(--mu)">👤 ${esc(lastNameFirst(assignee.name))}</span>` : ''}
+          ${creator ? `<span style="font-size:12px;color:var(--di)">erstellt von ${esc(lastNameFirst(creator.name))}</span>` : ''}
         </div>
         ${t.description ? `<div style="margin-top:8px;font-size:13px;color:var(--mu)">${esc(t.description)}</div>` : ''}
         ${aiInlinePanelHtml(t)}
@@ -8483,7 +8483,7 @@ function openTodoForm(id) {
   document.getElementById('tfPriority').value = t?.priority || 'medium';
   const asel = document.getElementById('tfAssignee');
   asel.innerHTML = '<option value="">— niemand —</option>' +
-    S.users.map(u => `<option value="${u.id}"${t?.assigned_to===u.id?' selected':''}>${esc(u.name)}</option>`).join('');
+    S.users.map(u => `<option value="${u.id}"${t?.assigned_to===u.id?' selected':''}>${esc(lastNameFirst(u.name))}</option>`).join('');
   openModal('todoFormOv');
 }
 
@@ -8585,7 +8585,7 @@ function openConvertItemModal({kind, ids, title, priority, description}) {
   document.getElementById('ctiPrio').value = priority || 'medium';
   document.getElementById('ctiDept').innerHTML = DEPTS.map(d=>`<option value="${d}">${DEPT_LABELS[d]||d}</option>`).join('');
   document.getElementById('ctiAssignee').innerHTML = '<option value="">— niemand —</option>' +
-    S.users.filter(isAssignable).map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join('');
+    S.users.filter(isAssignable).map(u => `<option value="${u.id}">${esc(lastNameFirst(u.name))}</option>`).join('');
   openModal('convertTodoOv');
 }
 async function submitConvertTodoItem() {
@@ -8667,7 +8667,7 @@ function openTodoItemAssignees(todoId, itemId) {
     const isAssigned = assignedIds.has(u.id);
     html += `<div style="padding:8px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);cursor:pointer" onclick="toggleTodoItemAssignee('${todoId}','${itemId}','${u.id}',${!isAssigned})">
       <input type="checkbox" ${isAssigned?'checked':''}>
-      <span>${esc(u.name)}</span>
+      <span>${esc(lastNameFirst(u.name))}</span>
     </div>`;
   });
   html += '</div>';
@@ -8729,7 +8729,7 @@ function renderChatList(){
     return `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="openChatWindow('${t.id}')">
       ${u?avHtml(u.initials,u.color,36,14,u.isOnline):'<div style="width:36px;height:36px;border-radius:50%;background:var(--sf2)"></div>'}
       <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:${unread?'700':'600'}">${esc(u?.name||'Unbekannt')}</div>
+        <div style="font-size:13px;font-weight:${unread?'700':'600'}">${esc(u?lastNameFirst(u.name):'Unbekannt')}</div>
         <div style="font-size:12px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${preview}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
@@ -8785,7 +8785,7 @@ function chatWinMinHtml(w){
   const unread=w.threadId?chatUnreadCount(w.threadId):0;
   return `<div class="chat-win-min" style="background:${unread?'rgba(239,68,68,.1)':'var(--bg)'};border:1px solid ${unread?'rgba(239,68,68,.4)':'var(--border)'}" onclick="maximizeChatWindow('${w.id}')">
     ${ou?avHtml(ou.initials,ou.color,26,10,ou.isOnline):'<div style="width:26px;height:26px;border-radius:50%;background:var(--sf2)"></div>'}
-    <div style="flex:1;min-width:0;font-size:12px;font-weight:${unread?'700':'600'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(ou?.name||'Chat')}</div>
+    <div style="flex:1;min-width:0;font-size:12px;font-weight:${unread?'700':'600'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(ou?lastNameFirst(ou.name):'Chat')}</div>
     ${unread?`<span style="min-width:18px;height:18px;background:#ef4444;color:#fff;border-radius:9px;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;flex-shrink:0">${unread}</span>`:''}
     <button class="mc" title="Maximieren" style="font-size:12px;flex-shrink:0" onclick="event.stopPropagation();maximizeChatWindow('${w.id}')">&#9650;</button>
     <button class="mc" title="Schließen" style="font-size:12px;flex-shrink:0" onclick="event.stopPropagation();closeChatWindow('${w.id}')">&#10005;</button>
@@ -8806,7 +8806,7 @@ function chatWinMaxHtml(w){
   return `<div class="chat-win-max">
     <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0">
       ${ou?avHtml(ou.initials,ou.color,26,10,ou.isOnline):''}
-      <div style="flex:1;font-weight:700;font-size:13px">${esc(ou?.name||'Chat')}</div>
+      <div style="flex:1;font-weight:700;font-size:13px">${esc(ou?lastNameFirst(ou.name):'Chat')}</div>
       <button class="mc" title="Minimieren" onclick="minimizeChatWindow('${w.id}')" style="font-size:14px">&#9660;</button>
       <button class="mc" title="Schließen" onclick="closeChatWindow('${w.id}')" style="font-size:14px">&#10005;</button>
     </div>
@@ -8830,7 +8830,7 @@ function chatWinPickerHtml(w){
     <div style="padding:10px 12px;flex:1;min-height:0;overflow-y:auto">
       <input type="text" value="${esc(w._search||'')}" placeholder="Mitarbeiter suchen…" oninput="onChatPickerSearch(this.value)" style="width:100%;margin-bottom:8px;box-sizing:border-box;font-size:16px">
       <div>${users.map(u=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 4px;cursor:pointer;border-radius:6px" onclick="selectChatWindowUser('${u.id}')" onmouseover="this.style.background='var(--sf2)'" onmouseout="this.style.background='none'">
-        ${avHtml(u.initials,u.color,26,10,u.isOnline)}<span style="font-size:13px">${esc(u.name)}</span>
+        ${avHtml(u.initials,u.color,26,10,u.isOnline)}<span style="font-size:13px">${esc(lastNameFirst(u.name))}</span>
       </div>`).join('')||'<div style="color:var(--di);font-size:12px;padding:8px 0">Keine Treffer.</div>'}</div>
     </div>
   </div>`;
@@ -8944,6 +8944,6 @@ function onChatMessagesChanged(prevMsgs){
   if(!notifyThreadIds.length)return;
   const t=(S.chatThreads||[]).find(x=>x.id===notifyThreadIds[0]);
   const ou=t?getU(t.otherUserId):null;
-  toast('💬 Neue Nachricht'+(ou?' von '+ou.name:'')+'!','chat');
+  toast('💬 Neue Nachricht'+(ou?' von '+lastNameFirst(ou.name):'')+'!','chat');
 }
 
