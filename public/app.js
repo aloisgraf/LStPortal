@@ -1422,8 +1422,11 @@ function renderAllw(){
     const ep=getEmpParamsAt(u.id,monthDateStr);
     if(!ep?.monthly_hours)return'<td style="text-align:center;color:var(--di);font-size:11px">–</td>';
     const b=(isBulk?getAllw(u.id,yr,S.allwMonth):sumAllw(u.id,yr,months)).buero||0;
-    const soll=ep.monthly_hours-b*8;
-    return'<td style="text-align:center;font-size:12px" title="'+ep.monthly_hours+'h Monatssoll'+(b?' − '+b+'×8h Büro':'')+'">'+soll+'h'+(b?'<div style="font-size:10px;color:var(--di)">von '+ep.monthly_hours+'h</div>':'')+'</td>';
+    const bueroH=b*8;
+    const soll=ep.monthly_hours-bueroH;
+    const pct=ep.monthly_hours?(bueroH/ep.monthly_hours*100):0;
+    const pctFmt=Number.isInteger(pct)?pct:pct.toFixed(1);
+    return'<td style="text-align:center;font-size:12px" title="'+ep.monthly_hours+'h Monatssoll'+(b?' − '+b+'×8h Büro = '+bueroH+'h ('+pctFmt+'%)':'')+'">'+soll+'h'+(b?'<div style="font-size:10px;color:var(--di)">von '+ep.monthly_hours+'h &middot; '+pctFmt+'% Büro</div>':'')+'</td>';
   };
   const allwEmpRow=u=>'<tr><td><div style="display:flex;align-items:center;gap:6px">'+avHtml(u.initials,u.color,22,9)+'<span>'+esc(lastNameFirst(u.name))+'</span></div></td>'+allwCells(u)+allwSollCell(u)+'</tr>';
   let allwBodyRows='';
