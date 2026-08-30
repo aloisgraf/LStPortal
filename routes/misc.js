@@ -9,9 +9,13 @@ router.put('/allowances', auth, async (req,res) => {
   try {
     if (!req.p.editAllw) return bad(res,'Keine Berechtigung',403);
     const {userId,year,month,nd,fd,fw,c10,rkt} = req.body;
+    const fdVal = Math.round((fd||0)*10)/10;
     await pool.query(`INSERT INTO allowances (id,user_id,year,month,nd,fd,fw,c10,rkt) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (user_id,year,month) DO UPDATE SET nd=EXCLUDED.nd,fd=EXCLUDED.fd,fw=EXCLUDED.fw,c10=EXCLUDED.c10,rkt=EXCLUDED.rkt`,
-      [newId(),userId,year,month,nd||0,Math.round((fd||0)*10)/10,fw||0,c10||0,rkt||0]);
-    ok(res);
+      [newId(),userId,year,month,nd||0,fdVal,fw||0,c10||0,rkt||0]);
+    // Aktualisierten Datensatz zurückgeben, damit das Frontend nur diesen
+    // einen Eintrag lokal patchen kann statt bei jedem Klick den kompletten
+    // /api/data-Bulk-Endpunkt neu zu laden (war sehr langsam).
+    ok(res, {userId,year,month,nd:nd||0,fd:fdVal,fw:fw||0,c10:c10||0,rkt:rkt||0});
   } catch(e) { bad(res,'Serverfehler',500); }
 });
 

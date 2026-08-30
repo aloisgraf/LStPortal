@@ -1334,6 +1334,7 @@ async function deleteDt(id) {
 
 
 function renderAllw(){
+  if(!S._allwCategoryExpanded)S._allwCategoryExpanded=_loadAllwCatState();
   const months=getPeriodMonths(),yr=S.allwYear;
   const pLbl=S.allwPeriod==='month'?MONTHS[S.allwMonth-1]:S.allwPeriod==='h1'?'1. Halbjahr':S.allwPeriod==='h2'?'2. Halbjahr':'Gesamtjahr';
   // Nur Mitarbeiter zeigen, die im gewählten Zeitraum (mind. teilweise) im
@@ -1371,7 +1372,7 @@ function renderAllw(){
     const empList=grouped[cat].slice().sort((a,b)=>lastNameOf(a.name).localeCompare(lastNameOf(b.name),'de'));
     const catId='allwcat_'+cat.replace(/\W/g,'_');
     const isExpanded=S._allwCategoryExpanded?.[catId]??true;
-    allwBodyRows+='<tr style="cursor:pointer;background:var(--sf2);font-weight:600" onclick="S._allwCategoryExpanded=S._allwCategoryExpanded||{};S._allwCategoryExpanded[\''+catId+'\']=!S._allwCategoryExpanded[\''+catId+'\'];renderMain()">'
+    allwBodyRows+='<tr style="cursor:pointer;background:var(--sf2);font-weight:600" onclick="toggleAllwCat(\''+catId+'\')">'
       +'<td colspan="6" style="padding:8px 12px">'+(isExpanded?'▼':'▶')+' '+esc(cat)+' ('+empList.length+')</td></tr>';
     if(isExpanded)allwBodyRows+=empList.map(allwEmpRow).join('');
   });
@@ -1433,6 +1434,17 @@ function renderAllw(){
       </tbody></table></div>
     </div>`;
 }
+// Auf-/zugeklappte Kategorien bleiben \u00fcber Seitenaufrufe hinweg erhalten
+// (pro Browser, nicht serverseitig \u2013 reine Anzeige-Pr\u00e4ferenz).
+function _loadAllwCatState(){
+  try{return JSON.parse(localStorage.getItem('lst_allwCatExpanded')||'{}');}catch(e){return{};}
+}
+function toggleAllwCat(catId){
+  if(!S._allwCategoryExpanded)S._allwCategoryExpanded=_loadAllwCatState();
+  S._allwCategoryExpanded[catId]=!(S._allwCategoryExpanded[catId]??true);
+  try{localStorage.setItem('lst_allwCatExpanded',JSON.stringify(S._allwCategoryExpanded));}catch(e){}
+  renderAllw();
+}
 // Zulagendienste: Linksklick +1, Rechtsklick -1 \u2013 speichert sofort, analog
 // zum Klick-Zyklus bei der Weihnachtsdienst-Rotation.
 async function allwCounterClick(e,uid,field,delta){
@@ -1441,8 +1453,13 @@ async function allwCounterClick(e,uid,field,delta){
   const body={userId:uid,year:S.allwYear,month:S.allwMonth,nd:a.nd||0,fd:a.fd||0,fw:a.fw||0,c10:a.c10||0,rkt:a.rkt||0};
   body[field]=Math.max(0,Math.round(((a[field]||0)+Number(delta))*10)/10);
   try{
-    await api('PUT','/allowances',body);
-    await fetchData();renderMain();
+    const updated=await api('PUT','/allowances',body);
+    // Nur den einen betroffenen Eintrag lokal patchen statt bei jedem Klick
+    // den kompletten /api/data-Bulk-Endpunkt neu zu laden (war sp\u00FCrbar
+    // langsam) \u2014 ein direktes renderAllw() reicht f\u00FCr die Anzeige.
+    const idx=S.allowances.findIndex(a=>a.userId===uid&&a.year===S.allwYear&&a.month===S.allwMonth);
+    if(idx>=0)S.allowances[idx]=updated;else S.allowances.push(updated);
+    renderAllw();
   }catch(err){toast('\u26A0\uFE0F '+err.message,'err');}
 }
 function openAllwM(uid,year,month){
