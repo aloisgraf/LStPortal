@@ -1215,7 +1215,19 @@ async function deleteEvt(id){
 // ALLOWANCES
 function getPeriodMonths(){if(S.allwPeriod==='month')return[S.allwMonth];if(S.allwPeriod==='h1')return[1,2,3,4,5,6];if(S.allwPeriod==='h2')return[7,8,9,10,11,12];return[1,2,3,4,5,6,7,8,9,10,11,12];}
 function sumAllw(uid,year,months){return months.reduce((a,m)=>{const r=getAllw(uid,year,m);return{nd:a.nd+r.nd,fd:a.fd+r.fd,fw:a.fw+r.fw,c10:a.c10+r.c10,rkt:a.rkt+(r.rkt||0),buero:a.buero+(r.buero||0)};},{nd:0,fd:0,fw:0,c10:0,rkt:0,buero:0});}
-function numCell(n,color){if(!n)return`<td style="text-align:center;color:var(--di)">\u2013</td>`;return`<td style="text-align:center"><span class="anum" style="background:${color}18;color:${color}">${n}</span></td>`;}
+function numCell(n,color,bg){if(!n)return`<td style="text-align:center;color:var(--di)">\u2013</td>`;return`<td style="text-align:center"><span class="anum" style="background:${bg||color+'18'};color:${color}">${n}</span></td>`;}
+// Excel-artige Farbskala (gr\u00fcn\u2192gelb\u2192rot) f\u00fcr eine Spalte: v wird relativ zu
+// min/max aller Werte dieser Spalte eingef\u00e4rbt, damit Ausrei\u00dfer sofort
+// auffallen (z.B. 4 Mitarbeiter mit 4 Nachtdiensten, einer mit 5).
+function allwHeatColor(t){
+  const lerp=(a,b,x)=>Math.round(a+(b-a)*x);
+  const stops=t<=0.5?[[16,185,129],[250,204,21],t*2]:[[250,204,21],[239,68,68],(t-0.5)*2];
+  return`rgba(${lerp(stops[0][0],stops[1][0],stops[2])},${lerp(stops[0][1],stops[1][1],stops[2])},${lerp(stops[0][2],stops[1][2],stops[2])},.35)`;
+}
+function allwColStats(users,getVal){
+  const vals=users.map(getVal);
+  return{min:Math.min(...vals),max:Math.max(...vals)};
+}
 
 
 function renderCalendar(){renderSchedule();}
@@ -1380,10 +1392,27 @@ function renderAllw(){
   const fmtAllw=v=>Number.isInteger(v)?String(v):v.toFixed(1);
   const monthDateStr=`${yr}-${String(S.allwMonth||1).padStart(2,'0')}-01`;
 
+  // Farbskala je Spalte, außer RKT (auf Wunsch ausgenommen) — Basis sind
+  // immer die aktuell angezeigten Werte (Zähler im Monat, sonst Summe über
+  // die Periode), unabhängig von auf-/zugeklappten Kategorien.
+  const colStats={};
+  ALLW_CATS.forEach(([f])=>{
+    if(f==='rkt')return;
+    colStats[f]=allwColStats(showUsers,u=>isBulk?(getAllw(u.id,yr,S.allwMonth)[f]||0):sumAllw(u.id,yr,months)[f]);
+  });
+  const heatBg=(f,v)=>{
+    const st=colStats[f];
+    if(!st||st.max===st.min)return null;
+    return allwHeatColor((v-st.min)/(st.max-st.min));
+  };
+
   const allwCells=u=>{
-    if(!isBulk){const sv=sumAllw(u.id,yr,months);return ALLW_CATS.map(([f,,color])=>numCell(sv[f],color)).join('');}
+    if(!isBulk){const sv=sumAllw(u.id,yr,months);return ALLW_CATS.map(([f,,color])=>numCell(sv[f],color,f==='rkt'?null:heatBg(f,sv[f]))).join('');}
     const a=getAllw(u.id,yr,S.allwMonth);
-    return ALLW_CATS.map(([f,,color,step])=>'<td style="text-align:center"><button type="button" class="allw-cnt" style="background:'+color+'18;color:'+color+'" onclick="allwCounterClick(event,\''+u.id+'\',\''+f+'\','+step+')" oncontextmenu="allwCounterClick(event,\''+u.id+'\',\''+f+'\',-'+step+');return false" title="Linksklick: +'+step+', Rechtsklick: -'+step+'">'+fmtAllw(a[f]||0)+'</button></td>').join('');
+    return ALLW_CATS.map(([f,,color,step])=>{
+      const bg=f==='rkt'?(color+'18'):(heatBg(f,a[f]||0)||(color+'18'));
+      return '<td style="text-align:center"><button type="button" class="allw-cnt" style="background:'+bg+';color:'+color+'" onclick="allwCounterClick(event,\''+u.id+'\',\''+f+'\','+step+')" oncontextmenu="allwCounterClick(event,\''+u.id+'\',\''+f+'\',-'+step+');return false" title="Linksklick: +'+step+', Rechtsklick: -'+step+'">'+fmtAllw(a[f]||0)+'</button></td>';
+    }).join('');
   };
   // Soll-Stunden Leitstelle = Monatsstunden (aus Dienstplanung-Konfiguration)
   // minus 8h je Bürodienst — nur im Monats-Zeitraum sinnvoll, da sich
