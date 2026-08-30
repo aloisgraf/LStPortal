@@ -185,6 +185,26 @@ const getCat=id=>S.categories.find(c=>c.id===id);
 const getTag=id=>S.tags.find(t=>t.id===id);
 const getTk=id=>S.tickets.find(t=>t.id===id);
 const getAllw=(uid,year,month)=>S.allowances.find(a=>a.userId===uid&&a.year===year&&a.month===month)||{nd:0,fd:0,fw:0,c10:0};
+// Ein-/Austrittsdatum-Sichtbarkeit: ein Mitarbeiter soll in einer für einen
+// bestimmten Monat/Jahr angezeigten Liste nur auftauchen, wenn er in diesem
+// Zeitraum tatsächlich (zumindest teilweise) im Dienstverhältnis war —
+// spiegelt lib/dp-rules.js isUserActive() für einen einzelnen Stichtag,
+// zusätzlich als Monats-/Jahres-Bereichsprüfung.
+function isUserActiveInRange(u,rangeStart,rangeEnd){
+  if(!u)return false;
+  const hire=u.hireDate||null,term=u.terminationDate||null;
+  if(term&&term<rangeStart)return false;
+  if(hire&&hire>rangeEnd)return false;
+  return true;
+}
+function isUserActiveInMonth(u,year,month){
+  const mm=String(month).padStart(2,'0');
+  const lastDay=new Date(year,month,0).getDate();
+  return isUserActiveInRange(u,`${year}-${mm}-01`,`${year}-${mm}-${String(lastDay).padStart(2,'0')}`);
+}
+function isUserActiveInYear(u,year){
+  return isUserActiveInRange(u,`${year}-01-01`,`${year}-12-31`);
+}
 const getRoleDef=r=>{
   const known=ROLES.find(x=>x.id===r);
   if(known)return known;
@@ -1316,7 +1336,14 @@ async function deleteDt(id) {
 function renderAllw(){
   const months=getPeriodMonths(),yr=S.allwYear;
   const pLbl=S.allwPeriod==='month'?MONTHS[S.allwMonth-1]:S.allwPeriod==='h1'?'1. Halbjahr':S.allwPeriod==='h2'?'2. Halbjahr':'Gesamtjahr';
-  const showUsers=S.p.editAllw?S.users.filter(u=>!(u.roles||[]).includes('admin')):[getU(S.currentUser)].filter(Boolean);
+  // Nur Mitarbeiter zeigen, die im gewählten Zeitraum (mind. teilweise) im
+  // Dienstverhältnis waren — z.B. bei Monat "Oktober" verschwindet ein
+  // Mitarbeiter mit Austritt Mitte September.
+  const periodActive=u=>S.allwPeriod==='month'?isUserActiveInMonth(u,yr,S.allwMonth)
+    :S.allwPeriod==='h1'?isUserActiveInRange(u,`${yr}-01-01`,`${yr}-06-30`)
+    :S.allwPeriod==='h2'?isUserActiveInRange(u,`${yr}-07-01`,`${yr}-12-31`)
+    :isUserActiveInYear(u,yr);
+  const showUsers=(S.p.editAllw?S.users.filter(u=>!(u.roles||[]).includes('admin')):[getU(S.currentUser)].filter(Boolean)).filter(periodActive);
   const isBulk=S.p.editAllw&&S.allwPeriod==='month';
 
   // Gruppierung nach Mitarbeiter-Kategorie, wie in der Planerstellung
@@ -5954,7 +5981,15 @@ function renderDPMatrix(data) {
   const empIds = new Set(allEmpIds || []);
   Object.keys(empAssignMap).forEach(id => empIds.add(id));
   data.assignments?.forEach(a => empIds.add(a.employee_id));
-  const emps = [...empIds].map(id => users.find(u => u.id === id)).filter(Boolean);
+  // Mitarbeiter ohne Dienstverhältnis im Planmonat ausblenden — außer sie
+  // haben tatsächlich Einträge in diesem Monat (historische Daten bleiben
+  // immer sichtbar, nur das reine "wählbar für neue Zuweisungen" verschwindet).
+  const assignedIds = new Set(Object.keys(empAssignMap || {}));
+  data.assignments?.forEach(a => assignedIds.add(a.employee_id));
+  let emps = [...empIds].map(id => users.find(u => u.id === id)).filter(Boolean);
+  if (plan?.month && plan?.year) {
+    emps = emps.filter(u => assignedIds.has(u.id) || isUserActiveInMonth(u, plan.year, plan.month));
+  }
   emps.sort((a,b) => a.name.localeCompare(b.name));
 
   // Stats columns: Soll, Ist, Diff, Zulage, WE, FWE, K, U
