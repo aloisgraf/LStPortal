@@ -10,7 +10,7 @@ router.put('/allowances', auth, async (req,res) => {
     if (!req.p.editAllw) return bad(res,'Keine Berechtigung',403);
     const {userId,year,month,nd,fd,fw,c10,rkt} = req.body;
     await pool.query(`INSERT INTO allowances (id,user_id,year,month,nd,fd,fw,c10,rkt) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (user_id,year,month) DO UPDATE SET nd=EXCLUDED.nd,fd=EXCLUDED.fd,fw=EXCLUDED.fw,c10=EXCLUDED.c10,rkt=EXCLUDED.rkt`,
-      [newId(),userId,year,month,nd||0,fd||0,fw||0,c10||0,rkt||0]);
+      [newId(),userId,year,month,nd||0,Math.round((fd||0)*10)/10,fw||0,c10||0,rkt||0]);
     ok(res);
   } catch(e) { bad(res,'Serverfehler',500); }
 });

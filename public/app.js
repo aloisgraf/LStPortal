@@ -1355,12 +1355,15 @@ function renderAllw(){
   const grouped={};
   showUsers.forEach(u=>{const cat=u.category||'(ohne Kategorie)';(grouped[cat]=grouped[cat]||[]).push(u);});
   const sortedCats=Object.keys(grouped).sort((a,b)=>(catOrder[a]??9999)-(catOrder[b]??9999)||a.localeCompare(b,'de'));
-  const ALLW_CATS=[['nd','Nacht','#3b6dd4'],['fd','Feiertag','#10b981'],['fw','WE','#f59e0b'],['c10','C10','#7c3aed'],['rkt','RKT','#14b8a6']];
+  // Feiertagsdienste gibt es auch als halbe Tage — daher 0,5er-Schritt nur
+  // bei "fd", alle anderen Kategorien zählen ganzzahlig.
+  const ALLW_CATS=[['nd','Nacht','#3b6dd4',1],['fd','Feiertag','#10b981',0.5],['fw','WE','#f59e0b',1],['c10','C10','#7c3aed',1],['rkt','RKT','#14b8a6',1]];
+  const fmtAllw=v=>Number.isInteger(v)?String(v):v.toFixed(1);
 
   const allwCells=u=>{
     if(!isBulk){const sv=sumAllw(u.id,yr,months);return ALLW_CATS.map(([f,,color])=>numCell(sv[f],color)).join('');}
     const a=getAllw(u.id,yr,S.allwMonth);
-    return ALLW_CATS.map(([f,,color])=>'<td style="text-align:center"><button type="button" class="allw-cnt" style="background:'+color+'18;color:'+color+'" onclick="allwCounterClick(event,\''+u.id+'\',\''+f+'\',1)" oncontextmenu="allwCounterClick(event,\''+u.id+'\',\''+f+'\',-1);return false" title="Linksklick: +1, Rechtsklick: -1">'+(a[f]||0)+'</button></td>').join('');
+    return ALLW_CATS.map(([f,,color,step])=>'<td style="text-align:center"><button type="button" class="allw-cnt" style="background:'+color+'18;color:'+color+'" onclick="allwCounterClick(event,\''+u.id+'\',\''+f+'\','+step+')" oncontextmenu="allwCounterClick(event,\''+u.id+'\',\''+f+'\',-'+step+');return false" title="Linksklick: +'+step+', Rechtsklick: -'+step+'">'+fmtAllw(a[f]||0)+'</button></td>').join('');
   };
   const allwEmpRow=u=>'<tr><td><div style="display:flex;align-items:center;gap:6px">'+avHtml(u.initials,u.color,22,9)+'<span>'+esc(lastNameFirst(u.name))+'</span></div></td>'+allwCells(u)+'</tr>';
   let allwBodyRows='';
@@ -1373,8 +1376,19 @@ function renderAllw(){
     if(isExpanded)allwBodyRows+=empList.map(allwEmpRow).join('');
   });
 
+  // Summen über alle sichtbaren Mitarbeiter im gewählten Zeitraum, für die
+  // Kopfzeile — WE bewusst ausgenommen, wie gewünscht.
+  const headerTotals=showUsers.reduce((a,u)=>{const sv=sumAllw(u.id,yr,months);return{nd:a.nd+sv.nd,fd:a.fd+sv.fd,c10:a.c10+sv.c10,rkt:a.rkt+sv.rkt};},{nd:0,fd:0,c10:0,rkt:0});
+
   document.getElementById('main').innerHTML=`
-    <div class="ph"><div class="pt">Zulagendienste <span>${pLbl} ${yr}</span></div></div>
+    <div class="ph"><div class="pt">Zulagendienste <span>${pLbl} ${yr}</span></div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--mu)">
+        <span>&#127769; Nacht: <b style="color:var(--tx)">${fmtAllw(headerTotals.nd)}</b></span>
+        <span>&#127881; Feiertag: <b style="color:var(--tx)">${fmtAllw(headerTotals.fd)}</b></span>
+        <span>&#128203; C10: <b style="color:var(--tx)">${fmtAllw(headerTotals.c10)}</b></span>
+        <span>&#128663; RKT: <b style="color:var(--tx)">${fmtAllw(headerTotals.rkt)}</b></span>
+      </div>
+    </div>
     <div class="fbar" style="flex-wrap:wrap;gap:6px;align-items:center">
       <div class="yr-row" style="margin:0"><button class="yb" onclick="S.allwYear--;renderMain()">&lsaquo;</button><span class="yv">${yr}</span><button class="yb" onclick="S.allwYear++;renderMain()">&rsaquo;</button></div>
       <div style="display:flex;gap:4px;flex-wrap:wrap">
@@ -1425,7 +1439,7 @@ async function allwCounterClick(e,uid,field,delta){
   e.preventDefault();
   const a=getAllw(uid,S.allwYear,S.allwMonth);
   const body={userId:uid,year:S.allwYear,month:S.allwMonth,nd:a.nd||0,fd:a.fd||0,fw:a.fw||0,c10:a.c10||0,rkt:a.rkt||0};
-  body[field]=Math.max(0,(a[field]||0)+delta);
+  body[field]=Math.max(0,Math.round(((a[field]||0)+Number(delta))*10)/10);
   try{
     await api('PUT','/allowances',body);
     await fetchData();renderMain();

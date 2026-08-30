@@ -264,6 +264,9 @@ async function initDB() {
     )`,
     `ALTER TABLE doc_categories ADD COLUMN IF NOT EXISTS parent_id TEXT`,
     `ALTER TABLE allowances ADD COLUMN IF NOT EXISTS rkt INTEGER DEFAULT 0`,
+    // Feiertagsdienste gibt es auch als halbe Tage (0,5-Schritte) — daher NUMERIC statt INTEGER.
+    `ALTER TABLE allowances ALTER COLUMN fd TYPE NUMERIC(6,1) USING fd::numeric(6,1)`,
+    `ALTER TABLE allowances ALTER COLUMN fd SET DEFAULT 0`,
     `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS ai_status TEXT`,
     `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS ai_result TEXT`,
     `CREATE TABLE IF NOT EXISTS documents (
