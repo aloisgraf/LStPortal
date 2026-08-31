@@ -10,7 +10,7 @@ router.get('/', auth, async (req,res) => {
     const canManageDp = roles.some(r=>['admin','leitung','dienstplanung'].includes(r));
     const canManageSpint = roles.some(r=>['admin','leitung','technik'].includes(r));
     const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
-           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw,dpQualificationsRaw,dpShiftPrefsRaw,dpProtocolRaw,todosRaw,todoItemsRaw,todoAssigneesRaw,myDpPlanIdsRaw,todoNotificationsRaw,contactsRaw,sopTemplatesRaw,sopItemsRaw,sopRunsRaw,sopRunItemsRaw,lockersRaw,sopBranchOptionsRaw,departmentsRaw,lockerCategoriesRaw,chatThreadsRaw,chatMessagesRaw,chatReadsRaw,protocolsRaw] = await Promise.all([
+           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw,dpQualificationsRaw,dpShiftPrefsRaw,dpProtocolRaw,todosRaw,todoItemsRaw,todoAssigneesRaw,myDpPlanIdsRaw,todoNotificationsRaw,contactsRaw,sopTemplatesRaw,sopItemsRaw,sopRunsRaw,sopRunItemsRaw,lockersRaw,sopBranchOptionsRaw,departmentsRaw,lockerCategoriesRaw,chatThreadsRaw,chatMessagesRaw,chatReadsRaw,protocolsRaw,todoNotesRaw] = await Promise.all([
       q('SELECT id,name,initials,roles,color,must_change_pw,last_seen,category,email,username,hire_date,termination_date FROM users ORDER BY name'),
       q('SELECT * FROM categories ORDER BY sort_order,label'),
       q('SELECT * FROM tags ORDER BY label'),
@@ -85,6 +85,7 @@ router.get('/', auth, async (req,res) => {
       q('SELECT cm.* FROM chat_messages cm JOIN chat_threads ct ON ct.id=cm.thread_id WHERE ct.user1_id=$1 OR ct.user2_id=$1 ORDER BY cm.created_at',[uid]).catch(()=>[]),
       q('SELECT * FROM chat_reads WHERE user_id=$1',[uid]).catch(()=>[]),
       q('SELECT * FROM meeting_protocols ORDER BY date DESC,created_at DESC').catch(()=>[]),
+      q('SELECT * FROM todo_notes ORDER BY created_at').catch(()=>[]),
     ]);
 
     const tkViewMap = new Map((tkViewsRaw||[]).map(v=>[v.ticket_id, v.viewed_at]));
@@ -286,7 +287,12 @@ router.get('/', auth, async (req,res) => {
         const items=(todoItemsRaw||[]).filter(i=>i.todo_id===t.id).map(i=>({...i,_canEdit:canMng||todoItemIsAssignedToMe.has(i.id),assignees:(todoAssigneesRaw||[]).filter(a=>a.item_id===i.id)}));
         const hasUnread = items.some(i=>todoNotifSet.has(i.id));
         const aiResult=(()=>{try{return t.ai_result?JSON.parse(t.ai_result):null;}catch{return null;}})();
-        return {...t,_canManage:canMng,protokoll,_hasUnreadNotifications:hasUnread,items,ai_result:aiResult};
+        const notes=(todoNotesRaw||[]).filter(n=>n.todo_id===t.id).map(n=>({
+          id:n.id, todoId:n.todo_id, text:n.text, authorId:n.author_id,
+          createdAt:n.created_at, editedAt:n.edited_at,
+          mentionedUsers:(()=>{try{return JSON.parse(n.mentioned_users||'[]');}catch{return [];}})(),
+        }));
+        return {...t,_canManage:canMng,protokoll,_hasUnreadNotifications:hasUnread,items,ai_result:aiResult,notes};
       }),
       contacts: (contactsRaw||[]).map(c=>({
         id:c.id, title:c.title||'', name:c.name, email:c.email||'',

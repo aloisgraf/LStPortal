@@ -268,6 +268,15 @@ async function initDB() {
     // Eintrag werden 8h vom Monatssoll (aus dp_employee_params) abgezogen,
     // um das effektive Leitstellen-Sollstunden zu ermitteln.
     `ALTER TABLE allowances ADD COLUMN IF NOT EXISTS buero INTEGER DEFAULT 0`,
+    // Freitext-Notizen zu Todos (z.B. Rückmeldungen von Mitarbeitern zu
+    // "Mittagessen bestellen") — bewusst getrennt von den Punkten/Items,
+    // damit ein Todo auch ganz ohne Checkliste als reine Notiz nutzbar ist.
+    `CREATE TABLE IF NOT EXISTS todo_notes (
+      id TEXT PRIMARY KEY, todo_id TEXT NOT NULL REFERENCES todos(id) ON DELETE CASCADE,
+      text TEXT NOT NULL, author_id TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW(), edited_at TIMESTAMPTZ,
+      mentioned_users TEXT DEFAULT '[]'
+    )`,
     // Feiertagsdienste gibt es auch als halbe Tage (0,5-Schritte) — daher NUMERIC statt INTEGER.
     `ALTER TABLE allowances ALTER COLUMN fd TYPE NUMERIC(6,1) USING fd::numeric(6,1)`,
     `ALTER TABLE allowances ALTER COLUMN fd SET DEFAULT 0`,

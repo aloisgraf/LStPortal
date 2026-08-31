@@ -1,6 +1,6 @@
 'use strict';
 const router = require('express').Router();
-const { q, q1, newId, pool, getUser, auditNote, nextTicketNumber } = require('../db');
+const { q, q1, newId, pool, getUser, auditNote, nextTicketNumber, parseMentions, createNotification } = require('../db');
 const { auth, ok, bad } = require('../middleware');
 
 // ── TODOS ─────────────────────────────────────────────────────────────────────
@@ -263,6 +263,70 @@ router.post('/todos/:todoId/mark-read', auth, async (req,res) => {
     for(const item of items){
       await q('UPDATE todo_item_notifications SET read_at=NOW() WHERE item_id=$1 AND user_id=$2 AND read_at IS NULL',[item.id,req.uid]);
     }
+    ok(res);
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+// ── TODO NOTES ────────────────────────────────────────────────────────────────
+// Freie Textnotizen zu einem Todo, unabhängig von den Punkten — z.B. um
+// Rückmeldungen von Mitarbeitern zu sammeln ("Mittagessen bestellen" →
+// wer will was). Zugriff: Ersteller, todo-weit Zugewiesener, jeder
+// Item-Zugewiesene, oder manageUsers.
+async function canAccessTodoNotes(todo, uid, p) {
+  if (p.manageUsers) return true;
+  if (todo.created_by === uid) return true;
+  if (todo.assigned_to === uid) return true;
+  const isItemAssignee = await q1(
+    `SELECT ta.id FROM todo_item_assignees ta JOIN todo_items ti ON ti.id=ta.item_id WHERE ti.todo_id=$1 AND ta.user_id=$2 LIMIT 1`,
+    [todo.id, uid]
+  );
+  return !!isItemAssignee;
+}
+
+router.post('/todos/:id/notes', auth, async (req,res) => {
+  try {
+    const todo = await q1('SELECT * FROM todos WHERE id=$1',[req.params.id]);
+    if (!todo) return bad(res,'Nicht gefunden',404);
+    if (!(await canAccessTodoNotes(todo, req.uid, req.p))) return bad(res,'Keine Berechtigung',403);
+    const text = req.body?.text?.trim();
+    if (!text) return bad(res,'Text erforderlich',400);
+    const allUsers = await q('SELECT id,name FROM users');
+    const mentioned = parseMentions(text, allUsers);
+    const mentionedIds = mentioned.map(u=>u.id);
+    const id = newId(), now = new Date().toISOString();
+    await pool.query(
+      `INSERT INTO todo_notes (id,todo_id,text,author_id,created_at,mentioned_users) VALUES ($1,$2,$3,$4,$5,$6)`,
+      [id, req.params.id, text, req.uid, now, JSON.stringify(mentionedIds)]
+    );
+    await q('UPDATE todos SET updated_at=NOW() WHERE id=$1',[req.params.id]).catch(()=>{});
+    const author = await getUser(req.uid);
+    for (const u of mentioned) {
+      if (u.id === req.uid) continue;
+      await createNotification(u.id,'mention',`${author?.name||'?'} erwähnte dich in „${todo.title}“`,null,id,req.uid).catch(()=>{});
+    }
+    ok(res,{id,text,authorId:req.uid,createdAt:now,editedAt:null,mentionedUsers:mentionedIds});
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+router.put('/todos/:id/notes/:noteId', auth, async (req,res) => {
+  try {
+    const note = await q1('SELECT * FROM todo_notes WHERE id=$1 AND todo_id=$2',[req.params.noteId,req.params.id]);
+    if (!note) return bad(res,'Nicht gefunden',404);
+    if (note.author_id!==req.uid && !req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+    const text = req.body?.text?.trim();
+    if (!text) return bad(res,'Text erforderlich',400);
+    const now = new Date().toISOString();
+    await pool.query('UPDATE todo_notes SET text=$1,edited_at=$2 WHERE id=$3',[text,now,req.params.noteId]);
+    ok(res,{text,editedAt:now});
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+router.delete('/todos/:id/notes/:noteId', auth, async (req,res) => {
+  try {
+    const note = await q1('SELECT * FROM todo_notes WHERE id=$1 AND todo_id=$2',[req.params.noteId,req.params.id]);
+    if (!note) return bad(res,'Nicht gefunden',404);
+    if (note.author_id!==req.uid && !req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+    await pool.query('DELETE FROM todo_notes WHERE id=$1',[req.params.noteId]);
     ok(res);
   } catch(e) { bad(res,'Serverfehler',500); }
 });

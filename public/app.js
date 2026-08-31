@@ -8557,11 +8557,12 @@ function renderTodoDetail(t) {
     </div>
 
     <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin:12px 0">
-      <button style="padding:4px 8px;border:none;background:${(S._todoTab||'punkte')!=='protokoll'?'var(--acc)':'transparent'};color:${(S._todoTab||'punkte')!=='protokoll'?'#fff':'var(--tx)'};cursor:pointer;font-weight:500;font-size:12px;border-radius:4px 0 0 0" onclick="S._todoTab='punkte';renderTodos()">Punkte</button>
-      <button style="padding:4px 8px;border:none;background:${(S._todoTab||'punkte')==='protokoll'?'var(--acc)':'transparent'};color:${(S._todoTab||'punkte')==='protokoll'?'#fff':'var(--tx)'};cursor:pointer;font-weight:500;font-size:12px;border-radius:0 4px 0 0" onclick="S._todoTab='protokoll';renderTodos()">Protokoll</button>
+      <button style="padding:4px 8px;border:none;background:${(S._todoTab||'punkte')==='punkte'?'var(--acc)':'transparent'};color:${(S._todoTab||'punkte')==='punkte'?'#fff':'var(--tx)'};cursor:pointer;font-weight:500;font-size:12px;border-radius:4px 0 0 0" onclick="S._todoTab='punkte';renderTodos()">Punkte</button>
+      <button style="padding:4px 8px;border:none;background:${S._todoTab==='notizen'?'var(--acc)':'transparent'};color:${S._todoTab==='notizen'?'#fff':'var(--tx)'};cursor:pointer;font-weight:500;font-size:12px" onclick="S._todoTab='notizen';renderTodos()">Notizen${(t.notes||[]).length?` (${t.notes.length})`:''}</button>
+      <button style="padding:4px 8px;border:none;background:${S._todoTab==='protokoll'?'var(--acc)':'transparent'};color:${S._todoTab==='protokoll'?'#fff':'var(--tx)'};cursor:pointer;font-weight:500;font-size:12px;border-radius:0 4px 0 0" onclick="S._todoTab='protokoll';renderTodos()">Protokoll</button>
     </div>
 
-    ${(S._todoTab||'punkte')!=='protokoll' ? `
+    ${(S._todoTab||'punkte')==='punkte' ? `
       ${total > 0 ? `<div class="todo-progress" title="${pct}% erledigt">
         <div class="todo-progress-bar" style="width:${pct}%"></div>
       </div>
@@ -8570,10 +8571,71 @@ function renderTodoDetail(t) {
       <div class="todo-checklist">${itemsHtml}</div>
 
       ${canManageTodo ? `<button class="btn-p" style="margin-top:14px" onclick="openTodoItemForm('${t.id}')">+ Punkt hinzufügen</button>` : ''}
+    ` : S._todoTab==='notizen' ? `
+      <div style="padding:8px 0">
+        <div class="nfeed">${renderTodoNotesFeed(t)}</div>
+        <div style="margin-top:12px;display:flex;gap:7px;align-items:flex-end">
+          <textarea id="todoNoteInput" rows="2" placeholder="Notiz … (@Name für Erwähnung)" style="font-size:13px;width:100%;box-sizing:border-box;flex:1"></textarea>
+          <button class="btn-p" onclick="addTodoNote('${t.id}')" style="padding:8px 12px;flex-shrink:0">Senden</button>
+        </div>
+      </div>
     ` : `
       <div style="padding:12px 0">${protokollHtml}</div>
     `}
   </div>`;
+}
+function renderTodoNotesFeed(t){
+  const notes=t.notes||[];
+  if(!notes.length)return`<div style="color:var(--di);font-size:12px;padding:8px 0">Noch keine Notizen.</div>`;
+  return notes.map(n=>{
+    const a=getU(n.authorId);
+    const canEditNote=n.authorId===S.currentUser||S.p.manageUsers;
+    const isEditing=S._editingTodoNoteId===n.id;
+    const body=isEditing
+      ?`<div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">
+          <textarea id="todoNoteEditInput-${n.id}" rows="3" style="font-size:13px;width:100%;box-sizing:border-box">${esc(n.text)}</textarea>
+          <div style="display:flex;gap:6px">
+            <button class="btn-p" style="font-size:11px;padding:3px 10px" onclick="saveEditTodoNote('${t.id}','${n.id}')">Speichern</button>
+            <button class="btn-s" style="font-size:11px;padding:3px 10px" onclick="cancelEditTodoNote()">Abbrechen</button>
+          </div>
+        </div>`
+      :`<div style="font-size:13px;line-height:1.5;color:var(--tx);white-space:pre-wrap;margin-top:2px">${highlightMentions(n.text)}${n.editedAt?'<span style="font-size:10px;color:var(--di);margin-left:4px">(bearbeitet)</span>':''}</div>`;
+    return`<div style="padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="font-size:10px;color:var(--di)">${a?`${avHtml(a.initials,a.color,14,6)} ${esc(lastNameFirst(a.name))} · `:''}${fdt(n.createdAt)}</div>
+        ${!isEditing&&canEditNote?`<div style="display:flex;gap:4px;flex-shrink:0">
+          <button class="btn-s" style="padding:1px 6px;font-size:10px" onclick="startEditTodoNote('${n.id}')">✏️</button>
+          <button class="btn-d" style="padding:1px 6px;font-size:10px" onclick="deleteTodoNote('${t.id}','${n.id}')">✕</button>
+        </div>`:''}
+      </div>
+      ${body}
+    </div>`;
+  }).join('');
+}
+function startEditTodoNote(noteId){S._editingTodoNoteId=noteId;renderTodos();const ta=document.getElementById('todoNoteEditInput-'+noteId);if(ta){ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);}}
+function cancelEditTodoNote(){S._editingTodoNoteId=null;renderTodos();}
+async function saveEditTodoNote(todoId,noteId){
+  const ta=document.getElementById('todoNoteEditInput-'+noteId);if(!ta)return;
+  const text=ta.value.trim();if(!text)return;
+  try{
+    await api('PUT','/todos/'+todoId+'/notes/'+noteId,{text});
+    S._editingTodoNoteId=null;await fetchData();renderTodos();toast('✅ Notiz aktualisiert');
+  }catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function deleteTodoNote(todoId,noteId){
+  if(!confirm('Notiz löschen?'))return;
+  try{
+    await api('DELETE','/todos/'+todoId+'/notes/'+noteId);
+    await fetchData();renderTodos();toast('✅ Notiz gelöscht');
+  }catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function addTodoNote(todoId){
+  const ta=document.getElementById('todoNoteInput');if(!ta?.value.trim())return;
+  try{
+    await api('POST','/todos/'+todoId+'/notes',{text:ta.value.trim()});
+    ta.value='';
+    await fetchData();renderTodos();
+  }catch(e){toast('⚠️ '+e.message,'err');}
 }
 
 function openTodoForm(id) {
