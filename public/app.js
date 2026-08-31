@@ -3021,6 +3021,40 @@ document.addEventListener('keydown',e=>{
 });
 ALL_MODALS.forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('click',e=>{if(e.target===el)closeModal(id);});});
 document.addEventListener('click',e=>{if(!e.target.closest('.note-input-wrap'))document.getElementById('mentionSug')?.classList.remove('open');});
+// Merkt sich die per Hand gezogene Größe von Textfeldern (Notizen, Kommentare
+// usw.) über Seitenaufrufe hinweg — betrifft die ganze Seite automatisch,
+// ohne dass jede einzelne Render-Stelle das selbst behandeln muss: ein
+// MutationObserver greift jedes neu ins DOM eingefügte <textarea id="..."> ab,
+// setzt eine zuvor gespeicherte Größe wieder und beobachtet es per
+// ResizeObserver auf künftige manuelle Größenänderungen.
+(function(){
+  const KEY='lst_fieldSizes';
+  let sizes; try{sizes=JSON.parse(localStorage.getItem(KEY)||'{}');}catch(e){sizes={};}
+  function persist(){try{localStorage.setItem(KEY,JSON.stringify(sizes));}catch(e){}}
+  const seen=new WeakSet();
+  function track(el){
+    if(!el.id||seen.has(el))return;
+    seen.add(el);
+    const saved=sizes[el.id];
+    if(saved?.h)el.style.height=saved.h+'px';
+    if(typeof ResizeObserver==='undefined')return;
+    new ResizeObserver(entries=>{
+      for(const entry of entries){
+        const h=Math.round(entry.contentRect.height);
+        if(h<=0)continue;
+        sizes[el.id]={h};
+        persist();
+      }
+    }).observe(el);
+  }
+  function scan(node){
+    if(!(node instanceof Element))return;
+    if(node.tagName==='TEXTAREA')track(node);
+    node.querySelectorAll?.('textarea[id]').forEach(track);
+  }
+  new MutationObserver(muts=>{muts.forEach(m=>m.addedNodes.forEach(scan));}).observe(document.documentElement,{childList:true,subtree:true});
+  document.querySelectorAll('textarea[id]').forEach(track);
+})();
 // AUTO-REFRESH
 let _lastMsgCount=-1,_lastTkCount=-1,_refreshTimer=null;
 let _lastBreakMinute='',_breakEndMinute='';
@@ -8575,7 +8609,7 @@ function renderTodoDetail(t) {
       <div style="padding:8px 0">
         <div class="nfeed">${renderTodoNotesFeed(t)}</div>
         <div style="margin-top:12px;display:flex;gap:7px;align-items:flex-end">
-          <textarea id="todoNoteInput" rows="2" placeholder="Notiz … (@Name für Erwähnung)" style="font-size:13px;width:100%;box-sizing:border-box;flex:1" oninput="S._todoNoteDraft=this.value">${esc(S._todoNoteDraft||'')}</textarea>
+          <textarea id="todoNoteInput" rows="6" placeholder="Notiz … (@Name für Erwähnung)" style="font-size:13px;width:100%;box-sizing:border-box;flex:1" oninput="S._todoNoteDraft=this.value">${esc(S._todoNoteDraft||'')}</textarea>
           <button class="btn-p" onclick="addTodoNote('${t.id}')" style="padding:8px 12px;flex-shrink:0">Senden</button>
         </div>
       </div>
