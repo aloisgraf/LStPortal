@@ -8963,10 +8963,21 @@ function renderChatWindows(){
   const wins=S._chatWindows||[];
   if(!wins.length){row.innerHTML='';row.classList.remove('open');_setQaWrapVisible(true);return;}
   row.classList.add('open');
+  // Der Hintergrundabgleich (alle paar Sekunden) baut die Fenster neu auf —
+  // ohne das hier würde ein noch nicht abgeschicktes Nachrichten-Entwurf
+  // beim Tippen verschwinden bzw. der Fokus mitten im Schreiben verloren
+  // gehen. Fokus + Cursorposition werden daher explizit gerettet.
+  const activeEl=document.activeElement;
+  const activeId=activeEl&&activeEl.id&&activeEl.id.startsWith('chatWinInput_')?activeEl.id:null;
+  const activeSel=activeId?activeEl.selectionStart:null;
   row.innerHTML=wins.map(w=>{
     if(w.id==='__picker__')return chatWinPickerHtml(w);
     return w.minimized?chatWinMinHtml(w):chatWinMaxHtml(w);
   }).join('');
+  if(activeId){
+    const el=document.getElementById(activeId);
+    if(el){el.focus();if(activeSel!=null)try{el.setSelectionRange(activeSel,activeSel);}catch(e){}}
+  }
   // Auf dem Handy überlappt der volle-Breite-Chat sonst den "+"-Schnell-
   // zugriff-Button — solange ein Fenster maximiert (nicht nur als Leiste
   // minimiert) offen ist, blenden wir ihn aus.
@@ -9011,7 +9022,7 @@ function chatWinMaxHtml(w){
     <div id="chatWinMsgs_${w.id}" style="flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px">${msgsHtml}</div>
     <div style="display:flex;gap:6px;padding:8px 10px;border-top:1px solid var(--border);flex-shrink:0">
       <button class="btn-s emoji-pick-btn" style="flex-shrink:0" onclick="openEmojiPicker('chatWinInput_${w.id}',this,'insert')">😀</button>
-      <input type="text" id="chatWinInput_${w.id}" placeholder="Nachricht…" onkeydown="if(event.key==='Enter'){event.preventDefault();sendChatWinMessage('${w.id}');}" style="flex:1;font-size:16px">
+      <input type="text" id="chatWinInput_${w.id}" value="${esc((S._chatDraft&&S._chatDraft[w.id])||'')}" oninput="S._chatDraft=S._chatDraft||{};S._chatDraft['${w.id}']=this.value" placeholder="Nachricht…" onkeydown="if(event.key==='Enter'){event.preventDefault();sendChatWinMessage('${w.id}');}" style="flex:1;font-size:16px">
       <button class="btn-p" onclick="sendChatWinMessage('${w.id}')">&#10148;</button>
     </div>
   </div>`;
@@ -9083,6 +9094,7 @@ async function sendChatWinMessage(threadId){
   if(!input)return;
   const text=input.value.trim();if(!text)return;
   input.value='';
+  if(S._chatDraft)S._chatDraft[threadId]='';
   // Optimistisch sofort anzeigen, statt auf den vollen Datenabgleich zu
   // warten — der lief bisher unbemerkt im Hintergrund, konnte aber je nach
   // Serverlast ein paar Sekunden dauern, bis die eigene Nachricht auftauchte.
@@ -9101,7 +9113,7 @@ async function sendChatWinMessage(threadId){
     S.chatMessages=S.chatMessages.filter(m=>m!==tempMsg);
     renderChatWindows();
     document.getElementById('chatWinInput_'+threadId)?.focus();
-    toast('⚠️ '+e.message,'err');input.value=text;
+    toast('⚠️ '+e.message,'err');input.value=text;if(S._chatDraft)S._chatDraft[threadId]=text;
   }
 }
 async function markChatThreadRead(threadId){
