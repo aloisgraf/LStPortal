@@ -578,7 +578,7 @@ function renderHomeNew(){
       todosBody+='<div style="padding:8px 14px;border-top:1px solid var(--border);cursor:pointer;display:flex;align-items:flex-start;gap:8px" onclick="setView(\'todos\')">'
         +'<span title="'+prio.label+'" style="width:8px;height:8px;border-radius:50%;background:'+prio.color+';flex-shrink:0;margin-top:5px"></span>'
         +'<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600">'+escHtml(todo.title)+'</div>'
-        +'<div style="font-size:11px;color:var(--mu)">'+(openItems.length?openItems.length+' Punkt(e) offen':'ohne Unterpunkte')+(dueTxt?' &middot; fällig '+dueTxt:'')+'</div></div></div>';
+        +'<div style="font-size:11px;color:var(--mu)">'+(openItems.length?openItems.length+' Punkt(e) offen':(todo.notes||[]).length?todo.notes.length+' Notiz'+(todo.notes.length!==1?'en':''):'ohne Unterpunkte')+(dueTxt?' &middot; fällig '+dueTxt:'')+'</div></div></div>';
     });
     todosBody+='<div style="padding:8px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--mu)">'+openTodos.length+' offene(s) Todo(s)'
       +' &middot; <a href="javascript:void(0)" onclick="setView(\'todos\')" style="color:var(--acc)">alle ansehen &#8594;</a></div>';
@@ -922,7 +922,7 @@ function renderHomeOld(){
         const openItems = (todo.items||[]).filter(i => !i.is_done);
         todosHtml += '<div style="padding:8px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="setView(\'todos\')">';
         todosHtml += '<div style="font-size:12px;font-weight:600">'+escHtml(todo.title)+'</div>';
-        todosHtml += '<div style="font-size:11px;color:var(--mu)">'+(openItems.length?openItems.length+' offen':'ohne Unterpunkte')+'</div>';
+        todosHtml += '<div style="font-size:11px;color:var(--mu)">'+(openItems.length?openItems.length+' offen':(todo.notes||[]).length?todo.notes.length+' Notiz'+(todo.notes.length!==1?'en':''):'ohne Unterpunkte')+'</div>';
         todosHtml += '</div>';
       });
       if (openTodos.length > 5) todosHtml += '<div style="padding:8px 14px;border-top:1px solid var(--border)"><button class="btn-s" style="font-size:11px;width:100%" onclick="setView(\'todos\')">Alle Todos anzeigen &#8594;</button></div>';
