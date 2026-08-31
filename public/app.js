@@ -8575,7 +8575,7 @@ function renderTodoDetail(t) {
       <div style="padding:8px 0">
         <div class="nfeed">${renderTodoNotesFeed(t)}</div>
         <div style="margin-top:12px;display:flex;gap:7px;align-items:flex-end">
-          <textarea id="todoNoteInput" rows="2" placeholder="Notiz … (@Name für Erwähnung)" style="font-size:13px;width:100%;box-sizing:border-box;flex:1"></textarea>
+          <textarea id="todoNoteInput" rows="2" placeholder="Notiz … (@Name für Erwähnung)" style="font-size:13px;width:100%;box-sizing:border-box;flex:1" oninput="S._todoNoteDraft=this.value">${esc(S._todoNoteDraft||'')}</textarea>
           <button class="btn-p" onclick="addTodoNote('${t.id}')" style="padding:8px 12px;flex-shrink:0">Senden</button>
         </div>
       </div>
@@ -8633,7 +8633,7 @@ async function addTodoNote(todoId){
   const ta=document.getElementById('todoNoteInput');if(!ta?.value.trim())return;
   try{
     await api('POST','/todos/'+todoId+'/notes',{text:ta.value.trim()});
-    ta.value='';
+    S._todoNoteDraft='';
     await fetchData();renderTodos();
   }catch(e){toast('⚠️ '+e.message,'err');}
 }
@@ -9055,6 +9055,9 @@ async function sendChatWinMessage(threadId){
   const tempMsg={id:'_pending_'+Date.now()+'_'+Math.random().toString(36).slice(2),threadId,senderId:S.currentUser,text,createdAt:new Date().toISOString()};
   S.chatMessages.push(tempMsg);
   renderChatWindows();
+  // renderChatWindows() baut das Eingabefeld als neues DOM-Element neu auf —
+  // der Fokus geht dabei verloren, deshalb hier gezielt zurückholen.
+  document.getElementById('chatWinInput_'+threadId)?.focus();
   if(S.view==='chat')renderChatList();
   try{
     const r=await api('POST','/chat/threads/'+threadId+'/messages',{text});
@@ -9063,6 +9066,7 @@ async function sendChatWinMessage(threadId){
   }catch(e){
     S.chatMessages=S.chatMessages.filter(m=>m!==tempMsg);
     renderChatWindows();
+    document.getElementById('chatWinInput_'+threadId)?.focus();
     toast('⚠️ '+e.message,'err');input.value=text;
   }
 }
