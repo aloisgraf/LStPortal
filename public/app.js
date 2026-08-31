@@ -2007,20 +2007,6 @@ function openTkDetail(id){
   }
   api('PUT','/tickets/'+id+'/view').catch(()=>{});
 }
-// Stößt beim Öffnen eines Tickets/Todos/Besprechungspunkts einmalig eine
-// KI-Hintergrundsuche an, falls noch keine vorliegt (z.B. weil der Eintrag
-// vor Einführung dieser Funktion angelegt wurde). Läuft pro Sitzung nur
-// einmal je Eintrag, damit nicht bei jedem erneuten Öffnen erneut angefragt
-// wird — sobald ein Ergebnis da ist, greift stattdessen aiInlinePanelHtml().
-const _aiRecheckedIds=new Set();
-async function _maybeAutoAiCheck(table,type,item){
-  if(!item)return;
-  const status=item.aiStatus||item.ai_status;
-  if(status||_aiRecheckedIds.has(item.id))return;
-  _aiRecheckedIds.add(item.id);
-  try{await api('POST','/ai/recheck',{table,id:item.id,type,title:item.title,description:item.description||''});}
-  catch(e){}
-}
 function highlightMentions(text){return esc(text).replace(/@(\S+)/g,(match,name)=>{const u=S.users.find(u=>u.name.toLowerCase()===name.toLowerCase());return u?`<span class="mention">@${esc(u.name)}</span>`:match;});}
 // ── Ticket Feed Renderer ──
 const _AUDIT_ICONS={
@@ -3211,19 +3197,10 @@ async function silentRefresh(){
       else if(S.view==='todos')renderTodos();
       else if(S.view==='sop'&&(S._sopView==='run'||S._sopView==='runlist'))renderSop();
       else if(S.view==='chat')renderChatList();
-      // Offene Ticket-/Besprechungspunkt-Detailansichten sind Modals (nicht
-      // Teil von S.view) und werden daher separat aktualisiert, damit das
-      // automatische KI-Ergebnis (pending → done) dort ohne Zutun erscheint.
+      // Offene Ticket-Detailansicht ist ein Modal (nicht Teil von S.view) und
+      // wird daher separat aktualisiert, damit das automatische KI-Ergebnis
+      // (pending → done) dort ohne Zutun erscheint.
       if(document.getElementById('tkDetOv')?.classList.contains('open')&&S.currentTicketId)renderTkDetail();
-      if(document.getElementById('itemFormOv')?.classList.contains('open')){
-        const itId=document.getElementById('itId')?.value;
-        const itInstanceId=document.getElementById('itInstanceId')?.value;
-        if(itId&&itInstanceId){
-          const item=S.meetings.flatMap(m=>m.instances.flatMap(i=>i.items)).find(x=>x.id===itId);
-          const itAiPanel=document.getElementById('itAiPanel');
-          if(item&&itAiPanel)itAiPanel.innerHTML=aiInlinePanelHtml(item);
-        }
-      }
     var _rd=document.getElementById('lastRefreshDisplay');if(_rd){var _n=new Date();_rd.textContent='↻ '+_n.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit',second:'2-digit'});_rd.style.display='block';}
   }catch(e){}
 }
@@ -5409,9 +5386,38 @@ function renderMeetings() {
 </div>`;
 }
 
+function meetingInstTabHtml(m, i, canManage) {
+  const open=(i.items||[]).filter(it=>it.status==='open'||it.status==='redo').length;
+  const statusColor={planned:'#3b82f6',done:'#10b981',cancelled:'#ef4444'}[i.status]||'#64748b';
+  const titleLine=i.title?esc(i.title):'Termin';
+  return`<div class="meetings-inst-tab${S._selInstance===i.id?' active':''}" style="position:relative">
+    <div onclick="S._selInstance='${i.id}';renderMeetings()" style="cursor:pointer;${canManage?'padding-right:18px':''}">
+      <div style="font-size:12px;font-weight:600">${i.kind==='protocol'?'📝 ':'📋 '}${titleLine}</div>
+      ${i.date?`<div style="font-size:11px;color:var(--mu);margin-top:1px">${fmtDate(i.date)}${i.time?' '+i.time:''}</div>`:''}
+      <div style="display:flex;gap:4px;margin-top:2px;align-items:center;flex-wrap:wrap">
+        ${!i.date?`<span style="font-size:10px;color:#f59e0b">Datum offen</span>`:''}
+        <span style="font-size:10px;color:${statusColor}">${{planned:'Geplant',done:'Abgeschlossen',cancelled:'Abgesagt'}[i.status]||i.status}</span>
+        ${open>0?`<span style="font-size:10px;color:#92400e;background:#fef3c7;padding:0 4px;border-radius:8px">${open}</span>`:''}
+      </div>
+    </div>
+    ${canManage?`<button class="btn-s" style="position:absolute;top:4px;right:4px;padding:1px 5px;font-size:10px;line-height:1.4" title="Termin ändern" onclick="event.stopPropagation();openInstanceForm('${m.id}','${i.id}')">&#9998;</button>`:''}
+  </div>`;
+}
+// Abgeschlossene Termine wandern in ein eigenes, einklappbares Archiv — bleiben
+// so weiterhin leicht erreichbar, drängen sich aber nicht mehr zwischen den
+// aktuell geplanten Terminen der Besprechung.
+if (!window._meetingArchiveExpanded) window._meetingArchiveExpanded = {};
+function toggleMeetingArchive(meetingId) {
+  window._meetingArchiveExpanded[meetingId] = !window._meetingArchiveExpanded[meetingId];
+  renderMeetings();
+}
 function renderMeetingDetail(m, canManage) {
   const inst = S._selInstance ? m.instances.find(x=>x.id===S._selInstance) : null;
   const rhythmLabels={weekly:'wöchentlich',biweekly:'alle 2 Wochen',monthly:'monatlich',daily:'täglich'};
+  const allInst = [...(m.instances||[])].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const activeInst = allInst.filter(i=>i.status!=='done');
+  const archivedInst = allInst.filter(i=>i.status==='done');
+  const archiveOpen = !!window._meetingArchiveExpanded[m.id] || (!!inst && inst.status==='done');
   return`<div style="padding:20px">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;gap:12px">
       <div>
@@ -5425,26 +5431,20 @@ function renderMeetingDetail(m, canManage) {
         ${canManage&&m.type==='jour_fixe'?`<button class="btn-s" onclick="generateNextInstance('${m.id}')">&#128257; Nächster</button>`:''}
       </div>
     </div>
-    <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;overflow-x:auto">
-      ${(m.instances||[]).length===0?`<div style="color:var(--mu);font-size:13px;padding:8px 0">Noch keine Termine</div>`:''}
-      ${[...(m.instances||[])].sort((a,b)=>new Date(b.date)-new Date(a.date)).map(i=>{
-        const open=(i.items||[]).filter(it=>it.status==='open'||it.status==='redo').length;
-        const statusColor={planned:'#3b82f6',done:'#10b981',cancelled:'#ef4444'}[i.status]||'#64748b';
-        const titleLine=i.title?esc(i.title):'Termin';
-        return`<div class="meetings-inst-tab${S._selInstance===i.id?' active':''}" style="position:relative">
-          <div onclick="S._selInstance='${i.id}';renderMeetings()" style="cursor:pointer;${canManage?'padding-right:18px':''}">
-            <div style="font-size:12px;font-weight:600">${i.kind==='protocol'?'📝 ':'📋 '}${titleLine}</div>
-            ${i.date?`<div style="font-size:11px;color:var(--mu);margin-top:1px">${fmtDate(i.date)}${i.time?' '+i.time:''}</div>`:''}
-            <div style="display:flex;gap:4px;margin-top:2px;align-items:center;flex-wrap:wrap">
-              ${!i.date?`<span style="font-size:10px;color:#f59e0b">Datum offen</span>`:''}
-              <span style="font-size:10px;color:${statusColor}">${{planned:'Geplant',done:'Abgeschlossen',cancelled:'Abgesagt'}[i.status]||i.status}</span>
-              ${open>0?`<span style="font-size:10px;color:#92400e;background:#fef3c7;padding:0 4px;border-radius:8px">${open}</span>`:''}
-            </div>
-          </div>
-          ${canManage?`<button class="btn-s" style="position:absolute;top:4px;right:4px;padding:1px 5px;font-size:10px;line-height:1.4" title="Termin ändern" onclick="event.stopPropagation();openInstanceForm('${m.id}','${i.id}')">&#9998;</button>`:''}
-        </div>`;
-      }).join('')}
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:${archivedInst.length?'0':'16px'};overflow-x:auto">
+      ${allInst.length===0?`<div style="color:var(--mu);font-size:13px;padding:8px 0">Noch keine Termine</div>`:''}
+      ${activeInst.length===0&&archivedInst.length>0?`<div style="color:var(--mu);font-size:13px;padding:8px 0">Keine offenen Termine — siehe Archiv unten</div>`:''}
+      ${activeInst.map(i=>meetingInstTabHtml(m,i,canManage)).join('')}
     </div>
+    ${archivedInst.length?`<div style="margin-bottom:16px">
+      <div onclick="toggleMeetingArchive('${m.id}')" style="cursor:pointer;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mu);padding:8px 0;user-select:none">
+        <span style="transition:transform .15s;display:inline-block;transform:rotate(${archiveOpen?'90':'0'}deg)">▶</span>
+        <span>📦 Archiv — ${archivedInst.length} abgeschlossene${archivedInst.length===1?'r':''} Termin${archivedInst.length===1?'':'e'}</span>
+      </div>
+      ${archiveOpen?`<div style="display:flex;gap:0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);overflow-x:auto">
+        ${archivedInst.map(i=>meetingInstTabHtml(m,i,canManage)).join('')}
+      </div>`:''}
+    </div>`:''}
     ${inst ? renderInstanceDetail(inst, m, canManage) : `<div style="color:var(--mu);font-size:13px">← Termin auswählen</div>`}
   </div>`;
 }
@@ -5691,9 +5691,6 @@ function openItemForm(instanceId, id=null) {
   document.getElementById('itResult').value = item?.result||'';
   document.getElementById('itLink').value = item?.link||'';
   document.getElementById('itDelegateTo').style.display = (item?.status)==='delegate'?'':'none';
-  const itAiPanel = document.getElementById('itAiPanel');
-  if (itAiPanel) itAiPanel.innerHTML = aiInlinePanelHtml(item);
-  if (item) _maybeAutoAiCheck('discussion_items','Besprechungspunkt',item);
   const delSel = document.getElementById('itDelegatedTo');
   delSel.innerHTML = S.users.map(u=>`<option value="${u.id}"${item?.delegatedTo===u.id?' selected':''}>${esc(lastNameFirst(u.name))}</option>`).join('');
   // Protokoll
