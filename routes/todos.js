@@ -2,7 +2,6 @@
 const router = require('express').Router();
 const { q, q1, newId, pool, getUser, auditNote, nextTicketNumber } = require('../db');
 const { auth, ok, bad } = require('../middleware');
-const { triggerBackgroundAiSuggest } = require('./ai');
 
 // ── TODOS ─────────────────────────────────────────────────────────────────────
 
@@ -31,7 +30,6 @@ router.post('/todos', auth, async (req,res) => {
        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
       [newId(), title.trim(), description||'', priority||'medium', dueDate||null, assignedTo||null, req.uid]
     );
-    triggerBackgroundAiSuggest({table:'todos',id:row.id,type:'Todo',title:title.trim(),description:description||''});
     ok(res, {...row, items:[]});
   } catch(e) { bad(res,'Serverfehler',500); }
 });
@@ -66,10 +64,6 @@ router.put('/todos/:id', auth, async (req,res) => {
        status=COALESCE($6,status), updated_at=NOW() WHERE id=$7 RETURNING *`,
       [title||null, description||null, priority||null, dueDate||null, assignedTo||null, status||null, req.params.id]
     );
-    if ((title!==undefined&&title!==old.title)||(description!==undefined&&description!==old.description)) {
-      triggerBackgroundAiSuggest({table:'todos',id:req.params.id,type:'Todo',
-        title:row.title, description:row.description});
-    }
     ok(res, row);
   } catch(e) { bad(res,'Serverfehler',500); }
 });

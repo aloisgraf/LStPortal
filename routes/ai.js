@@ -124,7 +124,7 @@ function triggerBackgroundAiSuggest({ table, id, type, title, description }) {
 // vor Einführung dieser Funktion angelegt wurde), stößt das Frontend hiermit
 // einmalig die Hintergrundsuche an. `table` ist strikt auf die drei
 // erlaubten Tabellen begrenzt, da er sonst roh in SQL interpoliert würde.
-const AI_TABLES = new Set(['tickets', 'todos', 'discussion_items']);
+const AI_TABLES = new Set(['tickets', 'discussion_items']);
 router.post('/ai/recheck', auth, async (req, res) => {
   try {
     const { table, id, type, title, description } = req.body;

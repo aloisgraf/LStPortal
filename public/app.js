@@ -8461,7 +8461,6 @@ function renderTodos() {
 }
 
 function renderTodoDetail(t) {
-  _maybeAutoAiCheck('todos','Todo',t);
   // Mark notifications as read when opening todo
   if(t._hasUnreadNotifications){
     api('POST',`/todos/${t.id}/mark-read`).catch(()=>{});
@@ -8549,10 +8548,8 @@ function renderTodoDetail(t) {
           ${creator ? `<span style="font-size:12px;color:var(--di)">erstellt von ${esc(lastNameFirst(creator.name))}</span>` : ''}
         </div>
         ${t.description ? `<div style="margin-top:8px;font-size:13px;color:var(--mu)">${esc(t.description)}</div>` : ''}
-        ${aiInlinePanelHtml(t)}
       </div>
       ${canManageTodo ? `<div style="display:flex;gap:6px;flex-shrink:0">
-        <button class="btn-s" onclick="openAiSuggestionsFor('Todo','${t.id}')">🤖 KI-Vorschläge</button>
         <button class="btn-s" onclick="openTodoForm('${t.id}')">✏️ Bearbeiten</button>
         ${t.status !== 'done' ? `<button class="btn-ok" onclick="setTodoStatus('${t.id}','done')">✓ Abschließen</button>` : `<button class="btn-warn" onclick="setTodoStatus('${t.id}','open')">↩ Wiederöffnen</button>`}
         <button class="btn-d" onclick="deleteTodo('${t.id}')">🗑</button>
