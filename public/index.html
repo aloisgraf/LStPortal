@@ -1918,7 +1918,7 @@
         <small style="color:var(--mu);font-size:11px">Durchschnittliche Sollstunden pro Monat (Vollzeit ≈ 173h)</small></div>
       <div class="fg"><label>Tagessoll (leer = Monatssoll/26)</label><input type="number" id="dpEpfDailyHours" step="0.1" min="0.5" max="24" placeholder="z.B. 7.0 (automatisch: Monatssoll÷26)"></div>
       <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:4px">
-        <label class="rck"><input type="checkbox" id="dpEpfNights" checked> Nachtdienste m&#246;glich</label>
+        <label class="rck"><input type="checkbox" id="dpEpfNights" checked onchange="dpEpfNightsChange()"> Nachtdienste m&#246;glich</label>
         <label class="rck"><input type="checkbox" id="dpEpfDoubleNights" checked> Doppeln&#228;chte erlaubt</label>
         <label class="rck"><input type="checkbox" id="dpEpfSpringer" onchange="dpEpfSpringerChange()"> Springer</label>
         <label class="rck"><input type="checkbox" id="dpEpfNoWeekends"> Keine Wochenenden</label>

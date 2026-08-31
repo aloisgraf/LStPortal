@@ -1394,6 +1394,15 @@ function renderAllw(){
   const ALLW_CATS=[['nd','Nacht','#3b6dd4',1],['fd','Feiertag','#10b981',0.5],['fw','WE','#f59e0b',1],['c10','C10','#7c3aed',1],['rkt','RKT','#14b8a6',1],['buero','B','#ec4899',1]];
   const fmtAllw=v=>Number.isInteger(v)?String(v):v.toFixed(1);
   const monthDateStr=`${yr}-${String(S.allwMonth||1).padStart(2,'0')}-01`;
+  // Mitarbeiter ohne "Nachtdienste möglich" (Dienstplanung-Konfiguration)
+  // bekommen keinen Nacht-Zähler und fließen auch nicht in Summen/Statistik
+  // für Nächte ein.
+  const nightsBlockedFor=u=>{
+    const refDate=S.allwPeriod==='month'?monthDateStr:`${yr}-12-31`;
+    const ep=getEmpParamsAt(u.id,refDate);
+    return ep&&ep.can_do_nights===false;
+  };
+  const ndEligibleUsers=showUsers.filter(u=>!nightsBlockedFor(u));
 
   // Farbskala je Spalte, außer RKT (auf Wunsch ausgenommen) — Basis sind
   // immer die aktuell angezeigten Werte (Zähler im Monat, sonst Summe über
@@ -1401,7 +1410,8 @@ function renderAllw(){
   const colStats={};
   ALLW_CATS.forEach(([f])=>{
     if(f==='rkt')return;
-    colStats[f]=allwColStats(showUsers,u=>isBulk?(getAllw(u.id,yr,S.allwMonth)[f]||0):sumAllw(u.id,yr,months)[f]);
+    const users=f==='nd'?ndEligibleUsers:showUsers;
+    colStats[f]=allwColStats(users,u=>isBulk?(getAllw(u.id,yr,S.allwMonth)[f]||0):sumAllw(u.id,yr,months)[f]);
   });
   const heatBg=(f,v)=>{
     const st=colStats[f];
@@ -1410,9 +1420,11 @@ function renderAllw(){
   };
 
   const allwCells=u=>{
-    if(!isBulk){const sv=sumAllw(u.id,yr,months);return ALLW_CATS.map(([f,,color])=>numCell(sv[f],color,f==='rkt'?null:heatBg(f,sv[f]))).join('');}
+    const ndBlocked=nightsBlockedFor(u);
+    if(!isBulk){const sv=sumAllw(u.id,yr,months);return ALLW_CATS.map(([f,,color])=>f==='nd'&&ndBlocked?'<td style="text-align:center;color:var(--di)" title="Keine Nachtdienste möglich (Dienstplanung-Konfiguration)">–</td>':numCell(sv[f],color,f==='rkt'?null:heatBg(f,sv[f]))).join('');}
     const a=getAllw(u.id,yr,S.allwMonth);
     return ALLW_CATS.map(([f,,color,step])=>{
+      if(f==='nd'&&ndBlocked)return'<td style="text-align:center;color:var(--di)" title="Keine Nachtdienste möglich (Dienstplanung-Konfiguration)">–</td>';
       const bg=f==='rkt'?(color+'18'):(heatBg(f,a[f]||0)||(color+'18'));
       return '<td style="text-align:center"><button type="button" class="allw-cnt" style="background:'+bg+';color:'+color+'" onclick="allwCounterClick(event,\''+u.id+'\',\''+f+'\','+step+')" oncontextmenu="allwCounterClick(event,\''+u.id+'\',\''+f+'\',-'+step+');return false" title="Linksklick: +'+step+', Rechtsklick: -'+step+'">'+fmtAllw(a[f]||0)+'</button></td>';
     }).join('');
@@ -1443,8 +1455,9 @@ function renderAllw(){
   });
 
   // Summen über alle sichtbaren Mitarbeiter im gewählten Zeitraum, für die
-  // Kopfzeile — WE bewusst ausgenommen, wie gewünscht.
-  const headerTotals=showUsers.reduce((a,u)=>{const sv=sumAllw(u.id,yr,months);return{nd:a.nd+sv.nd,fd:a.fd+sv.fd,c10:a.c10+sv.c10,rkt:a.rkt+sv.rkt};},{nd:0,fd:0,c10:0,rkt:0});
+  // Kopfzeile — WE bewusst ausgenommen, wie gewünscht. Nacht nur über
+  // Mitarbeiter mit "Nachtdienste möglich".
+  const headerTotals=showUsers.reduce((a,u)=>{const sv=sumAllw(u.id,yr,months);return{nd:a.nd+(nightsBlockedFor(u)?0:sv.nd),fd:a.fd+sv.fd,c10:a.c10+sv.c10,rkt:a.rkt+sv.rkt};},{nd:0,fd:0,c10:0,rkt:0});
 
   document.getElementById('main').innerHTML=`
     <div class="ph"><div class="pt">Zulagendienste <span>${pLbl} ${yr}</span></div>
@@ -1476,9 +1489,10 @@ function renderAllw(){
         // Durchschnitt nur für Dienstplanung (seeAllAllw) bei mehr als 1 User
         if(!S.p.seeAllAllw||showUsers.length<2)return '';
         const n=showUsers.length;
-        const tot=showUsers.reduce((a,u)=>{const sv=sumAllw(u.id,yr,months);return{nd:a.nd+sv.nd,fd:a.fd+sv.fd,fw:a.fw+sv.fw,c10:a.c10+sv.c10,rkt:a.rkt+sv.rkt,buero:a.buero+sv.buero};},{nd:0,fd:0,fw:0,c10:0,rkt:0,buero:0});
+        const nNd=ndEligibleUsers.length;
+        const tot=showUsers.reduce((a,u)=>{const sv=sumAllw(u.id,yr,months);return{nd:a.nd+(nightsBlockedFor(u)?0:sv.nd),fd:a.fd+sv.fd,fw:a.fw+sv.fw,c10:a.c10+sv.c10,rkt:a.rkt+sv.rkt,buero:a.buero+sv.buero};},{nd:0,fd:0,fw:0,c10:0,rkt:0,buero:0});
         const div=S.allwPeriod==='month'?1:S.allwPeriod==='h1'||S.allwPeriod==='h2'?6:12;
-        const avg={nd:tot.nd/n,fd:tot.fd/n,fw:tot.fw/n,c10:tot.c10/n,rkt:tot.rkt/n,buero:tot.buero/n};
+        const avg={nd:nNd?tot.nd/nNd:0,fd:tot.fd/n,fw:tot.fw/n,c10:tot.c10/n,rkt:tot.rkt/n,buero:tot.buero/n};
         const fmt=v=>(v%1===0?v:v.toFixed(1));
         return`<tr style="background:rgba(59,109,212,.06);font-weight:700;border-top:2px solid var(--border)">
           <td style="font-size:11px;color:var(--mu)">&#216; Durchschnitt pro MA</td>
@@ -7798,6 +7812,20 @@ function _dpEpfFillProfileDropdown(selectedProfileId) {
     (S.dpHoursProfiles||[]).map(p=>`<option value="${p.id}"${p.id===selectedProfileId?' selected':''}>${esc(p.name)} (${p.monthly_hours}h)</option>`).join('');
 }
 
+// "Doppelnächte erlaubt" und "Max. Nächte/Monat" ergeben nur Sinn, wenn der
+// Mitarbeiter überhaupt Nachtdienste machen kann — bei deaktivierten
+// Nachtdiensten werden beide Felder gesperrt und auf "kein Nachtdienst"
+// zurückgesetzt (0 statt "kein Limit"), statt widersprüchliche Werte zu
+// erlauben.
+function dpEpfNightsChange(){
+  const canNights=document.getElementById('dpEpfNights').checked;
+  const dbl=document.getElementById('dpEpfDoubleNights');
+  const maxN=document.getElementById('dpEpfMaxNights');
+  if(!dbl||!maxN)return;
+  dbl.disabled=!canNights;
+  maxN.disabled=!canNights;
+  if(!canNights){dbl.checked=false;maxN.value='0';}
+}
 function dpEpfProfileChange(profileId) {
   if (!profileId) return;
   const p = (S.dpHoursProfiles||[]).find(x=>x.id===profileId);
@@ -7834,6 +7862,7 @@ function openDpEmpParamForm(paramId) {
   if (noWEEl) noWEEl.checked = !!p?.no_weekends;
   const xmasEl = document.getElementById('dpEpfXmasRotation');
   if (xmasEl) xmasEl.checked = p?.xmas_rotation_participant !== false;
+  dpEpfNightsChange();
   openModal('dpEmpParamFormOv');
 }
 
@@ -7869,6 +7898,7 @@ function openDpEmpParamFormNew(empId) {
   if (noWEElNew) noWEElNew.checked = !!latest?.no_weekends;
   const xmasElNew = document.getElementById('dpEpfXmasRotation');
   if (xmasElNew) xmasElNew.checked = latest?.xmas_rotation_participant !== false;
+  dpEpfNightsChange();
   openModal('dpEmpParamFormOv');
 }
 
