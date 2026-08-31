@@ -2911,7 +2911,54 @@ function openUF(id){
   const extraDeptRoles=(S.departments||[]).filter(d=>d.id!=='frei'&&!ROLES.some(r=>r.id===d.id));
   document.getElementById('ufRoles').innerHTML=ROLES.map(r=>`<label class="rck"><input type="checkbox" value="${r.id}" ${(u?.roles||['standard']).includes(r.id)?'checked':''}><span>${r.icon} ${r.label}</span></label>`).join('')
     +extraDeptRoles.map(d=>`<label class="rck"><input type="checkbox" value="${d.id}" ${(u?.roles||['standard']).includes(d.id)?'checked':''}><span>${d.emoji||'🏢'} ${d.label}</span></label>`).join('');
+  // Rechte-Verlauf: reine Nachvollziehbarkeit, nur für bereits bestehende
+  // Mitarbeiter sichtbar (bei Neuanlage gibt es noch keinen).
+  const histWrap=document.getElementById('ufRoleHistWrap');
+  histWrap.style.display=u?'':'none';
+  document.getElementById('ufRoleHistBody').style.display='none';
+  document.getElementById('ufRoleHistBody').innerHTML='';
+  // Dienstplan-Einstellungen: eingebettet statt eigener Admin-Bereich, damit
+  // die Benutzerverwaltung alles an einem Ort hat.
+  document.getElementById('ufDpRelevant').checked=!!u?.dpRelevant;
+  const dpSection=document.getElementById('ufDpSection');
+  dpSection.style.display=u?.dpRelevant?'':'none';
+  if(u?.dpRelevant)renderUfDpParamsSection(u.id);
+  else document.getElementById('ufDpParamsBody').innerHTML=id?'':'<div style="font-size:12px;color:var(--mu)">Erst nach dem Speichern des Mitarbeiters verfügbar.</div>';
   buildCP('ufCR',S.ufColor,'pickU');closeModal('admOv');openModal('ufOv');
+}
+// Blendet den eingebetteten Dienstplan-Abschnitt ein/aus. Bei einem noch
+// nicht gespeicherten (neuen) Mitarbeiter gibt es noch keine ID, an die
+// dp_employee_params geknüpft werden könnte — dort erst nach dem Speichern
+// verfügbar.
+function onUfDpRelevantChange(){
+  const on=document.getElementById('ufDpRelevant').checked;
+  const dpSection=document.getElementById('ufDpSection');
+  dpSection.style.display=on?'':'none';
+  const uid=document.getElementById('ufId').value;
+  if(on&&uid)renderUfDpParamsSection(uid);
+}
+async function toggleUfRoleHistory(){
+  const body=document.getElementById('ufRoleHistBody');
+  if(!body)return;
+  const willShow=body.style.display==='none';
+  body.style.display=willShow?'':'none';
+  if(!willShow||body.dataset.loaded)return;
+  const uid=document.getElementById('ufId').value;
+  if(!uid)return;
+  body.innerHTML='Lade…';
+  try{
+    const hist=await api('GET','/users/'+uid+'/role-history');
+    body.dataset.loaded='1';
+    if(!hist.length){body.innerHTML='Noch keine Rechte-Änderungen protokolliert.';return;}
+    const roleLabel=r=>ROLES.find(x=>x.id===r)?.label||r;
+    body.innerHTML=hist.map(h=>{
+      const who=getU(h.changedBy);
+      return `<div style="padding:4px 0;border-top:1px solid var(--border)">
+        <div>${fdt(h.changedAt)}${who?' · '+esc(lastNameFirst(who.name)):''}</div>
+        <div>${esc(h.oldRoles.map(roleLabel).join(', ')||'—')} → ${esc(h.newRoles.map(roleLabel).join(', ')||'—')}</div>
+      </div>`;
+    }).join('');
+  }catch(e){body.innerHTML='⚠️ '+esc(e.message);}
 }
 async function saveUser(){
   const name=document.getElementById('ufNm').value.trim(),initials=document.getElementById('ufIn').value.trim().toUpperCase();
@@ -2928,9 +2975,10 @@ async function saveUser(){
   const roles=Array.from(document.querySelectorAll('#ufRoles input:checked')).map(cb=>cb.value);
   if(!roles.length){errEl.textContent='\u26A0\uFE0F Mindestens eine Rolle!';return;}
   const id=document.getElementById('ufId').value;loading(true);
+  const dpRelevant=document.getElementById('ufDpRelevant')?document.getElementById('ufDpRelevant').checked:false;
   try{
-    if(id)await api('PUT','/users/'+id,{name,initials,roles,color:S.ufColor,resetPassword:document.getElementById('ufPWRst').checked,category,email,username,hireDate,terminationDate});
-    else await api('POST','/users',{name,initials,roles,color:S.ufColor,category,email,username,hireDate,terminationDate});
+    if(id)await api('PUT','/users/'+id,{name,initials,roles,color:S.ufColor,resetPassword:document.getElementById('ufPWRst').checked,category,email,username,hireDate,terminationDate,dpRelevant});
+    else await api('POST','/users',{name,initials,roles,color:S.ufColor,category,email,username,hireDate,terminationDate,dpRelevant});
     await fetchData();backToAdmin('users');toast('\u2705 Benutzer gespeichert!');
   }catch(e){errEl.textContent='\u26A0\uFE0F '+e.message;}finally{loading(false);}
 }
@@ -6851,7 +6899,6 @@ async function renderDPConfig() {
     {id:'absence-types',label:'Abwesenheiten'},
     {id:'hours-profiles',label:'Stundenprofile'},
     {id:'emp-categories',label:'Kategorien'},
-    {id:'emp-params',label:'Mitarbeiter-Param.'},
     {id:'qualifications',label:'Qualifikationen'},
     {id:'requirements',label:'Schichtbedarf'},
     {id:'scheduling-rules',label:'⚙️ Dienstplanregeln'},
@@ -6865,7 +6912,6 @@ async function renderDPConfig() {
   else if (tab === 'absence-types') content = await renderDPConfigAbsenceTypes();
   else if (tab === 'hours-profiles') content = renderDPConfigHoursProfiles();
   else if (tab === 'emp-categories') content = renderDPConfigEmpCategories();
-  else if (tab === 'emp-params') content = await renderDPConfigEmpParams();
   else if (tab === 'qualifications') content = await renderDPConfigQualifications();
   else if (tab === 'requirements') content = await renderDPConfigRequirements();
   else if (tab === 'scheduling-rules') content = renderDPConfigSchedulingRules();
@@ -6876,6 +6922,7 @@ async function renderDPConfig() {
       <h2 style="margin:0 16px 0 0;font-size:16px;font-weight:700">⚙️ DP-Konfiguration</h2>
       ${tabs.map(t=>{const on=t.id===tab;return`<button style="padding:8px 14px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:${on?'700':'400'};border-bottom:2px solid ${on?'var(--acc)':'transparent'};color:${on?'var(--acc)':'var(--mu)'}" onclick="S._dpConfigTab='${t.id}';renderDPConfig()">${t.label}</button>`;}).join('')}
     </div>
+    <div style="padding:8px 16px 0;font-size:11px;color:var(--mu)">ℹ️ Mitarbeiter-Parameter (Sollstunden, Nachtdienste usw.) findest du jetzt direkt im Benutzer-Formular unter Admin → Benutzer.</div>
     <div id="dp-config-content" style="flex:1;overflow:auto;padding:16px">${content}</div>
   </div>`;
 }
@@ -6890,7 +6937,6 @@ async function renderDPConfigTab() {
   else if (tab === 'absence-types') content = await renderDPConfigAbsenceTypes();
   else if (tab === 'hours-profiles') content = renderDPConfigHoursProfiles();
   else if (tab === 'emp-categories') content = renderDPConfigEmpCategories();
-  else if (tab === 'emp-params') content = await renderDPConfigEmpParams();
   else if (tab === 'qualifications') content = await renderDPConfigQualifications();
   else if (tab === 'requirements') content = await renderDPConfigRequirements();
   else if (tab === 'scheduling-rules') content = renderDPConfigSchedulingRules();
@@ -6936,68 +6982,66 @@ async function renderDPConfigAbsenceTypes() {
   </div>`;
 }
 
-async function renderDPConfigEmpParams() {
-  S._dpEmpParamsLoaded=true;
-  let empParams = [];
-  try { empParams = await api('GET', '/dp/employee-params'); } catch(e) {}
-  S.dpEmpParams = empParams;
-  window.dpEmpParamsAll = empParams;
-
-  const rows = S.users.map(u => {
-    const userParams = empParams.filter(x=>x.employee_id===u.id)
-      .sort((a,b) => {
-        if (a.valid_from===null&&b.valid_from===null) return 0;
-        if (a.valid_from===null) return -1;
-        if (b.valid_from===null) return 1;
-        return String(b.valid_from).localeCompare(String(a.valid_from));
-      });
-    if (!userParams.length) {
-      return `<div class="dp-cfg-row" style="flex-wrap:wrap;gap:6px;align-items:center">
-        <span class="av-sm" style="background:${u.color}">${esc(u.initials)}</span>
-        <span class="dp-cfg-label">${esc(lastNameFirst(u.name))}</span>
-        <span style="font-size:11px;color:var(--mu)">Nicht konfiguriert</span>
-        <button class="btn-s" onclick="openDpEmpParamFormNew('${u.id}')">+ Einrichten</button>
-      </div>`;
-    }
-    const versionRows = userParams.map((p,idx) => {
-      const vfBadge = p.valid_from
-        ? `<span style="background:#3b6dd422;color:var(--acc);border-radius:12px;padding:1px 8px;font-size:11px;font-weight:600">ab ${String(p.valid_from).slice(0,10)}</span>`
-        : `<span style="background:#10b98122;color:#10b981;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:600">Standard</span>`;
-      const canDelete = userParams.length > 1;
-      return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0 4px 28px;flex-wrap:wrap">
-        ${vfBadge}
-        <span style="font-size:11px;color:var(--mu)">${p.monthly_hours||Math.round(p.weekly_hours*4.33)}h/Mo${p.office_pct?' 🏢'+p.office_pct+'%':''}${p.can_do_nights?' 🌙':''}${p.is_springer?' 🔄':''}${p.fd_springer_type==='FD_to_LS'?' 🚑A-'+p.fd_springer_location:''}${p.fd_springer_type==='LS_to_FD'?' 🚑B-'+p.fd_springer_location:''}</span>
-        <button class="btn-s" onclick="openDpEmpParamForm('${p.id}')">✏️</button>
-        ${canDelete?`<button class="btn-s" style="color:#ef4444" onclick="deleteDpEmpParam('${p.id}')">✕</button>`:''}
-      </div>`;
-    }).join('');
-    const userRules = (S.dpEmpRules||[]).filter(r=>r.employee_id===u.id);
-    const wdNames = ['So','Mo','Di','Mi','Do','Fr','Sa'];
-    const rulesHtml = userRules.map(r => {
-      const _stCode = r.shift_type_id ? esc((S.dpShiftTypes||[]).find(x=>x.id===r.shift_type_id)?.code||r.shift_type_id) : '?';
-      const ruleLabel = r.rule_type==='always_free' ? `Immer frei am ${wdNames[r.day_of_week]??r.day_of_week}` :
-        r.rule_type==='always_shift' ? `Immer Dienst am ${wdNames[r.day_of_week]??r.day_of_week}: ${_stCode}` :
-        r.rule_type==='if_shift_then' ? `Wenn Dienst am ${wdNames[r.day_of_week]??r.day_of_week}: nur ${_stCode}` :
-        esc(r.rule_type);
-      return `<div style="display:flex;align-items:center;gap:6px;padding:2px 0 2px 28px;font-size:11px">
-        <span style="color:var(--mu)">${ruleLabel}</span>
-        ${S.p.manageUsers?`<button class="btn-s" style="font-size:10px;padding:1px 6px;color:#ef4444" onclick="deleteDpEmpRule('${r.id}')">✕</button>`:''}
-      </div>`;
-    }).join('');
-    const addRuleBtn = S.p.manageUsers ? `<button class="btn-s" style="font-size:11px" onclick="openDpEmpRuleForm('${u.id}')">+ Fixregel</button>` : '';
-    return `<div class="dp-cfg-row" style="flex-direction:column;align-items:flex-start;gap:2px">
-      <div style="display:flex;align-items:center;gap:8px;width:100%">
-        <span class="av-sm" style="background:${u.color}">${esc(u.initials)}</span>
-        <span class="dp-cfg-label">${esc(lastNameFirst(u.name))}</span>
-        ${addRuleBtn}
-        <button class="btn-s" style="margin-left:auto;font-size:11px" onclick="openDpEmpParamFormNew('${u.id}')">+ Neue Version</button>
-      </div>
-      ${versionRows}
-      ${rulesHtml}
+// Ein Mitarbeiter-Parameter-Block (Versionen + Fixregeln) für EINEN
+// Mitarbeiter — genutzt im eingebetteten Dienstplan-Abschnitt des
+// Benutzer-Formulars (Admin → Benutzer, "Für Dienstplanung relevant").
+function dpEmpParamUserBlockHtml(u) {
+  const empParams = S.dpEmpParams||[];
+  const userParams = empParams.filter(x=>x.employee_id===u.id)
+    .sort((a,b) => {
+      if (a.valid_from===null&&b.valid_from===null) return 0;
+      if (a.valid_from===null) return -1;
+      if (b.valid_from===null) return 1;
+      return String(b.valid_from).localeCompare(String(a.valid_from));
+    });
+  const versionRows = userParams.length ? userParams.map((p) => {
+    const vfBadge = p.valid_from
+      ? `<span style="background:#3b6dd422;color:var(--acc);border-radius:12px;padding:1px 8px;font-size:11px;font-weight:600">ab ${String(p.valid_from).slice(0,10)}</span>`
+      : `<span style="background:#10b98122;color:#10b981;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:600">Standard</span>`;
+    const canDelete = userParams.length > 1;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;flex-wrap:wrap">
+      ${vfBadge}
+      <span style="font-size:11px;color:var(--mu)">${p.monthly_hours||Math.round(p.weekly_hours*4.33)}h/Mo${p.office_pct?' 🏢'+p.office_pct+'%':''}${p.can_do_nights?' 🌙':''}${p.is_springer?' 🔄':''}${p.fd_springer_type==='FD_to_LS'?' 🚑A-'+p.fd_springer_location:''}${p.fd_springer_type==='LS_to_FD'?' 🚑B-'+p.fd_springer_location:''}</span>
+      <button class="btn-s" onclick="openDpEmpParamForm('${p.id}')">✏️</button>
+      ${canDelete?`<button class="btn-s" style="color:#ef4444" onclick="deleteDpEmpParam('${p.id}')">✕</button>`:''}
+    </div>`;
+  }).join('') : `<div style="font-size:11px;color:var(--mu);padding:4px 0">Noch nicht konfiguriert.</div>`;
+  const userRules = (S.dpEmpRules||[]).filter(r=>r.employee_id===u.id);
+  const wdNames = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+  const rulesHtml = userRules.map(r => {
+    const _stCode = r.shift_type_id ? esc((S.dpShiftTypes||[]).find(x=>x.id===r.shift_type_id)?.code||r.shift_type_id) : '?';
+    const ruleLabel = r.rule_type==='always_free' ? `Immer frei am ${wdNames[r.day_of_week]??r.day_of_week}` :
+      r.rule_type==='always_shift' ? `Immer Dienst am ${wdNames[r.day_of_week]??r.day_of_week}: ${_stCode}` :
+      r.rule_type==='if_shift_then' ? `Wenn Dienst am ${wdNames[r.day_of_week]??r.day_of_week}: nur ${_stCode}` :
+      esc(r.rule_type);
+    return `<div style="display:flex;align-items:center;gap:6px;padding:2px 0;font-size:11px">
+      <span style="color:var(--mu)">${ruleLabel}</span>
+      ${S.p.manageUsers?`<button class="btn-s" style="font-size:10px;padding:1px 6px;color:#ef4444" onclick="deleteDpEmpRule('${r.id}')">✕</button>`:''}
     </div>`;
   }).join('');
-
-  return `<div class="dp-cfg-card"><h3>Mitarbeiter-Parameter</h3>${rows}</div>`;
+  const addRuleBtn = S.p.manageUsers ? `<button class="btn-s" style="font-size:11px" onclick="openDpEmpRuleForm('${u.id}')">+ Fixregel</button>` : '';
+  return `<div>
+    ${versionRows}
+    ${rulesHtml}
+    <div style="display:flex;gap:6px;margin-top:6px">
+      <button class="btn-s" style="font-size:11px" onclick="openDpEmpParamFormNew('${u.id}')">${userParams.length?'+ Neue Version':'+ Einrichten'}</button>
+      ${addRuleBtn}
+    </div>
+  </div>`;
+}
+// Lädt (einmalig pro Öffnung) die Dienstplan-Parameter des im Benutzer-
+// Formular gerade bearbeiteten Mitarbeiters und rendert sie im eingebetteten
+// Abschnitt — so ist "Dienstplanung relevant" komplett im Benutzer-Formular
+// bedienbar, ohne einen separaten Admin-Bereich aufsuchen zu müssen.
+async function renderUfDpParamsSection(uid) {
+  const body = document.getElementById('ufDpParamsBody');
+  if (!body) return;
+  body.innerHTML = '<div style="font-size:12px;color:var(--mu)">Lade…</div>';
+  try { S.dpEmpParams = await api('GET', '/dp/employee-params'); } catch(e) { S.dpEmpParams = S.dpEmpParams||[]; }
+  window.dpEmpParamsAll = S.dpEmpParams;
+  const u = getU(uid);
+  if (!u) { body.innerHTML = ''; return; }
+  body.innerHTML = dpEmpParamUserBlockHtml(u);
 }
 
 async function renderDPConfigRequirements() {
@@ -7928,18 +7972,27 @@ async function submitDpEmpParamForm() {
     await api('POST', '/dp/employee-params', body);
     closeModal('dpEmpParamFormOv');
     document.getElementById('dpEpfEmp').disabled = false;
-    renderDPConfig();
+    _refreshDpEmpParamsView(empId);
     toast('Gespeichert');
   } catch(e) { toast('Fehler: '+e.message,'err'); }
 }
 
 async function deleteDpEmpParam(id) {
   if (!confirm('Diese Parameterversion löschen?')) return;
+  const p = (window.dpEmpParamsAll||S.dpEmpParams||[]).find(x=>x.id===id);
   try {
     await api('DELETE', '/dp/employee-params/'+id);
-    renderDPConfig();
+    _refreshDpEmpParamsView(p?.employee_id);
     toast('Gelöscht');
   } catch(e) { toast('Fehler: '+e.message,'err'); }
+}
+// Nach dem Speichern/Löschen einer Dienstplan-Parameterversion die passende
+// Ansicht aktualisieren: eingebetteter Abschnitt im Benutzer-Formular, wenn
+// dieses gerade offen ist, sonst (Fallback) die klassische DP-Konfig-Ansicht.
+function _refreshDpEmpParamsView(empId) {
+  const ufOpen = document.getElementById('ufOv')?.classList.contains('open');
+  if (ufOpen && empId) renderUfDpParamsSection(empId);
+  else renderDPConfig();
 }
 
 function openDpEmpRuleForm(empId) {

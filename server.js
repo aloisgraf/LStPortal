@@ -268,6 +268,18 @@ async function initDB() {
     // Eintrag werden 8h vom Monatssoll (aus dp_employee_params) abgezogen,
     // um das effektive Leitstellen-Sollstunden zu ermitteln.
     `ALTER TABLE allowances ADD COLUMN IF NOT EXISTS buero INTEGER DEFAULT 0`,
+    // "Für Dienstplanung relevant" — schaltet die eingebettete Dienstplan-
+    // Konfiguration im Benutzer-Formular frei. Reines An/Aus-Flag, nicht
+    // versioniert (die eigentlichen Dienstplan-Werte in dp_employee_params
+    // sind es bereits über valid_from).
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS dp_relevant BOOLEAN DEFAULT false`,
+    // Nachvollziehbarkeit von Rechte-Änderungen (nicht rückwirkend wirksam,
+    // reines Audit-Log — die aktuelle Zugriffskontrolle liest immer
+    // users.roles live).
+    `CREATE TABLE IF NOT EXISTS user_role_history (
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL, changed_by TEXT NOT NULL,
+      changed_at TIMESTAMPTZ DEFAULT NOW(), old_roles TEXT, new_roles TEXT
+    )`,
     // Freitext-Notizen zu Todos (z.B. Rückmeldungen von Mitarbeitern zu
     // "Mittagessen bestellen") — bewusst getrennt von den Punkten/Items,
     // damit ein Todo auch ganz ohne Checkliste als reine Notiz nutzbar ist.
