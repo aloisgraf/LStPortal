@@ -69,7 +69,7 @@ router.put('/:id', auth, async (req,res) => {
     const add=(col,val)=>{ vals.push(val); setClauses.push(`${col}=$${vals.length}`); };
     const uname=(await getUser(req.uid))?.name||'?';
     const PL={low:'Gering',medium:'Mittel',high:'Hoch'};
-    const SL={open:'Offen',in_progress:'In Bearbeitung',on_hold:'Zurückgestellt',closed:'Abgeschlossen'};
+    const SL={open:'Offen',in_progress:'In Bearbeitung',on_hold:'Zurückgestellt',closed:'Abgeschlossen',cancelled:'Storniert'};
     const DL={frei:'Frei',technik:'Technik',leitung:'Leitung',dienstplanung:'Dienstplanung',ausbildung:'Ausbildung',qm:'QM'};
     const BL={urgent:'Dringend',week:'Diese Woche',sched:'Dienstplanung',wait:'Wartet',it:'IT',proj:'Projekte',org:'Organisation',ideas:'Ideen'};
     const fmtDate = d => d ? new Date(d).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
@@ -412,7 +412,7 @@ router.delete('/:id', auth, async (req,res) => {
     if (!tk) return bad(res,'Nicht gefunden',404);
     if (!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
     const activeChildren = await q(
-      'SELECT id FROM tickets WHERE parent_ticket_id=$1 AND (is_deleted IS NOT TRUE) AND status!=\'closed\'',
+      'SELECT id FROM tickets WHERE parent_ticket_id=$1 AND (is_deleted IS NOT TRUE) AND status NOT IN (\'closed\',\'cancelled\')',
       [req.params.id]
     );
     if (activeChildren.length > 0)

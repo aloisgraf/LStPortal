@@ -941,7 +941,7 @@ async function checkDueTickets() {
     const { q } = require('./db');
     const rows = await q(
       `SELECT id,number,title,due_date,assignee_id FROM tickets
-       WHERE status != 'closed' AND is_deleted IS NOT TRUE
+       WHERE status NOT IN ('closed','cancelled') AND is_deleted IS NOT TRUE
          AND assignee_id IS NOT NULL AND due_date IS NOT NULL
          AND due_date <= (CURRENT_DATE + INTERVAL '2 days')`);
     const today = new Date().toISOString().slice(0,10);

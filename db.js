@@ -63,6 +63,7 @@ const NAV_TABS = [
   {key:'links', label:'Links'},
   {key:'tickets', label:'Tickets: Offene'},
   {key:'tickets_closed', label:'Tickets: Abgeschlossene'},
+  {key:'tickets_cancelled', label:'Tickets: Stornierte'},
   {key:'tickets_deleted', label:'Tickets: Gelöschte'},
   {key:'checklists', label:'Checklisten'},
   {key:'dp', label:'Dienstplanung: Planerstellung'},

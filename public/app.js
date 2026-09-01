@@ -55,7 +55,12 @@ const ROLES=[{id:'admin',label:'Administrator',icon:'\uD83D\uDD11'},{id:'leitung
 let DEPTS=['technik','leitung','dienstplanung','ausbildung','qm','frei'];
 let DEPT_LABELS={technik:'\uD83D\uDD27 Technik',leitung:'\u2B50 Leitung',dienstplanung:'\uD83D\uDCCB Dienstplanung',ausbildung:'\uD83C\uDF93 Ausbildung',qm:'\u2705 QM',frei:'\uD83C\uDF10 Frei'};
 const PRIORITIES=[{id:'low',label:'\uD83D\uDFE2 Gering',color:'#10b981'},{id:'medium',label:'\uD83D\uDFE1 Mittel',color:'#f59e0b'},{id:'high',label:'\uD83D\uDD34 Hoch',color:'#ef4444'}];
-const STATUSES=[{id:'open',label:'Offen'},{id:'in_progress',label:'In Bearbeitung'},{id:'on_hold',label:'Zur\u00fcckgestellt'},{id:'closed',label:'Abgeschlossen'}];
+const STATUSES=[{id:'open',label:'Offen'},{id:'in_progress',label:'In Bearbeitung'},{id:'on_hold',label:'Zur\u00fcckgestellt'},{id:'closed',label:'Abgeschlossen'},{id:'cancelled',label:'Storniert'}];
+// Tickets gelten als "abgeschlossen/inaktiv" (nicht mehr offen) bei diesen
+// beiden Status \u2014 zentrale Stelle statt an jeder Filter-/Z\u00e4hlstelle einzeln
+// "closed" abzufragen, damit "cancelled" nirgends vergessen wird.
+const TK_INACTIVE_STATUSES=['closed','cancelled'];
+const isTkClosed=tk=>TK_INACTIVE_STATUSES.includes(tk.status);
 const BUCKETS=[{id:'urgent',label:'\uD83D\uDEA8 Dringend'},{id:'week',label:'\uD83D\uDCC5 Diese Woche'},{id:'sched',label:'\uD83D\uDCCB Dienstplanung'},{id:'wait',label:'\u23F3 Wartet'},{id:'it',label:'\uD83D\uDCBB IT'},{id:'proj',label:'\uD83D\uDE80 Projekte'},{id:'org',label:'\uD83C\uDFE2 Organisation'},{id:'ideas',label:'\uD83D\uDCA1 Ideen'}];
 const RM=[
   ['Benutzer verwalten',         {admin:1,leitung:0,dienstplanung:0,schichtleiter:0,technik:0,ausbildung:0,qm:0,standard:0}],
@@ -238,7 +243,7 @@ const deptColor=d=>{const dep=(S.departments||[]).find(x=>x.id===d);return dep?.
 const deptBdg=d=>{const c=deptColor(d);return `<span class="bdg" style="background:${c}1f;color:${c}">${DEPT_LABELS[d]||d}</span>`;};
 const tagChips=tgs=>(tgs||[]).map(tid=>{const t=getTag(tid);if(!t)return'';return`<span class="tag-chip" style="background:${t.color}1a;color:${t.color};border:1px solid ${t.color}30">${t.label}</span>`;}).join('');
 const dueBdg=tk=>{
-  if(!tk.dueDate||tk.status==='closed')return'';
+  if(!tk.dueDate||isTkClosed(tk))return'';
   const today=new Date();today.setHours(0,0,0,0);
   const due=new Date(tk.dueDate);due.setHours(0,0,0,0);
   const diff=Math.round((due-today)/(1000*60*60*24));
@@ -389,7 +394,7 @@ function restoreNavSectionState() {
   }
 }
 // Alle Sidebar-Reiter (id="ni-<key>") — muss mit db.js NAV_TABS übereinstimmen.
-const NAV_TAB_IDS=['home','sop','docs','meetings','todos','contacts','schedule','allw','homeoffice','vacation','diensttausch','abrechnung','dienstplaene','zahnarzt','platz','links','tickets','tickets_closed','tickets_deleted','checklists','dp','dp-config','dp-christmas','dp-mine','messages','messages_sent','news','statistik','spint','chat'];
+const NAV_TAB_IDS=['home','sop','docs','meetings','todos','contacts','schedule','allw','homeoffice','vacation','diensttausch','abrechnung','dienstplaene','zahnarzt','platz','links','tickets','tickets_closed','tickets_cancelled','tickets_deleted','checklists','dp','dp-config','dp-christmas','dp-mine','messages','messages_sent','news','statistik','spint','chat'];
 // Zusätzlich zur (abschaltbaren) Reiter-Sichtbarkeit weiterhin hart verdrahtete
 // Mindestanforderungen für die Dienstplanungs-/Statistik-Reiter — ein Reiter
 // ist nur sichtbar, wenn BEIDES zutrifft.
@@ -418,7 +423,7 @@ function renderSBF(){
     el.innerHTML='';
   }else if(S.view==='abrechnung'){
     el.innerHTML='';
-  }else if(S.view==='tickets'||S.view==='tickets_closed'||S.view==='tickets_deleted'){
+  }else if(S.view==='tickets'||S.view==='tickets_closed'||S.view==='tickets_cancelled'||S.view==='tickets_deleted'){
     el.innerHTML='';
   }else el.innerHTML='';
 }
@@ -433,7 +438,7 @@ function renderMain(){
   else if(S.view==='diensttausch')renderDiensttausch();
   else if(S.view==='abrechnung')renderAbrechnung();
   else if(S.view==='dienstplaene')renderDienstplaene();
-  else if(S.view==='tickets'||S.view==='tickets_closed'||S.view==='tickets_deleted')renderTickets();
+  else if(S.view==='tickets'||S.view==='tickets_closed'||S.view==='tickets_cancelled'||S.view==='tickets_deleted')renderTickets();
   else if(S.view==='checklists')renderChecklists();
   else if(S.view==='messages'||S.view==='messages_sent')renderMessages();
   else if(S.view==='zahnarzt')renderZahnarzt();
@@ -542,7 +547,7 @@ function renderHomeNew(){
 
   // ── Tickets: Top 5 in Summe, zuerst nach Fälligkeit (offene Tickets ohne
   // Fälligkeitsdatum kommen danach), innerhalb dessen nach Priorität sortiert ──
-  const openTks=S.tickets.filter(tk=>tk.status!=='closed'&&!tk.isDeleted);
+  const openTks=S.tickets.filter(tk=>!isTkClosed(tk)&&!tk.isDeleted);
   const overdueTks=openTks.filter(tk=>tk.dueDate&&new Date(tk.dueDate)<today);
   const prioOrder={high:0,medium:1,low:2};
   const ticketSort=(a,b)=>{
@@ -701,7 +706,7 @@ function renderHomeOld(){
   const myDepts=S.tp.myDepts;
   const myName=(getU(S.currentUser)?.name||'').toLowerCase();
   const relevantTks=S.tickets.filter(tk=>{
-    if(tk.status==='closed')return false;
+    if(isTkClosed(tk))return false;
     if(tk.assigneeId===S.currentUser)return true; // mir zugewiesen
     if(tk.createdBy===S.currentUser)return true;  // von mir erstellt
     if(myDepts.includes(tk.department))return true; // mein Fachbereich
@@ -801,7 +806,7 @@ function renderHomeOld(){
     var today=new Date();today.setHours(0,0,0,0);
     var weekEnd=new Date(today);weekEnd.setDate(today.getDate()+7);
     var dueTks=S.tickets.filter(function(tk){
-      if(!tk.dueDate||tk.status==='closed')return false;
+      if(!tk.dueDate||isTkClosed(tk))return false;
       var d=new Date(tk.dueDate);d.setHours(0,0,0,0);
       return d<=weekEnd;
     }).sort(function(a,b){return (a.dueDate||'').localeCompare(b.dueDate||'');}).slice(0,10);
@@ -822,7 +827,7 @@ function renderHomeOld(){
   if(S.tp.canSeeSubcat){
     // Nur Unterkategorien, die als Beschwerde markiert sind (Admin → Unterkategorien)
     var complaintLabels=new Set(S.ticketSubcategories.filter(function(s){return s.is_complaint;}).map(function(s){return s.label;}));
-    var beschwerden=S.tickets.filter(function(tk){return tk.subcategory&&complaintLabels.has(tk.subcategory)&&tk.status!=='closed';}).sort(function(a,b){return b.createdAt.localeCompare(a.createdAt);}).slice(0,15);
+    var beschwerden=S.tickets.filter(function(tk){return tk.subcategory&&complaintLabels.has(tk.subcategory)&&!isTkClosed(tk);}).sort(function(a,b){return b.createdAt.localeCompare(a.createdAt);}).slice(0,15);
     if(beschwerden.length){
       var _pColors={high:'#ef4444',medium:'#f59e0b',low:'#94a3b8'};
       beschwerden.forEach(function(tk){
@@ -962,7 +967,7 @@ async function markTkSeen(id) {
   if (tk) { tk.lastViewedAt = new Date().toISOString(); }
   await api('PUT','/tickets/'+id+'/view').catch(()=>{});
   renderHome();
-  if (S.view==='tickets'||S.view==='tickets_closed') renderTickets();
+  if (S.view==='tickets'||S.view==='tickets_closed'||S.view==='tickets_cancelled') renderTickets();
 }
 
 async function openNotif(notifId,ticketId){try{await api('POST','/notifications/'+notifId+'/read');}catch(e){}await fetchData();if(ticketId){openTkDetail(ticketId);setView('tickets');}else renderHome();}
@@ -1774,10 +1779,16 @@ async function deleteDp(id){
   loading(true);try{await api('DELETE','/dienstplaene/'+id);await fetchData();renderDienstplaene();}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}finally{loading(false);}
 }
 // TICKETS
-function getVisTks(closed=false,deleted=false){
+// bucket: 'open' (Standard) | 'closed' | 'cancelled' | 'deleted'
+function getVisTks(bucket='open'){
   return S.tickets.filter(tk=>{
-    if(deleted){if(!tk.isDeleted)return false;}
-    else{if(tk.isDeleted)return false;if(closed!=(tk.status==='closed'))return false;}
+    if(bucket==='deleted'){if(!tk.isDeleted)return false;}
+    else{
+      if(tk.isDeleted)return false;
+      if(bucket==='closed'&&tk.status!=='closed')return false;
+      if(bucket==='cancelled'&&tk.status!=='cancelled')return false;
+      if(bucket==='open'&&isTkClosed(tk))return false;
+    }
     if(S.tkFiltDept&&tk.department!==S.tkFiltDept)return false;
     if(S.tkFiltPrio&&tk.priority!==S.tkFiltPrio)return false;
     if(S.tkFiltTag&&!tk.tags.includes(S.tkFiltTag))return false;
@@ -1817,7 +1828,7 @@ const tkOpenTodoHtml=tk=>{const n=tkOpenTodoCount(tk);return n?`<span style="col
 function getDueHeatPref(){try{return localStorage.getItem('tkDueHeat')!=='off';}catch(e){return true;}}
 function toggleDueHeatPref(on){try{localStorage.setItem('tkDueHeat',on?'on':'off');}catch(e){}renderMain();toast(on?'Fälligkeits-Färbung aktiviert':'Fälligkeits-Färbung deaktiviert');}
 function dueHeatStyle(tk){
-  if(!getDueHeatPref()||!tk.dueDate||tk.status==='closed')return'';
+  if(!getDueHeatPref()||!tk.dueDate||isTkClosed(tk))return'';
   const today=new Date();today.setHours(0,0,0,0);
   const due=new Date(String(tk.dueDate).slice(0,10));
   const days=Math.round((due-today)/86400000);
@@ -1828,10 +1839,12 @@ function dueHeatStyle(tk){
 }
 
 function getTkViewPref(){try{return localStorage.getItem('tkViewPref')||'cards';}catch(e){return'cards';}}
-function saveTkViewPref(v){try{localStorage.setItem('tkViewPref',v);}catch(e){}if(S.view==='tickets'||S.view==='tickets_closed')renderTickets();}
+function saveTkViewPref(v){try{localStorage.setItem('tkViewPref',v);}catch(e){}if(S.view==='tickets'||S.view==='tickets_closed'||S.view==='tickets_cancelled')renderTickets();}
 
 function renderTickets(){
-  const deleted=S.view==='tickets_deleted';const closed=S.view==='tickets_closed';const tks=getVisTks(closed,deleted);
+  const deleted=S.view==='tickets_deleted';const closed=S.view==='tickets_closed';const cancelled=S.view==='tickets_cancelled';
+  const bucket=deleted?'deleted':closed?'closed':cancelled?'cancelled':'open';
+  const tks=getVisTks(bucket);
   const myD=S.tp.seeAll?DEPTS:S.tp.myDepts;
   const useTable=getTkViewPref()==='table';
   // Sort: parent tickets first, then children directly below their parent
@@ -1959,13 +1972,13 @@ function renderTickets(){
   }
   const viewIcon=useTable?'\u229e':'\u2261';
   document.getElementById('main').innerHTML=`
-    <div class="ph"><div class="pt">${deleted?'🗑️ Gelöschte':closed?'Abgeschlossene':'Offene'} Tickets <span style="font-size:16px;color:var(--mu)">(${tks.length})</span></div>
+    <div class="ph"><div class="pt">${deleted?'🗑️ Gelöschte':closed?'Abgeschlossene':cancelled?'🚫 Stornierte':'Offene'} Tickets <span style="font-size:16px;color:var(--mu)">(${tks.length})</span></div>
       <div style="display:flex;gap:6px">
         <button class="btn-s" title="${useTable?'Card-Ansicht':'Tabellen-Ansicht'}" onclick="saveTkViewPref('${useTable?'cards':'table'}')" style="font-size:16px;padding:4px 10px">${viewIcon}</button>
         <button class="btn-s${S.tkBatchMode?' on':''}" onclick="toggleTkBatch()" title="Mehrfachauswahl" style="font-size:13px;padding:5px 10px">&#9745; Auswahl</button>
         ${!deleted?`<button class="btn-p" onclick="openTkForm(null)">&#65291; Ticket</button>`:''}
       </div></div>
-    ${!closed&&!deleted?`<div id="tkEmailDropzone" style="border:2px dashed var(--border);border-radius:var(--r);padding:10px 14px;margin-bottom:12px;font-size:12px;color:var(--mu);text-align:center;transition:.15s"
+    ${!closed&&!deleted&&!cancelled?`<div id="tkEmailDropzone" style="border:2px dashed var(--border);border-radius:var(--r);padding:10px 14px;margin-bottom:12px;font-size:12px;color:var(--mu);text-align:center;transition:.15s"
       ondragover="event.preventDefault();this.style.borderColor='var(--acc)';this.style.color='var(--acc)';this.style.background='rgba(59,109,212,.05)'"
       ondragleave="this.style.borderColor='var(--border)';this.style.color='var(--mu)';this.style.background='transparent'"
       ondrop="tkEmailDrop(event,this)">&#128231; E-Mail hierher ziehen, um daraus ein Ticket zu erstellen</div>`:''}
@@ -1980,7 +1993,7 @@ function renderTickets(){
     </div>`:''}
     <div class="fbar" style="flex-wrap:wrap;gap:6px">
       <input class="srch" type="text" placeholder="Suchen \u2026" value="${S.tkSearch}" oninput="S.tkSearch=this.value;S._tkSearchCursor=this.selectionStart;renderMain()" style="width:160px">
-      <select class="flt" onchange="S.tkFiltStatus=this.value;renderMain()"><option value="">Alle Status</option>${STATUSES.filter(s=>closed?(s.id==='closed'):(s.id!=='closed')).map(s=>`<option value="${s.id}"${S.tkFiltStatus===s.id?' selected':''}>${s.label}</option>`).join('')}</select>
+      <select class="flt" onchange="S.tkFiltStatus=this.value;renderMain()"><option value="">Alle Status</option>${STATUSES.filter(s=>closed?s.id==='closed':cancelled?s.id==='cancelled':deleted?true:!TK_INACTIVE_STATUSES.includes(s.id)).map(s=>`<option value="${s.id}"${S.tkFiltStatus===s.id?' selected':''}>${s.label}</option>`).join('')}</select>
       <select class="flt" onchange="S.tkFiltDept=this.value;renderMain()"><option value="">Alle Bereiche</option>${myD.map(d=>`<option value="${d}"${S.tkFiltDept===d?' selected':''}>${DEPT_LABELS[d]}</option>`).join('')}</select>
       <select class="flt" onchange="S.tkFiltPrio=this.value;renderMain()"><option value="">Alle Priorit\u00e4ten</option>${PRIORITIES.map(p2=>`<option value="${p2.id}"${S.tkFiltPrio===p2.id?' selected':''}>${p2.label}</option>`).join('')}</select>
       <select class="flt" onchange="S.tkFiltTag=this.value;renderMain()"><option value="">Alle Tags</option>${S.tags.map(t=>`<option value="${t.id}"${S.tkFiltTag===t.id?' selected':''}>${t.label}</option>`).join('')}</select>
@@ -2002,7 +2015,7 @@ function openTkDetail(id){
   const tk=S.tickets.find(t=>t.id===id);
   if(tk){
     tk.lastViewedAt=new Date().toISOString();
-    if(S.view==='tickets'||S.view==='tickets_closed')renderTickets();
+    if(S.view==='tickets'||S.view==='tickets_closed'||S.view==='tickets_cancelled')renderTickets();
     if(S.view==='home')renderHome();
   }
   api('PUT','/tickets/'+id+'/view').catch(()=>{});
@@ -2253,9 +2266,9 @@ function renderTkDetail(){
     </div></div>
     ${S.tp.canSetPublic?`<div class="tkf"><label>Sichtbarkeit</label><button class="bdg ${tk.isPublic?'pub-on':'pub-off'}" onclick="updateTkField('${tk.id}','isPublic',${!tk.isPublic})" style="cursor:pointer;padding:5px 10px;border-radius:6px;font-size:12px">${tk.isPublic?'&#127760; \u00d6ffentlich':'&#128274; Privat'}</button></div>`:''}
     <div class="tkf"><label>Elternticket</label><select onchange="updateTkField('${tk.id}','parentTicketId',this.value||null)"><option value="">\u2014</option>${(() => {
-      const active = S.tickets.filter(t=>t.id!==tk.id && !t.parentTicketId && !t.isDeleted && t.status!=='closed').map(t=>`<option value="${t.id}"${tk.parentTicketId===t.id?' selected':''}>${t.number}: ${t.title.slice(0,25)}</option>`).join('');
-      const closed = S.tickets.filter(t=>t.id!==tk.id && !t.parentTicketId && !t.isDeleted && t.status==='closed').map(t=>`<option value="${t.id}"${tk.parentTicketId===t.id?' selected':''}>${t.number}: ${t.title.slice(0,25)}</option>`).join('');
-      return active + (closed ? `<optgroup label="Abgeschlossen">${closed}</optgroup>` : '');
+      const active = S.tickets.filter(t=>t.id!==tk.id && !t.parentTicketId && !t.isDeleted && !isTkClosed(t)).map(t=>`<option value="${t.id}"${tk.parentTicketId===t.id?' selected':''}>${t.number}: ${t.title.slice(0,25)}</option>`).join('');
+      const closed = S.tickets.filter(t=>t.id!==tk.id && !t.parentTicketId && !t.isDeleted && isTkClosed(t)).map(t=>`<option value="${t.id}"${tk.parentTicketId===t.id?' selected':''}>${t.number}: ${t.title.slice(0,25)}</option>`).join('');
+      return active + (closed ? `<optgroup label="Abgeschlossen/Storniert">${closed}</optgroup>` : '');
     })()}</select></div>
     <div class="tkf"><label>&#128197; F\u00e4lligkeit</label><input type="date" value="${tk.dueDate||''}" onchange="updateTkField('${tk.id}','dueDate',this.value||null)" style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:var(--r);background:var(--sf);color:var(--tx);width:100%;box-sizing:border-box"></div>
     <div class="tkf"><label>&#128100; Einmelder</label><input type="text" value="${esc(tk.reporter||'')}" placeholder="optional" onchange="updateTkField('${tk.id}','reporter',this.value.trim())" style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:var(--r);background:var(--sf);color:var(--tx);width:100%;box-sizing:border-box"></div>`
@@ -2287,7 +2300,7 @@ function renderTkDetail(){
     ${par?`<div class="tkf"><label>Elternticket</label><div class="subi" onclick="S.currentTicketId='${par.id}';renderTkDetail()" style="margin-top:4px"><span style="font-family:monospace;font-size:11px">${par.number}</span><span style="font-size:12px;flex:1">${par.title.slice(0,22)}</span></div></div>`:''}
     ${canEdit?`<div class="tkdiv"></div>
     <button class="btn-s" style="width:100%;justify-content:center;font-size:12px" onclick="openAttachCl('${tk.id}')">&#9745;&#65039; Checkliste anh\u00e4ngen</button>
-    ${tk.status!=='closed'?`<button class="btn-ok" style="width:100%;justify-content:center;margin-top:4px" onclick="updateTkField('${tk.id}','status','closed')">\u2713 Abschlie\u00dfen</button>`:''}`:''}`;
+    ${!isTkClosed(tk)?`<button class="btn-ok" style="width:100%;justify-content:center;margin-top:4px" onclick="updateTkField('${tk.id}','status','closed')">\u2713 Abschlie\u00dfen</button>`:''}`:''}`;
   // KI-Ergebnisse bekommen eine eigene, breitere Spalte links im Fenster
   // statt unter der Beschreibung eingebettet zu sein \u2014 Fenster wird daf\u00fcr
   // automatisch breiter (siehe .modal.xl.wide-ai).
@@ -2336,16 +2349,17 @@ async function addNote(tkId){
   const isClosing=kind==='closing';
   const isCancel=kind==='cancel';
   if(isClosing&&!confirm('Ticket nach dem Senden dieser Abschlussnachricht als abgeschlossen markieren?'))return;
-  if(isCancel&&!confirm('Ticket nach dem Senden dieser Stornierungsnachricht als storniert schlie\u00dfen?'))return;
+  if(isCancel&&!confirm('Ticket nach dem Senden dieser Stornierungsnachricht als storniert markieren?'))return;
   const todoStatus=kind==='open'?'open':kind==='closing'?'closing':kind==='cancel'?'cancel':undefined;
   try{
     await api('POST','/tickets/'+tkId+'/notes',{text:inp.value.trim(),todoStatus});
-    if(isClosing||isCancel)await api('PUT','/tickets/'+tkId,{status:'closed'});
+    if(isClosing)await api('PUT','/tickets/'+tkId,{status:'closed'});
+    if(isCancel)await api('PUT','/tickets/'+tkId,{status:'cancelled'});
     inp.value='';if(todoSel)todoSel.value='';if(S._tkNoteDraft)delete S._tkNoteDraft[tkId];
     await fetchData();renderTkDetail();
     // Liste im Hintergrund (unter dem Detail-Modal) sonst veraltet, bis Seite
     // neu geladen wird \u2014 Ticket verschwindet erst nach Reload aus "Offen".
-    if(S.view==='tickets'||S.view==='tickets_closed'||S.view==='tickets_deleted')renderTickets();
+    if(S.view==='tickets'||S.view==='tickets_closed'||S.view==='tickets_cancelled'||S.view==='tickets_deleted')renderTickets();
     if(isClosing)toast('\u2705 Ticket abgeschlossen');
     else if(isCancel)toast('\ud83d\udeab Ticket storniert');
   }catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
@@ -2728,7 +2742,7 @@ const RIGHTS_NAV_TABS=[
   {key:'schedule',label:'Dienstplan (Kalender)'},{key:'allw',label:'Zulagendienste'},{key:'homeoffice',label:'Homeoffice'},{key:'vacation',label:'Urlaubs\u00fcbersicht'},
   {key:'diensttausch',label:'Diensttausch'},{key:'abrechnung',label:'Abrechnung'},{key:'dienstplaene',label:'Dienstpl\u00e4ne'},
   {key:'zahnarzt',label:'Dienstplan Zahn\u00e4rzte'},{key:'platz',label:'Platz\u00fcbersicht'},{key:'links',label:'Links'},
-  {key:'tickets',label:'Tickets: Offene'},{key:'tickets_closed',label:'Tickets: Abgeschlossene'},{key:'tickets_deleted',label:'Tickets: Gel\u00f6schte'},{key:'checklists',label:'Checklisten'},
+  {key:'tickets',label:'Tickets: Offene'},{key:'tickets_closed',label:'Tickets: Abgeschlossene'},{key:'tickets_cancelled',label:'Tickets: Stornierte'},{key:'tickets_deleted',label:'Tickets: Gel\u00f6schte'},{key:'checklists',label:'Checklisten'},
   {key:'dp',label:'Dienstplanung: Planerstellung'},{key:'dp-config',label:'Dienstplanung: Konfiguration'},{key:'dp-christmas',label:'Dienstplanung: Weihnachtsdienst'},{key:'dp-mine',label:'Dienstplanung: Mein Dienstplan'},
   {key:'messages',label:'Nachrichten: Eingang'},{key:'messages_sent',label:'Nachrichten: Gesendet'},{key:'news',label:'News'},{key:'statistik',label:'Statistik'},
   {key:'spint',label:'Spindvergabe'},{key:'chat',label:'Chat'},
@@ -3175,7 +3189,7 @@ async function silentRefresh(){
       const newMsgCount=(data.messages||[]).filter(m=>!m.isRead&&m.senderId!==S.currentUser).length;
       const myD=S.tp?.myDepts||[];
       const newTkCount=(data.tickets||[]).filter(tk=>{
-        if(tk.status==='closed')return false;
+        if(isTkClosed(tk))return false;
         if(tk.assigneeId===S.currentUser)return true;
         if(myD.includes(tk.department))return true;
         if(tk.department==='frei')return myD.length>0||S.tp?.seeAll;
@@ -3206,7 +3220,7 @@ async function silentRefresh(){
       if((S._chatWindows||[]).length)renderChatWindows();
       if(S.view==='home')renderHome();
       else if(S.view==='messages'||S.view==='messages_sent')renderMessages();
-      else if(S.view==='tickets'||S.view==='tickets_closed'||S.view==='tickets_deleted')renderTickets();
+      else if(S.view==='tickets'||S.view==='tickets_closed'||S.view==='tickets_cancelled'||S.view==='tickets_deleted')renderTickets();
       else if(S.view==='platz')renderPlatz();
       else if(S.view==='links')renderLinks();
       else if(S.view==='docs')renderDocs();
@@ -3224,7 +3238,7 @@ async function silentRefresh(){
 function startAutoRefresh(){
   if(_refreshTimer)clearInterval(_refreshTimer);
   _lastMsgCount=S.messages.filter(m=>!m.isRead&&m.senderId!==S.currentUser).length;
-  _lastTkCount=S.tickets.filter(tk=>tk.status!=='closed'&&((S.tp.myDepts.includes(tk.department)&&!tk.assigneeId)||tk.assigneeId===S.currentUser)).length;
+  _lastTkCount=S.tickets.filter(tk=>!isTkClosed(tk)&&((S.tp.myDepts.includes(tk.department)&&!tk.assigneeId)||tk.assigneeId===S.currentUser)).length;
   _refreshTimer=setInterval(silentRefresh,30000);
 }
 // Eigener, deutlich schnellerer Poller NUR für Chat (leichter Endpoint,
@@ -3420,13 +3434,13 @@ async function deleteSubcat(id){
 function renderStatsPanel(){
   const el=document.getElementById('statsPanel');if(!el)return;
   const tks=S.tickets;
-  const open=tks.filter(t=>t.status!=='closed');
+  const open=tks.filter(t=>!isTkClosed(t));
   const closed=tks.filter(t=>t.status==='closed');
   const today=new Date();today.setHours(0,0,0,0);
   const overdue=open.filter(t=>t.dueDate&&new Date(t.dueDate)<today);
   // Count by dept
   const byDept={};DEPTS.forEach(d=>{byDept[d]={open:0,closed:0};});
-  tks.forEach(t=>{if(byDept[t.department]){if(t.status==='closed')byDept[t.department].closed++;else byDept[t.department].open++;}});
+  tks.forEach(t=>{if(byDept[t.department]){if(isTkClosed(t))byDept[t.department].closed++;else byDept[t.department].open++;}});
   // Count by prio
   const byPrio={high:0,medium:0,low:0};open.forEach(t=>{if(byPrio[t.priority]!==undefined)byPrio[t.priority]++;});
   // Count by status
@@ -3446,7 +3460,7 @@ function renderStatsPanel(){
   const prioData=[{key:'high',label:'Hoch',value:byPrio.high},{key:'medium',label:'Mittel',value:byPrio.medium},{key:'low',label:'Gering',value:byPrio.low}];
   const prioColors={high:'#ef4444',medium:'#f59e0b',low:'#10b981'};
   const stData=STATUSES.map(s=>({key:s.id,label:s.label,value:byStatus[s.id]||0}));
-  const stColors={open:'#3b6dd4',in_progress:'#f59e0b',on_hold:'#8b5cf6',closed:'#10b981'};
+  const stColors={open:'#3b6dd4',in_progress:'#f59e0b',on_hold:'#8b5cf6',closed:'#10b981',cancelled:'#64748b'};
   el.innerHTML=`
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
       <div style="padding:14px;background:var(--sf);border:1px solid var(--border);border-radius:var(--r);text-align:center">
@@ -3462,7 +3476,7 @@ function renderStatsPanel(){
         <div style="font-size:11px;color:var(--mu)">Überfällig</div>
       </div>
       <div style="padding:14px;background:var(--sf);border:1px solid var(--border);border-radius:var(--r);text-align:center">
-        <div style="font-size:32px;font-weight:800;color:#8b5cf6">${tks.filter(t=>!t.assigneeId&&t.status!=='closed').length}</div>
+        <div style="font-size:32px;font-weight:800;color:#8b5cf6">${tks.filter(t=>!t.assigneeId&&!isTkClosed(t)).length}</div>
         <div style="font-size:11px;color:var(--mu)">Ohne Zuständigen</div>
       </div>
     </div>
@@ -3941,7 +3955,7 @@ async function setSnooze(tkId){
   catch(e){toast('⚠️ '+e.message,'err');}
 }
 const snoozeBdg=tk=>{
-  if(!tk.snoozedUntil||tk.status==='closed')return'';
+  if(!tk.snoozedUntil||isTkClosed(tk))return'';
   const today=new Date();today.setHours(0,0,0,0);
   const d=new Date(tk.snoozedUntil);d.setHours(0,0,0,0);
   if(d>today)return`<span class="bdg" style="background:#f0f9ff;color:#0284c7;border:1px solid #7dd3fc">💤 bis ${d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}</span>`;
@@ -4045,7 +4059,7 @@ function renderGSearch(){
   const results=[];
   // Tickets
   S.tickets.filter(t=>(t.title+' '+t.number+' '+(t.description||'')).toLowerCase().includes(q)).slice(0,6).forEach(t=>{
-    const overdue=t.dueDate&&t.status!=='closed'&&new Date(t.dueDate)<new Date();
+    const overdue=t.dueDate&&!isTkClosed(t)&&new Date(t.dueDate)<new Date();
     results.push({type:'ticket',icon:'🎫',label:t.number+': '+t.title,sub:(DEPT_LABELS[t.department]||t.department)+' · '+STATUSES.find(s=>s.id===t.status)?.label+(overdue?' · ⚠️ Überfällig':''),action:()=>openTkDetail(t.id),accent:'#3b6dd4'});
   });
   // Nachrichten
@@ -4298,7 +4312,7 @@ async function renderStatistik(){
     }
     if(tk.assignee_id&&userStats[tk.assignee_id]){
       userStats[tk.assignee_id].assigned++;
-      if(tk.status==='closed'){
+      if(isTkClosed(tk)){
         userStats[tk.assignee_id].closed++;
         const d=tk.department||'—';
         userStats[tk.assignee_id].closedByDept[d]=(userStats[tk.assignee_id].closedByDept[d]||0)+1;
@@ -4307,7 +4321,7 @@ async function renderStatistik(){
   });
   // Dept stats
   const deptStats={};
-  tickets.forEach(tk=>{const d=tk.department||'—';if(!deptStats[d])deptStats[d]={total:0,open:0,closed:0};deptStats[d].total++;if(tk.status==='closed')deptStats[d].closed++;else deptStats[d].open++;});
+  tickets.forEach(tk=>{const d=tk.department||'—';if(!deptStats[d])deptStats[d]={total:0,open:0,closed:0};deptStats[d].total++;if(isTkClosed(tk))deptStats[d].closed++;else deptStats[d].open++;});
   const maxBar=Math.max(...Object.values(deptStats).map(d=>d.total),1);
   function bar(val,max,color='var(--acc)'){const w=Math.round(val/max*100);return`<div style="display:flex;align-items:center;gap:6px"><div style="flex:1;background:var(--sf3);border-radius:3px;height:8px"><div style="width:${w}%;background:${color};height:8px;border-radius:3px;transition:.3s"></div></div><span style="font-size:11px;font-weight:600;min-width:24px;text-align:right">${val}</span></div>`;}
   document.getElementById('main').innerHTML=`
