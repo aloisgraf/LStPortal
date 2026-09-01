@@ -5393,7 +5393,7 @@ function renderMeetings() {
           </div>
           ${activeThemen.length?`<div style="margin-top:5px;display:flex;flex-direction:column;gap:2px">
             ${activeThemen.map(i=>`<div style="font-size:11px;color:var(--mu);display:flex;align-items:center;gap:4px">
-              <span style="flex-shrink:0">${i.kind==='protocol'?'📝':'📋'}</span>
+              <span style="flex-shrink:0">${i.kind==='protocol'?'📖':'📋'}</span>
               <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(i.title||'Thema')}</span>
               <span style="flex-shrink:0">${i.date?fmtDate(i.date):'offen'}</span>
             </div>`).join('')}
@@ -5413,13 +5413,21 @@ function meetingInstTabHtml(m, i, canManage) {
   const open=(i.items||[]).filter(it=>it.status==='open'||it.status==='redo').length;
   const statusColor={planned:'#3b82f6',done:'#10b981',cancelled:'#ef4444'}[i.status]||'#64748b';
   const titleLine=i.title?esc(i.title):'Thema';
+  const isProtocol = i.kind==='protocol';
+  // Bei Protokoll-Themen liegen Datum/Uhrzeit bei den einzelnen Protokollen,
+  // nicht am Thema selbst — "Datum offen" und der Status "Geplant" wären hier
+  // immer (und damit bedeutungslos) zu sehen. Nur ein tatsächlicher Endstatus
+  // (Abgeschlossen/Abgesagt) ist bei Protokoll-Themen relevant genug zum Zeigen.
+  const showDate = !isProtocol && i.date;
+  const showDateOpen = !isProtocol && !i.date;
+  const showStatus = !isProtocol || i.status!=='planned';
   return`<div class="meetings-inst-tab${S._selInstance===i.id?' active':''}" style="position:relative">
     <div onclick="S._selInstance='${i.id}';renderMeetings()" style="cursor:pointer;${canManage?'padding-right:18px':''}">
-      <div style="font-size:12px;font-weight:600">${i.kind==='protocol'?'📝 ':'📋 '}${titleLine}</div>
-      ${i.date?`<div style="font-size:11px;color:var(--mu);margin-top:1px">${fmtDate(i.date)}${i.time?' '+i.time:''}</div>`:''}
+      <div style="font-size:12px;font-weight:600">${isProtocol?'📖 ':'📋 '}${titleLine}</div>
+      ${showDate?`<div style="font-size:11px;color:var(--mu);margin-top:1px">${fmtDate(i.date)}${i.time?' '+i.time:''}</div>`:''}
       <div style="display:flex;gap:4px;margin-top:2px;align-items:center;flex-wrap:wrap">
-        ${!i.date?`<span style="font-size:10px;color:#f59e0b">Datum offen</span>`:''}
-        <span style="font-size:10px;color:${statusColor}">${{planned:'Geplant',done:'Abgeschlossen',cancelled:'Abgesagt'}[i.status]||i.status}</span>
+        ${showDateOpen?`<span style="font-size:10px;color:#f59e0b">Datum offen</span>`:''}
+        ${showStatus?`<span style="font-size:10px;color:${statusColor}">${{planned:'Geplant',done:'Abgeschlossen',cancelled:'Abgesagt'}[i.status]||i.status}</span>`:''}
         ${open>0?`<span style="font-size:10px;color:#92400e;background:#fef3c7;padding:0 4px;border-radius:8px">${open}</span>`:''}
       </div>
     </div>

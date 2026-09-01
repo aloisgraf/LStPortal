@@ -489,9 +489,9 @@ details.dash-card > summary { list-style: none; cursor: pointer; display: flex; 
 .meetings-sidebar{width:260px;min-width:200px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
 .meetings-sidebar-hdr{padding:14px 14px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
 .meetings-list{flex:1;overflow-y:auto;padding:8px}
-.meetings-item{padding:10px 12px;border-radius:8px;cursor:pointer;margin-bottom:4px;transition:background .15s}
+.meetings-item{padding:10px 12px;border-radius:8px;cursor:pointer;margin-bottom:8px;transition:background .15s,border-color .15s;background:var(--sf);border:1px solid var(--border)}
 .meetings-item:hover{background:var(--sf2)}
-.meetings-item.active{background:var(--sf2);border-left:3px solid var(--acc)}
+.meetings-item.active{background:var(--sf2);border-left:3px solid var(--acc);border-color:var(--acc)}
 .meetings-main{flex:1;overflow-y:auto}
 .meetings-inst-tab{padding:8px 14px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .15s}
 .meetings-inst-tab:hover{background:var(--sf2)}
