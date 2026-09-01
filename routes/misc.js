@@ -166,14 +166,14 @@ const isValidUsername = u => /^[a-z0-9._-]{3,40}$/.test(u);
 
 router.post('/users', auth, adminOnly, async (req,res) => {
   try {
-    const {name,initials,roles,color,category,email,username,hireDate,terminationDate,dpRelevant}=req.body;
+    const {name,initials,roles,color,category,email,username,hireDate,terminationDate,dpRelevant,isTestUser}=req.body;
     if (!name?.trim()||!initials?.trim()) return bad(res,'Name und Kürzel erforderlich');
     if (!hireDate) return bad(res,'Eintrittsdatum erforderlich');
     const uname = normalizeUsername(username);
     if (!isValidUsername(uname)) return bad(res,'Benutzername: min. 3 Zeichen, nur Buchstaben/Zahlen/._-');
     const id=newId(), hash=await bcrypt.hash('Passwort1',10);
-    await pool.query('INSERT INTO users (id,name,initials,roles,color,pw_hash,must_change_pw,category,email,username,hire_date,termination_date,dp_relevant) VALUES ($1,$2,$3,$4,$5,$6,true,$7,$8,$9,$10,$11,$12)',
-      [id,name.trim(),initials.trim().toUpperCase(),JSON.stringify(roles||['standard']),color||'#64748b',hash,category||null,email?.trim()||null,uname,hireDate,terminationDate||null,!!dpRelevant]);
+    await pool.query('INSERT INTO users (id,name,initials,roles,color,pw_hash,must_change_pw,category,email,username,hire_date,termination_date,dp_relevant,is_test_user) VALUES ($1,$2,$3,$4,$5,$6,true,$7,$8,$9,$10,$11,$12,$13)',
+      [id,name.trim(),initials.trim().toUpperCase(),JSON.stringify(roles||['standard']),color||'#64748b',hash,category||null,email?.trim()||null,uname,hireDate,terminationDate||null,!!dpRelevant,!!isTestUser]);
     ok(res,{id});
   } catch(e) {
     if (e.code==='23505') return bad(res,'Benutzername bereits vergeben');
@@ -189,7 +189,7 @@ router.put('/users/:id', auth, async (req,res) => {
       await pool.query('UPDATE users SET color=$1 WHERE id=$2',[req.body.color||'#64748b',req.params.id]);
       return ok(res);
     }
-    const {name,initials,roles,color,resetPassword,category,email,username,hireDate,terminationDate,dpRelevant}=req.body;
+    const {name,initials,roles,color,resetPassword,category,email,username,hireDate,terminationDate,dpRelevant,isTestUser}=req.body;
     if (!name?.trim()||!initials?.trim()) return bad(res,'Name und Kürzel erforderlich');
     if (!hireDate) return bad(res,'Eintrittsdatum erforderlich');
     const uname = normalizeUsername(username);
@@ -206,8 +206,8 @@ router.put('/users/:id', auth, async (req,res) => {
           [newId(),req.params.id,req.uid,JSON.stringify(oldRolesArr),JSON.stringify(newRolesArr)]);
       }
     }
-    await pool.query('UPDATE users SET name=$1,initials=$2,roles=$3,color=$4,category=$5,email=$6,username=$7,hire_date=$8,termination_date=$9,dp_relevant=$10 WHERE id=$11',
-      [name.trim(),initials.trim().toUpperCase(),JSON.stringify(newRolesArr),color||'#64748b',category||null,email?.trim()||null,uname,hireDate,terminationDate||null,!!dpRelevant,req.params.id]);
+    await pool.query('UPDATE users SET name=$1,initials=$2,roles=$3,color=$4,category=$5,email=$6,username=$7,hire_date=$8,termination_date=$9,dp_relevant=$10,is_test_user=$11 WHERE id=$12',
+      [name.trim(),initials.trim().toUpperCase(),JSON.stringify(newRolesArr),color||'#64748b',category||null,email?.trim()||null,uname,hireDate,terminationDate||null,!!dpRelevant,!!isTestUser,req.params.id]);
     if (resetPassword) await pool.query('UPDATE users SET pw_hash=$1,must_change_pw=true WHERE id=$2',
       [await bcrypt.hash('Passwort1',10),req.params.id]);
     ok(res);
@@ -233,6 +233,28 @@ router.delete('/users/:id', auth, adminOnly, async (req,res) => {
     if (req.params.id===req.uid) return bad(res,'Eigenen Account nicht löschbar');
     await pool.query('DELETE FROM users WHERE id=$1',[req.params.id]); ok(res);
   } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+// ── "ANSICHT ALS" (Testuser-Impersonation) ──────────────────────────────────
+// Nur echte Admins dürfen starten, und nur auf Konten, die explizit als
+// Testuser markiert sind (req.realIsAdmin statt req.p.manageUsers, damit
+// dieses Recht während einer bereits laufenden Ansicht-als-Sitzung immer an
+// der tatsächlichen Person hängt, nicht am gerade angezeigten Testuser).
+router.post('/impersonate/start', auth, async (req,res) => {
+  try {
+    if (!req.realIsAdmin) return bad(res,'Keine Berechtigung',403);
+    const { userId } = req.body;
+    if (!userId) return bad(res,'userId erforderlich');
+    const target = await getUser(userId);
+    if (!target) return bad(res,'Benutzer nicht gefunden',404);
+    if (!target.is_test_user) return bad(res,'Nur als Testuser markierte Benutzer können ausgewählt werden');
+    req.session.viewAsUserId = userId;
+    ok(res,{id:target.id,name:target.name});
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+router.post('/impersonate/stop', auth, async (req,res) => {
+  delete req.session.viewAsUserId;
+  ok(res);
 });
 
 // ── DIENSTPLAENE ──────────────────────────────────────────────────────────────

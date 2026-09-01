@@ -11,7 +11,7 @@ router.get('/', auth, async (req,res) => {
     const canManageSpint = roles.some(r=>['admin','leitung','technik'].includes(r));
     const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
            tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw,dpQualificationsRaw,dpShiftPrefsRaw,dpProtocolRaw,todosRaw,todoItemsRaw,todoAssigneesRaw,myDpPlanIdsRaw,todoNotificationsRaw,contactsRaw,sopTemplatesRaw,sopItemsRaw,sopRunsRaw,sopRunItemsRaw,lockersRaw,sopBranchOptionsRaw,departmentsRaw,lockerCategoriesRaw,chatThreadsRaw,chatMessagesRaw,chatReadsRaw,protocolsRaw,todoNotesRaw] = await Promise.all([
-      q('SELECT id,name,initials,roles,color,must_change_pw,last_seen,category,email,username,hire_date,termination_date,dp_relevant FROM users ORDER BY name'),
+      q('SELECT id,name,initials,roles,color,must_change_pw,last_seen,category,email,username,hire_date,termination_date,dp_relevant,is_test_user FROM users ORDER BY name'),
       q('SELECT * FROM categories ORDER BY sort_order,label'),
       q('SELECT * FROM tags ORDER BY label'),
       // Alle Events werden für JEDEN Nutzer geladen — die Sichtbarkeits-/
@@ -147,8 +147,19 @@ router.get('/', auth, async (req,res) => {
     const dtSeenSet = new Set(dtReadsRaw.map(r=>r.diensttausch_id));
     const myNameForDt = (usersRaw.find(u=>u.id===uid)?.name||'').toLowerCase();
     const todoNotifSet = new Set((todoNotificationsRaw||[]).map(n=>n.item_id));
+    // "Ansicht als": realIsAdmin bleibt an der tatsächlichen Person hängen
+    // (nicht an einer evtl. gerade angezeigten Testuser-Ansicht), damit der
+    // Steuer-Button/Banner im Frontend immer korrekt ein-/ausblendet.
+    const impersonation = {
+      realIsAdmin: !!req.realIsAdmin,
+      viewingAs: req.session.viewAsUserId ? { id: uid, name: req.user.name } : null,
+      testUsers: req.realIsAdmin
+        ? usersRaw.filter(u=>u.is_test_user).map(u=>({ id: u.id, name: u.name }))
+        : [],
+    };
     ok(res, {
       currentUser: uid,
+      impersonation,
       permissions: {
         canApproveEvents:p.canApproveEvents, canSendMessages:p.canSendMessages,
         seeAllEntries:true, editAllPersonal:p.editAllPersonal,
@@ -172,6 +183,7 @@ router.get('/', auth, async (req,res) => {
         // KEIN gespeichertes Flag, damit es überall im Portal einheitlich ist.
         isActive: isUserActive(u),
         dpRelevant: !!u.dp_relevant,
+        isTestUser: !!u.is_test_user,
       })),
       categories: cats,
       tags: tagsRaw,

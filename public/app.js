@@ -178,7 +178,9 @@ async function fetchData(){
       canSeeSubcat:has('admin','leitung','schichtleiter','qm'),
       canEditSubcat:has('admin','leitung','schichtleiter','qm'),
       roles};
+    S.imp=data.impersonation||{realIsAdmin:false,viewingAs:null,testUsers:[]};
     updateBadges();
+    renderViewAsUi();
   }finally{loading(false);}
 }
 const getU=id=>S.users.find(u=>u.id===id);
@@ -2992,6 +2994,7 @@ function openUF(id){
   // Dienstplan-Einstellungen: eingebettet statt eigener Admin-Bereich, damit
   // die Benutzerverwaltung alles an einem Ort hat.
   document.getElementById('ufDpRelevant').checked=!!u?.dpRelevant;
+  document.getElementById('ufIsTestUser').checked=!!u?.isTestUser;
   const dpSection=document.getElementById('ufDpSection');
   dpSection.style.display=u?.dpRelevant?'':'none';
   if(u?.dpRelevant)renderUfDpParamsSection(u.id);
@@ -3048,9 +3051,10 @@ async function saveUser(){
   if(!roles.length){errEl.textContent='\u26A0\uFE0F Mindestens eine Rolle!';return;}
   const id=document.getElementById('ufId').value;loading(true);
   const dpRelevant=document.getElementById('ufDpRelevant')?document.getElementById('ufDpRelevant').checked:false;
+  const isTestUser=document.getElementById('ufIsTestUser')?document.getElementById('ufIsTestUser').checked:false;
   try{
-    if(id)await api('PUT','/users/'+id,{name,initials,roles,color:S.ufColor,resetPassword:document.getElementById('ufPWRst').checked,category,email,username,hireDate,terminationDate,dpRelevant});
-    else await api('POST','/users',{name,initials,roles,color:S.ufColor,category,email,username,hireDate,terminationDate,dpRelevant});
+    if(id)await api('PUT','/users/'+id,{name,initials,roles,color:S.ufColor,resetPassword:document.getElementById('ufPWRst').checked,category,email,username,hireDate,terminationDate,dpRelevant,isTestUser});
+    else await api('POST','/users',{name,initials,roles,color:S.ufColor,category,email,username,hireDate,terminationDate,dpRelevant,isTestUser});
     await fetchData();backToAdmin('users');toast('\u2705 Benutzer gespeichert!');
   }catch(e){errEl.textContent='\u26A0\uFE0F '+e.message;}finally{loading(false);}
 }
@@ -3061,6 +3065,45 @@ async function delCat(id){if(!confirm('Kategorie l\u00f6schen?'))return;loading(
 function openTF(id){const t=id?getTag(id):null;document.getElementById('tfT').textContent=t?'Tag bearbeiten':'Tag anlegen';document.getElementById('tfId').value=t?.id||'';document.getElementById('tfLb').value=t?.label||'';document.getElementById('tfErr').textContent='';S.tfColor=t?.color||pal()[0];buildCP('tfCR',S.tfColor,'pickT');closeModal('admOv');openModal('tfOv');}
 async function saveTag(){const label=document.getElementById('tfLb').value.trim();const errEl=document.getElementById('tfErr');errEl.textContent='';if(!label){errEl.textContent='\u26A0\uFE0F Bezeichnung erforderlich!';return;}const id=document.getElementById('tfId').value;loading(true);try{if(id)await api('PUT','/tags/'+id,{label,color:S.tfColor});else await api('POST','/tags',{label,color:S.tfColor});await fetchData();backToAdmin('tags');toast('\u2705 Gespeichert!');}catch(e){errEl.textContent='\u26A0\uFE0F '+e.message;}finally{loading(false);}}
 async function delTag(id){if(!confirm('Tag l\u00f6schen?'))return;loading(true);try{await api('DELETE','/tags/'+id);await fetchData();backToAdmin('tags');}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}finally{loading(false);}}
+// \u2500\u2500 "ANSICHT ALS" (Testuser-Impersonation) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// S.imp.realIsAdmin bezieht sich immer auf die tats\u00E4chlich angemeldete Person
+// (nicht auf den evtl. gerade angezeigten Testuser) \u2014 Button/Banner richten
+// sich danach, damit man w\u00E4hrend einer laufenden Ansicht jederzeit sauber
+// wieder zur eigenen Sicht zur\u00FCckkann.
+function renderViewAsUi(){
+  const btn=document.getElementById('viewAsBtn');
+  if(btn)btn.style.display=S.imp?.realIsAdmin?'':'none';
+  const banner=document.getElementById('viewAsBanner');
+  if(!banner)return;
+  if(S.imp?.viewingAs){
+    banner.style.display='flex';
+    document.getElementById('viewAsBannerName').textContent=S.imp.viewingAs.name;
+  } else {
+    banner.style.display='none';
+  }
+}
+function openViewAsMenu(){
+  const sel=document.getElementById('viewAsSelect');
+  const testUsers=S.imp?.testUsers||[];
+  if(!testUsers.length){toast('\u26A0\uFE0F Noch keine Testuser angelegt \u2014 im Benutzer-Formular als "Testuser" markieren','err');return;}
+  sel.innerHTML=testUsers.slice().sort((a,b)=>a.name.localeCompare(b.name,'de')).map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('');
+  openModal('viewAsOv');
+}
+async function startImpersonation(){
+  const userId=document.getElementById('viewAsSelect').value;
+  if(!userId)return;
+  try{
+    await api('POST','/impersonate/start',{userId});
+    closeModal('viewAsOv');
+    location.reload();
+  }catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
+}
+async function stopImpersonation(){
+  try{
+    await api('POST','/impersonate/stop');
+    location.reload();
+  }catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
+}
 // UTILS
 function toggleTheme(){
   // Falls gerade der JARVIS-Modus aktiv ist, diesen erst sauber verlassen
@@ -3148,7 +3191,7 @@ function openModal(id){document.getElementById(id)?.classList.add('open');}
 function closeModal(id){document.getElementById(id)?.classList.remove('open');}
 function eyeToggle(inputId,btn){const inp=document.getElementById(inputId);const show=inp.type==='password';inp.type=show?'text':'password';btn.textContent=show?'\uD83D\uDE48':'\uD83D\uDC41';}
 function toast(msg,type='',dur=3200){const t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),dur);}
-const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOr','clFormOv','attachClOv','changelogOv','dpOv','rejectEinspOv','helpOv','msgFormOv','msgDetOv','gSearchOv','stLoginOv','docFormOv','docVerOv','docHistOv','docCatOv','dpReportModal','deptOv','spintCatOv','spintCatFormOv','aiSuggestOv','protoFormOv'];
+const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOr','clFormOv','attachClOv','changelogOv','dpOv','rejectEinspOv','helpOv','msgFormOv','msgDetOv','gSearchOv','stLoginOv','docFormOv','docVerOv','docHistOv','docCatOv','dpReportModal','deptOv','spintCatOv','spintCatFormOv','aiSuggestOv','protoFormOv','viewAsOv'];
 document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();openGSearch();return;}
   if(e.key==='Escape'){ALL_MODALS.forEach(closeModal);closeGSearch();}
@@ -5134,11 +5177,20 @@ function renderSpint(){
   const assignedUser=lockers.filter(l=>l.assigneeType==='user').length;
   const assignedGeneral=lockers.filter(l=>l.assigneeType==='general').length;
   const free=lockers.filter(l=>l.assigneeType==='none').length;
+  // Beim Übergang zu einer neuen Kategorie (bzw. von/zu den freien Spinden
+  // ganz vorne) einen kleinen Abstand einfügen, damit Gruppenwechsel auf
+  // einen Blick erkennbar sind.
+  const groupKey=l=>l.assigneeType==='none'?'__free__':(l.categoryId||'__none__');
+  let _prevGroupKey=null;
   const row=l=>{
     const label=l.assigneeType==='user'?('👤 '+esc(getU(l.assigneeUserId)?lastNameFirst(getU(l.assigneeUserId).name):'Unbekannt'))
       :l.assigneeType==='general'?('🏷️ '+esc(l.assigneeLabel||'—'))
       :'<span style="color:var(--di)">— frei —</span>';
-    return '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid var(--border)">'
+    const gk=groupKey(l);
+    const newGroup=_prevGroupKey!==null&&gk!==_prevGroupKey;
+    _prevGroupKey=gk;
+    return (newGroup?'<div style="height:14px"></div>':'')
+      +'<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid var(--border)">'
       +'<div style="font-weight:700;font-size:13px;min-width:70px;flex-shrink:0">'+esc(l.number)+'</div>'
       +'<div style="min-width:130px;flex-shrink:0">'+(l.categoryId?'<span class="bdg" style="font-size:11px">'+esc(lockerCatLabel(l.categoryId))+'</span>':'')+'</div>'
       +'<div style="flex:1;min-width:0;font-size:13px">'+label+(l.note?'<div style="font-size:11px;color:var(--mu);margin-top:2px">'+esc(l.note)+'</div>':'')+'</div>'

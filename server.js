@@ -273,6 +273,10 @@ async function initDB() {
     // versioniert (die eigentlichen Dienstplan-Werte in dp_employee_params
     // sind es bereits über valid_from).
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS dp_relevant BOOLEAN DEFAULT false`,
+    // "Testuser": nur als solche markierte Konten können per "Ansicht als"
+    // (Admin-Funktion) angesehen werden — echte Mitarbeiterkonten sind davon
+    // bewusst ausgeschlossen (siehe middleware.js auth()).
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_test_user BOOLEAN DEFAULT false`,
     // Nachvollziehbarkeit von Rechte-Änderungen (nicht rückwirkend wirksam,
     // reines Audit-Log — die aktuelle Zugriffskontrolle liest immer
     // users.roles live).
