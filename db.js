@@ -146,15 +146,17 @@ async function getTP(uid, userObj=null) {
 // Sichtbarkeit: Ersteller, zugewiesener Bearbeiter und explizit hinzugefügte
 // Teilnehmer (participants) sehen ihr Ticket IMMER, unabhängig von
 // Sichtbarkeit/Fachbereich. Für alle anderen User desselben Fachbereichs-
-// Rechts gilt: nur ÖFFENTLICHE Tickets sind sichtbar. Ein Ticket OHNE
-// zugewiesenen Bearbeiter gilt automatisch als öffentlich (es gibt sonst
-// niemanden, der es exklusiv bearbeiten könnte).
+// Rechts gilt: nur ÖFFENTLICHE Tickets sind sichtbar — das Flag wird immer
+// respektiert (auch ohne zugewiesenen Bearbeiter bleibt ein als "privat"
+// markiertes Ticket privat). Neu angelegte Tickets sind daher standardmäßig
+// öffentlich (siehe routes/tickets.js POST /), damit unzugewiesene Tickets
+// im Fachbereich wie gewohnt sichtbar/übernehmbar bleiben — "privat" muss
+// dafür jetzt aktiv gewählt werden statt implizit ignoriert zu werden.
 const canSeeTk = (tp,tk,uid) => {
   if(tp.seeAll || tk.created_by===uid || tk.assignee_id===uid || tk.department==='frei') return true;
   try { if (JSON.parse(tk.mentioned_users||'[]').includes(uid)) return true; } catch {}
   try { if (JSON.parse(tk.participants||'[]').includes(uid)) return true; } catch {}
-  const isPublic = !!tk.is_public || !tk.assignee_id;
-  if(!isPublic) return false;
+  if(!tk.is_public) return false;
   if(tp.myDepts.includes(tk.department)) return true;
   if(tk.subcategory && tp.canSeeSubcat) return true;
   return false;

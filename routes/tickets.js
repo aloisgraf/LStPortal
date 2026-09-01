@@ -25,8 +25,13 @@ router.post('/', auth, async (req,res) => {
     }
     const id=newId(), number=await nextTicketNumber();
     const subcat = subcategory||'';
-    await pool.query('INSERT INTO tickets (id,number,title,description,department,subcategory,tags,priority,status,bucket,assignee_id,parent_ticket_id,created_by,due_date,reporter) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)',
-      [id,number,title.trim(),description||'',department||'technik',subcat,JSON.stringify(tags||[]),priority||'medium',status||'open',bucket||'',assigneeId||null,parentTicketId||null,req.uid,dueDate||null,(reporter||'').trim()]);
+    // Standardmäßig öffentlich (auch ohne Zuständigen im eigenen Fachbereich
+    // sichtbar/übernehmbar) — nur wenn explizit "privat" gewählt wird, bleibt
+    // das Ticket privat (siehe canSeeTk in db.js, das dieses Flag konsequent
+    // respektiert statt es bei fehlendem Zuständigen zu überschreiben).
+    const isPublic = req.body.isPublic!==undefined ? !!req.body.isPublic : true;
+    await pool.query('INSERT INTO tickets (id,number,title,description,department,subcategory,tags,priority,status,bucket,assignee_id,parent_ticket_id,created_by,due_date,reporter,is_public) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)',
+      [id,number,title.trim(),description||'',department||'technik',subcat,JSON.stringify(tags||[]),priority||'medium',status||'open',bucket||'',assigneeId||null,parentTicketId||null,req.uid,dueDate||null,(reporter||'').trim(),isPublic]);
     const uname = (await getUser(req.uid))?.name||'?';
     await auditNote(id,req.uid,`✅ Ticket erstellt von ${uname}${subcat?' ['+subcat+']':''}`);
     const deptUsers = await q('SELECT id FROM users WHERE roles @> $1::jsonb AND id != $2',
@@ -258,7 +263,9 @@ router.post('/:id/notes', auth, async (req,res) => {
 });
 
 // Freigabe erteilen: nur die im "Zur Freigabe"-Eintrag markierte Person (oder
-// ein Admin) darf das gesperrte Ticket wieder entsperren.
+// ein Admin) darf freigeben. Wird als regulärer (nicht nur Audit-)Eintrag
+// protokolliert, damit "Freigegeben von …" auch in der normalen Konversation
+// sichtbar bleibt, nicht nur in der Historie.
 router.post('/:id/approve', auth, async (req,res) => {
   try {
     const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
@@ -267,7 +274,26 @@ router.post('/:id/approve', auth, async (req,res) => {
     if (tk.approval_user_id!==req.uid && !req.p.manageUsers) return bad(res,'Nur die angefragte Person kann freigeben',403);
     await pool.query('UPDATE tickets SET locked_for_approval=false,approval_user_id=NULL,approval_requested_by=NULL,approval_requested_at=NULL,updated_at=NOW() WHERE id=$1',[req.params.id]);
     const uname=(await getUser(req.uid))?.name||'?';
-    await auditNote(tk.id,req.uid,`✅ Ticket freigegeben von ${uname}`);
+    await pool.query('INSERT INTO ticket_notes (id,ticket_id,text,author_id,note_type,todo_status) VALUES ($1,$2,$3,$4,$5,$6)',
+      [newId(),tk.id,`✅ Freigegeben von ${uname}`,req.uid,'note','approved']);
+    ok(res);
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+// Freigabe-Anfrage zurückziehen: nur die Person, die die Freigabe angefordert
+// hat (oder ein Admin), kann die Sperre ohne tatsächliche Freigabe wieder
+// aufheben — im Unterschied zu /approve, das nur die angefragte Person selbst
+// auslösen darf.
+router.post('/:id/withdraw-approval', auth, async (req,res) => {
+  try {
+    const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
+    if (!tk) return bad(res,'Nicht gefunden',404);
+    if (!tk.locked_for_approval) return bad(res,'Ticket ist nicht zur Freigabe gesperrt');
+    if (tk.approval_requested_by!==req.uid && !req.p.manageUsers) return bad(res,'Nur die anfordernde Person kann die Anfrage zurückziehen',403);
+    await pool.query('UPDATE tickets SET locked_for_approval=false,approval_user_id=NULL,approval_requested_by=NULL,approval_requested_at=NULL,updated_at=NOW() WHERE id=$1',[req.params.id]);
+    const uname=(await getUser(req.uid))?.name||'?';
+    await pool.query('INSERT INTO ticket_notes (id,ticket_id,text,author_id,note_type,todo_status) VALUES ($1,$2,$3,$4,$5,$6)',
+      [newId(),tk.id,`🔓 Freigabe-Anfrage zurückgezogen von ${uname}`,req.uid,'note','approval_withdrawn']);
     ok(res);
   } catch(e) { bad(res,'Serverfehler',500); }
 });

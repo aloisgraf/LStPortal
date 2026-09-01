@@ -401,6 +401,9 @@
         <div id="tkFParHint" style="display:none;font-size:11px;color:var(--mu);margin-top:3px">&#8505;&#65039; Fachbereich wird vom Elternticket &#252;bernommen.</div></div>
       <div class="fr">
         <div class="fg"><label>&#128197; F&#228;lligkeit</label><input type="date" id="tkFDue"></div>
+        <div class="fg" id="tkFVisWrap" style="display:none"><label>Sichtbarkeit</label>
+          <button type="button" class="bdg" id="tkFVisBtn" onclick="toggleTkFormVisibility()" style="cursor:pointer;padding:5px 10px;border-radius:6px;font-size:12px"></button>
+        </div>
       </div>
     </div>
     <div class="mf"><button class="btn-s" onclick="closeModal('tkFormOv')">Abbrechen</button><button class="btn-s" onclick="saveTicket(true)">&#129302; Speichern mit KI-Suche</button><button class="btn-p" onclick="saveTicket()">&#128190; Speichern</button></div>

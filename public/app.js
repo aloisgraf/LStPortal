@@ -2077,13 +2077,15 @@ function _renderFeed(notes,tkId,canEdit,filter){
         </div>
       </div>`;
     } else {
-      const todoBg=n.todoStatus==='open'?'rgba(239,68,68,.07)':n.todoStatus==='done'?'rgba(16,185,129,.07)':n.todoStatus==='closing'?'rgba(59,109,212,.07)':n.todoStatus==='cancel'?'rgba(100,116,139,.1)':n.todoStatus==='approval'?'rgba(245,158,11,.08)':'var(--sf)';
-      const todoBorder=n.todoStatus==='open'?'rgba(239,68,68,.25)':n.todoStatus==='done'?'rgba(16,185,129,.25)':n.todoStatus==='closing'?'rgba(59,109,212,.25)':n.todoStatus==='cancel'?'rgba(100,116,139,.35)':n.todoStatus==='approval'?'rgba(245,158,11,.3)':'var(--border)';
+      const todoBg=n.todoStatus==='open'?'rgba(239,68,68,.07)':n.todoStatus==='done'?'rgba(16,185,129,.07)':n.todoStatus==='closing'?'rgba(59,109,212,.07)':n.todoStatus==='cancel'?'rgba(100,116,139,.1)':n.todoStatus==='approval'?'rgba(245,158,11,.08)':n.todoStatus==='approved'?'rgba(16,185,129,.07)':n.todoStatus==='approval_withdrawn'?'rgba(100,116,139,.1)':'var(--sf)';
+      const todoBorder=n.todoStatus==='open'?'rgba(239,68,68,.25)':n.todoStatus==='done'?'rgba(16,185,129,.25)':n.todoStatus==='closing'?'rgba(59,109,212,.25)':n.todoStatus==='cancel'?'rgba(100,116,139,.35)':n.todoStatus==='approval'?'rgba(245,158,11,.3)':n.todoStatus==='approved'?'rgba(16,185,129,.25)':n.todoStatus==='approval_withdrawn'?'rgba(100,116,139,.35)':'var(--border)';
       const todoLabel=n.todoStatus==='open'?'<span class="bdg" style="font-size:10px;background:rgba(239,68,68,.12);color:#ef4444">Noch offen</span>'
         :n.todoStatus==='done'?'<span class="bdg" style="font-size:10px;background:rgba(16,185,129,.12);color:#10b981">Erledigt</span>'
         :n.todoStatus==='closing'?'<span class="bdg" style="font-size:10px;background:rgba(59,109,212,.12);color:var(--acc)">🔒 Ticket-Abschluss</span>'
         :n.todoStatus==='cancel'?'<span class="bdg" style="font-size:10px;background:rgba(100,116,139,.15);color:#64748b">🚫 Storniert</span>'
-        :n.todoStatus==='approval'?'<span class="bdg" style="font-size:10px;background:rgba(245,158,11,.15);color:#b45309">🔒 Zur Freigabe</span>':'';
+        :n.todoStatus==='approval'?'<span class="bdg" style="font-size:10px;background:rgba(245,158,11,.15);color:#b45309">🔒 Zur Freigabe</span>'
+        :n.todoStatus==='approved'?'<span class="bdg" style="font-size:10px;background:rgba(16,185,129,.12);color:#10b981">✅ Freigegeben</span>'
+        :n.todoStatus==='approval_withdrawn'?'<span class="bdg" style="font-size:10px;background:rgba(100,116,139,.15);color:#64748b">🔓 Zurückgezogen</span>':'';
       const todoCheckbox=(n.todoStatus==='open'||n.todoStatus==='done')&&canEdit
         ?`<label style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--mu);cursor:pointer"><input type="checkbox" ${n.todoStatus==='done'?'checked':''} onchange="toggleNoteTodo('${tkId}','${n.id}',this.checked)" style="width:13px;height:13px;cursor:pointer">Erledigt</label>`
         :'';
@@ -2170,9 +2172,13 @@ function renderTkDetail(){
     </div>`:'';
   const approvalUser=locked?getU(tk.approvalUserId):null;
   const canApprove=locked&&(tk.approvalUserId===S.currentUser||S.p.manageUsers);
+  const canWithdrawApproval=locked&&(tk.approvalRequestedBy===S.currentUser||S.p.manageUsers);
   const lockBannerHtml=locked?`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px 14px;margin-bottom:14px">
       <div style="font-size:12px;color:#b45309">🔒 Zur Freigabe gesperrt — wartet auf Freigabe von <b>${approvalUser?esc(lastNameFirst(approvalUser.name)):'?'}</b>. Nur Notizen sind derzeit möglich.</div>
-      ${canApprove?`<button class="btn-ok" style="flex-shrink:0" onclick="approveTk('${tk.id}')">✓ Freigeben</button>`:''}
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        ${canWithdrawApproval?`<button class="btn-s" onclick="withdrawApprovalTk('${tk.id}')">↩ Anfrage zurückziehen</button>`:''}
+        ${canApprove?`<button class="btn-ok" onclick="approveTk('${tk.id}')">✓ Freigeben</button>`:''}
+      </div>
     </div>`:'';
   const detailsHtml=`
     ${lockBannerHtml}
@@ -2392,6 +2398,15 @@ async function approveTk(tkId){
     toast('\u2705 Ticket freigegeben');
   }catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
 }
+async function withdrawApprovalTk(tkId){
+  if(!confirm('Freigabe-Anfrage zur\u00fcckziehen? Das Ticket ist danach wieder f\u00fcr alle normal bearbeitbar, ohne dass eine Freigabe erfolgt ist.'))return;
+  try{
+    await api('POST','/tickets/'+tkId+'/withdraw-approval');
+    await fetchData();renderTkDetail();
+    if(S.view==='tickets'||S.view==='tickets_closed'||S.view==='tickets_cancelled'||S.view==='tickets_deleted')renderTickets();
+    toast('\uD83D\uDD13 Freigabe-Anfrage zur\u00fcckgezogen');
+  }catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
+}
 async function toggleNoteTodo(tkId,noteId,checked){
   try{
     await api('PUT','/tickets/'+tkId+'/notes/'+noteId,{todoStatus:checked?'done':'open'});
@@ -2494,13 +2509,25 @@ function openTkForm(id,parentId){
   document.getElementById('tkFPar').innerHTML='<option value="">\u2014</option>'+S.tickets.filter(t=>!id||t.id!==id).map(t=>`<option value="${t.id}"${t.id===pid?' selected':''}>${t.number}: ${t.title.slice(0,35)}</option>`).join('');
   onTkParentChange();
   const dueFld=document.getElementById('tkFDue');if(dueFld)dueFld.value=tk?.dueDate||'';
+  // Sichtbarkeit: bei neuen Tickets Standard "Öffentlich" (server-seitig
+  // ebenso der Default), bei bestehenden der tatsächliche Wert.
+  S._tkFormVisPublic = tk ? !!tk.isPublic : true;
+  const visWrap=document.getElementById('tkFVisWrap');
+  if(visWrap)visWrap.style.display=S.tp.canSetPublic?'':'none';
+  renderTkFormVisibility();
   closeModal('tkDetOv');openModal('tkFormOv');
 }
+function renderTkFormVisibility(){
+  const btn=document.getElementById('tkFVisBtn');if(!btn)return;
+  btn.className='bdg '+(S._tkFormVisPublic?'pub-on':'pub-off');
+  btn.textContent=S._tkFormVisPublic?'🌐 Öffentlich':'🔒 Privat';
+}
+function toggleTkFormVisibility(){S._tkFormVisPublic=!S._tkFormVisPublic;renderTkFormVisibility();}
 async function saveTicket(withAi){
   const nm=document.getElementById('tkFNm').value.trim();if(!nm){toast('\u26A0\uFE0F Name erforderlich!');return;}
   const id=document.getElementById('tkFId').value;
   const tags=Array.from(document.getElementById('tkFTags').selectedOptions).map(o=>o.value);
-  const body={title:nm,reporter:document.getElementById('tkFReporter').value.trim(),description:document.getElementById('tkFDesc').value.trim(),department:document.getElementById('tkFDept').value,subcategory:document.getElementById('tkFSubcat')?.value||'',priority:document.getElementById('tkFPrio').value,status:document.getElementById('tkFSt').value,bucket:document.getElementById('tkFBkt').value,tags,assigneeId:document.getElementById('tkFAsgn').value||null,parentTicketId:document.getElementById('tkFPar').value||null,dueDate:document.getElementById('tkFDue')?.value||null,aiSearch:!!withAi};
+  const body={title:nm,reporter:document.getElementById('tkFReporter').value.trim(),description:document.getElementById('tkFDesc').value.trim(),department:document.getElementById('tkFDept').value,subcategory:document.getElementById('tkFSubcat')?.value||'',priority:document.getElementById('tkFPrio').value,status:document.getElementById('tkFSt').value,bucket:document.getElementById('tkFBkt').value,tags,assigneeId:document.getElementById('tkFAsgn').value||null,parentTicketId:document.getElementById('tkFPar').value||null,dueDate:document.getElementById('tkFDue')?.value||null,aiSearch:!!withAi,isPublic:S.tp.canSetPublic?!!S._tkFormVisPublic:undefined};
   try{
     let savedId=id;
     if(id)await api('PUT','/tickets/'+id,body);
