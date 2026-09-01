@@ -2135,7 +2135,7 @@ function renderTkDetail(){
       <div style="display:flex;gap:7px;align-items:flex-end">
         <div class="note-input-wrap" style="flex:1">
           <div class="mention-suggestions" id="mentionSug"></div>
-          <textarea id="noteInput" rows="2" placeholder="Text \u2026 @Name f\u00fcr Erw\u00e4hnung" style="font-size:13px;width:100%" onkeyup="onNoteKey(event,'${tk.id}')"></textarea>
+          <textarea id="noteInput" rows="2" placeholder="Text \u2026 @Name f\u00fcr Erw\u00e4hnung" style="font-size:13px;width:100%" onkeyup="onNoteKey(event,'${tk.id}')" oninput="S._tkNoteDraft=S._tkNoteDraft||{};S._tkNoteDraft['${tk.id}']=this.value">${esc((S._tkNoteDraft&&S._tkNoteDraft[tk.id])||'')}</textarea>
         </div>
         <select id="noteTodoType" style="font-size:12px;padding:8px 6px;width:auto;flex-shrink:0" title="Art des Eintrags">
           <option value="">Info</option>
@@ -2217,6 +2217,11 @@ function renderTkDetail(){
         </div>`).join('')}
       </div>
     </div>`;
+  // Wird u.a. alle 30s vom Hintergrund-Refresh neu aufgerufen \u2014 ohne diese
+  // Fokus-/Cursor-Rettung w\u00fcrde der Nutzer beim Tippen in "noteInput" mitten
+  // im Satz aus dem Feld fliegen, weil das <textarea> hier neu erzeugt wird.
+  const _tkActiveId=document.activeElement?.id;
+  const _tkActiveSel=(_tkActiveId==='noteInput')?document.getElementById('noteInput')?.selectionStart:null;
   document.getElementById('tkDetMain').innerHTML=`
     <div style="border-bottom:1px solid var(--border);margin:-18px -18px 14px;padding:0 18px;display:flex;gap:0">
       ${tabBtn('details','\ud83d\udccb Details')}
@@ -2224,6 +2229,13 @@ function renderTkDetail(){
       ${tabBtn('history','\ud83d\udd52 Historie')}
     </div>
     ${tab==='details'?detailsHtml:tab==='files'?filesHtml:historyHtml}`;
+  if(_tkActiveId){
+    const _tkRestore=document.getElementById(_tkActiveId);
+    if(_tkRestore){
+      _tkRestore.focus();
+      if(_tkActiveSel!=null&&_tkRestore.setSelectionRange)_tkRestore.setSelectionRange(_tkActiveSel,_tkActiveSel);
+    }
+  }
   document.getElementById('tkDetSB').innerHTML=`
     ${canEdit?`
     <div class="tkf"><label>Status</label><select onchange="updateTkField('${tk.id}','status',this.value)">${STATUSES.map(s=>`<option value="${s.id}"${tk.status===s.id?' selected':''}>${s.label}</option>`).join('')}</select></div>
@@ -2325,7 +2337,7 @@ async function addNote(tkId){
   try{
     await api('POST','/tickets/'+tkId+'/notes',{text:inp.value.trim(),todoStatus});
     if(isClosing)await api('PUT','/tickets/'+tkId,{status:'closed'});
-    inp.value='';if(todoSel)todoSel.value='';
+    inp.value='';if(todoSel)todoSel.value='';if(S._tkNoteDraft)delete S._tkNoteDraft[tkId];
     await fetchData();renderTkDetail();
     // Liste im Hintergrund (unter dem Detail-Modal) sonst veraltet, bis Seite
     // neu geladen wird \u2014 Ticket verschwindet erst nach Reload aus "Offen".
