@@ -202,10 +202,11 @@ router.post('/:id/notes', auth, async (req,res) => {
     if (!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
     const text=req.body?.text?.trim();
     if (!text) return bad(res,'Text erforderlich');
-    // Todo-Kennzeichnung: Standard "Info" (kein Status), optional "Noch offen"
-    // oder "closing" (Abschlussnachricht — Status-Schließen erfolgt separat per PUT)
+    // Todo-Kennzeichnung: Standard "Info" (kein Status), optional "Noch offen",
+    // "closing" (Abschlussnachricht) oder "cancel" (Stornierungsnachricht) —
+    // Status-Schließen erfolgt in beiden Fällen separat per PUT.
     const reqTodoStatus = req.body?.todoStatus;
-    const todoStatus = reqTodoStatus==='open' ? 'open' : reqTodoStatus==='closing' ? 'closing' : null;
+    const todoStatus = ['open','closing','cancel'].includes(reqTodoStatus) ? reqTodoStatus : null;
     const id=newId(), now=new Date().toISOString();
     const allUsers = await q('SELECT id,name FROM users');
     const mentioned = parseMentions(text, allUsers);

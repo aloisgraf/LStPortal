@@ -2064,11 +2064,12 @@ function _renderFeed(notes,tkId,canEdit,filter){
         </div>
       </div>`;
     } else {
-      const todoBg=n.todoStatus==='open'?'rgba(239,68,68,.07)':n.todoStatus==='done'?'rgba(16,185,129,.07)':n.todoStatus==='closing'?'rgba(59,109,212,.07)':'var(--sf)';
-      const todoBorder=n.todoStatus==='open'?'rgba(239,68,68,.25)':n.todoStatus==='done'?'rgba(16,185,129,.25)':n.todoStatus==='closing'?'rgba(59,109,212,.25)':'var(--border)';
+      const todoBg=n.todoStatus==='open'?'rgba(239,68,68,.07)':n.todoStatus==='done'?'rgba(16,185,129,.07)':n.todoStatus==='closing'?'rgba(59,109,212,.07)':n.todoStatus==='cancel'?'rgba(100,116,139,.1)':'var(--sf)';
+      const todoBorder=n.todoStatus==='open'?'rgba(239,68,68,.25)':n.todoStatus==='done'?'rgba(16,185,129,.25)':n.todoStatus==='closing'?'rgba(59,109,212,.25)':n.todoStatus==='cancel'?'rgba(100,116,139,.35)':'var(--border)';
       const todoLabel=n.todoStatus==='open'?'<span class="bdg" style="font-size:10px;background:rgba(239,68,68,.12);color:#ef4444">Noch offen</span>'
         :n.todoStatus==='done'?'<span class="bdg" style="font-size:10px;background:rgba(16,185,129,.12);color:#10b981">Erledigt</span>'
-        :n.todoStatus==='closing'?'<span class="bdg" style="font-size:10px;background:rgba(59,109,212,.12);color:var(--acc)">🔒 Ticket-Abschluss</span>':'';
+        :n.todoStatus==='closing'?'<span class="bdg" style="font-size:10px;background:rgba(59,109,212,.12);color:var(--acc)">🔒 Ticket-Abschluss</span>'
+        :n.todoStatus==='cancel'?'<span class="bdg" style="font-size:10px;background:rgba(100,116,139,.15);color:#64748b">🚫 Storniert</span>':'';
       const todoCheckbox=(n.todoStatus==='open'||n.todoStatus==='done')&&canEdit
         ?`<label style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--mu);cursor:pointer"><input type="checkbox" ${n.todoStatus==='done'?'checked':''} onchange="toggleNoteTodo('${tkId}','${n.id}',this.checked)" style="width:13px;height:13px;cursor:pointer">Erledigt</label>`
         :'';
@@ -2141,6 +2142,7 @@ function renderTkDetail(){
           <option value="">Info</option>
           <option value="open">Noch offen</option>
           <option value="closing">Ticket-Abschluss</option>
+          <option value="cancel">Ticket stornieren</option>
         </select>
         <button class="btn-p" onclick="addNote('${tk.id}')" style="padding:8px 12px;flex-shrink:0">Senden</button>
       </div>
@@ -2332,17 +2334,20 @@ async function addNote(tkId){
   const todoSel=document.getElementById('noteTodoType');
   const kind=todoSel?todoSel.value:'';
   const isClosing=kind==='closing';
+  const isCancel=kind==='cancel';
   if(isClosing&&!confirm('Ticket nach dem Senden dieser Abschlussnachricht als abgeschlossen markieren?'))return;
-  const todoStatus=kind==='open'?'open':kind==='closing'?'closing':undefined;
+  if(isCancel&&!confirm('Ticket nach dem Senden dieser Stornierungsnachricht als storniert schlie\u00dfen?'))return;
+  const todoStatus=kind==='open'?'open':kind==='closing'?'closing':kind==='cancel'?'cancel':undefined;
   try{
     await api('POST','/tickets/'+tkId+'/notes',{text:inp.value.trim(),todoStatus});
-    if(isClosing)await api('PUT','/tickets/'+tkId,{status:'closed'});
+    if(isClosing||isCancel)await api('PUT','/tickets/'+tkId,{status:'closed'});
     inp.value='';if(todoSel)todoSel.value='';if(S._tkNoteDraft)delete S._tkNoteDraft[tkId];
     await fetchData();renderTkDetail();
     // Liste im Hintergrund (unter dem Detail-Modal) sonst veraltet, bis Seite
     // neu geladen wird \u2014 Ticket verschwindet erst nach Reload aus "Offen".
     if(S.view==='tickets'||S.view==='tickets_closed'||S.view==='tickets_deleted')renderTickets();
     if(isClosing)toast('\u2705 Ticket abgeschlossen');
+    else if(isCancel)toast('\ud83d\udeab Ticket storniert');
   }catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
 }
 async function toggleNoteTodo(tkId,noteId,checked){
@@ -5358,6 +5363,11 @@ function fmtDate(d){if(!d)return'';var p=String(d).slice(0,10);return p.slice(8)
 function renderMeetings() {
   const canCreateMeeting = S.p.addGeneral || S.p.manageUsers;
   const m = S._selMeeting ? S.meetings.find(x=>x.id===S._selMeeting) : null;
+  // Wird u.a. alle 30s vom Hintergrund-Refresh erneut aufgerufen — ohne diese
+  // Rettung würde die Seitenleiste (und der Hauptbereich) beim Lesen/Scrollen
+  // ständig wieder nach oben springen, weil hier alles neu erzeugt wird.
+  const _mScrollList = document.querySelector('.meetings-list')?.scrollTop;
+  const _mScrollMain = document.querySelector('.meetings-main')?.scrollTop;
   document.getElementById('main').innerHTML = `
 <div class="meetings-layout">
   <div class="meetings-sidebar">
@@ -5407,6 +5417,8 @@ function renderMeetings() {
     ${m ? renderMeetingDetail(m, m._canManage||false) : `<div style="color:var(--mu);padding:32px;text-align:center;font-size:14px">← Besprechung auswählen</div>`}
   </div>
 </div>`;
+  if(_mScrollList!=null){const el=document.querySelector('.meetings-list');if(el)el.scrollTop=_mScrollList;}
+  if(_mScrollMain!=null){const el=document.querySelector('.meetings-main');if(el)el.scrollTop=_mScrollMain;}
 }
 
 function meetingInstTabHtml(m, i, canManage) {
