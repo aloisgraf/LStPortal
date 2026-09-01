@@ -822,6 +822,9 @@ async function initDB() {
       created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW(),
       updated_at TIMESTAMPTZ DEFAULT NOW()
     )`,
+    // Freigegebene Protokolle sind für ihre Teilnehmer lesbar (read-only),
+    // auch wenn diese sonst keinen Zugriff auf die Besprechung haben.
+    `ALTER TABLE meeting_protocols ADD COLUMN IF NOT EXISTS released BOOLEAN DEFAULT false`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }

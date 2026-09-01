@@ -160,13 +160,13 @@ router.delete('/meeting-instances/:id', auth, async (req, res) => {
 
 router.post('/meeting-instances/:id/protocols', auth, async (req, res) => {
   try {
-    const { title, date, time, location, attendees, body } = req.body;
+    const { title, date, time, location, attendees, body, released } = req.body;
     if (!title?.trim()) return bad(res, 'Titel erforderlich', 400);
     const id = newId();
     await pool.query(
-      `INSERT INTO meeting_protocols (id, instance_id, title, date, time, location, attendees, body, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-      [id, req.params.id, title.trim(), date || null, time || '', location || '', JSON.stringify(attendees || []), body || '', req.uid]
+      `INSERT INTO meeting_protocols (id, instance_id, title, date, time, location, attendees, body, released, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      [id, req.params.id, title.trim(), date || null, time || '', location || '', JSON.stringify(attendees || []), body || '', !!released, req.uid]
     );
     const row = await q1('SELECT * FROM meeting_protocols WHERE id=$1', [id]);
     ok(res, row);
@@ -177,15 +177,16 @@ router.put('/meeting-protocols/:id', auth, async (req, res) => {
   try {
     const existing = await q1('SELECT * FROM meeting_protocols WHERE id=$1', [req.params.id]);
     if (!existing) return bad(res, 'Nicht gefunden', 404);
-    const { title, date, time, location, attendees, body } = req.body;
+    const { title, date, time, location, attendees, body, released } = req.body;
     if (title !== undefined && !title.trim()) return bad(res, 'Titel erforderlich', 400);
     await pool.query(
       `UPDATE meeting_protocols SET title=COALESCE($1,title), date=$2, time=COALESCE($3,time),
-       location=COALESCE($4,location), attendees=COALESCE($5,attendees), body=COALESCE($6,body), updated_at=NOW()
-       WHERE id=$7`,
+       location=COALESCE($4,location), attendees=COALESCE($5,attendees), body=COALESCE($6,body),
+       released=COALESCE($7,released), updated_at=NOW()
+       WHERE id=$8`,
       [title?.trim() || null, date !== undefined ? (date || null) : existing.date, time !== undefined ? time : null,
        location !== undefined ? location : null, attendees !== undefined ? JSON.stringify(attendees) : null,
-       body !== undefined ? body : null, req.params.id]
+       body !== undefined ? body : null, released !== undefined ? !!released : null, req.params.id]
     );
     const row = await q1('SELECT * FROM meeting_protocols WHERE id=$1', [req.params.id]);
     ok(res, row);

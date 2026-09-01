@@ -1676,6 +1676,13 @@
         </div>
       </div>
       <div class="fg"><label>Protokolltext</label><textarea id="pfBody" rows="8"></textarea></div>
+      <div class="fg">
+        <label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer">
+          <input type="checkbox" id="pfReleased">
+          <span>&#128274; Protokoll freigeben</span>
+        </label>
+        <small style="color:var(--mu)">Freigegebene Teilnehmer (intern) erhalten damit Lesezugriff auf diese Besprechung — auch wenn sie sonst keinen Zugang dazu hätten.</small>
+      </div>
     </div>
     <div class="mf"><button class="btn" onclick="submitProtocolForm()">&#10003; Speichern</button></div>
   </div>

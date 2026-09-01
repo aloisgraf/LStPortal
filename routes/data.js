@@ -102,7 +102,7 @@ router.get('/', auth, async (req,res) => {
     const itemMap={};
     (itemsRaw||[]).forEach(it=>{if(!itemMap[it.instance_id])itemMap[it.instance_id]=[];itemMap[it.instance_id].push({id:it.id,instanceId:it.instance_id,title:it.title,description:it.description,status:it.status,dueDate:it.due_date,meetingDate:it.meeting_date,parentId:it.parent_id,delegatedTo:it.delegated_to,result:it.result,sortOrder:it.sort_order,createdBy:it.created_by,createdAt:it.created_at,groupId:it.group_id||null,link:it.link||null,convertedTicketId:it.converted_ticket_id||null,convertedAt:it.converted_at||null,convertedBy:it.converted_by||null,protokoll:(()=>{try{return JSON.parse(it.protokoll||'[]');}catch{return [];}})(),participants:partMap[it.id]||[],aiStatus:it.ai_status||null,aiResult:(()=>{try{return it.ai_result?JSON.parse(it.ai_result):null;}catch{return null;}})()});});
     const protoMap={};
-    (protocolsRaw||[]).forEach(pr=>{if(!protoMap[pr.instance_id])protoMap[pr.instance_id]=[];protoMap[pr.instance_id].push({id:pr.id,instanceId:pr.instance_id,title:pr.title,date:pr.date,time:pr.time||'',location:pr.location||'',attendees:(()=>{try{return JSON.parse(pr.attendees||'[]');}catch{return [];}})(),body:pr.body||'',createdBy:pr.created_by,createdAt:pr.created_at,updatedAt:pr.updated_at});});
+    (protocolsRaw||[]).forEach(pr=>{if(!protoMap[pr.instance_id])protoMap[pr.instance_id]=[];protoMap[pr.instance_id].push({id:pr.id,instanceId:pr.instance_id,title:pr.title,date:pr.date,time:pr.time||'',location:pr.location||'',attendees:(()=>{try{return JSON.parse(pr.attendees||'[]');}catch{return [];}})(),body:pr.body||'',released:!!pr.released,createdBy:pr.created_by,createdAt:pr.created_at,updatedAt:pr.updated_at});});
     const instMap={};
     (instancesRaw||[]).forEach(inst=>{if(!instMap[inst.meeting_id])instMap[inst.meeting_id]=[];instMap[inst.meeting_id].push({id:inst.id,meetingId:inst.meeting_id,date:inst.date,time:inst.time||'',title:inst.title||null,status:inst.status,notes:inst.notes||'',kind:inst.kind||'points',createdBy:inst.created_by,createdAt:inst.created_at,items:itemMap[inst.id]||[],protocols:protoMap[inst.id]||[]});});
     // Meetings: find which meetings the user has assigned items in
@@ -114,6 +114,17 @@ router.get('/', auth, async (req,res) => {
         const it=(itemsRaw||[]).find(x=>x.id===pp.item_id);
         if(it){const inst=(instancesRaw||[]).find(x=>x.id===it.instance_id);if(inst)assignedMeetingIds.add(inst.meeting_id);}
       }
+    });
+    // Freigegebene Protokolle: Teilnehmer (interne User-IDs, keine externen
+    // "ext:"-Einträge) bekommen dadurch — wie schon bestehende Besprechungs-
+    // punkt-Teilnehmer — Lesezugriff auf die gesamte Besprechung; Bearbeiten
+    // bleibt weiterhin ausschließlich Ersteller/Admins vorbehalten (_canManage).
+    (protocolsRaw||[]).forEach(pr=>{
+      if(!pr.released)return;
+      let att=[]; try{att=JSON.parse(pr.attendees||'[]');}catch{}
+      if(!att.includes(uid))return;
+      const inst=(instancesRaw||[]).find(x=>x.id===pr.instance_id);
+      if(inst)assignedMeetingIds.add(inst.meeting_id);
     });
     // Todos: find which todos the user has assigned items in
     const assignedTodoIds = new Set();

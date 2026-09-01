@@ -5504,7 +5504,10 @@ function renderProtocolInstanceDetail(inst, meeting, canManage) {
     <div style="display:flex;flex-direction:column;gap:10px">
       ${protos.map(p=>`<div class="meetings-card" style="cursor:default">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-          <div style="font-weight:600;font-size:13px">${esc(p.title)}</div>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <span style="font-weight:600;font-size:13px">${esc(p.title)}</span>
+            ${p.released?`<span class="bdg" style="font-size:10px;background:#10b98122;color:#10b981">&#128274; Freigegeben</span>`:''}
+          </div>
           ${canManage?`<div style="display:flex;gap:4px;flex-shrink:0">
             <button class="btn-e" style="padding:2px 6px;font-size:11px" onclick="openProtocolForm('${inst.id}','${p.id}')">&#9998;</button>
             <button class="btn-d" style="padding:2px 6px;font-size:11px" onclick="deleteProtocol('${p.id}')">&#10005;</button>
@@ -5907,6 +5910,7 @@ function openProtocolForm(instanceId, id=null) {
   const extNames = allAtt.filter(a=>a.startsWith(EXT_ATTENDEE_PREFIX)).map(a=>a.slice(EXT_ATTENDEE_PREFIX.length));
   document.getElementById('pfExtAttendeesList').innerHTML = protoExtAttendeesChipsHtml(extNames);
   document.getElementById('pfExtAttendeeInput').value = '';
+  document.getElementById('pfReleased').checked = !!proto?.released;
   document.getElementById('protoDeleteBtn').style.display = proto ? '' : 'none';
   openModal('protoFormOv');
 }
@@ -5921,6 +5925,7 @@ async function submitProtocolForm() {
   const body = {
     title, date: document.getElementById('pfDate').value || null, time: document.getElementById('pfTime').value,
     location: document.getElementById('pfLocation').value.trim(), attendees, body: document.getElementById('pfBody').value,
+    released: document.getElementById('pfReleased').checked,
   };
   try {
     if (id) await api('PUT','/meeting-protocols/'+id, body);
