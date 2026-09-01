@@ -215,6 +215,8 @@ router.get('/', auth, async (req,res) => {
         participants:(()=>{try{return JSON.parse(tk.participants||'[]');}catch{return [];}})(),
         notes:noteMap[tk.id]||[], checklists:tkClMap[tk.id]||[], files:tkFileMap[tk.id]||[],
         aiStatus:tk.ai_status||null, aiResult:(()=>{try{return tk.ai_result?JSON.parse(tk.ai_result):null;}catch{return null;}})(),
+        lockedForApproval:!!tk.locked_for_approval, approvalUserId:tk.approval_user_id||null,
+        approvalRequestedBy:tk.approval_requested_by||null, approvalRequestedAt:tk.approval_requested_at||null,
         _canEdit:canEditTk(tp,tk,uid),
       })),
       allowances: allwRaw.map(a=>({id:a.id,userId:a.user_id,year:a.year,month:a.month,nd:a.nd,fd:Number(a.fd)||0,fw:a.fw,c10:a.c10,rkt:a.rkt||0,buero:a.buero||0})),

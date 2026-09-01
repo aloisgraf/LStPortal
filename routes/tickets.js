@@ -65,6 +65,7 @@ router.put('/:id', auth, async (req,res) => {
     const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
     if (!tk) return bad(res,'Nicht gefunden',404);
     if (!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
+    if (tk.locked_for_approval) return bad(res,'Ticket ist zur Freigabe gesperrt — nur Notizen sind möglich, bis die Freigabe erfolgt ist.',423);
     const b=req.body, setClauses=[], vals=[];
     const add=(col,val)=>{ vals.push(val); setClauses.push(`${col}=$${vals.length}`); };
     const uname=(await getUser(req.uid))?.name||'?';
@@ -203,16 +204,30 @@ router.post('/:id/notes', auth, async (req,res) => {
     const text=req.body?.text?.trim();
     if (!text) return bad(res,'Text erforderlich');
     // Todo-Kennzeichnung: Standard "Info" (kein Status), optional "Noch offen",
-    // "closing" (Abschlussnachricht) oder "cancel" (Stornierungsnachricht) —
-    // Status-Schließen erfolgt in beiden Fällen separat per PUT.
+    // "closing" (Abschlussnachricht), "cancel" (Stornierungsnachricht) oder
+    // "approval" (Freigabe-Anfrage — sperrt das Ticket bis zur Freigabe durch
+    // die im Text per @Name markierte Person). Status-Schließen erfolgt in
+    // den ersten beiden Fällen separat per PUT.
     const reqTodoStatus = req.body?.todoStatus;
-    const todoStatus = ['open','closing','cancel'].includes(reqTodoStatus) ? reqTodoStatus : null;
+    const todoStatus = ['open','closing','cancel','approval'].includes(reqTodoStatus) ? reqTodoStatus : null;
     const id=newId(), now=new Date().toISOString();
     const allUsers = await q('SELECT id,name FROM users');
     const mentioned = parseMentions(text, allUsers);
     const mentionedIds = mentioned.map(u=>u.id);
+    let approver = null;
+    if (todoStatus==='approval') {
+      if (tk.locked_for_approval) return bad(res,'Ticket ist bereits zur Freigabe gesperrt');
+      approver = mentioned[0];
+      if (!approver) return bad(res,'Bitte im Text mit @Name die Person markieren, die freigeben muss');
+    }
     await pool.query('INSERT INTO ticket_notes (id,ticket_id,text,author_id,note_type,created_at,mentioned_users,todo_status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
       [id,req.params.id,text,req.uid,'note',now,JSON.stringify(mentionedIds),todoStatus]);
+    if (approver) {
+      await pool.query('UPDATE tickets SET locked_for_approval=true,approval_user_id=$1,approval_requested_by=$2,approval_requested_at=NOW() WHERE id=$3',
+        [approver.id,req.uid,req.params.id]);
+      const requesterName=(await getUser(req.uid))?.name||'?';
+      await auditNote(tk.id,req.uid,`🔒 Freigabe angefordert bei ${approver.name} (von ${requesterName})`);
+    }
     // Add mentioned users to ticket so they can see it
     try {
       if(mentionedIds.length){
@@ -239,6 +254,21 @@ router.post('/:id/notes', auth, async (req,res) => {
         `${author?.name||'?'} hat einen neuen Eintrag zum Ticket "${tk.title}" (${tk.number}) hinzugefügt:\n\n"${text}"`).catch(()=>{});
     }
     ok(res,{id,createdAt:now,todoStatus});
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+// Freigabe erteilen: nur die im "Zur Freigabe"-Eintrag markierte Person (oder
+// ein Admin) darf das gesperrte Ticket wieder entsperren.
+router.post('/:id/approve', auth, async (req,res) => {
+  try {
+    const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
+    if (!tk) return bad(res,'Nicht gefunden',404);
+    if (!tk.locked_for_approval) return bad(res,'Ticket ist nicht zur Freigabe gesperrt');
+    if (tk.approval_user_id!==req.uid && !req.p.manageUsers) return bad(res,'Nur die angefragte Person kann freigeben',403);
+    await pool.query('UPDATE tickets SET locked_for_approval=false,approval_user_id=NULL,approval_requested_by=NULL,approval_requested_at=NULL,updated_at=NOW() WHERE id=$1',[req.params.id]);
+    const uname=(await getUser(req.uid))?.name||'?';
+    await auditNote(tk.id,req.uid,`✅ Ticket freigegeben von ${uname}`);
+    ok(res);
   } catch(e) { bad(res,'Serverfehler',500); }
 });
 
@@ -302,6 +332,7 @@ router.put('/:id/participants', auth, async (req,res) => {
     const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
     if (!tk) return bad(res,'Nicht gefunden',404);
     if (!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
+    if (tk.locked_for_approval) return bad(res,'Ticket ist zur Freigabe gesperrt',423);
     const { userId, action } = req.body;
     if (!userId || (action!=='add' && action!=='remove'))
       return bad(res,'userId und action (add/remove) erforderlich');
@@ -330,6 +361,7 @@ router.post('/:id/checklists', auth, async (req,res) => {
   try {
     const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
     if (!tk||!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
+    if (tk.locked_for_approval) return bad(res,'Ticket ist zur Freigabe gesperrt',423);
     const tmpl = await q1('SELECT * FROM checklist_templates WHERE id=$1',[req.body.templateId]);
     if (!tmpl) return bad(res,'Vorlage nicht gefunden',404);
     const items = await q('SELECT * FROM checklist_template_items WHERE template_id=$1 ORDER BY sort_order',[tmpl.id]);
@@ -346,6 +378,7 @@ router.delete('/:id/checklists/:cid', auth, async (req,res) => {
   try {
     const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
     if (!tk||!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
+    if (tk.locked_for_approval) return bad(res,'Ticket ist zur Freigabe gesperrt',423);
     await pool.query('DELETE FROM ticket_checklist_items WHERE checklist_id=$1',[req.params.cid]);
     await pool.query('DELETE FROM ticket_checklists WHERE id=$1',[req.params.cid]);
     ok(res);
@@ -355,6 +388,7 @@ router.put('/:id/checklists/:cid/sync', auth, async (req,res) => {
   try {
     const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
     if (!tk||!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
+    if (tk.locked_for_approval) return bad(res,'Ticket ist zur Freigabe gesperrt',423);
     const cl = await q1('SELECT * FROM ticket_checklists WHERE id=$1',[req.params.cid]);
     if (!cl||!cl.template_id) return bad(res,'Keine Vorlage verknüpft',400);
     const tmpl = await q1('SELECT * FROM checklist_templates WHERE id=$1',[cl.template_id]);
@@ -390,6 +424,7 @@ router.put('/:id/checklists/:cid/items/:iid', auth, async (req,res) => {
   try {
     const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
     if (!tk||!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
+    if (tk.locked_for_approval) return bad(res,'Ticket ist zur Freigabe gesperrt',423);
     const item = await q1('SELECT * FROM ticket_checklist_items WHERE id=$1',[req.params.iid]);
     if (!item) return bad(res,'Item nicht gefunden',404);
     const {completed, userNote} = req.body;
@@ -498,6 +533,7 @@ router.delete('/:id/files/:fid', auth, async (req,res) => {
     const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
     if (!tk) return bad(res,'Nicht gefunden',404);
     if (!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
+    if (tk.locked_for_approval) return bad(res,'Ticket ist zur Freigabe gesperrt',423);
     const file = await q1('SELECT * FROM ticket_files WHERE id=$1 AND ticket_id=$2',[req.params.fid,req.params.id]);
     if (!file) return bad(res,'Datei nicht gefunden',404);
     const filePath = path.join(UPLOAD_DIR, file.filename);

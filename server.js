@@ -294,6 +294,12 @@ async function initDB() {
     `ALTER TABLE allowances ALTER COLUMN fd SET DEFAULT 0`,
     `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS ai_status TEXT`,
     `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS ai_result TEXT`,
+    // "Zur Freigabe": sperrt das Ticket für alle Feldänderungen außer Notizen,
+    // bis die per @Name markierte Person (approval_user_id) freigibt.
+    `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS locked_for_approval BOOLEAN DEFAULT false`,
+    `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS approval_user_id TEXT`,
+    `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS approval_requested_by TEXT`,
+    `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS approval_requested_at TIMESTAMPTZ`,
     `CREATE TABLE IF NOT EXISTS documents (
       id TEXT PRIMARY KEY, category_id TEXT,
       title TEXT NOT NULL, description TEXT DEFAULT '',

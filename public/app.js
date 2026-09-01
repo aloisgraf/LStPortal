@@ -1887,7 +1887,7 @@ function renderTickets(){
         </div>
         ${preview?`<div style="font-size:11px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px">${preview}</div>`:''}
         <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--mu);align-items:center">
-          ${showDept?deptBdg(tk.department):''}${prioBdg(tk.priority)}${stBdg(tk.status)}${dueBdg(tk)}${snoozeBdg(tk)}${tagChips(tk.tags)}
+          ${showDept?deptBdg(tk.department):''}${prioBdg(tk.priority)}${stBdg(tk.status)}${tk.lockedForApproval?'<span class="bdg" style="font-size:10px;background:rgba(245,158,11,.15);color:#b45309" title="Zur Freigabe gesperrt">🔒 Freigabe</span>':''}${dueBdg(tk)}${snoozeBdg(tk)}${tagChips(tk.tags)}
           ${asn?`<div style="display:flex;align-items:center;gap:3px">${avHtml(asn.initials,asn.color,14,6)}<span>${lastNameFirst(asn.name)}</span></div>`:''}
           ${isChild&&par?`<span style="color:var(--di);font-size:10px">&#x2191; ${par.number}</span>`:''}
           ${nc?`<span>💬 ${nc}</span>`:''}${tkOpenTodoHtml(tk)}
@@ -1925,7 +1925,7 @@ function renderTickets(){
           <td style="max-width:220px"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(tk.title)}</div>${nc?`<span style="font-size:10px;color:var(--mu)">💬 ${nc}</span>`:''}${tkOpenTodoCount(tk)?`<span style="font-size:10px;color:#ef4444;font-weight:600;margin-left:6px">Noch offen: ${tkOpenTodoCount(tk)}</span>`:''}</td>
           <td>${deptBdg(tk.department)}${tk.subcategory?`<div><span class="bdg" style="font-size:10px;background:rgba(124,58,237,.12);color:#7c3aed">${tk.subcategory}</span></div>`:''}</td>
           <td>${prioBdg(tk.priority)}</td>
-          <td>${stBdg(tk.status)}</td>
+          <td>${stBdg(tk.status)}${tk.lockedForApproval?' 🔒':''}</td>
           <td style="max-width:140px">${tagChips(tk.tags)}${dueBdg(tk)}</td>
           <td style="font-size:12px">${asn?`<div style="display:flex;align-items:center;gap:3px">${avHtml(asn.initials,asn.color,16,7)}<span>${lastNameFirst(asn.name)}</span></div>`:'-'}</td>
           <td style="font-size:11px;color:var(--mu);white-space:nowrap">Erstellt: ${fd(tk.createdAt)}${tk.updatedAt&&fd(tk.updatedAt)!==fd(tk.createdAt)?`<br>Geändert: ${fd(tk.updatedAt)}`:''}${tk.dueDate?`<br>Fällig: ${fd(tk.dueDate)}`:''}</td>
@@ -2077,12 +2077,13 @@ function _renderFeed(notes,tkId,canEdit,filter){
         </div>
       </div>`;
     } else {
-      const todoBg=n.todoStatus==='open'?'rgba(239,68,68,.07)':n.todoStatus==='done'?'rgba(16,185,129,.07)':n.todoStatus==='closing'?'rgba(59,109,212,.07)':n.todoStatus==='cancel'?'rgba(100,116,139,.1)':'var(--sf)';
-      const todoBorder=n.todoStatus==='open'?'rgba(239,68,68,.25)':n.todoStatus==='done'?'rgba(16,185,129,.25)':n.todoStatus==='closing'?'rgba(59,109,212,.25)':n.todoStatus==='cancel'?'rgba(100,116,139,.35)':'var(--border)';
+      const todoBg=n.todoStatus==='open'?'rgba(239,68,68,.07)':n.todoStatus==='done'?'rgba(16,185,129,.07)':n.todoStatus==='closing'?'rgba(59,109,212,.07)':n.todoStatus==='cancel'?'rgba(100,116,139,.1)':n.todoStatus==='approval'?'rgba(245,158,11,.08)':'var(--sf)';
+      const todoBorder=n.todoStatus==='open'?'rgba(239,68,68,.25)':n.todoStatus==='done'?'rgba(16,185,129,.25)':n.todoStatus==='closing'?'rgba(59,109,212,.25)':n.todoStatus==='cancel'?'rgba(100,116,139,.35)':n.todoStatus==='approval'?'rgba(245,158,11,.3)':'var(--border)';
       const todoLabel=n.todoStatus==='open'?'<span class="bdg" style="font-size:10px;background:rgba(239,68,68,.12);color:#ef4444">Noch offen</span>'
         :n.todoStatus==='done'?'<span class="bdg" style="font-size:10px;background:rgba(16,185,129,.12);color:#10b981">Erledigt</span>'
         :n.todoStatus==='closing'?'<span class="bdg" style="font-size:10px;background:rgba(59,109,212,.12);color:var(--acc)">🔒 Ticket-Abschluss</span>'
-        :n.todoStatus==='cancel'?'<span class="bdg" style="font-size:10px;background:rgba(100,116,139,.15);color:#64748b">🚫 Storniert</span>':'';
+        :n.todoStatus==='cancel'?'<span class="bdg" style="font-size:10px;background:rgba(100,116,139,.15);color:#64748b">🚫 Storniert</span>'
+        :n.todoStatus==='approval'?'<span class="bdg" style="font-size:10px;background:rgba(245,158,11,.15);color:#b45309">🔒 Zur Freigabe</span>':'';
       const todoCheckbox=(n.todoStatus==='open'||n.todoStatus==='done')&&canEdit
         ?`<label style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--mu);cursor:pointer"><input type="checkbox" ${n.todoStatus==='done'?'checked':''} onchange="toggleNoteTodo('${tkId}','${n.id}',this.checked)" style="width:13px;height:13px;cursor:pointer">Erledigt</label>`
         :'';
@@ -2137,7 +2138,13 @@ function renderTkDetail(){
   document.getElementById('tkDetTitle').textContent=tk.title;
   document.getElementById('tkDetPrio').innerHTML=prioBdg(tk.priority);
   document.getElementById('tkDetSt').innerHTML=stBdg(tk.status);
-  document.getElementById('tkDetEditBtn').style.display=canEdit?'':'none';
+  // "Zur Freigabe" gesperrt: Feldänderungen sind blockiert (serverseitig
+  // ebenso durchgesetzt), nur Notizfelder bleiben bedienbar — separate
+  // Variable statt canEdit direkt zu überschreiben, da Notizen und einzelne
+  // Notiz-Aktionen (bearbeiten/löschen eigener Einträge) weiterhin canEdit nutzen.
+  const locked=!!tk.lockedForApproval;
+  const canEditFields=canEdit&&!locked;
+  document.getElementById('tkDetEditBtn').style.display=canEditFields?'':'none';
   const notes=tk.notes||[];
   const tab=S._tkTab||'details';
   const tabBtn=(id,label)=>`<button onclick="S._tkTab='${id}';renderTkDetail()" style="padding:8px 16px;font-size:13px;font-weight:${tab===id?'600':'500'};background:none;border:none;border-bottom:2px solid ${tab===id?'var(--acc)':'transparent'};color:${tab===id?'var(--acc)':'var(--mu)'};cursor:pointer;font-family:inherit;transition:.15s;margin-bottom:-1px">${label}</button>`;
@@ -2156,20 +2163,28 @@ function renderTkDetail(){
           <option value="open">Noch offen</option>
           <option value="closing">Ticket-Abschluss</option>
           <option value="cancel">Ticket stornieren</option>
+          <option value="approval">Zur Freigabe</option>
         </select>
         <button class="btn-p" onclick="addNote('${tk.id}')" style="padding:8px 12px;flex-shrink:0">Senden</button>
       </div>
     </div>`:'';
+  const approvalUser=locked?getU(tk.approvalUserId):null;
+  const canApprove=locked&&(tk.approvalUserId===S.currentUser||S.p.manageUsers);
+  const lockBannerHtml=locked?`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px 14px;margin-bottom:14px">
+      <div style="font-size:12px;color:#b45309">🔒 Zur Freigabe gesperrt — wartet auf Freigabe von <b>${approvalUser?esc(lastNameFirst(approvalUser.name)):'?'}</b>. Nur Notizen sind derzeit möglich.</div>
+      ${canApprove?`<button class="btn-ok" style="flex-shrink:0" onclick="approveTk('${tk.id}')">✓ Freigeben</button>`:''}
+    </div>`:'';
   const detailsHtml=`
+    ${lockBannerHtml}
     <div><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di)">BESCHREIBUNG</div>
         <button class="btn-s" style="font-size:11px;padding:3px 9px" onclick="openAiSuggestionsFor('Ticket','${tk.id}')">🤖 KI-Vorschläge</button>
       </div>
       <div style="font-size:13px;line-height:1.6;color:${tk.description?'var(--tx)':'var(--di)'};white-space:pre-wrap">${tk.description?esc(tk.description):'Keine Beschreibung.'}</div></div>
-    ${subs.length||canEdit?`<div>
+    ${subs.length||canEditFields?`<div>
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di);margin-bottom:8px">UNTERTICKETS (${subs.length})</div>
       <div class="subl">${subs.map(st=>`<div class="subi" onclick="S.currentTicketId='${st.id}';renderTkDetail()">\u21b8<span style="font-family:monospace;font-size:11px;color:var(--mu)">${st.number}</span><span style="flex:1;font-size:12px">${st.title}</span>${stBdg(st.status)}</div>`).join('')}
-      ${canEdit?`<button class="btn-s" style="font-size:11px;margin-top:4px" onclick="openTkForm(null,'${tk.id}')">&#65291; Unterticket</button>`:''}
+      ${canEditFields?`<button class="btn-s" style="font-size:11px;margin-top:4px" onclick="openTkForm(null,'${tk.id}')">&#65291; Unterticket</button>`:''}
       </div></div>`:''}
     ${tk.checklists.length?`<div>
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di);margin-bottom:8px">CHECKLISTEN</div>
@@ -2178,17 +2193,17 @@ function renderTkDetail(){
           <span style="font-size:12px;font-weight:700">${cl.name}</span>
           <div style="display:flex;gap:5px;align-items:center">
             <span style="font-size:10px;color:var(--mu)">${cl.items.filter(i=>i.completedBy).length}/${cl.items.length}</span>
-            ${canEdit&&cl.templateId?`<button class="btn-s" style="padding:2px 6px;font-size:10px" title="Checkliste auf aktuelle Vorlage aktualisieren" onclick="syncCl('${tk.id}','${cl.id}')">&#x1F504; Aktualisieren</button>`:''}
-            ${canEdit?`<button class="btn-d" style="padding:2px 6px;font-size:10px" onclick="removeCl('${tk.id}','${cl.id}')">\u2715</button>`:''}
+            ${canEditFields&&cl.templateId?`<button class="btn-s" style="padding:2px 6px;font-size:10px" title="Checkliste auf aktuelle Vorlage aktualisieren" onclick="syncCl('${tk.id}','${cl.id}')">&#x1F504; Aktualisieren</button>`:''}
+            ${canEditFields?`<button class="btn-d" style="padding:2px 6px;font-size:10px" onclick="removeCl('${tk.id}','${cl.id}')">\u2715</button>`:''}
           </div>
         </div>
         <div class="cl-items">${cl.items.map(it=>`<div class="cl-item${it.completedBy?' done':''}" id="cli-${it.id}">
           <div class="cl-item-row">
-            <input type="checkbox" ${it.completedBy?'checked':''} onchange="toggleClItem('${tk.id}','${cl.id}','${it.id}',this.checked)">
+            <input type="checkbox" ${it.completedBy?'checked':''} ${locked?'disabled':''} onchange="toggleClItem('${tk.id}','${cl.id}','${it.id}',this.checked)">
             <span class="cl-item-text">${it.text}</span>
             ${it.completedBy?`<span class="cl-done-by">&#128100; ${getU(it.completedBy)?lastNameFirst(getU(it.completedBy).name):'?'}</span>`:''}
           </div>
-          ${it.itemType==='check_text'?`<div class="cl-user-note"><input type="text" placeholder="Notiz \u2026" value="${(it.userNote||'').replace(/"/g,'&quot;')}" onchange="saveClItemNote('${tk.id}','${cl.id}','${it.id}',this.value)"></div>`:''}
+          ${it.itemType==='check_text'?`<div class="cl-user-note"><input type="text" placeholder="Notiz \u2026" ${locked?'disabled':''} value="${(it.userNote||'').replace(/"/g,'&quot;')}" onchange="saveClItemNote('${tk.id}','${cl.id}','${it.id}',this.value)"></div>`:''}
         </div>`).join('')}</div>
       </div>`).join('')}
     </div>`:''}
@@ -2228,7 +2243,7 @@ function renderTkDetail(){
             <div class="tk-file-meta">${fmtBytes(f.sizeBytes)} &bull; ${getU(f.uploadedBy)?lastNameFirst(getU(f.uploadedBy).name):'?'} &bull; ${fdt(f.createdAt)}</div>
             ${f.mimeType.startsWith('image/')?`<div class="tk-file-thumb"><img src="/api/tickets/${tk.id}/files/${f.id}" alt="${f.originalName}" loading="lazy"></div>`:''}
           </div>
-          ${canEdit?`<button class="btn-d tk-file-del" onclick="deleteTkFile('${tk.id}','${f.id}','${f.originalName.replace(/'/g,"\\'")}')">&#128465;</button>`:''}
+          ${canEditFields?`<button class="btn-d tk-file-del" onclick="deleteTkFile('${tk.id}','${f.id}','${f.originalName.replace(/'/g,"\\'")}')">&#128465;</button>`:''}
         </div>`).join('')}
       </div>
     </div>`;
@@ -2252,7 +2267,7 @@ function renderTkDetail(){
     }
   }
   document.getElementById('tkDetSB').innerHTML=`
-    ${canEdit?`
+    ${canEditFields?`
     <div class="tkf"><label>Status</label><select onchange="updateTkField('${tk.id}','status',this.value)">${STATUSES.map(s=>`<option value="${s.id}"${tk.status===s.id?' selected':''}>${s.label}</option>`).join('')}</select></div>
     <div class="tkf"><label>Priorit\u00e4t</label><select onchange="updateTkField('${tk.id}','priority',this.value)">${PRIORITIES.map(p2=>`<option value="${p2.id}"${tk.priority===p2.id?' selected':''}>${p2.label}</option>`).join('')}</select></div>
     <div class="tkf"><label>Fachbereich</label>${tk.parentTicketId?
@@ -2281,7 +2296,7 @@ function renderTkDetail(){
     <div class="tkdiv"></div>
     <div class="tkf"><label>Tags</label><div>${tagChips(tk.tags)||'<span style="color:var(--di);font-size:11px">\u2014</span>'}</div></div>
     <div class="tkf"><label>&#128164; Wiedervorlage</label>
-      ${canEdit?`<div style="display:flex;gap:5px;align-items:center">
+      ${canEditFields?`<div style="display:flex;gap:5px;align-items:center">
         <input type="date" value="${tk.snoozedUntil||''}" id="snoozeDate" style="flex:1;font-size:12px;padding:4px 7px;border:1px solid var(--border);border-radius:var(--r);background:var(--sf);color:var(--tx)">
         <button class="btn-s" style="font-size:11px;padding:3px 7px" onclick="setSnooze('${tk.id}')">&#10003;</button>
         ${tk.snoozedUntil?`<button class="btn-d" style="font-size:11px;padding:3px 7px" onclick="updateTkField('${tk.id}','snoozedUntil',null);toast('\u2705 Wiedervorlage entfernt')">\u2715</button>`:''}
@@ -2291,14 +2306,14 @@ function renderTkDetail(){
     <div class="tkf"><label>Erstellt von</label><div style="font-size:12px">${getU(tk.createdBy)?lastNameFirst(getU(tk.createdBy).name):'?'}</div></div>
     <div class="tkf"><label>Erstellt am</label><div style="font-size:11px;color:var(--mu)">${fdt(tk.createdAt)}</div></div>
     <div class="tkf"><label>&#128101; Teilnehmer</label>
-      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:${canEdit?'4px':'0'}">
-        ${(tk.participants||[]).map(pid=>{const pu=getU(pid);if(!pu)return'';return `<span class="bdg" style="display:inline-flex;align-items:center;gap:4px;padding:2px 6px;background:var(--sf2)" title="${esc(lastNameFirst(pu.name))}">${avHtml(pu.initials,pu.color,16,7)}<span style="font-size:11px">${esc(lastNameFirst(pu.name))}</span>${canEdit?`<button onclick="removeTkParticipant('${tk.id}','${pid}')" title="Entfernen" style="border:none;background:none;cursor:pointer;color:var(--danger);font-size:11px;padding:0;margin-left:2px">&#10005;</button>`:''}</span>`;}).join('')}
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:${canEditFields?'4px':'0'}">
+        ${(tk.participants||[]).map(pid=>{const pu=getU(pid);if(!pu)return'';return `<span class="bdg" style="display:inline-flex;align-items:center;gap:4px;padding:2px 6px;background:var(--sf2)" title="${esc(lastNameFirst(pu.name))}">${avHtml(pu.initials,pu.color,16,7)}<span style="font-size:11px">${esc(lastNameFirst(pu.name))}</span>${canEditFields?`<button onclick="removeTkParticipant('${tk.id}','${pid}')" title="Entfernen" style="border:none;background:none;cursor:pointer;color:var(--danger);font-size:11px;padding:0;margin-left:2px">&#10005;</button>`:''}</span>`;}).join('')}
         ${!(tk.participants||[]).length?'<span style="font-size:11px;color:var(--di)">— keine —</span>':''}
       </div>
-      ${canEdit?`<select onchange="if(this.value){addTkParticipant('${tk.id}',this.value);}this.value='';" style="width:100%;font-size:12px"><option value="">+ Teilnehmer hinzufügen…</option>${S.users.filter(u=>isAssignable(u)&&u.id!==tk.createdBy&&u.id!==tk.assigneeId&&!(tk.participants||[]).includes(u.id)).slice().sort(byLastName).map(u=>`<option value="${u.id}">${lastNameFirst(u.name)}</option>`).join('')}</select>`:''}
+      ${canEditFields?`<select onchange="if(this.value){addTkParticipant('${tk.id}',this.value);}this.value='';" style="width:100%;font-size:12px"><option value="">+ Teilnehmer hinzufügen…</option>${S.users.filter(u=>isAssignable(u)&&u.id!==tk.createdBy&&u.id!==tk.assigneeId&&!(tk.participants||[]).includes(u.id)).slice().sort(byLastName).map(u=>`<option value="${u.id}">${lastNameFirst(u.name)}</option>`).join('')}</select>`:''}
     </div>
     ${par?`<div class="tkf"><label>Elternticket</label><div class="subi" onclick="S.currentTicketId='${par.id}';renderTkDetail()" style="margin-top:4px"><span style="font-family:monospace;font-size:11px">${par.number}</span><span style="font-size:12px;flex:1">${par.title.slice(0,22)}</span></div></div>`:''}
-    ${canEdit?`<div class="tkdiv"></div>
+    ${canEditFields?`<div class="tkdiv"></div>
     <button class="btn-s" style="width:100%;justify-content:center;font-size:12px" onclick="openAttachCl('${tk.id}')">&#9745;&#65039; Checkliste anh\u00e4ngen</button>
     ${!isTkClosed(tk)?`<button class="btn-ok" style="width:100%;justify-content:center;margin-top:4px" onclick="updateTkField('${tk.id}','status','closed')">\u2713 Abschlie\u00dfen</button>`:''}`:''}`;
   // KI-Ergebnisse bekommen eine eigene, breitere Spalte links im Fenster
@@ -2348,9 +2363,12 @@ async function addNote(tkId){
   const kind=todoSel?todoSel.value:'';
   const isClosing=kind==='closing';
   const isCancel=kind==='cancel';
+  const isApproval=kind==='approval';
   if(isClosing&&!confirm('Ticket nach dem Senden dieser Abschlussnachricht als abgeschlossen markieren?'))return;
   if(isCancel&&!confirm('Ticket nach dem Senden dieser Stornierungsnachricht als storniert markieren?'))return;
-  const todoStatus=kind==='open'?'open':kind==='closing'?'closing':kind==='cancel'?'cancel':undefined;
+  if(isApproval&&!/@\S/.test(inp.value)){toast('\u26A0\uFE0F Bitte im Text mit @Name die Person markieren, die freigeben muss','err');return;}
+  if(isApproval&&!confirm('Ticket nach dem Senden f\u00fcr alle Feld\u00e4nderungen sperren, bis die markierte Person freigibt? (Notizen bleiben weiterhin m\u00f6glich)'))return;
+  const todoStatus=kind==='open'?'open':kind==='closing'?'closing':kind==='cancel'?'cancel':kind==='approval'?'approval':undefined;
   try{
     await api('POST','/tickets/'+tkId+'/notes',{text:inp.value.trim(),todoStatus});
     if(isClosing)await api('PUT','/tickets/'+tkId,{status:'closed'});
@@ -2362,6 +2380,16 @@ async function addNote(tkId){
     if(S.view==='tickets'||S.view==='tickets_closed'||S.view==='tickets_cancelled'||S.view==='tickets_deleted')renderTickets();
     if(isClosing)toast('\u2705 Ticket abgeschlossen');
     else if(isCancel)toast('\ud83d\udeab Ticket storniert');
+    else if(isApproval)toast('\ud83d\udd12 Ticket zur Freigabe gesperrt');
+  }catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
+}
+async function approveTk(tkId){
+  if(!confirm('Ticket freigeben? Es ist danach wieder f\u00fcr alle normal bearbeitbar.'))return;
+  try{
+    await api('POST','/tickets/'+tkId+'/approve');
+    await fetchData();renderTkDetail();
+    if(S.view==='tickets'||S.view==='tickets_closed'||S.view==='tickets_cancelled'||S.view==='tickets_deleted')renderTickets();
+    toast('\u2705 Ticket freigegeben');
   }catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
 }
 async function toggleNoteTodo(tkId,noteId,checked){
