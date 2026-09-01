@@ -5114,7 +5114,16 @@ function renderSopRunList(){
 function lockerCatLabel(catId){const c=(S.lockerCategories||[]).find(x=>x.id===catId);return c?(c.emoji?c.emoji+' ':'')+c.label:'';}
 function renderSpint(){
   if(!S.p.canManageSpint){ document.getElementById('main').innerHTML='<div class="empty">⚠️ Kein Zugriff</div>'; return; }
-  const lockers=(S.lockers||[]).slice().sort((a,b)=>a.number.localeCompare(b.number,'de',{numeric:true}));
+  // Reihenfolge: freie Spinde ganz vorne (unabhängig von der Kategorie —
+  // damit offene Kapazität sofort ins Auge fällt), danach nach Kategorie
+  // (alphabetisch) und innerhalb der Kategorie nach Spind-Nr sortiert.
+  const lockers=(S.lockers||[]).slice().sort((a,b)=>{
+    const aFree=a.assigneeType==='none', bFree=b.assigneeType==='none';
+    if(aFree!==bFree)return aFree?-1:1;
+    const catCmp=lockerCatLabel(a.categoryId||'').localeCompare(lockerCatLabel(b.categoryId||''),'de');
+    if(catCmp!==0)return catCmp;
+    return a.number.localeCompare(b.number,'de',{numeric:true});
+  });
   const search=(S._spintFilter||'').toLowerCase().trim();
   const catFilter=S._spintCatFilter||'';
   const assigneeText=l=>l.assigneeType==='user'?(getU(l.assigneeUserId)?lastNameFirst(getU(l.assigneeUserId).name):'Unbekannt'):l.assigneeType==='general'?l.assigneeLabel:'';
@@ -5131,7 +5140,7 @@ function renderSpint(){
       :'<span style="color:var(--di)">— frei —</span>';
     return '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid var(--border)">'
       +'<div style="font-weight:700;font-size:13px;min-width:70px;flex-shrink:0">'+esc(l.number)+'</div>'
-      +(l.categoryId?'<span class="bdg" style="font-size:11px;flex-shrink:0">'+esc(lockerCatLabel(l.categoryId))+'</span>':'')
+      +'<div style="min-width:130px;flex-shrink:0">'+(l.categoryId?'<span class="bdg" style="font-size:11px">'+esc(lockerCatLabel(l.categoryId))+'</span>':'')+'</div>'
       +'<div style="flex:1;min-width:0;font-size:13px">'+label+(l.note?'<div style="font-size:11px;color:var(--mu);margin-top:2px">'+esc(l.note)+'</div>':'')+'</div>'
       +'<button class="btn-s" style="font-size:11px;padding:3px 8px;flex-shrink:0" onclick="openSpintForm(\''+l.id+'\')">✎</button>'
       +'<button class="btn-d" style="font-size:11px;padding:3px 8px;flex-shrink:0" onclick="deleteLocker(\''+l.id+'\')">✕</button>'
