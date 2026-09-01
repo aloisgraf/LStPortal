@@ -1624,17 +1624,17 @@
 <!-- INSTANCE FORM MODAL -->
 <div class="ov" id="instanceFormOv">
   <div class="modal sm">
-    <div class="mh"><h2 id="instanceFormTitle">Termin</h2><button class="mc" onclick="closeModal('instanceFormOv')">&#10005;</button></div>
+    <div class="mh"><h2 id="instanceFormTitle">Thema</h2><button class="mc" onclick="closeModal('instanceFormOv')">&#10005;</button></div>
     <div class="mb2">
       <input type="hidden" id="ifId">
       <input type="hidden" id="ifMeetingId">
-      <div class="fg" id="ifKindWrap"><label>Art des Termins</label>
+      <div class="fg" id="ifKindWrap"><label>Art des Themas</label>
         <div style="display:flex;gap:14px">
-          <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:400;cursor:pointer"><input type="radio" name="ifKind" value="points" id="ifKindPoints" checked onchange="onIfKindChange()">&#128203; Punktetermin</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:400;cursor:pointer"><input type="radio" name="ifKind" value="protocol" id="ifKindProtocol" onchange="onIfKindChange()">&#128221; Protokolltermin</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:400;cursor:pointer"><input type="radio" name="ifKind" value="points" id="ifKindPoints" checked onchange="onIfKindChange()">&#128203; Punkte-Thema</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:400;cursor:pointer"><input type="radio" name="ifKind" value="protocol" id="ifKindProtocol" onchange="onIfKindChange()">&#128221; Protokoll-Thema</label>
         </div>
       </div>
-      <div class="fg"><label>Titel (optional)</label><input type="text" id="ifTitle" placeholder="z.B. Kick-off"></div>
+      <div class="fg"><label>Titel (optional)</label><input type="text" id="ifTitle" placeholder="z.B. Urlaubsplanung"></div>
       <div id="ifDateTimeWrap">
         <div class="fg">
           <label>Datum</label>
@@ -1656,7 +1656,7 @@
 
 <!-- PROTOKOLL FORM MODAL -->
 <div class="ov" id="protoFormOv">
-  <div class="modal sm">
+  <div class="modal wide">
     <div class="mh"><h2 id="protoFormTitle">Protokoll</h2><div style="display:flex;gap:4px"><button class="mc" id="protoDeleteBtn" onclick="deleteProtocol()" style="display:none" title="Löschen">&#128465;&#65039;</button><button class="mc" onclick="closeModal('protoFormOv')">&#10005;</button></div></div>
     <div class="mb2">
       <input type="hidden" id="pfId">
@@ -1667,7 +1667,14 @@
         <div class="fg" style="flex:1"><label>Uhrzeit</label><input type="time" id="pfTime"></div>
       </div>
       <div class="fg"><label>Ort</label><input type="text" id="pfLocation" placeholder="z.B. Besprechungsraum 1"></div>
-      <div class="fg"><label>Teilnehmer</label><select id="pfAttendees" multiple size="5"></select></div>
+      <div class="fg"><label>Teilnehmer (intern)</label><select id="pfAttendees" multiple size="5"></select></div>
+      <div class="fg"><label>Externe Teilnehmer</label>
+        <div id="pfExtAttendeesList" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px"></div>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="pfExtAttendeeInput" placeholder="Name (extern) …" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();addProtoExternalAttendee();}">
+          <button class="btn-s" onclick="addProtoExternalAttendee()">+ Hinzufügen</button>
+        </div>
+      </div>
       <div class="fg"><label>Protokolltext</label><textarea id="pfBody" rows="8"></textarea></div>
     </div>
     <div class="mf"><button class="btn" onclick="submitProtocolForm()">&#10003; Speichern</button></div>
@@ -1681,7 +1688,7 @@
     <div class="mb2">
       <input type="hidden" id="itId">
       <input type="hidden" id="itInstanceId">
-      <div class="fg"><label>Thema *</label><input type="text" id="itTitle"></div>
+      <div class="fg"><label>Titel *</label><input type="text" id="itTitle"></div>
       <div class="fg"><label>Beschreibung</label><textarea id="itDesc" rows="4"></textarea></div>
       <div style="display:flex;gap:12px">
         <div class="fg" style="flex:1"><label>F&#228;llig bis</label><input type="date" id="itDueDate"></div>
@@ -1740,7 +1747,7 @@
       <div class="fg"><label>Besprechung</label>
         <select id="moveItemMeeting" onchange="onMoveMeetingChange()"></select>
       </div>
-      <div class="fg"><label>Ziel-Termin</label>
+      <div class="fg"><label>Ziel-Thema</label>
         <select id="moveItemInstance"></select>
       </div>
     </div>
@@ -1760,7 +1767,7 @@
       <div class="fg"><label>Besprechung</label>
         <select id="copyItemMeeting" onchange="onCopyMeetingChange()"></select>
       </div>
-      <div class="fg"><label>Termin</label>
+      <div class="fg"><label>Thema</label>
         <select id="copyItemInstance"></select>
       </div>
     </div>
