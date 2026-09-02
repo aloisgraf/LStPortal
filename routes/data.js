@@ -10,7 +10,7 @@ router.get('/', auth, async (req,res) => {
     const canManageDp = roles.some(r=>['admin','leitung','dienstplanung'].includes(r));
     const canManageSpint = roles.some(r=>['admin','leitung','technik'].includes(r));
     const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
-           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw,dpQualificationsRaw,dpShiftPrefsRaw,dpProtocolRaw,todosRaw,todoItemsRaw,todoAssigneesRaw,myDpPlanIdsRaw,todoNotificationsRaw,contactsRaw,sopTemplatesRaw,sopItemsRaw,sopRunsRaw,sopRunItemsRaw,lockersRaw,sopBranchOptionsRaw,departmentsRaw,lockerCategoriesRaw,chatThreadsRaw,chatMessagesRaw,chatReadsRaw,protocolsRaw,todoNotesRaw] = await Promise.all([
+           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw,dpQualificationsRaw,dpShiftPrefsRaw,dpProtocolRaw,todosRaw,todoItemsRaw,todoAssigneesRaw,myDpPlanIdsRaw,todoNotificationsRaw,contactsRaw,sopTemplatesRaw,sopItemsRaw,sopRunsRaw,sopRunItemsRaw,lockersRaw,sopBranchOptionsRaw,departmentsRaw,lockerCategoriesRaw,chatThreadsRaw,chatMessagesRaw,chatReadsRaw,protocolsRaw,todoNotesRaw,instFilesRaw,docLinksRaw,contactLinksRaw] = await Promise.all([
       q('SELECT id,name,initials,roles,color,must_change_pw,last_seen,category,email,username,hire_date,termination_date,dp_relevant,is_test_user FROM users ORDER BY name'),
       q('SELECT * FROM categories ORDER BY sort_order,label'),
       q('SELECT * FROM tags ORDER BY label'),
@@ -86,6 +86,9 @@ router.get('/', auth, async (req,res) => {
       q('SELECT * FROM chat_reads WHERE user_id=$1',[uid]).catch(()=>[]),
       q('SELECT * FROM meeting_protocols ORDER BY date DESC,created_at DESC').catch(()=>[]),
       q('SELECT * FROM todo_notes ORDER BY created_at').catch(()=>[]),
+      q('SELECT * FROM meeting_instance_files ORDER BY created_at DESC').catch(()=>[]),
+      q('SELECT * FROM meeting_doc_links').catch(()=>[]),
+      q('SELECT * FROM meeting_contact_links').catch(()=>[]),
     ]);
 
     const tkViewMap = new Map((tkViewsRaw||[]).map(v=>[v.ticket_id, v.viewed_at]));
@@ -99,12 +102,39 @@ router.get('/', auth, async (req,res) => {
 
     const partMap={};
     (partRaw||[]).forEach(p=>{if(!partMap[p.item_id])partMap[p.item_id]=[];partMap[p.item_id].push({id:p.id,userId:p.user_id,role:p.role});});
+    // Themen-Dokumente: eigene Uploads pro Thema, sowie Verknüpfungen (auf
+    // eigene Uploads ODER auf globale Dokumente aus dem Dokumente-Modul) auf
+    // einzelne Punkte/Protokolle. Bei globalen Dokumenten wird immer der
+    // aktuelle Titel/Mime-Type ausgeliefert — Versionsaustausch im Dokumente-
+    // Modul wirkt sich dadurch automatisch auf die Verknüpfung aus.
+    const docById={};
+    (docsRaw||[]).forEach(d=>{docById[d.id]=d;});
+    const instFileById={};
+    const instFileMap={};
+    (instFilesRaw||[]).forEach(f=>{
+      instFileById[f.id]=f;
+      if(!instFileMap[f.instance_id])instFileMap[f.instance_id]=[];
+      instFileMap[f.instance_id].push({id:f.id,instanceId:f.instance_id,originalName:f.original_name,mimeType:f.mime_type,sizeBytes:f.size_bytes,uploadedBy:f.uploaded_by,createdAt:f.created_at});
+    });
+    const docLinksByTarget={};
+    (docLinksRaw||[]).forEach(l=>{
+      const src = l.source_type==='document' ? docById[l.source_id] : instFileById[l.source_id];
+      if(!src) return;
+      const name = l.source_type==='document' ? src.title : src.original_name;
+      if(!docLinksByTarget[l.target_id])docLinksByTarget[l.target_id]=[];
+      docLinksByTarget[l.target_id].push({id:l.id,sourceType:l.source_type,sourceId:l.source_id,name,mimeType:src.mime_type,createdAt:l.created_at});
+    });
+    const contactLinksByTarget={};
+    (contactLinksRaw||[]).forEach(l=>{
+      if(!contactLinksByTarget[l.target_id])contactLinksByTarget[l.target_id]=[];
+      contactLinksByTarget[l.target_id].push({id:l.id,contactId:l.contact_id,createdAt:l.created_at});
+    });
     const itemMap={};
-    (itemsRaw||[]).forEach(it=>{if(!itemMap[it.instance_id])itemMap[it.instance_id]=[];itemMap[it.instance_id].push({id:it.id,instanceId:it.instance_id,title:it.title,description:it.description,status:it.status,dueDate:it.due_date,meetingDate:it.meeting_date,parentId:it.parent_id,delegatedTo:it.delegated_to,result:it.result,sortOrder:it.sort_order,createdBy:it.created_by,createdAt:it.created_at,groupId:it.group_id||null,link:it.link||null,convertedTicketId:it.converted_ticket_id||null,convertedAt:it.converted_at||null,convertedBy:it.converted_by||null,protokoll:(()=>{try{return JSON.parse(it.protokoll||'[]');}catch{return [];}})(),participants:partMap[it.id]||[],externalParticipants:(()=>{try{return JSON.parse(it.external_participants||'[]');}catch{return [];}})(),aiStatus:it.ai_status||null,aiResult:(()=>{try{return it.ai_result?JSON.parse(it.ai_result):null;}catch{return null;}})()});});
+    (itemsRaw||[]).forEach(it=>{if(!itemMap[it.instance_id])itemMap[it.instance_id]=[];itemMap[it.instance_id].push({id:it.id,instanceId:it.instance_id,title:it.title,description:it.description,status:it.status,dueDate:it.due_date,meetingDate:it.meeting_date,parentId:it.parent_id,delegatedTo:it.delegated_to,result:it.result,sortOrder:it.sort_order,createdBy:it.created_by,createdAt:it.created_at,groupId:it.group_id||null,link:it.link||null,convertedTicketId:it.converted_ticket_id||null,convertedAt:it.converted_at||null,convertedBy:it.converted_by||null,protokoll:(()=>{try{return JSON.parse(it.protokoll||'[]');}catch{return [];}})(),participants:partMap[it.id]||[],externalParticipants:(()=>{try{return JSON.parse(it.external_participants||'[]');}catch{return [];}})(),aiStatus:it.ai_status||null,aiResult:(()=>{try{return it.ai_result?JSON.parse(it.ai_result):null;}catch{return null;}})(),docLinks:docLinksByTarget[it.id]||[],contactLinks:contactLinksByTarget[it.id]||[]});});
     const protoMap={};
-    (protocolsRaw||[]).forEach(pr=>{if(!protoMap[pr.instance_id])protoMap[pr.instance_id]=[];protoMap[pr.instance_id].push({id:pr.id,instanceId:pr.instance_id,title:pr.title,date:pr.date,time:pr.time||'',location:pr.location||'',attendees:(()=>{try{return JSON.parse(pr.attendees||'[]');}catch{return [];}})(),body:pr.body||'',released:!!pr.released,createdBy:pr.created_by,createdAt:pr.created_at,updatedAt:pr.updated_at});});
+    (protocolsRaw||[]).forEach(pr=>{if(!protoMap[pr.instance_id])protoMap[pr.instance_id]=[];protoMap[pr.instance_id].push({id:pr.id,instanceId:pr.instance_id,title:pr.title,date:pr.date,time:pr.time||'',location:pr.location||'',attendees:(()=>{try{return JSON.parse(pr.attendees||'[]');}catch{return [];}})(),body:pr.body||'',released:!!pr.released,createdBy:pr.created_by,createdAt:pr.created_at,updatedAt:pr.updated_at,docLinks:docLinksByTarget[pr.id]||[],contactLinks:contactLinksByTarget[pr.id]||[]});});
     const instMap={};
-    (instancesRaw||[]).forEach(inst=>{if(!instMap[inst.meeting_id])instMap[inst.meeting_id]=[];instMap[inst.meeting_id].push({id:inst.id,meetingId:inst.meeting_id,date:inst.date,time:inst.time||'',title:inst.title||null,status:inst.status,notes:inst.notes||'',kind:inst.kind||'points',createdBy:inst.created_by,createdAt:inst.created_at,items:itemMap[inst.id]||[],protocols:protoMap[inst.id]||[]});});
+    (instancesRaw||[]).forEach(inst=>{if(!instMap[inst.meeting_id])instMap[inst.meeting_id]=[];instMap[inst.meeting_id].push({id:inst.id,meetingId:inst.meeting_id,date:inst.date,time:inst.time||'',title:inst.title||null,status:inst.status,notes:inst.notes||'',kind:inst.kind||'points',createdBy:inst.created_by,createdAt:inst.created_at,items:itemMap[inst.id]||[],protocols:protoMap[inst.id]||[],files:instFileMap[inst.id]||[]});});
     // Meetings: find which meetings the user has assigned items in
     const assignedMeetingIds = new Set();
     const itemIsAssignedToMe = new Set(); // item ids where user is participant

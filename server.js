@@ -838,6 +838,38 @@ async function initDB() {
     // Freigegebene Protokolle sind für ihre Teilnehmer lesbar (read-only),
     // auch wenn diese sonst keinen Zugriff auf die Besprechung haben.
     `ALTER TABLE meeting_protocols ADD COLUMN IF NOT EXISTS released BOOLEAN DEFAULT false`,
+    // Themen-eigene Dokumente (Drag&Drop von Dateien/E-Mails direkt ins
+    // Thema) — getrennt von den globalen "Dokumente"; können zusätzlich zu
+    // Dokumenten aus dem Dokumente-Modul an einzelne Punkte/Protokolle
+    // verknüpft werden.
+    `CREATE TABLE IF NOT EXISTS meeting_instance_files (
+      id TEXT PRIMARY KEY,
+      instance_id TEXT NOT NULL REFERENCES meeting_instances(id) ON DELETE CASCADE,
+      filename TEXT NOT NULL, original_name TEXT NOT NULL,
+      mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+      size_bytes INTEGER NOT NULL DEFAULT 0,
+      uploaded_by TEXT NOT NULL, file_data TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
+    // Verknüpfung eines Dokuments (entweder eines Themen-eigenen Uploads oder
+    // eines Dokuments aus dem globalen Dokumente-Modul) mit einem Punkt oder
+    // einem Protokoll. Bei globalen Dokumenten zeigt source_id auf documents.id
+    // — wird das Dokument dort ausgetauscht (neue Version), gilt automatisch
+    // die neue Version, da /docs/:id immer den aktuellen Stand ausliefert.
+    `CREATE TABLE IF NOT EXISTS meeting_doc_links (
+      id TEXT PRIMARY KEY,
+      target_type TEXT NOT NULL, target_id TEXT NOT NULL,
+      source_type TEXT NOT NULL, source_id TEXT NOT NULL,
+      created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
+    // Verknüpfung eines bestehenden Kontakts (aus dem Kontakte-Modul) mit
+    // einem Punkt oder einem Protokoll.
+    `CREATE TABLE IF NOT EXISTS meeting_contact_links (
+      id TEXT PRIMARY KEY,
+      target_type TEXT NOT NULL, target_id TEXT NOT NULL,
+      contact_id TEXT NOT NULL,
+      created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }

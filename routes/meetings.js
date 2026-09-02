@@ -2,6 +2,7 @@
 const router = require('express').Router();
 const { q, q1, newId, pool, getUser, auditNote, nextTicketNumber } = require('../db');
 const { auth, ok, bad } = require('../middleware');
+const { sanitizeFilename, validateMime } = require('../fileutil');
 
 // ── MEETINGS ──────────────────────────────────────────────────────────────────
 
@@ -57,6 +58,7 @@ router.delete('/meetings/:id', auth, async (req, res) => {
 router.post('/meetings/:id/instances', auth, async (req, res) => {
   try {
     const { date, time, notes, title, kind } = req.body;
+    if (!title?.trim()) return bad(res, 'Titel erforderlich', 400);
     const id = newId();
     await pool.query(
       `INSERT INTO meeting_instances (id, meeting_id, date, time, notes, title, kind, created_by)
@@ -479,6 +481,116 @@ router.delete('/discussion-items/:id/participants/:uid', auth, async (req, res) 
       'DELETE FROM discussion_participants WHERE item_id=$1 AND user_id=$2',
       [req.params.id, req.params.uid]
     );
+    ok(res, { deleted: true });
+  } catch (e) { bad(res, 'Serverfehler', 500); }
+});
+
+// ── THEMEN-DOKUMENTE (eigene Uploads, getrennt vom Dokumente-Modul) ─────────
+// Datei/E-Mail per Drag&Drop direkt ins Thema — unabhängig von der
+// chronologischen Punkte-/Protokoll-Historie, in einer eigenen Seitenleiste.
+
+router.post('/meeting-instances/:id/files', auth, async (req, res) => {
+  try {
+    const inst = await q1('SELECT id FROM meeting_instances WHERE id=$1', [req.params.id]);
+    if (!inst) return bad(res, 'Termin nicht gefunden', 404);
+    const { name, mimeType, data } = req.body;
+    if (!name?.trim() || !data) return bad(res, 'Dateiname und Daten erforderlich', 400);
+    const mime = mimeType || 'application/octet-stream';
+    if (!validateMime(mime)) return bad(res, 'Dateityp nicht erlaubt', 400);
+    const buf = Buffer.from(data, 'base64');
+    if (buf.length > 20 * 1024 * 1024) return bad(res, 'Datei zu groß (max. 20 MB)', 400);
+    const id = newId();
+    const safeName = sanitizeFilename(name.trim());
+    await pool.query(
+      `INSERT INTO meeting_instance_files (id,instance_id,filename,original_name,mime_type,size_bytes,uploaded_by,file_data)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [id, req.params.id, safeName, safeName, mime, buf.length, req.uid, buf.toString('base64')]
+    );
+    const row = await q1(
+      'SELECT id,instance_id,original_name,mime_type,size_bytes,uploaded_by,created_at FROM meeting_instance_files WHERE id=$1',
+      [id]
+    );
+    ok(res, row);
+  } catch (e) { bad(res, 'Serverfehler', 500); }
+});
+
+router.get('/meeting-instances/:id/files/:fid', auth, async (req, res) => {
+  try {
+    const file = await q1('SELECT * FROM meeting_instance_files WHERE id=$1 AND instance_id=$2', [req.params.fid, req.params.id]);
+    if (!file) return bad(res, 'Datei nicht gefunden', 404);
+    const inlineSafe = /^(image\/(jpeg|png|gif|webp)|application\/pdf|text\/plain)$/.test(file.mime_type);
+    res.setHeader('Content-Type', inlineSafe ? file.mime_type : 'application/octet-stream');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Disposition', `${inlineSafe ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(file.original_name)}`);
+    res.send(Buffer.from(file.file_data, 'base64'));
+  } catch (e) { bad(res, 'Serverfehler', 500); }
+});
+
+router.delete('/meeting-instances/:id/files/:fid', auth, async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM meeting_doc_links WHERE source_type='instance_file' AND source_id=$1`, [req.params.fid]);
+    await pool.query('DELETE FROM meeting_instance_files WHERE id=$1 AND instance_id=$2', [req.params.fid, req.params.id]);
+    ok(res, { deleted: true });
+  } catch (e) { bad(res, 'Serverfehler', 500); }
+});
+
+// ── DOKUMENT-VERKNÜPFUNGEN (Themen-Datei ODER globales Dokument → Punkt/Protokoll) ──
+
+router.post('/meetings/doc-links', auth, async (req, res) => {
+  try {
+    const { targetType, targetId, sourceType, sourceId } = req.body;
+    if (!['item', 'protocol'].includes(targetType)) return bad(res, 'Ungültiger Zieltyp', 400);
+    if (!['instance_file', 'document'].includes(sourceType)) return bad(res, 'Ungültiger Quelltyp', 400);
+    if (!targetId || !sourceId) return bad(res, 'Ziel und Quelle erforderlich', 400);
+    const target = targetType === 'item'
+      ? await q1('SELECT id FROM discussion_items WHERE id=$1', [targetId])
+      : await q1('SELECT id FROM meeting_protocols WHERE id=$1', [targetId]);
+    if (!target) return bad(res, 'Ziel nicht gefunden', 404);
+    const source = sourceType === 'document'
+      ? await q1('SELECT id FROM documents WHERE id=$1', [sourceId])
+      : await q1('SELECT id FROM meeting_instance_files WHERE id=$1', [sourceId]);
+    if (!source) return bad(res, 'Dokument nicht gefunden', 404);
+    const id = newId();
+    await pool.query(
+      `INSERT INTO meeting_doc_links (id,target_type,target_id,source_type,source_id,created_by) VALUES ($1,$2,$3,$4,$5,$6)`,
+      [id, targetType, targetId, sourceType, sourceId, req.uid]
+    );
+    ok(res, { id });
+  } catch (e) { bad(res, 'Serverfehler', 500); }
+});
+
+router.delete('/meeting-doc-links/:id', auth, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM meeting_doc_links WHERE id=$1', [req.params.id]);
+    ok(res, { deleted: true });
+  } catch (e) { bad(res, 'Serverfehler', 500); }
+});
+
+// ── KONTAKT-VERKNÜPFUNGEN (bestehender Kontakt → Punkt/Protokoll) ──────────
+
+router.post('/meetings/contact-links', auth, async (req, res) => {
+  try {
+    const { targetType, targetId, contactId } = req.body;
+    if (!['item', 'protocol'].includes(targetType)) return bad(res, 'Ungültiger Zieltyp', 400);
+    if (!targetId || !contactId) return bad(res, 'Ziel und Kontakt erforderlich', 400);
+    const target = targetType === 'item'
+      ? await q1('SELECT id FROM discussion_items WHERE id=$1', [targetId])
+      : await q1('SELECT id FROM meeting_protocols WHERE id=$1', [targetId]);
+    if (!target) return bad(res, 'Ziel nicht gefunden', 404);
+    const contact = await q1('SELECT id FROM contacts WHERE id=$1', [contactId]);
+    if (!contact) return bad(res, 'Kontakt nicht gefunden', 404);
+    const id = newId();
+    await pool.query(
+      `INSERT INTO meeting_contact_links (id,target_type,target_id,contact_id,created_by) VALUES ($1,$2,$3,$4,$5)`,
+      [id, targetType, targetId, contactId, req.uid]
+    );
+    ok(res, { id });
+  } catch (e) { bad(res, 'Serverfehler', 500); }
+});
+
+router.delete('/meeting-contact-links/:id', auth, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM meeting_contact_links WHERE id=$1', [req.params.id]);
     ok(res, { deleted: true });
   } catch (e) { bad(res, 'Serverfehler', 500); }
 });

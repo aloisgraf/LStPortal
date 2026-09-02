@@ -1605,23 +1605,16 @@
     <div class="mb2">
       <input type="hidden" id="mfId">
       <div class="fg"><label>Titel *</label><input type="text" id="mfTitle" placeholder="z.B. Technik-Weekly"></div>
-      <div class="fg"><label>Typ</label>
-        <select id="mfType" onchange="onMfTypeChange()">
-          <option value="einmalig">Einmalig</option>
-          <option value="jour_fixe">Jour Fixe (wiederkehrend)</option>
-          <option value="ad_hoc">Ad hoc</option>
-          <option value="ungeplant">Ungeplant</option>
+      <div class="fg"><label>Rhythmus</label>
+        <select id="mfRhythm" onchange="onMfTypeChange()">
+          <option value="">Keine Wiederholung</option>
+          <option value="weekly">W&#246;chentlich</option>
+          <option value="biweekly">Alle 2 Wochen</option>
+          <option value="monthly">Monatlich</option>
+          <option value="daily">T&#228;glich</option>
         </select>
       </div>
       <div id="mfRhythmDiv" style="display:none">
-        <div class="fg"><label>Rhythmus</label>
-          <select id="mfRhythm">
-            <option value="weekly">W&#246;chentlich</option>
-            <option value="biweekly">Alle 2 Wochen</option>
-            <option value="monthly">Monatlich</option>
-            <option value="daily">T&#228;glich</option>
-          </select>
-        </div>
         <div class="fg"><label>Uhrzeit</label><input type="time" id="mfRhythmTime"></div>
       </div>
       <div class="fg"><label>Beschreibung</label><textarea id="mfDesc" rows="2"></textarea></div>
@@ -1638,7 +1631,7 @@
     <div class="mb2">
       <input type="hidden" id="ifId">
       <input type="hidden" id="ifMeetingId">
-      <div class="fg"><label>Titel (optional)</label><input type="text" id="ifTitle" placeholder="z.B. Urlaubsplanung"></div>
+      <div class="fg"><label>Titel *</label><input type="text" id="ifTitle" placeholder="z.B. Urlaubsplanung"></div>
       <div id="ifDateTimeWrap">
         <div class="fg">
           <label>Datum</label>
@@ -1680,6 +1673,20 @@
         </div>
       </div>
       <div class="fg"><label>Protokolltext</label><textarea id="pfBody" rows="8"></textarea></div>
+      <div class="fg" id="pfLinksSection" style="display:none">
+        <label>Verknüpfte Dokumente</label>
+        <div id="pfDocLinksList" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px"></div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <select id="pfDocLinkSelect" style="flex:1"></select>
+          <button class="btn-s" onclick="addDocLink('protocol')">+ Verknüpfen</button>
+        </div>
+        <label>Verknüpfte Kontakte</label>
+        <div id="pfContactLinksList" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px"></div>
+        <div style="display:flex;gap:8px">
+          <select id="pfContactLinkSelect" style="flex:1"></select>
+          <button class="btn-s" onclick="addContactLink('protocol')">+ Verknüpfen</button>
+        </div>
+      </div>
       <div class="fg">
         <label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer">
           <input type="checkbox" id="pfReleased">
@@ -1736,6 +1743,20 @@
           <input type="text" id="itExtParticipantInput" list="itExtParticipantSuggestions" placeholder="Name eingeben …" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();addItemExternalParticipant();}">
           <datalist id="itExtParticipantSuggestions"></datalist>
           <button class="btn-s" onclick="addItemExternalParticipant()">+</button>
+        </div>
+      </div>
+      <div class="fg" id="itLinksSection" style="display:none">
+        <label>Verknüpfte Dokumente</label>
+        <div id="itDocLinksList" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px"></div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <select id="itDocLinkSelect" style="flex:1"></select>
+          <button class="btn-s" onclick="addDocLink('item')">+ Verknüpfen</button>
+        </div>
+        <label>Verknüpfte Kontakte</label>
+        <div id="itContactLinksList" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px"></div>
+        <div style="display:flex;gap:8px">
+          <select id="itContactLinkSelect" style="flex:1"></select>
+          <button class="btn-s" onclick="addContactLink('item')">+ Verknüpfen</button>
         </div>
       </div>
     </div>

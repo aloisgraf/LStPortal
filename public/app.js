@@ -5544,7 +5544,7 @@ function renderMeetings() {
           </div>
           ${activeThemen.length?`<div style="margin-top:5px;display:flex;flex-direction:column;gap:2px">
             ${activeThemen.map(i=>`<div style="font-size:11px;color:var(--mu);display:flex;align-items:center;gap:4px">
-              <span style="flex-shrink:0">📌</span>
+              <span style="flex-shrink:0">🗒️</span>
               <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(i.title||'Thema')}</span>
             </div>`).join('')}
           </div>`:insts.length?`<div style="font-size:11px;color:var(--di);margin-top:3px">Alle Themen abgeschlossen</div>`:''}
@@ -5573,7 +5573,7 @@ function meetingInstTabHtml(m, i, canManage) {
   const showStatus = i.status==='done' || i.status==='cancelled';
   return`<div class="meetings-inst-tab${S._selInstance===i.id?' active':''}" style="position:relative">
     <div onclick="S._selInstance='${i.id}';renderMeetings()" style="cursor:pointer;${canManage?'padding-right:18px':''}">
-      <div style="font-size:12px;font-weight:600">📌 ${titleLine}</div>
+      <div style="font-size:12px;font-weight:600">🗒️ ${titleLine}</div>
       <div style="display:flex;gap:4px;margin-top:2px;align-items:center;flex-wrap:wrap">
         ${showStatus?`<span style="font-size:10px;color:${statusColor}">${{done:'Abgeschlossen',cancelled:'Abgesagt'}[i.status]||i.status}</span>`:''}
         ${open>0?`<span style="font-size:10px;color:#92400e;background:#fef3c7;padding:0 4px;border-radius:8px">${open}</span>`:''}
@@ -5631,11 +5631,13 @@ function renderMeetingDetail(m, canManage) {
 function renderInstanceDetail(inst, meeting, canManage) {
   const tab = S._themaTab==='protocol' ? 'protocol' : 'points';
   const protos=[...(inst.protocols||[])].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  const openPointsCount=(inst.items||[]).filter(it=>it.status==='open'||it.status==='redo').length;
   return`<div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
       <div style="display:flex;gap:0;border-bottom:1px solid var(--border)">
-        <div onclick="S._themaTab='points';renderMeetings()" style="cursor:pointer;padding:6px 12px;font-size:12px;font-weight:600;${tab==='points'?'border-bottom:2px solid var(--acc);color:var(--acc)':'color:var(--mu)'}">📋 Punkte</div>
-        <div onclick="S._themaTab='protocol';renderMeetings()" style="cursor:pointer;padding:6px 12px;font-size:12px;font-weight:600;${tab==='protocol'?'border-bottom:2px solid var(--acc);color:var(--acc)':'color:var(--mu)'}">📖 Protokolle</div>
+        <div onclick="S._themaTab='points';renderMeetings()" style="cursor:pointer;padding:6px 12px;font-size:12px;font-weight:600;${tab==='points'?'border-bottom:2px solid var(--acc);color:var(--acc)':'color:var(--mu)'}">📋 Punkte (${openPointsCount})</div>
+        <div onclick="S._themaTab='protocol';renderMeetings()" style="cursor:pointer;padding:6px 12px;font-size:12px;font-weight:600;${tab==='protocol'?'border-bottom:2px solid var(--acc);color:var(--acc)':'color:var(--mu)'}">📖 Protokolle (${protos.length})</div>
+        <div onclick="S._themaTab='files';renderMeetings()" style="cursor:pointer;padding:6px 12px;font-size:12px;font-weight:600;${tab==='files'?'border-bottom:2px solid var(--acc);color:var(--acc)':'color:var(--mu)'}">📎 Dokumente (${(inst.files||[]).length})</div>
       </div>
       <div style="display:flex;gap:8px">
         ${canManage&&tab==='points'?`<button class="btn-add" onclick="openItemForm('${inst.id}')">+ Punkt</button>`:''}
@@ -5649,7 +5651,7 @@ function renderInstanceDetail(inst, meeting, canManage) {
     ${tab==='points'?`
     <input class="srch" type="text" id="meetingItemSearch" placeholder="🔍 Punkte durchsuchen …" value="${esc(S._meetingItemSearch||'')}" oninput="filterMeetingItems(this.value)" style="width:100%;margin-bottom:12px;box-sizing:border-box">
     <div id="meetingItemsGrid">${renderMeetingItemsGrid(inst, canManage, S._meetingItemSearch||'')}</div>
-    `:`
+    `:tab==='protocol'?`
     ${protos.length===0?`<div style="color:var(--mu);font-size:13px;padding:16px 0;text-align:center">Noch keine Protokolle.</div>`:''}
     <div style="display:flex;flex-direction:column;gap:10px">
       ${protos.map(p=>`<div class="meetings-card" style="cursor:default">
@@ -5671,11 +5673,151 @@ function renderInstanceDetail(inst, meeting, canManage) {
           if(a.startsWith(EXT_ATTENDEE_PREFIX)){const n=a.slice(EXT_ATTENDEE_PREFIX.length);return`<span class="av-sm" style="background:#64748b" title="${esc(n)} (extern)">${esc(n.slice(0,2).toUpperCase())}</span>`;}
           const u=getU(a);return u?`<span class="av-sm" style="background:${u.color}" title="${esc(lastNameFirst(u.name))}">${esc(u.initials)}</span>`:'';
         }).join('')}</div>`:''}
+        ${docContactLinkBadgesHtml(p)}
         ${p.body?`<div style="font-size:12px;color:var(--tx);margin-top:8px;white-space:pre-wrap;border-top:1px solid var(--border);padding-top:8px;max-height:240px;overflow-y:auto">${esc(p.body)}</div>`:''}
       </div>`).join('')}
     </div>
-    `}
+    `:renderInstanceFilesTab(inst, canManage)}
   </div>`;
+}
+
+// Themen-eigene Dokumente: unabhängig von Punkten/Protokollen, per Drag&Drop
+// hochladbar (auch E-Mails als .msg/.eml — werden wie jede andere Datei
+// einfach als Anhang gespeichert, ohne Auswertung des Inhalts). Können von
+// hier aus zusätzlich an einzelne Punkte/Protokolle verknüpft werden.
+function renderInstanceFilesTab(inst, canManage) {
+  const files = inst.files||[];
+  return`
+    ${canManage?`<div id="thema-dropzone-${inst.id}" style="border:2px dashed var(--border);border-radius:8px;padding:24px 16px;text-align:center;margin-bottom:14px;background:var(--sf);cursor:pointer;transition:all .2s;color:var(--mu);font-size:13px"
+      onclick="document.getElementById('thema-dropinput-${inst.id}').click()"
+      ondragover="event.preventDefault();this.style.background='var(--acc)';this.style.borderColor='var(--acc)';this.style.color='#fff'"
+      ondragleave="this.style.background='var(--sf)';this.style.borderColor='var(--border)';this.style.color='var(--mu)'"
+      ondrop="event.preventDefault();this.style.background='var(--sf)';this.style.borderColor='var(--border)';this.style.color='var(--mu)';uploadInstanceFiles('${inst.id}',{files:event.dataTransfer.files})">
+      &#128193; Datei oder E-Mail hierher ziehen, oder klicken zum Auswählen
+      <input type="file" multiple id="thema-dropinput-${inst.id}" style="display:none" onchange="uploadInstanceFiles('${inst.id}',this)">
+    </div>`:''}
+    ${files.length===0?`<div style="color:var(--mu);font-size:13px;padding:16px 0;text-align:center">Noch keine Dokumente.</div>`:''}
+    <div style="display:flex;flex-direction:column;gap:6px">
+      ${files.map(f=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--sf);border:1px solid var(--border);border-radius:8px">
+        <span style="flex-shrink:0">${fileIcon(f.mimeType)}</span>
+        <a href="/api/meeting-instances/${inst.id}/files/${f.id}" target="_blank" rel="noopener noreferrer" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:var(--tx);text-decoration:none">${esc(f.originalName)}</a>
+        <span style="font-size:11px;color:var(--mu);flex-shrink:0">${fmtBytes(f.sizeBytes||0)}</span>
+        ${canManage?`<button class="btn-d" style="padding:2px 6px;font-size:11px;flex-shrink:0" onclick="deleteInstanceFile('${inst.id}','${f.id}')">&#10005;</button>`:''}
+      </div>`).join('')}
+    </div>`;
+}
+// Kleine Badge-Zeile mit verknüpften Dokumenten (eigener Thema-Upload oder
+// globales Dokument — Anzeigename/Mime-Type kommen bereits fertig aufgelöst
+// vom Server, sodass ein Versionsaustausch im Dokumente-Modul automatisch
+// den neuen Stand zeigt) und verknüpften Kontakten, für Punkt-/Protokoll-Karten.
+function docContactLinkBadgesHtml(target) {
+  const docs = target.docLinks||[];
+  const contacts = target.contactLinks||[];
+  if (!docs.length && !contacts.length) return '';
+  return `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">
+    ${docs.map(d=>`<span style="display:inline-flex;align-items:center;gap:3px;background:var(--bg2);border-radius:10px;padding:1px 7px;font-size:10px;color:var(--mu)" title="${esc(d.name)}">${fileIcon(d.mimeType)} ${esc(d.name.length>18?d.name.slice(0,18)+'…':d.name)}</span>`).join('')}
+    ${contacts.map(c=>{const ct=(S.contacts||[]).find(x=>x.id===c.contactId);return ct?`<span style="display:inline-flex;align-items:center;gap:3px;background:var(--bg2);border-radius:10px;padding:1px 7px;font-size:10px;color:var(--mu)" title="${esc(ct.name)}">👤 ${esc(ct.name.length>18?ct.name.slice(0,18)+'…':ct.name)}</span>`:'';}).join('')}
+  </div>`;
+}
+function fileIcon(mime) {
+  if (!mime) return '📄';
+  if (mime.startsWith('image/')) return '🖼️';
+  if (mime==='application/pdf') return '📕';
+  if (mime.includes('word')) return '📝';
+  if (mime.includes('sheet')||mime.includes('excel')) return '📊';
+  if (mime==='message/rfc822'||mime.includes('outlook')) return '✉️';
+  return '📄';
+}
+async function uploadInstanceFiles(instanceId, input) {
+  const files = input.files;
+  if (!files || !files.length) return;
+  loading(true);
+  try {
+    for (const f of files) {
+      if (f.size > 20*1024*1024) { toast(`⚠️ ${f.name} zu groß (max. 20 MB)`,'err'); continue; }
+      const dataUrl = await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(new Error('Lesefehler'));r.readAsDataURL(f);});
+      const b64 = dataUrl.split(',')[1];
+      await api('POST','/meeting-instances/'+instanceId+'/files',{name:f.name,mimeType:f.type||'application/octet-stream',data:b64});
+    }
+    await fetchData(); renderMeetings(); toast('✅ Dokument(e) hochgeladen');
+  } catch(e) { toast('⚠️ '+e.message,'err'); } finally { loading(false); if(input.value!==undefined) input.value=''; }
+}
+async function deleteInstanceFile(instanceId, fileId) {
+  if (!confirm('Dokument löschen? Bestehende Verknüpfungen zu Punkten/Protokollen werden dabei entfernt.')) return;
+  try {
+    await api('DELETE',`/meeting-instances/${instanceId}/files/${fileId}`);
+    await fetchData(); renderMeetings(); toast('Gelöscht');
+  } catch(e) { toast('⚠️ '+e.message,'err'); }
+}
+
+// Dokument-/Kontakt-Verknüpfungen an einem Punkt oder Protokoll (nur beim
+// Bearbeiten bereits gespeicherter Einträge möglich — vor dem ersten
+// Speichern gibt es noch keine ID, an die verknüpft werden könnte). Zur
+// Auswahl stehen sowohl Themen-eigene Uploads als auch Dokumente aus dem
+// globalen Dokumente-Modul.
+function _docLinkOptionsHtml(instanceId, excludeKeys) {
+  const inst = S.meetings.flatMap(m=>m.instances).find(i=>i.id===instanceId);
+  const themaFiles = (inst?.files||[]).filter(f=>!excludeKeys.has('instance_file:'+f.id));
+  const globalDocs = (S.docs||[]).slice().sort((a,b)=>a.title.localeCompare(b.title,'de')).filter(d=>!excludeKeys.has('document:'+d.id));
+  let html = '<option value="">– Dokument wählen –</option>';
+  if (themaFiles.length) html += '<optgroup label="Dokumente dieses Themas">' + themaFiles.map(f=>`<option value="instance_file:${f.id}">${esc(f.originalName)}</option>`).join('') + '</optgroup>';
+  if (globalDocs.length) html += '<optgroup label="Dokumente-Modul">' + globalDocs.map(d=>`<option value="document:${d.id}">${esc(d.title)}</option>`).join('') + '</optgroup>';
+  return html;
+}
+function renderLinkSections(prefix, target, instanceId) {
+  const section = document.getElementById(prefix+'LinksSection');
+  if (!target) { section.style.display='none'; return; }
+  section.style.display='';
+  const docLinks = target.docLinks||[];
+  document.getElementById(prefix+'DocLinksList').innerHTML = docLinks.length ? docLinks.map(d=>`<span style="display:inline-flex;align-items:center;gap:4px;background:var(--bg2);border-radius:12px;padding:2px 8px;font-size:12px">${fileIcon(d.mimeType)} ${esc(d.name)}<button style="border:none;background:none;cursor:pointer;color:var(--mu);padding:0 2px;font-size:13px" onclick="removeDocLink('${d.id}')">&#215;</button></span>`).join('') : '<span style="color:var(--mu);font-size:12px">Keine</span>';
+  document.getElementById(prefix+'DocLinkSelect').innerHTML = _docLinkOptionsHtml(instanceId, new Set(docLinks.map(d=>d.sourceType+':'+d.sourceId)));
+  const contactLinks = target.contactLinks||[];
+  document.getElementById(prefix+'ContactLinksList').innerHTML = contactLinks.length ? contactLinks.map(c=>{const ct=(S.contacts||[]).find(x=>x.id===c.contactId); return ct?`<span style="display:inline-flex;align-items:center;gap:4px;background:var(--bg2);border-radius:12px;padding:2px 8px;font-size:12px">👤 ${esc(ct.name)}<button style="border:none;background:none;cursor:pointer;color:var(--mu);padding:0 2px;font-size:13px" onclick="removeContactLink('${c.id}')">&#215;</button></span>`:'';}).join('') : '<span style="color:var(--mu);font-size:12px">Keine</span>';
+  const excludedContactIds = new Set(contactLinks.map(c=>c.contactId));
+  document.getElementById(prefix+'ContactLinkSelect').innerHTML = '<option value="">– Kontakt wählen –</option>' + (S.contacts||[]).slice().sort((a,b)=>a.name.localeCompare(b.name,'de')).filter(c=>!excludedContactIds.has(c.id)).map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
+}
+function _refreshOpenLinkForm() {
+  if (document.getElementById('itemFormOv').classList.contains('open')) {
+    const id=document.getElementById('itId').value, instanceId=document.getElementById('itInstanceId').value;
+    if (id) openItemForm(instanceId, id);
+  } else if (document.getElementById('protoFormOv').classList.contains('open')) {
+    const id=document.getElementById('pfId').value, instanceId=document.getElementById('pfInstanceId').value;
+    if (id) openProtocolForm(instanceId, id);
+  }
+}
+async function addDocLink(kind) {
+  const prefix = kind==='item' ? 'it' : 'pf';
+  const targetId = document.getElementById(prefix+'Id').value;
+  const sel = document.getElementById(prefix+'DocLinkSelect').value;
+  if (!targetId || !sel) return;
+  const idx = sel.indexOf(':');
+  const sourceType = sel.slice(0,idx), sourceId = sel.slice(idx+1);
+  try {
+    await api('POST','/meetings/doc-links',{targetType:kind,targetId,sourceType,sourceId});
+    await fetchData(); renderMeetings(); _refreshOpenLinkForm();
+  } catch(e) { toast('⚠️ '+e.message,'err'); }
+}
+async function removeDocLink(linkId) {
+  try {
+    await api('DELETE','/meeting-doc-links/'+linkId);
+    await fetchData(); renderMeetings(); _refreshOpenLinkForm();
+  } catch(e) { toast('⚠️ '+e.message,'err'); }
+}
+async function addContactLink(kind) {
+  const prefix = kind==='item' ? 'it' : 'pf';
+  const targetId = document.getElementById(prefix+'Id').value;
+  const contactId = document.getElementById(prefix+'ContactLinkSelect').value;
+  if (!targetId || !contactId) return;
+  try {
+    await api('POST','/meetings/contact-links',{targetType:kind,targetId,contactId});
+    await fetchData(); renderMeetings(); _refreshOpenLinkForm();
+  } catch(e) { toast('⚠️ '+e.message,'err'); }
+}
+async function removeContactLink(linkId) {
+  try {
+    await api('DELETE','/meeting-contact-links/'+linkId);
+    await fetchData(); renderMeetings(); _refreshOpenLinkForm();
+  } catch(e) { toast('⚠️ '+e.message,'err'); }
 }
 function renderMeetingItemsGrid(inst, canManage, search) {
   const statusCols={open:'Zu besprechen',done:'Besprochen',redo:'Nochmal',delegate:'Delegiert'};
@@ -5709,6 +5851,7 @@ function renderMeetingItemsGrid(inst, canManage, search) {
               ${(it.externalParticipants||[]).slice(0,4).map(n=>`<span class="av-sm" style="background:#64748b" title="${esc(n)} (extern)">${esc(n.slice(0,2).toUpperCase())}</span>`).join('')}
               ${(it.externalParticipants||[]).length>4?`<span style="font-size:11px;color:var(--mu)">+${it.externalParticipants.length-4}</span>`:''}
             </div>
+            ${docContactLinkBadgesHtml(it)}
             ${it.link?`<div style="margin-top:4px;font-size:11px"><a href="${esc(it.link)}" target="_blank" rel="noopener noreferrer" style="color:#3b6dd4;text-decoration:none;display:inline-flex;align-items:center;gap:3px"><span>🔗</span><span>${esc(it.link.slice(0,30))}${it.link.length>30?'…':''}</span></a></div>`:''}
             ${it.parentId?`<div style="font-size:11px;color:#7c3aed;margin-top:4px">&#8617; Folge</div>`:''}
             ${it.groupId?`<div style="font-size:11px;color:#0ea5e9;margin-top:4px">🔗 Verknüpft</div>`:''}
@@ -5730,26 +5873,29 @@ function openMeetingForm(id=null) {
   document.getElementById('meetingFormTitle').textContent = m ? 'Besprechung bearbeiten' : 'Neue Besprechung';
   document.getElementById('mfId').value = m?.id||'';
   document.getElementById('mfTitle').value = m?.title||'';
-  document.getElementById('mfType').value = m?.type||'einmalig';
   document.getElementById('mfDesc').value = m?.description||'';
   document.getElementById('mfLink').value = m?.link||'';
-  document.getElementById('mfRhythm').value = m?.rhythm||'weekly';
+  document.getElementById('mfRhythm').value = m?.rhythm||'';
   document.getElementById('mfRhythmTime').value = m?.rhythmTime||'';
-  document.getElementById('mfRhythmDiv').style.display = (m?.type||'einmalig')==='jour_fixe'?'':'none';
+  document.getElementById('mfRhythmDiv').style.display = m?.rhythm?'':'none';
   openModal('meetingFormOv');
 }
 
+// Ein eigenes "Typ"-Feld gibt es nicht mehr — ob eine Besprechung wiederkehrend
+// ist (bisher "Jour Fixe"), ergibt sich allein daraus, ob ein Rhythmus gewählt
+// wurde; ohne Rhythmus ist sie einmalig.
 function onMfTypeChange() {
-  document.getElementById('mfRhythmDiv').style.display = document.getElementById('mfType').value==='jour_fixe'?'':'none';
+  document.getElementById('mfRhythmDiv').style.display = document.getElementById('mfRhythm').value?'':'none';
 }
 
 async function submitMeetingForm() {
   const id = document.getElementById('mfId').value;
   const title = document.getElementById('mfTitle').value.trim();
   if (!title) return toast('Titel erforderlich','err');
+  const rhythm = document.getElementById('mfRhythm').value;
   const body = {
-    title, type: document.getElementById('mfType').value,
-    rhythm: document.getElementById('mfRhythm').value,
+    title, type: rhythm ? 'jour_fixe' : 'einmalig',
+    rhythm: rhythm || null,
     rhythmTime: document.getElementById('mfRhythmTime').value,
     description: document.getElementById('mfDesc').value.trim(),
     link: document.getElementById('mfLink').value.trim() || null,
@@ -5788,7 +5934,9 @@ function openInstanceForm(meetingId, id=null) {
 async function submitInstanceForm() {
   const id = document.getElementById('ifId').value;
   const meetingId = document.getElementById('ifMeetingId').value;
-  const body = { date: null, time: '', notes: document.getElementById('ifNotes').value, title: document.getElementById('ifTitle').value };
+  const title = document.getElementById('ifTitle').value.trim();
+  if (!title) return toast('Titel erforderlich','err');
+  const body = { date: null, time: '', notes: document.getElementById('ifNotes').value, title };
   try {
     if (id) await api('PUT','/meeting-instances/'+id, body);
     else await api('POST','/meetings/'+meetingId+'/instances', body);
@@ -5902,6 +6050,7 @@ function openItemForm(instanceId, id=null) {
   document.getElementById('itStatus').onchange = function(){
     document.getElementById('itDelegateTo').style.display = this.value==='delegate'?'':'none';
   };
+  renderLinkSections('it', item, instanceId);
   openModal('itemFormOv');
 }
 
@@ -6069,6 +6218,7 @@ function openProtocolForm(instanceId, id=null) {
   document.getElementById('pfExtAttendeeInput').value = '';
   document.getElementById('pfReleased').checked = !!proto?.released;
   document.getElementById('protoDeleteBtn').style.display = proto ? '' : 'none';
+  renderLinkSections('pf', proto, instanceId);
   openModal('protoFormOv');
 }
 async function submitProtocolForm() {
