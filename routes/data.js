@@ -1,20 +1,26 @@
 'use strict';
 const router = require('express').Router();
-const { q, q1, parseRoles, parseTags, canSeeTk, canEditTk, canSeeMsg, pool } = require('../db');
+const { q, q1, parseRoles, parseTags, canSeeTk, canEditTk, canSeeMsg, pool, isUserActive } = require('../db');
 const { auth, ok, bad } = require('../middleware');
 
 // DATA
 router.get('/', auth, async (req,res) => {
   try {
     const uid=req.uid, p=req.p, tp=req.tp, roles=p.roles;
+    const canManageDp = roles.some(r=>['admin','leitung','dienstplanung'].includes(r));
+    const canManageSpint = roles.some(r=>['admin','leitung','technik'].includes(r));
     const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
-           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw] = await Promise.all([
-      q('SELECT id,name,initials,roles,color,must_change_pw,last_seen FROM users ORDER BY name'),
+           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw,dpQualificationsRaw,dpShiftPrefsRaw,dpProtocolRaw,todosRaw,todoItemsRaw,todoAssigneesRaw,myDpPlanIdsRaw,todoNotificationsRaw,contactsRaw,sopTemplatesRaw,sopItemsRaw,sopRunsRaw,sopRunItemsRaw,lockersRaw,sopBranchOptionsRaw,departmentsRaw,lockerCategoriesRaw,chatThreadsRaw,chatMessagesRaw,chatReadsRaw,protocolsRaw,todoNotesRaw,instFilesRaw,docLinksRaw,contactLinksRaw] = await Promise.all([
+      q('SELECT id,name,initials,roles,color,must_change_pw,last_seen,category,email,username,hire_date,termination_date,dp_relevant,is_test_user FROM users ORDER BY name'),
       q('SELECT * FROM categories ORDER BY sort_order,label'),
       q('SELECT * FROM tags ORDER BY label'),
-      p.canApproveEvents
-        ? q('SELECT * FROM events ORDER BY date_from')
-        : q('SELECT * FROM events WHERE is_general=true OR user_id=$1 OR created_by=$1 ORDER BY date_from',[uid]),
+      // Alle Events werden für JEDEN Nutzer geladen — die Sichtbarkeits-/
+      // Anonymisierungs-Logik weiter unten (canSeeAll/isForMe/createdByMe)
+      // entscheidet, was davon im Detail (Name/Grund) sichtbar ist. Eine
+      // zusätzliche SQL-Einschränkung hier würde Standard-Usern auch die
+      // ANONYMISIERTE Sicht auf Kolleg:innen-Einträge (z.B. im Dienstplan)
+      // unmöglich machen, statt sie nur zu maskieren.
+      q('SELECT * FROM events ORDER BY date_from'),
       q('SELECT event_id FROM event_confirms WHERE user_id=$1',[uid]),
       q('SELECT * FROM tickets ORDER BY created_at DESC'),
       q('SELECT * FROM ticket_notes ORDER BY created_at'),
@@ -39,15 +45,129 @@ router.get('/', auth, async (req,res) => {
       q('SELECT * FROM homeoffice_boxes ORDER BY sort_order,label').catch(()=>[]),
       q('SELECT * FROM homeoffice_dienste ORDER BY sort_order,label').catch(()=>[]),
       q('SELECT * FROM vacation_config ORDER BY date').catch(()=>[]),
+      q('SELECT * FROM ticket_subcategories ORDER BY department,sort_order,label').catch(()=>[]),
+      q('SELECT * FROM note_templates ORDER BY sort_order,label').catch(()=>[]),
+      q('SELECT * FROM station_shifts ORDER BY sort_order,label').catch(()=>[]),
+      q('SELECT * FROM station_sessions ORDER BY logged_in_at').catch(()=>[]),
+      q('SELECT id,ticket_id,original_name,mime_type,size_bytes,uploaded_by,created_at FROM ticket_files ORDER BY created_at DESC').catch(()=>[]),
+      q('SELECT * FROM doc_categories ORDER BY sort_order,name').catch(()=>[]),
+      q('SELECT id,category_id,title,description,original_name,mime_type,size_bytes,current_version,uploaded_by,created_at,updated_at FROM documents ORDER BY created_at DESC').catch(()=>[]),
+      q('SELECT * FROM portal_links ORDER BY sort_order,label').catch(()=>[]),
+      q('SELECT * FROM station_outages WHERE end_at IS NULL OR end_at > NOW() ORDER BY created_at').catch(()=>[]),
+      q('SELECT * FROM role_permissions').catch(()=>[]),
+      q('SELECT * FROM meetings ORDER BY created_at DESC').catch(()=>[]),
+      q('SELECT * FROM meeting_instances ORDER BY date DESC').catch(()=>[]),
+      q('SELECT * FROM discussion_items ORDER BY sort_order,created_at').catch(()=>[]),
+      q('SELECT * FROM discussion_participants').catch(()=>[]),
+      q('SELECT * FROM dp_shift_types ORDER BY sort_order, name').catch(()=>[]),
+      q('SELECT * FROM dp_absence_types ORDER BY sort_order, label').catch(()=>[]),
+      q('SELECT * FROM dp_plans ORDER BY year DESC, month DESC').catch(()=>[]),
+      q('SELECT * FROM dp_employee_qualifications').catch(()=>[]),
+      q('SELECT * FROM dp_shift_preferences').catch(()=>[]),
+      q('SELECT * FROM dp_generation_protocol ORDER BY created_at DESC').catch(()=>[]),
+      q('SELECT * FROM todos ORDER BY created_at DESC').catch(()=>[]),
+      q('SELECT * FROM todo_items ORDER BY sort_order, created_at').catch(()=>[]),
+      q('SELECT * FROM todo_item_assignees').catch(()=>[]),
+      canManageDp ? Promise.resolve([]) : q('SELECT DISTINCT plan_id FROM dp_assignments WHERE employee_id=$1',[uid]).catch(()=>[]),
+      q('SELECT * FROM todo_item_notifications WHERE user_id=$1 AND read_at IS NULL',[uid]).catch(()=>[]),
+      q('SELECT * FROM contacts ORDER BY name').catch(()=>[]),
+      q('SELECT * FROM sop_checklists ORDER BY category,title,version DESC').catch(()=>[]),
+      q('SELECT * FROM sop_checklist_items ORDER BY template_id,sort_order').catch(()=>[]),
+      p.manageSop ? q('SELECT * FROM sop_checklist_runs ORDER BY started_at DESC LIMIT 200').catch(()=>[])
+        : q('SELECT * FROM sop_checklist_runs WHERE started_by=$1 ORDER BY started_at DESC LIMIT 200',[uid]).catch(()=>[]),
+      q('SELECT * FROM sop_checklist_run_items').catch(()=>[]),
+      canManageSpint ? q('SELECT * FROM lockers ORDER BY number').catch(()=>[])
+        : q('SELECT * FROM lockers WHERE assignee_type=\'user\' AND assignee_user_id=$1 ORDER BY number',[uid]).catch(()=>[]),
+      q('SELECT * FROM sop_checklist_item_branch_options ORDER BY item_id,sort_order').catch(()=>[]),
+      q('SELECT * FROM departments ORDER BY sort_order,label').catch(()=>[]),
+      q('SELECT * FROM locker_categories ORDER BY sort_order,label').catch(()=>[]),
+      q('SELECT * FROM chat_threads WHERE user1_id=$1 OR user2_id=$1',[uid]).catch(()=>[]),
+      q('SELECT cm.* FROM chat_messages cm JOIN chat_threads ct ON ct.id=cm.thread_id WHERE ct.user1_id=$1 OR ct.user2_id=$1 ORDER BY cm.created_at',[uid]).catch(()=>[]),
+      q('SELECT * FROM chat_reads WHERE user_id=$1',[uid]).catch(()=>[]),
+      q('SELECT * FROM meeting_protocols ORDER BY date DESC,created_at DESC').catch(()=>[]),
+      q('SELECT * FROM todo_notes ORDER BY created_at').catch(()=>[]),
+      q('SELECT * FROM meeting_instance_files ORDER BY created_at DESC').catch(()=>[]),
+      q('SELECT * FROM meeting_doc_links').catch(()=>[]),
+      q('SELECT * FROM meeting_contact_links').catch(()=>[]),
     ]);
 
     const tkViewMap = new Map((tkViewsRaw||[]).map(v=>[v.ticket_id, v.viewed_at]));
+    const tkFileMap = {};
+    (tkFilesRaw||[]).forEach(f=>{ if(!tkFileMap[f.ticket_id]) tkFileMap[f.ticket_id]=[]; tkFileMap[f.ticket_id].push({id:f.id,originalName:f.original_name,mimeType:f.mime_type,sizeBytes:f.size_bytes,uploadedBy:f.uploaded_by,createdAt:f.created_at}); });
     const noteMap={}, clItemMap={}, tkClItemMap={}, tkClMap={};
-    notesRaw.forEach(n=>{ if(!noteMap[n.ticket_id]) noteMap[n.ticket_id]=[]; noteMap[n.ticket_id].push({id:n.id,text:n.text,authorId:n.author_id,noteType:n.note_type,createdAt:n.created_at,mentionedUsers:(()=>{try{return JSON.parse(n.mentioned_users||'[]');}catch{return [];}})()}); });
+    notesRaw.forEach(n=>{ if(!noteMap[n.ticket_id]) noteMap[n.ticket_id]=[]; noteMap[n.ticket_id].push({id:n.id,text:n.text,authorId:n.author_id,noteType:n.note_type,createdAt:n.created_at,editedAt:n.edited_at||null,todoStatus:n.todo_status||null,mentionedUsers:(()=>{try{return JSON.parse(n.mentioned_users||'[]');}catch{return [];}})()}); });
     clItems.forEach(i=>{ if(!clItemMap[i.template_id]) clItemMap[i.template_id]=[]; clItemMap[i.template_id].push({id:i.id,text:i.text,itemType:i.item_type||'check',sortOrder:i.sort_order}); });
     tkClItemsRaw.forEach(i=>{ if(!tkClItemMap[i.checklist_id]) tkClItemMap[i.checklist_id]=[]; tkClItemMap[i.checklist_id].push({id:i.id,text:i.text,itemType:i.item_type||'check',sortOrder:i.sort_order,completedBy:i.completed_by,completedAt:i.completed_at,userNote:i.user_note||''}); });
     tkClRaw.forEach(c=>{ if(!tkClMap[c.ticket_id]) tkClMap[c.ticket_id]=[]; tkClMap[c.ticket_id].push({id:c.id,templateId:c.template_id,name:c.name,createdBy:c.created_by,items:tkClItemMap[c.id]||[]}); });
 
+    const partMap={};
+    (partRaw||[]).forEach(p=>{if(!partMap[p.item_id])partMap[p.item_id]=[];partMap[p.item_id].push({id:p.id,userId:p.user_id,role:p.role});});
+    // Themen-Dokumente: eigene Uploads pro Thema, sowie Verknüpfungen (auf
+    // eigene Uploads ODER auf globale Dokumente aus dem Dokumente-Modul) auf
+    // einzelne Punkte/Protokolle. Bei globalen Dokumenten wird immer der
+    // aktuelle Titel/Mime-Type ausgeliefert — Versionsaustausch im Dokumente-
+    // Modul wirkt sich dadurch automatisch auf die Verknüpfung aus.
+    const docById={};
+    (docsRaw||[]).forEach(d=>{docById[d.id]=d;});
+    const instFileById={};
+    const instFileMap={};
+    (instFilesRaw||[]).forEach(f=>{
+      instFileById[f.id]=f;
+      if(!instFileMap[f.instance_id])instFileMap[f.instance_id]=[];
+      instFileMap[f.instance_id].push({id:f.id,instanceId:f.instance_id,originalName:f.original_name,mimeType:f.mime_type,sizeBytes:f.size_bytes,uploadedBy:f.uploaded_by,createdAt:f.created_at});
+    });
+    const docLinksByTarget={};
+    (docLinksRaw||[]).forEach(l=>{
+      const src = l.source_type==='document' ? docById[l.source_id] : instFileById[l.source_id];
+      if(!src) return;
+      const name = l.source_type==='document' ? src.title : src.original_name;
+      if(!docLinksByTarget[l.target_id])docLinksByTarget[l.target_id]=[];
+      docLinksByTarget[l.target_id].push({id:l.id,sourceType:l.source_type,sourceId:l.source_id,name,mimeType:src.mime_type,createdAt:l.created_at});
+    });
+    const contactLinksByTarget={};
+    (contactLinksRaw||[]).forEach(l=>{
+      if(!contactLinksByTarget[l.target_id])contactLinksByTarget[l.target_id]=[];
+      contactLinksByTarget[l.target_id].push({id:l.id,contactId:l.contact_id,createdAt:l.created_at});
+    });
+    const itemMap={};
+    (itemsRaw||[]).forEach(it=>{if(!itemMap[it.instance_id])itemMap[it.instance_id]=[];itemMap[it.instance_id].push({id:it.id,instanceId:it.instance_id,title:it.title,description:it.description,status:it.status,dueDate:it.due_date,meetingDate:it.meeting_date,parentId:it.parent_id,delegatedTo:it.delegated_to,result:it.result,sortOrder:it.sort_order,createdBy:it.created_by,createdAt:it.created_at,groupId:it.group_id||null,link:it.link||null,convertedTicketId:it.converted_ticket_id||null,convertedAt:it.converted_at||null,convertedBy:it.converted_by||null,protokoll:(()=>{try{return JSON.parse(it.protokoll||'[]');}catch{return [];}})(),participants:partMap[it.id]||[],externalParticipants:(()=>{try{return JSON.parse(it.external_participants||'[]');}catch{return [];}})(),aiStatus:it.ai_status||null,aiResult:(()=>{try{return it.ai_result?JSON.parse(it.ai_result):null;}catch{return null;}})(),docLinks:docLinksByTarget[it.id]||[],contactLinks:contactLinksByTarget[it.id]||[]});});
+    const protoMap={};
+    (protocolsRaw||[]).forEach(pr=>{if(!protoMap[pr.instance_id])protoMap[pr.instance_id]=[];protoMap[pr.instance_id].push({id:pr.id,instanceId:pr.instance_id,title:pr.title,date:pr.date,time:pr.time||'',location:pr.location||'',attendees:(()=>{try{return JSON.parse(pr.attendees||'[]');}catch{return [];}})(),body:pr.body||'',released:!!pr.released,createdBy:pr.created_by,createdAt:pr.created_at,updatedAt:pr.updated_at,docLinks:docLinksByTarget[pr.id]||[],contactLinks:contactLinksByTarget[pr.id]||[]});});
+    const instMap={};
+    (instancesRaw||[]).forEach(inst=>{if(!instMap[inst.meeting_id])instMap[inst.meeting_id]=[];instMap[inst.meeting_id].push({id:inst.id,meetingId:inst.meeting_id,date:inst.date,time:inst.time||'',title:inst.title||null,status:inst.status,notes:inst.notes||'',kind:inst.kind||'points',createdBy:inst.created_by,createdAt:inst.created_at,items:itemMap[inst.id]||[],protocols:protoMap[inst.id]||[],files:instFileMap[inst.id]||[]});});
+    // Meetings: find which meetings the user has assigned items in
+    const assignedMeetingIds = new Set();
+    const itemIsAssignedToMe = new Set(); // item ids where user is participant
+    (partRaw||[]).forEach(pp=>{
+      if(pp.user_id===uid){
+        itemIsAssignedToMe.add(pp.item_id);
+        const it=(itemsRaw||[]).find(x=>x.id===pp.item_id);
+        if(it){const inst=(instancesRaw||[]).find(x=>x.id===it.instance_id);if(inst)assignedMeetingIds.add(inst.meeting_id);}
+      }
+    });
+    // Freigegebene Protokolle: Teilnehmer (interne User-IDs, keine externen
+    // "ext:"-Einträge) bekommen dadurch — wie schon bestehende Besprechungs-
+    // punkt-Teilnehmer — Lesezugriff auf die gesamte Besprechung; Bearbeiten
+    // bleibt weiterhin ausschließlich Ersteller/Admins vorbehalten (_canManage).
+    (protocolsRaw||[]).forEach(pr=>{
+      if(!pr.released)return;
+      let att=[]; try{att=JSON.parse(pr.attendees||'[]');}catch{}
+      if(!att.includes(uid))return;
+      const inst=(instancesRaw||[]).find(x=>x.id===pr.instance_id);
+      if(inst)assignedMeetingIds.add(inst.meeting_id);
+    });
+    // Todos: find which todos the user has assigned items in
+    const assignedTodoIds = new Set();
+    const todoItemIsAssignedToMe = new Set(); // item ids where user is assignee
+    (todoAssigneesRaw||[]).forEach(a=>{
+      if(a.user_id===uid){
+        todoItemIsAssignedToMe.add(a.item_id);
+        const it=(todoItemsRaw||[]).find(x=>x.id===a.item_id);
+        if(it) assignedTodoIds.add(it.todo_id);
+      }
+    });
+    // Dienstplan: set of plan IDs current user has assignments in
+    const myDpPlanIdSet = new Set((myDpPlanIdsRaw||[]).map(r=>r.plan_id));
     const fiveMinAgo = new Date(Date.now() - 5*60*1000);
     const readIds  = new Set(readsRaw.map(r=>r.message_id));
     const readSet   = new Set(readsRaw.filter(r=>r.read_at).map(r=>r.message_id));  // nur wirklich bestätigt
@@ -56,8 +176,20 @@ router.get('/', auth, async (req,res) => {
 
     const dtSeenSet = new Set(dtReadsRaw.map(r=>r.diensttausch_id));
     const myNameForDt = (usersRaw.find(u=>u.id===uid)?.name||'').toLowerCase();
+    const todoNotifSet = new Set((todoNotificationsRaw||[]).map(n=>n.item_id));
+    // "Ansicht als": realIsAdmin bleibt an der tatsächlichen Person hängen
+    // (nicht an einer evtl. gerade angezeigten Testuser-Ansicht), damit der
+    // Steuer-Button/Banner im Frontend immer korrekt ein-/ausblendet.
+    const impersonation = {
+      realIsAdmin: !!req.realIsAdmin,
+      viewingAs: req.session.viewAsUserId ? { id: uid, name: req.user.name } : null,
+      testUsers: req.realIsAdmin
+        ? usersRaw.filter(u=>u.is_test_user).map(u=>({ id: u.id, name: u.name }))
+        : [],
+    };
     ok(res, {
       currentUser: uid,
+      impersonation,
       permissions: {
         canApproveEvents:p.canApproveEvents, canSendMessages:p.canSendMessages,
         seeAllEntries:true, editAllPersonal:p.editAllPersonal,
@@ -66,11 +198,22 @@ router.get('/', auth, async (req,res) => {
         seeAllAbrechnung:p.seeAllAbrechnung,
         myDepts:tp.myDepts, seeAllTickets:tp.seeAll,
         canSetPublic:tp.canSetPublic, canAssign:tp.canAssign,
+        tabs:p.tabs,
+        roles: p.roles,
+        canManageDp, manageSop:p.manageSop, canManageSpint,
       },
       users: usersRaw.map(u=>({
         id:u.id, name:u.name, initials:u.initials, roles:parseRoles(u.roles),
         color:u.color, mustChangePW:u.must_change_pw,
+        category:u.category||'', username:u.username||'', email:u.email||'',
         isOnline: !!(u.last_seen && new Date(u.last_seen) > fiveMinAgo),
+        hireDate: u.hire_date ? new Date(u.hire_date).toISOString().slice(0,10) : null,
+        terminationDate: u.termination_date ? new Date(u.termination_date).toISOString().slice(0,10) : null,
+        // Zentral aus hire_date/termination_date abgeleitet (db.isUserActive) —
+        // KEIN gespeichertes Flag, damit es überall im Portal einheitlich ist.
+        isActive: isUserActive(u),
+        dpRelevant: !!u.dp_relevant,
+        isTestUser: !!u.is_test_user,
       })),
       categories: cats,
       tags: tagsRaw,
@@ -103,15 +246,22 @@ router.get('/', auth, async (req,res) => {
       }),
       tickets: tkRaw.filter(tk=>canSeeTk(tp,tk,uid)).map(tk=>({
         id:tk.id, number:tk.number, title:tk.title, description:tk.description||'',
-        department:tk.department, tags:parseTags(tk.tags), priority:tk.priority,
+        department:tk.department, subcategory:tk.subcategory||'', reporter:tk.reporter||'', tags:parseTags(tk.tags), priority:tk.priority,
         status:tk.status, bucket:tk.bucket||'', isPublic:tk.is_public,
+        isDeleted:!!tk.is_deleted, deletedAt:tk.deleted_at||null, deletedBy:tk.deleted_by||null,
         assigneeId:tk.assignee_id, parentTicketId:tk.parent_ticket_id,
+        dueDate:tk.due_date?(typeof tk.due_date==='string'?tk.due_date.slice(0,10):tk.due_date.toISOString().slice(0,10)):null,
+        snoozedUntil:tk.snoozed_until?(typeof tk.snoozed_until==='string'?tk.snoozed_until.slice(0,10):tk.snoozed_until.toISOString().slice(0,10)):null,
         createdBy:tk.created_by, createdAt:tk.created_at, updatedAt:tk.updated_at, lastViewedAt:tkViewMap.get(tk.id)||null,
         mentionedUsers:[...new Set((noteMap[tk.id]||[]).flatMap(n=>n.mentionedUsers||[]))].filter(Boolean),
-        notes:noteMap[tk.id]||[], checklists:tkClMap[tk.id]||[],
+        participants:(()=>{try{return JSON.parse(tk.participants||'[]');}catch{return [];}})(),
+        notes:noteMap[tk.id]||[], checklists:tkClMap[tk.id]||[], files:tkFileMap[tk.id]||[],
+        aiStatus:tk.ai_status||null, aiResult:(()=>{try{return tk.ai_result?JSON.parse(tk.ai_result):null;}catch{return null;}})(),
+        lockedForApproval:!!tk.locked_for_approval, approvalUserId:tk.approval_user_id||null,
+        approvalRequestedBy:tk.approval_requested_by||null, approvalRequestedAt:tk.approval_requested_at||null,
         _canEdit:canEditTk(tp,tk,uid),
       })),
-      allowances: allwRaw.map(a=>({id:a.id,userId:a.user_id,year:a.year,month:a.month,nd:a.nd,fd:a.fd,fw:a.fw,c10:a.c10})),
+      allowances: allwRaw.map(a=>({id:a.id,userId:a.user_id,year:a.year,month:a.month,nd:a.nd,fd:Number(a.fd)||0,fw:a.fw,c10:a.c10,rkt:a.rkt||0,buero:a.buero||0})),
       checklists: clTmpls.map(t=>({id:t.id,name:t.name,department:t.department,createdBy:t.created_by,items:clItemMap[t.id]||[]})),
       messages: msgsRaw.filter(m=>{
         if(!m.sender_id) return true;             // alte Nachrichten → alle sehen
@@ -157,15 +307,100 @@ router.get('/', auth, async (req,res) => {
         if (myNameForDt && dt.text.toLowerCase().includes('@'+myNameForDt)) return true;
         return false;
       }).map(dt => ({
-        id:dt.id, text:dt.text, createdBy:dt.created_by, createdAt:dt.created_at,
+        id:dt.id, text:dt.text, createdBy:dt.created_by, createdByName:dt.created_by_name||'', createdAt:dt.created_at,
         status:dt.status, decidedBy:dt.decided_by, decidedAt:dt.decided_at,
         rejectReason:dt.reject_reason, isSeen:dtSeenSet.has(dt.id),
         isRelevant: dt.created_by===uid ||
           (myNameForDt && dt.text.toLowerCase().includes('@'+myNameForDt)) ||
           (p.canApproveEvents && dt.status==='pending'),
       })),
+      ticketSubcategories: (tkSubcatsRaw||[]).map(s=>({id:s.id,department:s.department,label:s.label,sortOrder:s.sort_order})),
+      noteTemplates: (noteTmplsRaw||[]).map(t=>({id:t.id,label:t.label,body:t.body})),
+      stationShifts: (stShiftsRaw||[]).map(s=>({id:s.id,label:s.label,sortOrder:s.sort_order,serviceStart:s.service_start||'',serviceEnd:s.service_end||'',hasBreak:s.has_break!==false})),
+      stationSessions: (stSessionsRaw||[]).map(s=>({id:s.id,stationName:s.station_name,userId:s.user_id,shiftId:s.shift_id,loggedInAt:s.logged_in_at,breakTime:s.break_time||null})),
+      docCategories: (docCatsRaw||[]).map(c=>({id:c.id,name:c.name,icon:c.icon,color:c.color,sortOrder:c.sort_order,parentId:c.parent_id||null})),
+      docs: (docsRaw||[]).map(d=>({id:d.id,categoryId:d.category_id,title:d.title,description:d.description||'',originalName:d.original_name,mimeType:d.mime_type,sizeBytes:d.size_bytes,currentVersion:d.current_version,uploadedBy:d.uploaded_by,createdAt:d.created_at,updatedAt:d.updated_at})),
+      portalLinks: (linksRaw||[]).map(l=>({id:l.id,label:l.label,url:l.url,icon:l.icon,description:l.description,sortOrder:l.sort_order})),
+      stationOutages: (stOutagesRaw||[]).map(o=>({id:o.id,stationName:o.station_name,reason:o.reason,startAt:o.start_at,endAt:o.end_at,createdBy:o.created_by})),
+      rolePermissions: (rolePermsRaw||[]).map(r=>({role:r.role,permission:r.permission,granted:r.granted})),
+      meetings: (meetingsRaw||[]).filter(m=>p.manageUsers||m.created_by===uid||assignedMeetingIds.has(m.id)).map(m=>{
+        const canMng=p.manageUsers||m.created_by===uid;
+        return {id:m.id,title:m.title,type:m.type,rhythm:m.rhythm,rhythmDay:m.rhythm_day,rhythmTime:m.rhythm_time||'',description:m.description||'',link:m.link||null,createdBy:m.created_by,createdAt:m.created_at,_canManage:canMng,
+          instances:(instMap[m.id]||[]).map(inst=>({...inst,items:(inst.items||[]).map(it=>({...it,_canEdit:canMng||it.createdBy===uid||it.delegatedTo===uid||itemIsAssignedToMe.has(it.id)}))}))};
+      }),
+      dpShiftTypes: dpShiftTypesRaw||[],
+      dpAbsenceTypes: dpAbsenceTypesRaw||[],
+      dpHoursProfiles: await q('SELECT * FROM dp_hours_profiles ORDER BY name').catch(()=>[]),
+      dpEmpCategories: await q('SELECT * FROM dp_emp_categories ORDER BY sort_order, name').catch(()=>[]),
+      dpEmpRules: await q('SELECT * FROM dp_emp_rules ORDER BY employee_id, day_of_week').catch(()=>[]),
+      dpPlans: canManageDp ? (dpPlansRaw||[]) : (dpPlansRaw||[]).filter(p=>p.status==='published'&&myDpPlanIdSet.has(p.id)),
+      dpQualifications: dpQualificationsRaw||[],
+      dpShiftPrefs: dpShiftPrefsRaw||[],
+      dpProtocol: (dpProtocolRaw||[]).map(p=>({id:p.id,planId:p.plan_id,date:p.date,shiftTypeId:p.shift_type_id,reason:p.reason,employeeId:p.employee_id,details:p.details||{}})),
+      todos: (todosRaw||[]).filter(t=>p.manageUsers||t.created_by===uid||assignedTodoIds.has(t.id)).map(t=>{
+        const canMng=p.manageUsers||t.created_by===uid;
+        const protokoll=(()=>{try{return JSON.parse(t.protokoll||'[]');}catch{return [];}})();
+        const items=(todoItemsRaw||[]).filter(i=>i.todo_id===t.id).map(i=>({...i,_canEdit:canMng||todoItemIsAssignedToMe.has(i.id),assignees:(todoAssigneesRaw||[]).filter(a=>a.item_id===i.id)}));
+        const hasUnread = items.some(i=>todoNotifSet.has(i.id));
+        const aiResult=(()=>{try{return t.ai_result?JSON.parse(t.ai_result):null;}catch{return null;}})();
+        const notes=(todoNotesRaw||[]).filter(n=>n.todo_id===t.id).map(n=>({
+          id:n.id, todoId:n.todo_id, text:n.text, authorId:n.author_id,
+          createdAt:n.created_at, editedAt:n.edited_at,
+          mentionedUsers:(()=>{try{return JSON.parse(n.mentioned_users||'[]');}catch{return [];}})(),
+        }));
+        return {...t,_canManage:canMng,protokoll,_hasUnreadNotifications:hasUnread,items,ai_result:aiResult,notes};
+      }),
+      contacts: (contactsRaw||[]).map(c=>({
+        id:c.id, title:c.title||'', name:c.name, email:c.email||'',
+        phone1:c.phone1||'', phone2:c.phone2||'', company:c.company||'',
+        responsibleFor:c.responsible_for||'', availability:c.availability||'',
+        createdBy:c.created_by, createdAt:c.created_at,
+      })),
+      // Notfall-Checklisten: Nicht-Manager sehen nur die jeweils freigegebene+
+      // aktive Version jeder Checkliste; der technische Leiter (manageSop)
+      // sieht zusätzlich Entwürfe und deaktivierte/ältere Versionen zur Pflege.
+      sopTemplates: (sopTemplatesRaw||[]).filter(t=>p.manageSop||(t.status==='approved'&&t.active)).map(t=>({
+        id:t.id, baseId:t.base_id, version:t.version, title:t.title, category:t.category||'',
+        description:t.description||'', status:t.status, active:t.active,
+        createdBy:t.created_by, createdAt:t.created_at,
+        approvedBy:t.approved_by||null, approvedAt:t.approved_at||null,
+        lastPrintedAt:t.last_printed_at||null,
+        items:(sopItemsRaw||[]).filter(i=>i.template_id===t.id).map(i=>({
+          id:i.id, sortOrder:i.sort_order, text:i.text, required:i.required,
+          itemType:i.item_type, hint:i.hint||'', contactId:i.contact_id||null,
+          branchOptionId:i.branch_option_id||null,
+          options:(sopBranchOptionsRaw||[]).filter(o=>o.item_id===i.id).map(o=>({id:o.id,label:o.label,sortOrder:o.sort_order})),
+        })),
+      })),
+      sopRuns: (sopRunsRaw||[]).map(r=>({
+        id:r.id, templateId:r.template_id, startedBy:r.started_by, startedAt:r.started_at,
+        completedAt:r.completed_at||null, status:r.status, isTest:!!r.is_test,
+        items:(sopRunItemsRaw||[]).filter(ri=>ri.run_id===r.id).map(ri=>({
+          id:ri.id, itemId:ri.item_id, done:ri.done, value:ri.value||'', note:ri.note||'',
+          updatedAt:ri.updated_at||null, updatedBy:ri.updated_by||null,
+        })),
+      })),
+      lockers: (lockersRaw||[]).map(l=>({
+        id:l.id, number:l.number, assigneeType:l.assignee_type,
+        assigneeUserId:l.assignee_user_id||null, assigneeLabel:l.assignee_label||'',
+        note:l.note||'', categoryId:l.category_id||null, createdBy:l.created_by, createdAt:l.created_at,
+        updatedBy:l.updated_by||null, updatedAt:l.updated_at||null,
+      })),
+      lockerCategories: (lockerCategoriesRaw||[]).map(c=>({
+        id:c.id, label:c.label, emoji:c.emoji||'', sortOrder:c.sort_order,
+      })),
+      departments: (departmentsRaw||[]).map(d=>({
+        id:d.id, label:d.label, emoji:d.emoji||'', color:d.color||'#64748b', sortOrder:d.sort_order,
+      })),
+      chatThreads: (chatThreadsRaw||[]).map(t=>({
+        id:t.id, otherUserId: t.user1_id===uid?t.user2_id:t.user1_id, createdAt:t.created_at,
+        myLastReadAt: (chatReadsRaw||[]).find(r=>r.thread_id===t.id)?.last_read_at || null,
+      })),
+      chatMessages: (chatMessagesRaw||[]).map(m=>({
+        id:m.id, threadId:m.thread_id, senderId:m.sender_id, text:m.text, createdAt:m.created_at,
+      })),
     });
-  } catch(e) { console.error('[/api/data FEHLER]', e.message, e.stack?.split('\n')[1]); bad(res,e.message,500); }
+  } catch(e) { console.error('[/api/data FEHLER]', e.message, e.stack?.split('\n')[1]); bad(res,'Serverfehler',500); }
 });
 
 // EVENTS
