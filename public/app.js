@@ -61,7 +61,6 @@ const STATUSES=[{id:'open',label:'Offen'},{id:'in_progress',label:'In Bearbeitun
 // "closed" abzufragen, damit "cancelled" nirgends vergessen wird.
 const TK_INACTIVE_STATUSES=['closed','cancelled'];
 const isTkClosed=tk=>TK_INACTIVE_STATUSES.includes(tk.status);
-const BUCKETS=[{id:'urgent',label:'\uD83D\uDEA8 Dringend'},{id:'week',label:'\uD83D\uDCC5 Diese Woche'},{id:'sched',label:'\uD83D\uDCCB Dienstplanung'},{id:'wait',label:'\u23F3 Wartet'},{id:'it',label:'\uD83D\uDCBB IT'},{id:'proj',label:'\uD83D\uDE80 Projekte'},{id:'org',label:'\uD83C\uDFE2 Organisation'},{id:'ideas',label:'\uD83D\uDCA1 Ideen'}];
 const RM=[
   ['Benutzer verwalten',         {admin:1,leitung:0,dienstplanung:0,schichtleiter:0,technik:0,ausbildung:0,qm:0,standard:0}],
   ['Dienstplan: alle sehen',     {admin:1,leitung:1,dienstplanung:1,schichtleiter:1,technik:0,ausbildung:0,qm:0,standard:0}],
@@ -72,7 +71,7 @@ const RM=[
   ['Tickets: alle sehen',        {admin:1,leitung:1,dienstplanung:0,schichtleiter:0,technik:0,ausbildung:0,qm:0,standard:0}],
   ['Tickets: Beschwerden sehen', {admin:1,leitung:1,dienstplanung:0,schichtleiter:1,technik:0,ausbildung:0,qm:1,standard:0}],
   ['Tickets: nur eigene',        {admin:0,leitung:0,dienstplanung:0,schichtleiter:0,technik:0,ausbildung:0,qm:0,standard:1}],
-  ['Status/Bucket setzen',       {admin:1,leitung:1,dienstplanung:1,schichtleiter:1,technik:1,ausbildung:1,qm:1,standard:0}],
+  ['Status setzen',              {admin:1,leitung:1,dienstplanung:1,schichtleiter:1,technik:1,ausbildung:1,qm:1,standard:0}],
   ['Nachrichten senden',         {admin:1,leitung:1,dienstplanung:1,schichtleiter:1,technik:1,ausbildung:1,qm:1,standard:0}],
   ['Alle Zulagen',               {admin:1,leitung:1,dienstplanung:1,schichtleiter:0,technik:0,ausbildung:0,qm:0,standard:0}],
   ['Abrechnung alle sehen',      {admin:1,leitung:0,dienstplanung:1,schichtleiter:0,technik:0,ausbildung:0,qm:0,standard:0}],
@@ -81,7 +80,7 @@ const RM=[
 let S={
   year:new Date().getFullYear(),month:new Date().getMonth(),
   currentUser:null,view:'home',filterUser:null,
-  tkFiltDept:'',tkFiltPrio:'',tkFiltBucket:'',tkFiltTag:'',tkFiltAssignee:'',tkSearch:'',tkFiltStatus:'',
+  tkFiltDept:'',tkFiltPrio:'',tkFiltTag:'',tkFiltAssignee:'',tkSearch:'',tkFiltStatus:'',
   allwYear:new Date().getFullYear(),allwPeriod:'month',allwMonth:new Date().getMonth()+1,
   abrYear:new Date().getFullYear(),abrMonth:new Date().getMonth()+1,abrUser:null,
   zahnarztWeek:null, // null = all from today, otherwise ISO Mon of week
@@ -2136,7 +2135,7 @@ async function saveEditNote(tkId,noteId){
 }
 function renderTkDetail(){
   const tk=getTk(S.currentTicketId);if(!tk)return;
-  const canEdit=tk._canEdit;const bkt=BUCKETS.find(b=>b.id===tk.bucket);const par=tk.parentTicketId?getTk(tk.parentTicketId):null;
+  const canEdit=tk._canEdit;const par=tk.parentTicketId?getTk(tk.parentTicketId):null;
   const subs=S.tickets.filter(t=>t.parentTicketId===tk.id);
   document.getElementById('tkDetNum').textContent=tk.number;
   document.getElementById('tkDetTitle').textContent=tk.title;
@@ -2189,10 +2188,9 @@ function renderTkDetail(){
         <button class="btn-s" style="font-size:11px;padding:3px 9px" onclick="openAiSuggestionsFor('Ticket','${tk.id}')">🤖 KI-Vorschläge</button>
       </div>
       <div style="font-size:13px;line-height:1.6;color:${tk.description?'var(--tx)':'var(--di)'};white-space:pre-wrap">${tk.description?esc(tk.description):'Keine Beschreibung.'}</div></div>
-    ${subs.length||canEditFields?`<div>
+    ${subs.length?`<div>
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di);margin-bottom:8px">UNTERTICKETS (${subs.length})</div>
       <div class="subl">${subs.map(st=>`<div class="subi" onclick="S.currentTicketId='${st.id}';renderTkDetail()">\u21b8<span style="font-family:monospace;font-size:11px;color:var(--mu)">${st.number}</span><span style="flex:1;font-size:12px">${st.title}</span>${stBdg(st.status)}</div>`).join('')}
-      ${canEditFields?`<button class="btn-s" style="font-size:11px;margin-top:4px" onclick="openTkForm(null,'${tk.id}')">&#65291; Unterticket</button>`:''}
       </div></div>`:''}
     ${tk.checklists.length?`<div>
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di);margin-bottom:8px">CHECKLISTEN</div>
@@ -2281,25 +2279,24 @@ function renderTkDetail(){
     <div class="tkf"><label>Fachbereich</label>${tk.parentTicketId?
       `<div class="val">${deptBdg(tk.department)} <span style="font-size:11px;color:var(--mu)">(vom Elternticket übernommen)</span></div>`
       :`<select onchange="updateTkField('${tk.id}','department',this.value)">${DEPTS.map(d=>`<option value="${d}"${tk.department===d?' selected':''}>${DEPT_LABELS[d]}</option>`).join('')}</select>`}</div>
-    ${S.tp.canSeeSubcat?`<div class="tkf"><label>Unterkategorie</label><select onchange="updateTkField('${tk.id}','subcategory',this.value)"><option value="">— keine —</option>${(()=>{const opts=S.ticketSubcategories.filter(s=>s.department===tk.department).map(s=>s.label);if(tk.subcategory&&!opts.includes(tk.subcategory))opts.unshift(tk.subcategory);return opts.map(l=>`<option value="${l}"${tk.subcategory===l?' selected':''}>${l}</option>`).join('');})()}</select></div>`:''}
-    <div class="tkf"><label>Bucket</label><select onchange="updateTkField('${tk.id}','bucket',this.value)"><option value="">\u2014</option>${BUCKETS.map(b=>`<option value="${b.id}"${tk.bucket===b.id?' selected':''}>${b.label}</option>`).join('')}</select></div>
     <div class="tkf"><label>Zust\u00e4ndig</label><div style="display:flex;gap:5px">
       <select onchange="updateTkField('${tk.id}','assigneeId',this.value||null)" style="flex:1"><option value="">\u2014</option>${S.users.filter(isAssignable).map(u=>`<option value="${u.id}"${tk.assigneeId===u.id?' selected':''}>${lastNameFirst(u.name)}</option>`).join('')}</select>
       ${S.tp.canAssign&&tk.assigneeId!==S.currentUser?`<button class="btn-ok" onclick="updateTkField('${tk.id}','assigneeId','${S.currentUser}')">Ich</button>`:''}
     </div></div>
-    ${S.tp.canSetPublic?`<div class="tkf"><label>Sichtbarkeit</label><button class="bdg ${tk.isPublic?'pub-on':'pub-off'}" onclick="updateTkField('${tk.id}','isPublic',${!tk.isPublic})" style="cursor:pointer;padding:5px 10px;border-radius:6px;font-size:12px">${tk.isPublic?'&#127760; \u00d6ffentlich':'&#128274; Privat'}</button></div>`:''}
+    ${S.tp.canSeeSubcat?`<div class="tkf"><label>Unterkategorie</label><select onchange="updateTkField('${tk.id}','subcategory',this.value)"><option value="">— keine —</option>${(()=>{const opts=S.ticketSubcategories.filter(s=>s.department===tk.department).map(s=>s.label);if(tk.subcategory&&!opts.includes(tk.subcategory))opts.unshift(tk.subcategory);return opts.map(l=>`<option value="${l}"${tk.subcategory===l?' selected':''}>${l}</option>`).join('');})()}</select></div>`:''}
     <div class="tkf"><label>Elternticket</label><select onchange="updateTkField('${tk.id}','parentTicketId',this.value||null)"><option value="">\u2014</option>${(() => {
       const active = S.tickets.filter(t=>t.id!==tk.id && !t.parentTicketId && !t.isDeleted && !isTkClosed(t)).map(t=>`<option value="${t.id}"${tk.parentTicketId===t.id?' selected':''}>${t.number}: ${t.title.slice(0,25)}</option>`).join('');
       const closed = S.tickets.filter(t=>t.id!==tk.id && !t.parentTicketId && !t.isDeleted && isTkClosed(t)).map(t=>`<option value="${t.id}"${tk.parentTicketId===t.id?' selected':''}>${t.number}: ${t.title.slice(0,25)}</option>`).join('');
       return active + (closed ? `<optgroup label="Abgeschlossen/Storniert">${closed}</optgroup>` : '');
     })()}</select></div>
+    ${S.tp.canSetPublic?`<div class="tkf"><label>Sichtbarkeit</label><button class="bdg ${tk.isPublic?'pub-on':'pub-off'}" onclick="updateTkField('${tk.id}','isPublic',${!tk.isPublic})" style="cursor:pointer;padding:5px 10px;border-radius:6px;font-size:12px">${tk.isPublic?'&#127760; \u00d6ffentlich':'&#128274; Privat'}</button></div>`:''}
     <div class="tkf"><label>&#128197; F\u00e4lligkeit</label><input type="date" value="${tk.dueDate||''}" onchange="updateTkField('${tk.id}','dueDate',this.value||null)" style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:var(--r);background:var(--sf);color:var(--tx);width:100%;box-sizing:border-box"></div>
     <div class="tkf"><label>&#128100; Einmelder</label><input type="text" value="${esc(tk.reporter||'')}" placeholder="optional" onchange="updateTkField('${tk.id}','reporter',this.value.trim())" style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:var(--r);background:var(--sf);color:var(--tx);width:100%;box-sizing:border-box"></div>`
     :`<div class="tkf"><label>Status</label><div class="val">${stBdg(tk.status)}</div></div>
     <div class="tkf"><label>Priorit\u00e4t</label><div class="val">${prioBdg(tk.priority)}</div></div>
     <div class="tkf"><label>Fachbereich</label><div class="val">${deptBdg(tk.department)}</div></div>
-    ${S.tp.canSeeSubcat&&tk.subcategory?`<div class="tkf"><label>Unterkategorie</label><div class="val"><span class="bdg" style="font-size:11px;background:rgba(124,58,237,.12);color:#7c3aed">${tk.subcategory}</span></div></div>`:''}
     <div class="tkf"><label>Zust\u00e4ndig</label><div class="val">${getU(tk.assigneeId)?`<div style="display:flex;align-items:center;gap:5px">${avHtml(getU(tk.assigneeId).initials,getU(tk.assigneeId).color,18,8)}<span style="font-size:12px">${lastNameFirst(getU(tk.assigneeId).name)}</span></div>`:'\u2014'}</div></div>
+    ${S.tp.canSeeSubcat&&tk.subcategory?`<div class="tkf"><label>Unterkategorie</label><div class="val"><span class="bdg" style="font-size:11px;background:rgba(124,58,237,.12);color:#7c3aed">${tk.subcategory}</span></div></div>`:''}
     ${tk.reporter?`<div class="tkf"><label>&#128100; Einmelder</label><div class="val" style="font-size:12px">${esc(tk.reporter)}</div></div>`:''}`}
     <div class="tkdiv"></div>
     <div class="tkf"><label>Tags</label><div>${tagChips(tk.tags)||'<span style="color:var(--di);font-size:11px">\u2014</span>'}</div></div>
@@ -2500,11 +2497,10 @@ function openTkForm(id,parentId){
   if(tk?.subcategory){const sel=document.getElementById('tkFSubcat');if(sel)sel.value=tk.subcategory||'';}
 
   document.getElementById('tkFSt').value=tk?.status||'open';
-  // Standard-User sehen keine Status/Bucket-Auswahl
+  // Standard-User sehen keine Status-Auswahl
   var isStd=!(S.tp.seeAll||S.tp.myDepts.length>0);
   var advRow=document.getElementById('tkFAdvRow');
   if(advRow)advRow.style.display=isStd?'none':'flex';
-  document.getElementById('tkFBkt').innerHTML='<option value="">\u2014</option>'+BUCKETS.map(b=>`<option value="${b.id}"${tk?.bucket===b.id?' selected':''}>${b.label}</option>`).join('');
   document.getElementById('tkFTags').innerHTML=S.tags.map(t=>`<option value="${t.id}"${tk?.tags?.includes(t.id)?' selected':''}>${t.label}</option>`).join('');
   document.getElementById('tkFAsgn').innerHTML='<option value="">\u2014 niemand \u2014</option>'+S.users.filter(isAssignable).map(u=>`<option value="${u.id}"${tk?.assigneeId===u.id?' selected':''}>${lastNameFirst(u.name)}</option>`).join('');
   const pid=parentId||tk?.parentTicketId||'';
@@ -2529,7 +2525,7 @@ async function saveTicket(withAi){
   const nm=document.getElementById('tkFNm').value.trim();if(!nm){toast('\u26A0\uFE0F Name erforderlich!');return;}
   const id=document.getElementById('tkFId').value;
   const tags=Array.from(document.getElementById('tkFTags').selectedOptions).map(o=>o.value);
-  const body={title:nm,reporter:document.getElementById('tkFReporter').value.trim(),description:document.getElementById('tkFDesc').value.trim(),department:document.getElementById('tkFDept').value,subcategory:document.getElementById('tkFSubcat')?.value||'',priority:document.getElementById('tkFPrio').value,status:document.getElementById('tkFSt').value,bucket:document.getElementById('tkFBkt').value,tags,assigneeId:document.getElementById('tkFAsgn').value||null,parentTicketId:document.getElementById('tkFPar').value||null,dueDate:document.getElementById('tkFDue')?.value||null,aiSearch:!!withAi,isPublic:S.tp.canSetPublic?!!S._tkFormVisPublic:undefined};
+  const body={title:nm,reporter:document.getElementById('tkFReporter').value.trim(),description:document.getElementById('tkFDesc').value.trim(),department:document.getElementById('tkFDept').value,subcategory:document.getElementById('tkFSubcat')?.value||'',priority:document.getElementById('tkFPrio').value,status:document.getElementById('tkFSt').value,tags,assigneeId:document.getElementById('tkFAsgn').value||null,parentTicketId:document.getElementById('tkFPar').value||null,dueDate:document.getElementById('tkFDue')?.value||null,aiSearch:!!withAi,isPublic:S.tp.canSetPublic?!!S._tkFormVisPublic:undefined};
   try{
     let savedId=id;
     if(id)await api('PUT','/tickets/'+id,body);

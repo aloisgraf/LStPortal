@@ -526,7 +526,10 @@ router.post('/:id/files', auth, async (req,res) => {
     await pool.query('INSERT INTO ticket_files (id,ticket_id,filename,original_name,mime_type,size_bytes,uploaded_by,file_data) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
       [id,req.params.id,filename,safeName,mime,buf.length,req.uid,buf.toString('base64')]);
     const uname=(await getUser(req.uid))?.name||'?';
-    await auditNote(req.params.id,req.uid,`📎 Datei hochgeladen: ${safeName} von ${uname}`);
+    // Als regulärer Eintrag statt nur Audit-Log, damit das Anhängen einer
+    // Datei direkt in der normalen Konversation (Details-Tab) sichtbar ist.
+    await pool.query('INSERT INTO ticket_notes (id,ticket_id,text,author_id,note_type) VALUES ($1,$2,$3,$4,$5)',
+      [newId(),req.params.id,`📎 ${safeName} angehängt (von ${uname})`,req.uid,'note']);
     ok(res,{id});
   } catch(e) { bad(res,'Serverfehler',500); }
 });
