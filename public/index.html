@@ -1746,6 +1746,15 @@
           <button class="btn-s" onclick="addItemParticipantForm()">+</button>
         </div>
       </div>
+      <div class="fg">
+        <label>Weitere Teilnehmer (händisch)</label>
+        <div id="itExtParticipantsList" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px"></div>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="itExtParticipantInput" list="itExtParticipantSuggestions" placeholder="Name eingeben …" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();addItemExternalParticipant();}">
+          <datalist id="itExtParticipantSuggestions"></datalist>
+          <button class="btn-s" onclick="addItemExternalParticipant()">+</button>
+        </div>
+      </div>
     </div>
       <!-- Protokoll (read-only, shown when editing) -->
       <div id="itProtokollSection" style="display:none">

@@ -5531,7 +5531,6 @@ function renderMeetings() {
             ${activeThemen.map(i=>`<div style="font-size:11px;color:var(--mu);display:flex;align-items:center;gap:4px">
               <span style="flex-shrink:0">${i.kind==='protocol'?'📖':'📋'}</span>
               <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(i.title||'Thema')}</span>
-              <span style="flex-shrink:0">${i.date?fmtDate(i.date):'offen'}</span>
             </div>`).join('')}
           </div>`:insts.length?`<div style="font-size:11px;color:var(--di);margin-top:3px">Alle Themen abgeschlossen</div>`:''}
           ${open>0?`<div style="margin-top:3px"><span style="font-size:11px;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:10px">${open} offene Punkte</span></div>`:''}
@@ -5552,19 +5551,16 @@ function meetingInstTabHtml(m, i, canManage) {
   const statusColor={planned:'#3b82f6',done:'#10b981',cancelled:'#ef4444'}[i.status]||'#64748b';
   const titleLine=i.title?esc(i.title):'Thema';
   const isProtocol = i.kind==='protocol';
-  // Bei Protokoll-Themen liegen Datum/Uhrzeit bei den einzelnen Protokollen,
-  // nicht am Thema selbst — "Datum offen" und der Status "Geplant" wären hier
-  // immer (und damit bedeutungslos) zu sehen. Nur ein tatsächlicher Endstatus
-  // (Abgeschlossen/Abgesagt) ist bei Protokoll-Themen relevant genug zum Zeigen.
-  const showDate = !isProtocol && i.date;
-  const showDateOpen = !isProtocol && !i.date;
+  // Datum/Uhrzeit werden für kein Thema mehr am Thema selbst angezeigt — bei
+  // Protokoll-Themen liegen sie bei den einzelnen Protokollen, bei Punkte-
+  // Themen bei den einzelnen Punkten ("Besprochen am"/"Fällig bis"). Der
+  // Status "Geplant" wäre bei Protokoll-Themen ohnehin immer (und damit
+  // bedeutungslos) zu sehen — nur ein echter Endstatus zählt dort.
   const showStatus = !isProtocol || i.status!=='planned';
   return`<div class="meetings-inst-tab${S._selInstance===i.id?' active':''}" style="position:relative">
     <div onclick="S._selInstance='${i.id}';renderMeetings()" style="cursor:pointer;${canManage?'padding-right:18px':''}">
       <div style="font-size:12px;font-weight:600">${isProtocol?'📖 ':'📋 '}${titleLine}</div>
-      ${showDate?`<div style="font-size:11px;color:var(--mu);margin-top:1px">${fmtDate(i.date)}${i.time?' '+i.time:''}</div>`:''}
       <div style="display:flex;gap:4px;margin-top:2px;align-items:center;flex-wrap:wrap">
-        ${showDateOpen?`<span style="font-size:10px;color:#f59e0b">Datum offen</span>`:''}
         ${showStatus?`<span style="font-size:10px;color:${statusColor}">${{planned:'Geplant',done:'Abgeschlossen',cancelled:'Abgesagt'}[i.status]||i.status}</span>`:''}
         ${open>0?`<span style="font-size:10px;color:#92400e;background:#fef3c7;padding:0 4px;border-radius:8px">${open}</span>`:''}
       </div>
@@ -5701,6 +5697,8 @@ function renderMeetingItemsGrid(inst, canManage, search) {
               ${it.delegatedTo?`<span style="font-size:11px;color:#7c3aed">→ ${esc(getU(it.delegatedTo)?lastNameFirst(getU(it.delegatedTo).name):'?')}</span>`:''}
               ${(it.participants||[]).slice(0,4).map(p=>{const u=getU(p.userId);return u?`<span class="av-sm" style="background:${u.color}" title="${esc(lastNameFirst(u.name))}">${esc(u.initials)}</span>`:''}).join('')}
               ${(it.participants||[]).length>4?`<span style="font-size:11px;color:var(--mu)">+${it.participants.length-4}</span>`:''}
+              ${(it.externalParticipants||[]).slice(0,4).map(n=>`<span class="av-sm" style="background:#64748b" title="${esc(n)} (extern)">${esc(n.slice(0,2).toUpperCase())}</span>`).join('')}
+              ${(it.externalParticipants||[]).length>4?`<span style="font-size:11px;color:var(--mu)">+${it.externalParticipants.length-4}</span>`:''}
             </div>
             ${it.link?`<div style="margin-top:4px;font-size:11px"><a href="${esc(it.link)}" target="_blank" rel="noopener noreferrer" style="color:#3b6dd4;text-decoration:none;display:inline-flex;align-items:center;gap:3px"><span>🔗</span><span>${esc(it.link.slice(0,30))}${it.link.length>30?'…':''}</span></a></div>`:''}
             ${it.parentId?`<div style="font-size:11px;color:#7c3aed;margin-top:4px">&#8617; Folge</div>`:''}
@@ -5781,31 +5779,22 @@ function openInstanceForm(meetingId, id=null) {
   kindPoints.disabled = kindProtocol.disabled = !!inst;
   document.getElementById('ifKindWrap').style.opacity = inst?'.55':'1';
   onIfKindChange();
-  const dateOpen = inst && !inst.date;
-  const cb = document.getElementById('ifDateOpen');
-  cb.checked = dateOpen;
-  document.getElementById('ifDate').disabled = dateOpen;
-  document.getElementById('ifDate').value = dateOpen ? '' : (inst?.date?.slice?.(0,10)||'');
-  document.getElementById('ifTime').value = inst?.time||m?.rhythmTime||'';
   document.getElementById('ifNotes').value = inst?.notes||'';
   openModal('instanceFormOv');
 }
 
-// Bei Protokoll-Themen werden Datum/Uhrzeit pro Protokoll-Eintrag erfasst,
-// nicht am Thema selbst — Felder ausblenden und die Datumspflicht dafür
-// aufheben.
+// Datum/Uhrzeit werden für kein Thema mehr am Thema selbst erfasst — bei
+// Protokoll-Themen liegen sie pro Protokoll-Eintrag, bei Punkte-Themen pro
+// einzelnem Punkt ("Besprochen am"/"Fällig bis"). Feld daher immer
+// ausgeblendet, unabhängig von der Art.
 function onIfKindChange() {
-  const isProtocol = document.getElementById('ifKindProtocol').checked;
-  document.getElementById('ifDateTimeWrap').style.display = isProtocol ? 'none' : '';
+  document.getElementById('ifDateTimeWrap').style.display = 'none';
 }
 async function submitInstanceForm() {
   const id = document.getElementById('ifId').value;
   const meetingId = document.getElementById('ifMeetingId').value;
   const isProtocol = document.getElementById('ifKindProtocol').checked;
-  const dateOpen = document.getElementById('ifDateOpen').checked;
-  const date = document.getElementById('ifDate').value;
-  if (!isProtocol && !dateOpen && !date) return toast('Datum erforderlich oder "Datum noch offen" aktivieren','err');
-  const body = { date: (isProtocol||dateOpen) ? null : date, time: isProtocol ? '' : document.getElementById('ifTime').value, notes: document.getElementById('ifNotes').value, title: document.getElementById('ifTitle').value };
+  const body = { date: null, time: '', notes: document.getElementById('ifNotes').value, title: document.getElementById('ifTitle').value };
   if (!id) body.kind = isProtocol ? 'protocol' : 'points';
   try {
     if (id) await api('PUT','/meeting-instances/'+id, body);
@@ -5911,6 +5900,9 @@ function openItemForm(instanceId, id=null) {
   }
   document.getElementById('itPartUser').innerHTML = S.users.map(u=>`<option value="${u.id}">${esc(lastNameFirst(u.name))}</option>`).join('');
   renderItemParticipants(item?.participants||[]);
+  document.getElementById('itExtParticipantsList').innerHTML = itemExtParticipantsChipsHtml(item?.externalParticipants||[]);
+  document.getElementById('itExtParticipantInput').value = '';
+  document.getElementById('itExtParticipantSuggestions').innerHTML = _allKnownExtParticipantNames().map(n=>`<option value="${esc(n)}">`).join('');
   const fbtn = document.getElementById('itFollowupBtn');
   fbtn.style.display = (item && item.status==='done') ? '' : 'none';
   if (item) fbtn.onclick = ()=>openFollowupForm(item.id);
@@ -5954,6 +5946,31 @@ function removeItemParticipantForm(userId) {
   spans.forEach(s=>{ if(s.dataset.userId===userId) s.remove(); });
 }
 
+// Händisch eingetragene Teilnehmer (kein Benutzerkonto, z.B. Externe) — mit
+// Vorschlagsliste aus allen bisher irgendwo im Portal so eingetragenen Namen,
+// damit man wiederkehrende externe Teilnehmer nicht jedes Mal neu eintippt.
+function itemExtParticipantsChipsHtml(names) {
+  return names.map(n=>`<span data-ext-name="${esc(n)}" style="display:inline-flex;align-items:center;gap:4px;background:var(--bg2);border-radius:12px;padding:2px 8px;font-size:12px">
+    <span class="av-sm" style="background:#64748b">${esc(n.slice(0,2).toUpperCase())}</span>${esc(n)}
+    <button style="border:none;background:none;cursor:pointer;color:var(--mu);padding:0 2px;font-size:13px" onclick="this.parentElement.remove()">&#215;</button>
+  </span>`).join('');
+}
+function _allKnownExtParticipantNames() {
+  const names = new Set();
+  (S.meetings||[]).forEach(m=>(m.instances||[]).forEach(inst=>(inst.items||[]).forEach(it=>(it.externalParticipants||[]).forEach(n=>names.add(n)))));
+  return [...names].sort((a,b)=>a.localeCompare(b,'de'));
+}
+function addItemExternalParticipant() {
+  const inp = document.getElementById('itExtParticipantInput');
+  const name = inp.value.trim();
+  if (!name) return;
+  const list = document.getElementById('itExtParticipantsList');
+  if ([...list.children].some(el=>el.dataset.extName===name)) { inp.value=''; return; }
+  list.insertAdjacentHTML('beforeend', itemExtParticipantsChipsHtml([name]));
+  inp.value = '';
+  inp.focus();
+}
+
 async function submitItemForm() {
   const id = document.getElementById('itId').value;
   const instanceId = document.getElementById('itInstanceId').value;
@@ -5965,6 +5982,7 @@ async function submitItemForm() {
   for (const el of partEls) {
     if (el.dataset.userId) participants.push({userId:el.dataset.userId, role:el.dataset.role||'required'});
   }
+  const externalParticipants = [...document.getElementById('itExtParticipantsList').children].map(el=>el.dataset.extName).filter(Boolean);
   const body = {
     title, description: document.getElementById('itDesc').value.trim(),
     status, dueDate: document.getElementById('itDueDate').value||null,
@@ -5972,7 +5990,7 @@ async function submitItemForm() {
     delegatedTo: status==='delegate'?document.getElementById('itDelegatedTo').value:null,
     result: document.getElementById('itResult').value.trim(),
     link: document.getElementById('itLink').value||null,
-    participants,
+    participants, externalParticipants,
   };
   try {
     if (id) {
@@ -6126,7 +6144,7 @@ function onMoveMeetingChange() {
     instSel.innerHTML = '<option value="">— Keine anderen Themen —</option>';
   } else {
     const stLabel = {planned:'Geplant',done:'Abgeschlossen',cancelled:'Abgesagt'};
-    instSel.innerHTML = otherInsts.map(i=>`<option value="${i.id}">${i.title?esc(i.title)+' · ':''}${i.date?fmtDate(i.date):'Datum offen'} ${i.time||''} (${stLabel[i.status]||i.status})</option>`).join('');
+    instSel.innerHTML = otherInsts.map(i=>`<option value="${i.id}">${esc(i.title||'Thema')} (${stLabel[i.status]||i.status})</option>`).join('');
   }
 }
 
@@ -6163,7 +6181,7 @@ function onCopyMeetingChange() {
   if (!insts.length) {
     iSel.innerHTML = '<option value="">— Kein geplantes Thema —</option>';
   } else {
-    iSel.innerHTML = insts.map(i=>`<option value="${i.id}">${i.date?fmtDate(i.date):'Datum offen'} ${i.time||''}</option>`).join('');
+    iSel.innerHTML = insts.map(i=>`<option value="${i.id}">${esc(i.title||'Thema')}</option>`).join('');
   }
 }
 
