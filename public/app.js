@@ -2078,15 +2078,23 @@ function _renderFeed(notes,tkId,canEdit,filter){
         </div>
       </div>`;
     } else {
+      // Für die per Dropdown gewählte "Art des Eintrags" (Noch offen/Ticket-
+      // Abschluss/Storniert/Zur Freigabe/…) gibt es eine eigene Akzentfarbe,
+      // die den ganzen Eintrag hervorhebt: getönter Hintergrund, farbiger
+      // linker Rand UND ein fett hervorgehobenes Label über dem Text (statt
+      // nur einer kleinen Pille) — damit man solche Einträge auf einen Blick
+      // von normalen Info-Notizen unterscheidet.
+      const todoColor=n.todoStatus==='open'?'#ef4444':n.todoStatus==='done'?'#10b981':n.todoStatus==='closing'?'#3b6dd4':n.todoStatus==='cancel'?'#64748b':n.todoStatus==='approval'?'#b45309':n.todoStatus==='approved'?'#10b981':n.todoStatus==='approval_withdrawn'?'#64748b':null;
       const todoBg=n.todoStatus==='open'?'rgba(239,68,68,.07)':n.todoStatus==='done'?'rgba(16,185,129,.07)':n.todoStatus==='closing'?'rgba(59,109,212,.07)':n.todoStatus==='cancel'?'rgba(100,116,139,.1)':n.todoStatus==='approval'?'rgba(245,158,11,.08)':n.todoStatus==='approved'?'rgba(16,185,129,.07)':n.todoStatus==='approval_withdrawn'?'rgba(100,116,139,.1)':'var(--sf)';
       const todoBorder=n.todoStatus==='open'?'rgba(239,68,68,.25)':n.todoStatus==='done'?'rgba(16,185,129,.25)':n.todoStatus==='closing'?'rgba(59,109,212,.25)':n.todoStatus==='cancel'?'rgba(100,116,139,.35)':n.todoStatus==='approval'?'rgba(245,158,11,.3)':n.todoStatus==='approved'?'rgba(16,185,129,.25)':n.todoStatus==='approval_withdrawn'?'rgba(100,116,139,.35)':'var(--border)';
-      const todoLabel=n.todoStatus==='open'?'<span class="bdg" style="font-size:10px;background:rgba(239,68,68,.12);color:#ef4444">Noch offen</span>'
-        :n.todoStatus==='done'?'<span class="bdg" style="font-size:10px;background:rgba(16,185,129,.12);color:#10b981">Erledigt</span>'
-        :n.todoStatus==='closing'?'<span class="bdg" style="font-size:10px;background:rgba(59,109,212,.12);color:var(--acc)">🔒 Ticket-Abschluss</span>'
-        :n.todoStatus==='cancel'?'<span class="bdg" style="font-size:10px;background:rgba(100,116,139,.15);color:#64748b">🚫 Storniert</span>'
-        :n.todoStatus==='approval'?'<span class="bdg" style="font-size:10px;background:rgba(245,158,11,.15);color:#b45309">🔒 Zur Freigabe</span>'
-        :n.todoStatus==='approved'?'<span class="bdg" style="font-size:10px;background:rgba(16,185,129,.12);color:#10b981">✅ Freigegeben</span>'
-        :n.todoStatus==='approval_withdrawn'?'<span class="bdg" style="font-size:10px;background:rgba(100,116,139,.15);color:#64748b">🔓 Zurückgezogen</span>':'';
+      const todoLabelText=n.todoStatus==='open'?'Noch offen'
+        :n.todoStatus==='done'?'Erledigt'
+        :n.todoStatus==='closing'?'🔒 Ticket-Abschluss'
+        :n.todoStatus==='cancel'?'🚫 Storniert'
+        :n.todoStatus==='approval'?'🔒 Zur Freigabe'
+        :n.todoStatus==='approved'?'✅ Freigegeben'
+        :n.todoStatus==='approval_withdrawn'?'🔓 Zurückgezogen':'';
+      const todoLabel=todoColor?`<div style="font-size:13px;font-weight:700;color:${todoColor};margin-bottom:4px">${todoLabelText}</div>`:'';
       const todoCheckbox=(n.todoStatus==='open'||n.todoStatus==='done')&&canEdit
         ?`<label style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--mu);cursor:pointer"><input type="checkbox" ${n.todoStatus==='done'?'checked':''} onchange="toggleNoteTodo('${tkId}','${n.id}',this.checked)" style="width:13px;height:13px;cursor:pointer">Erledigt</label>`
         :'';
@@ -2100,17 +2108,16 @@ function _renderFeed(notes,tkId,canEdit,filter){
               <button class="btn-s" style="font-size:11px;padding:3px 10px" onclick="cancelEditNote()">Abbrechen</button>
             </div>
           </div>`
-        :`<div style="font-size:13px;line-height:1.5;color:var(--mu);white-space:pre-wrap">${highlightMentions(n.text)}${n.editedAt?'<span style="font-size:10px;color:var(--di);margin-left:4px">(bearbeitet)</span>':''}</div>`;
+        :`<div style="font-size:13px;line-height:1.5;color:var(--mu);white-space:pre-wrap">${todoLabel}${highlightMentions(n.text)}${n.editedAt?'<span style="font-size:10px;color:var(--di);margin-left:4px">(bearbeitet)</span>':''}</div>`;
       return`<div style="display:flex;gap:10px;position:relative">
         <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0">
           <div style="width:28px;height:28px;border-radius:50%;flex-shrink:0;z-index:1;overflow:hidden;border:2px solid var(--border)">${a?avHtml(a.initials,a.color,24,10):`<div style="width:28px;height:28px;background:var(--sf2);display:flex;align-items:center;justify-content:center;font-size:14px">💬</div>`}</div>
           ${!isLast?`<div style="width:2px;flex:1;background:var(--border);margin:2px 0;min-height:12px"></div>`:''}
         </div>
-        <div style="background:${todoBg};border:1px solid ${todoBorder};border-radius:8px;padding:9px 12px;flex:1;min-width:0;margin-bottom:${isLast?'0':'10px'}">
+        <div style="background:${todoBg};border:1px solid ${todoBorder};${todoColor?`border-left:4px solid ${todoColor};`:''}border-radius:8px;padding:9px 12px;flex:1;min-width:0;margin-bottom:${isLast?'0':'10px'}">
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
             <span style="font-size:12px;font-weight:700">${a?lastNameFirst(a.name):'?'}</span>
             <span style="font-size:10px;color:var(--di)">${fdt(n.createdAt)}</span>
-            ${todoLabel}
             <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
               ${todoCheckbox}
               ${canEditNote&&!isEditing?`<button class="btn-s" style="padding:1px 6px;font-size:10px" onclick="startEditNote('${n.id}')">✎</button>`:''}
@@ -2183,10 +2190,7 @@ function renderTkDetail(){
     </div>`:'';
   const detailsHtml=`
     ${lockBannerHtml}
-    <div><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di)">BESCHREIBUNG</div>
-        <button class="btn-s" style="font-size:11px;padding:3px 9px" onclick="openAiSuggestionsFor('Ticket','${tk.id}')">🤖 KI-Vorschläge</button>
-      </div>
+    <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di);margin-bottom:6px">BESCHREIBUNG</div>
       <div style="font-size:13px;line-height:1.6;color:${tk.description?'var(--tx)':'var(--di)'};white-space:pre-wrap">${tk.description?esc(tk.description):'Keine Beschreibung.'}</div></div>
     ${subs.length?`<div>
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di);margin-bottom:8px">UNTERTICKETS (${subs.length})</div>
@@ -2324,11 +2328,22 @@ function renderTkDetail(){
   // KI-Ergebnisse bekommen eine eigene, breitere Spalte links im Fenster
   // statt unter der Beschreibung eingebettet zu sein \u2014 Fenster wird daf\u00fcr
   // automatisch breiter (siehe .modal.xl.wide-ai).
+  // KI-Spalte ist jetzt immer sichtbar mit dem Ausl\u00f6se-Button ganz oben \u2014
+  // prim\u00e4r steht dort nichts, erst nach einer aktiv gestarteten Suche
+  // (Klick auf den Button) erscheint hier ein Ergebnis.
   const hasAi=!!(tk.aiStatus||tk.ai_status);
-  document.getElementById('tkDetModal')?.classList.toggle('wide-ai',hasAi);
-  document.getElementById('tkDetBody')?.classList.toggle('has-ai',hasAi);
+  document.getElementById('tkDetModal')?.classList.add('wide-ai');
+  document.getElementById('tkDetBody')?.classList.add('has-ai');
   const aiCol=document.getElementById('tkDetAi');
-  if(aiCol)aiCol.innerHTML=hasAi?`<div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di);margin-bottom:8px">\ud83e\udd16 KI-L\u00d6SUNGEN</div>${aiInlinePanelHtml(tk)}`:'';
+  if(aiCol)aiCol.innerHTML=`<button class="btn-s" style="width:100%;justify-content:center" onclick="triggerTicketAiSearch('${tk.id}')">\ud83e\udd16 KI-Vorschl\u00e4ge</button>${hasAi?`<div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di);margin:12px 0 8px">KI-L\u00d6SUNGEN</div>${aiInlinePanelHtml(tk)}`:''}`;
+}
+async function triggerTicketAiSearch(tkId){
+  const tk=getTk(tkId); if(!tk) return;
+  try{
+    await api('POST','/ai/recheck',{table:'tickets',id:tkId,type:'Ticket',title:tk.title,description:tk.description||''});
+    await fetchData(); renderTkDetail();
+    toast('\ud83e\udd16 KI durchsucht im Hintergrund\u2026');
+  }catch(e){toast('\u26a0\ufe0f '+e.message,'err');}
 }
 let _mentionActive=false;
 function onNoteKey(e,tkId){
@@ -3187,7 +3202,7 @@ function openModal(id){document.getElementById(id)?.classList.add('open');}
 function closeModal(id){document.getElementById(id)?.classList.remove('open');}
 function eyeToggle(inputId,btn){const inp=document.getElementById(inputId);const show=inp.type==='password';inp.type=show?'text':'password';btn.textContent=show?'\uD83D\uDE48':'\uD83D\uDC41';}
 function toast(msg,type='',dur=3200){const t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),dur);}
-const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOr','clFormOv','attachClOv','changelogOv','dpOv','rejectEinspOv','helpOv','msgFormOv','msgDetOv','gSearchOv','stLoginOv','docFormOv','docVerOv','docHistOv','docCatOv','dpReportModal','deptOv','spintCatOv','spintCatFormOv','aiSuggestOv','protoFormOv','viewAsOv'];
+const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOr','clFormOv','attachClOv','changelogOv','dpOv','rejectEinspOv','helpOv','msgFormOv','msgDetOv','gSearchOv','stLoginOv','docFormOv','docVerOv','docHistOv','docCatOv','dpReportModal','deptOv','spintCatOv','spintCatFormOv','protoFormOv','viewAsOv'];
 document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();openGSearch();return;}
   if(e.key==='Escape'){ALL_MODALS.forEach(closeModal);closeGSearch();}
@@ -6208,43 +6223,11 @@ async function unlinkItem() {
 }
 
 // ── KI-VORSCHLÄGE ────────────────────────────────────────────────────────
-// Durchsucht bestehende Tickets nach ähnlichen, bereits gelösten Problemen
-// UND das Internet (Web-Suche serverseitig über die Anthropic-API) — jeder
-// Vorschlag kommt mit einer geprüften Quellenangabe zurück (Ticket-Nummer
-// oder echte URL), nichts wird ohne Beleg vorgeschlagen.
-// Für Ticket/Todo: Titel/Beschreibung sicher aus dem State per id nachschlagen
-// statt sie (per JSON.stringify) direkt in ein onclick-Attribut zu schreiben —
-// das hätte das Attribut an den ersten " in der Ausgabe abgeschnitten und
-// sowohl den Button als auch das benachbarte Beschreibungsfeld zerschossen.
-function openAiSuggestionsFor(type,id){
-  let item;
-  if(type==='Ticket') item=(S.tickets||[]).find(t=>t.id===id);
-  else if(type==='Todo') item=(S.todos||[]).find(t=>t.id===id);
-  if(!item){toast('⚠️ Eintrag nicht gefunden','err');return;}
-  openAiSuggestions(type,item.title,item.description||'',id);
-}
-async function openAiSuggestions(type,title,description,id){
-  openModal('aiSuggestOv');
-  const body=document.getElementById('aiSuggestBody');
-  body.innerHTML=`<div style="text-align:center;padding:30px 10px">
-    <div class="spinner" style="margin:0 auto 12px"></div>
-    <div style="font-size:13px;color:var(--mu)">Durchsuche alte Tickets und das Internet nach Lösungen… (kann bis zu einer Minute dauern)</div>
-  </div>`;
-  const ctrl=new AbortController();
-  const timer=setTimeout(()=>ctrl.abort(),60000);
-  try{
-    const res=await fetch('/api/ai/suggest',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,title,description,id}),signal:ctrl.signal});
-    clearTimeout(timer);
-    if(res.status===401){_handleSessionExpired();throw new Error('Sitzung abgelaufen');}
-    const data=await res.json();
-    if(!data.success)throw new Error(data.error||'Fehler');
-    renderAiSuggestions(data.data);
-  }catch(e){
-    clearTimeout(timer);
-    const msg=e.name==='AbortError'?'KI-Suche hat zu lange gedauert (Zeitlimit 60s) — bitte erneut versuchen':e.message;
-    body.innerHTML=`<div style="color:var(--danger);font-size:13px;padding:12px">⚠️ ${esc(msg)}</div>`;
-  }
-}
+// Durchsucht bestehende Tickets nach ähnlichen, bereits gelösten Problemen —
+// jeder Vorschlag kommt mit einer geprüften Quellenangabe zurück (Ticket-
+// Nummer oder echte URL), nichts wird ohne Beleg vorgeschlagen. Läuft über
+// den persistenten Hintergrund-Trigger (/ai/recheck), damit das Ergebnis
+// direkt in der KI-Spalte der Ticket-Detailansicht erscheint (kein Popup).
 function aiSuggestionCardHtml(s){
   const isTicket=/^Ticket\s/i.test(s.source||'');
   const isNet=!isTicket&&(/internet/i.test(s.source||'')||s.sourceUrl);
@@ -6262,44 +6245,28 @@ function aiSuggestionCardHtml(s){
     ${srcLink?`<div style="margin-top:6px">${srcLink}</div>`:''}
   </div>`;
 }
-function renderAiSuggestions(data){
-  const body=document.getElementById('aiSuggestBody');
-  const sugg=data.suggestions||[];
-  if(!sugg.length){
-    body.innerHTML=`<div style="color:var(--mu);font-size:13px;padding:12px">${esc(data.summary||'Keine Vorschläge gefunden.')}</div>`;
-    return;
-  }
-  body.innerHTML=(data.summary?`<div style="font-size:12px;color:var(--mu);margin-bottom:12px;padding:8px 10px;background:var(--sf2);border-radius:6px">${esc(data.summary)}</div>`:'')
-    +sugg.map(aiSuggestionCardHtml).join('');
-}
-// Zeigt das Ergebnis der automatischen Hintergrundsuche (ausgelöst beim
-// Anlegen) direkt im jeweiligen Formular/Detail an — akzeptiert sowohl
-// camelCase (Ticket/Besprechungspunkt) als auch die rohen snake_case-Felder
-// (Todo, da dessen Datensatz ungemappt durchgereicht wird).
+// Zeigt das Ergebnis einer (per Button aktiv gestarteten) KI-Suche in der
+// KI-Spalte der Ticket-Detailansicht an.
 function aiInlinePanelHtml(item){
   const status=item?.aiStatus||item?.ai_status||null;
   const result=item?.aiResult||item?.ai_result||null;
   if(!status) return '';
-  if(status==='pending') return `<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--sf2);border:1px solid var(--border);border-radius:8px;margin-top:10px">
+  if(status==='pending') return `<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--sf2);border:1px solid var(--border);border-radius:8px">
     <div class="spinner" style="width:16px;height:16px;flex-shrink:0"></div>
-    <div style="font-size:12px;color:var(--mu)">🤖 KI durchsucht automatisch nach Lösungen…</div>
+    <div style="font-size:12px;color:var(--mu)">🤖 KI durchsucht nach Lösungen…</div>
   </div>`;
-  if(status==='error') return `<div style="padding:10px 12px;background:var(--sf2);border:1px solid var(--border);border-radius:8px;margin-top:10px;font-size:12px;color:var(--danger)">⚠️ ${esc(result?.error||'KI-Suche fehlgeschlagen')}</div>`;
+  if(status==='error') return `<div style="padding:10px 12px;background:var(--sf2);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--danger)">⚠️ ${esc(result?.error||'KI-Suche fehlgeschlagen')}</div>`;
   if(status==='done'){
     const sugg=result?.suggestions||[];
-    if(!sugg.length) return `<div style="padding:10px 12px;background:var(--sf2);border:1px solid var(--border);border-radius:8px;margin-top:10px;font-size:12px;color:var(--mu)">🤖 ${esc(result?.summary||'Keine passenden Vorschläge gefunden.')}</div>`;
-    return `<div style="margin-top:10px">
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--di);margin-bottom:6px">🤖 KI-VORSCHLÄGE</div>
-      ${result.summary?`<div style="font-size:12px;color:var(--mu);margin-bottom:8px;padding:8px 10px;background:var(--sf2);border-radius:6px">${esc(result.summary)}</div>`:''}
-      ${sugg.map(aiSuggestionCardHtml).join('')}
-    </div>`;
+    if(!sugg.length) return `<div style="padding:10px 12px;background:var(--sf2);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--mu)">🤖 ${esc(result?.summary||'Keine passenden Vorschläge gefunden.')}</div>`;
+    return `${result.summary?`<div style="font-size:12px;color:var(--mu);margin-bottom:8px;padding:8px 10px;background:var(--sf2);border-radius:6px">${esc(result.summary)}</div>`:''}
+      ${sugg.map(aiSuggestionCardHtml).join('')}`;
   }
   return '';
 }
 function _openTicketByNumber(number){
   const tk=(S.tickets||[]).find(t=>t.number===number);
   if(!tk){toast('⚠️ Ticket '+number+' nicht gefunden (evtl. keine Berechtigung oder gelöscht)','err');return;}
-  closeModal('aiSuggestOv');
   openTkDetail(tk.id);
 }
 
