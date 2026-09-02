@@ -5544,7 +5544,7 @@ function renderMeetings() {
           </div>
           ${activeThemen.length?`<div style="margin-top:5px;display:flex;flex-direction:column;gap:2px">
             ${activeThemen.map(i=>`<div style="font-size:11px;color:var(--mu);display:flex;align-items:center;gap:4px">
-              <span style="flex-shrink:0">${i.kind==='protocol'?'📖':'📋'}</span>
+              <span style="flex-shrink:0">📌</span>
               <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(i.title||'Thema')}</span>
             </div>`).join('')}
           </div>`:insts.length?`<div style="font-size:11px;color:var(--di);margin-top:3px">Alle Themen abgeschlossen</div>`:''}
@@ -5563,20 +5563,19 @@ function renderMeetings() {
 
 function meetingInstTabHtml(m, i, canManage) {
   const open=(i.items||[]).filter(it=>it.status==='open'||it.status==='redo').length;
-  const statusColor={planned:'#3b82f6',done:'#10b981',cancelled:'#ef4444'}[i.status]||'#64748b';
+  const statusColor={done:'#10b981',cancelled:'#ef4444'}[i.status]||'#64748b';
   const titleLine=i.title?esc(i.title):'Thema';
-  const isProtocol = i.kind==='protocol';
   // Datum/Uhrzeit werden für kein Thema mehr am Thema selbst angezeigt — bei
-  // Protokoll-Themen liegen sie bei den einzelnen Protokollen, bei Punkte-
-  // Themen bei den einzelnen Punkten ("Besprochen am"/"Fällig bis"). Der
-  // Status "Geplant" wäre bei Protokoll-Themen ohnehin immer (und damit
-  // bedeutungslos) zu sehen — nur ein echter Endstatus zählt dort.
-  const showStatus = !isProtocol || i.status!=='planned';
+  // Protokollen liegen sie bei den einzelnen Protokollen, bei Punkten bei den
+  // einzelnen Punkten ("Besprochen am"/"Fällig bis"). Der Status "Geplant"
+  // ist der Normalzustand jedes offenen Themas und daher nicht mehr eigens
+  // ausgewiesen — nur ein echter Endstatus (Abgeschlossen/Abgesagt) zählt.
+  const showStatus = i.status==='done' || i.status==='cancelled';
   return`<div class="meetings-inst-tab${S._selInstance===i.id?' active':''}" style="position:relative">
     <div onclick="S._selInstance='${i.id}';renderMeetings()" style="cursor:pointer;${canManage?'padding-right:18px':''}">
-      <div style="font-size:12px;font-weight:600">${isProtocol?'📖 ':'📋 '}${titleLine}</div>
+      <div style="font-size:12px;font-weight:600">📌 ${titleLine}</div>
       <div style="display:flex;gap:4px;margin-top:2px;align-items:center;flex-wrap:wrap">
-        ${showStatus?`<span style="font-size:10px;color:${statusColor}">${{planned:'Geplant',done:'Abgeschlossen',cancelled:'Abgesagt'}[i.status]||i.status}</span>`:''}
+        ${showStatus?`<span style="font-size:10px;color:${statusColor}">${{done:'Abgeschlossen',cancelled:'Abgesagt'}[i.status]||i.status}</span>`:''}
         ${open>0?`<span style="font-size:10px;color:#92400e;background:#fef3c7;padding:0 4px;border-radius:8px">${open}</span>`:''}
       </div>
     </div>
@@ -5630,33 +5629,27 @@ function renderMeetingDetail(m, canManage) {
 }
 
 function renderInstanceDetail(inst, meeting, canManage) {
-  if (inst.kind==='protocol') return renderProtocolInstanceDetail(inst, meeting, canManage);
-  return`<div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <div style="font-size:13px;color:var(--mu)">${inst.notes?`<span>${esc(inst.notes)}</span>`:''}</div>
-      <div style="display:flex;gap:8px">
-        ${canManage?`<button class="btn-add" onclick="openItemForm('${inst.id}')">+ Punkt</button>`:''}
-        ${canManage&&inst.status==='planned'?`<button class="btn-s" style="background:#10b981;color:#fff" onclick="setInstanceStatus('${inst.id}','done')">&#10003; Abschließen</button>`:''}
-        ${canManage&&inst.status==='done'?`<button class="btn-s" style="background:#f59e0b;color:#fff" onclick="setInstanceStatus('${inst.id}','planned')">↩ Wiederöffnen</button>`:''}
-        ${canManage?`<button class="btn-d" style="padding:4px 8px" onclick="deleteInstance('${inst.id}')">&#128465;</button>`:''}
-      </div>
-    </div>
-    <input class="srch" type="text" id="meetingItemSearch" placeholder="🔍 Punkte durchsuchen …" value="${esc(S._meetingItemSearch||'')}" oninput="filterMeetingItems(this.value)" style="width:100%;margin-bottom:12px;box-sizing:border-box">
-    <div id="meetingItemsGrid">${renderMeetingItemsGrid(inst, canManage, S._meetingItemSearch||'')}</div>
-  </div>`;
-}
-function renderProtocolInstanceDetail(inst, meeting, canManage) {
+  const tab = S._themaTab==='protocol' ? 'protocol' : 'points';
   const protos=[...(inst.protocols||[])].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
   return`<div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <div style="font-size:13px;color:var(--mu)">${inst.notes?`<span>${esc(inst.notes)}</span>`:''}</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;gap:0;border-bottom:1px solid var(--border)">
+        <div onclick="S._themaTab='points';renderMeetings()" style="cursor:pointer;padding:6px 12px;font-size:12px;font-weight:600;${tab==='points'?'border-bottom:2px solid var(--acc);color:var(--acc)':'color:var(--mu)'}">📋 Punkte</div>
+        <div onclick="S._themaTab='protocol';renderMeetings()" style="cursor:pointer;padding:6px 12px;font-size:12px;font-weight:600;${tab==='protocol'?'border-bottom:2px solid var(--acc);color:var(--acc)':'color:var(--mu)'}">📖 Protokolle</div>
+      </div>
       <div style="display:flex;gap:8px">
-        ${canManage?`<button class="btn-add" onclick="openProtocolForm('${inst.id}')">+ Protokoll</button>`:''}
-        ${canManage&&inst.status==='planned'?`<button class="btn-s" style="background:#10b981;color:#fff" onclick="setInstanceStatus('${inst.id}','done')">&#10003; Abschließen</button>`:''}
+        ${canManage&&tab==='points'?`<button class="btn-add" onclick="openItemForm('${inst.id}')">+ Punkt</button>`:''}
+        ${canManage&&tab==='protocol'?`<button class="btn-add" onclick="openProtocolForm('${inst.id}')">+ Protokoll</button>`:''}
+        ${canManage&&inst.status!=='done'?`<button class="btn-s" style="background:#10b981;color:#fff" onclick="setInstanceStatus('${inst.id}','done')">&#10003; Abschließen</button>`:''}
         ${canManage&&inst.status==='done'?`<button class="btn-s" style="background:#f59e0b;color:#fff" onclick="setInstanceStatus('${inst.id}','planned')">↩ Wiederöffnen</button>`:''}
         ${canManage?`<button class="btn-d" style="padding:4px 8px" onclick="deleteInstance('${inst.id}')">&#128465;</button>`:''}
       </div>
     </div>
+    ${inst.notes?`<div style="font-size:13px;color:var(--mu);margin-bottom:12px">${esc(inst.notes)}</div>`:''}
+    ${tab==='points'?`
+    <input class="srch" type="text" id="meetingItemSearch" placeholder="🔍 Punkte durchsuchen …" value="${esc(S._meetingItemSearch||'')}" oninput="filterMeetingItems(this.value)" style="width:100%;margin-bottom:12px;box-sizing:border-box">
+    <div id="meetingItemsGrid">${renderMeetingItemsGrid(inst, canManage, S._meetingItemSearch||'')}</div>
+    `:`
     ${protos.length===0?`<div style="color:var(--mu);font-size:13px;padding:16px 0;text-align:center">Noch keine Protokolle.</div>`:''}
     <div style="display:flex;flex-direction:column;gap:10px">
       ${protos.map(p=>`<div class="meetings-card" style="cursor:default">
@@ -5681,6 +5674,7 @@ function renderProtocolInstanceDetail(inst, meeting, canManage) {
         ${p.body?`<div style="font-size:12px;color:var(--tx);margin-top:8px;white-space:pre-wrap;border-top:1px solid var(--border);padding-top:8px;max-height:240px;overflow-y:auto">${esc(p.body)}</div>`:''}
       </div>`).join('')}
     </div>
+    `}
   </div>`;
 }
 function renderMeetingItemsGrid(inst, canManage, search) {
@@ -5786,31 +5780,15 @@ function openInstanceForm(meetingId, id=null) {
   document.getElementById('ifId').value = inst?.id||'';
   document.getElementById('ifMeetingId').value = meetingId;
   document.getElementById('ifTitle').value = inst?.title||'';
-  // Art (Punkte/Protokoll) wird bei Neuanlage gewählt und ist danach fix,
-  // da sich beide Ansichten strukturell unterscheiden (Punkte vs. Protokolle).
-  const kindPoints=document.getElementById('ifKindPoints'), kindProtocol=document.getElementById('ifKindProtocol');
-  kindPoints.checked = (inst?.kind||'points')==='points';
-  kindProtocol.checked = inst?.kind==='protocol';
-  kindPoints.disabled = kindProtocol.disabled = !!inst;
-  document.getElementById('ifKindWrap').style.opacity = inst?'.55':'1';
-  onIfKindChange();
+  document.getElementById('ifDateTimeWrap').style.display = 'none';
   document.getElementById('ifNotes').value = inst?.notes||'';
   openModal('instanceFormOv');
 }
 
-// Datum/Uhrzeit werden für kein Thema mehr am Thema selbst erfasst — bei
-// Protokoll-Themen liegen sie pro Protokoll-Eintrag, bei Punkte-Themen pro
-// einzelnem Punkt ("Besprochen am"/"Fällig bis"). Feld daher immer
-// ausgeblendet, unabhängig von der Art.
-function onIfKindChange() {
-  document.getElementById('ifDateTimeWrap').style.display = 'none';
-}
 async function submitInstanceForm() {
   const id = document.getElementById('ifId').value;
   const meetingId = document.getElementById('ifMeetingId').value;
-  const isProtocol = document.getElementById('ifKindProtocol').checked;
   const body = { date: null, time: '', notes: document.getElementById('ifNotes').value, title: document.getElementById('ifTitle').value };
-  if (!id) body.kind = isProtocol ? 'protocol' : 'points';
   try {
     if (id) await api('PUT','/meeting-instances/'+id, body);
     else await api('POST','/meetings/'+meetingId+'/instances', body);
