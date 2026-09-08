@@ -1375,6 +1375,19 @@ function renderAllw(){
     api('GET','/dp/employee-params').then(d=>{S.dpEmpParams=d||[];if(S.view==='allw')renderAllw();}).catch(()=>{S._dpEmpParamsLoaded=false;});
   }
   const months=getPeriodMonths(),yr=S.allwYear;
+  // Urlaubstage/Feiertage für die "Planbar LS"-Spalte (nur Monatsansicht
+  // relevant) — pro Jahr/Monat gecacht, damit nicht bei jedem Render neu
+  // geladen wird.
+  const lsStatsKey=yr+'-'+S.allwMonth;
+  if(S.allwPeriod==='month'&&!S._lsLeaveStats)S._lsLeaveStats={};
+  if(S.allwPeriod==='month'&&!S._lsLeaveStats[lsStatsKey]){
+    S._lsLeaveStats[lsStatsKey]={vacationByEmployee:{},holidayWeekdaysInMonth:0,_loading:true};
+    api('GET','/dp/leave-holiday-stats?year='+yr+'&month='+S.allwMonth).then(d=>{
+      S._lsLeaveStats[lsStatsKey]=d||{vacationByEmployee:{},holidayWeekdaysInMonth:0};
+      if(S.view==='allw')renderAllw();
+    }).catch(()=>{delete S._lsLeaveStats[lsStatsKey];});
+  }
+  const lsStats=S._lsLeaveStats?.[lsStatsKey]||{vacationByEmployee:{},holidayWeekdaysInMonth:0};
   const pLbl=S.allwPeriod==='month'?MONTHS[S.allwMonth-1]:S.allwPeriod==='h1'?'1. Halbjahr':S.allwPeriod==='h2'?'2. Halbjahr':'Gesamtjahr';
   // Nur Mitarbeiter zeigen, die im gewählten Zeitraum (mind. teilweise) im
   // Dienstverhältnis waren — z.B. bei Monat "Oktober" verschwindet ein
@@ -1449,14 +1462,34 @@ function renderAllw(){
     const pctFmt=Number.isInteger(pct)?pct:pct.toFixed(1);
     return'<td style="text-align:center;font-size:12px" title="'+ep.monthly_hours+'h Monatssoll'+(b?' − '+b+'×8h Büro = '+bueroH+'h ('+pctFmt+'%)':'')+'">'+soll+'h'+(b?'<div style="font-size:10px;color:var(--di)">von '+ep.monthly_hours+'h &middot; '+pctFmt+'% Büro</div>':'')+'</td>';
   };
-  const allwEmpRow=u=>'<tr><td><div style="display:flex;align-items:center;gap:6px">'+avHtml(u.initials,u.color,22,9)+'<span>'+esc(lastNameFirst(u.name))+'</span></div></td>'+allwCells(u)+allwSollCell(u)+'</tr>';
+  // Planbare Leitstelle-Stunden für Mitarbeiter mit eingeschränktem
+  // Leitstelle-Anteil (z.B. 50:50 mit RKT): vom Monatssoll werden zuerst
+  // Urlaubstage und die auf Werktage fallenden Feiertage (je mit dem
+  // Tagessoll des Mitarbeiters) abgezogen, der Rest wird anteilig nach
+  // ls_pct verplanbar. Nur in der Monatsansicht sinnvoll (Urlaub/Feiertage
+  // sind monatsbezogen).
+  const allwPlanbarCell=u=>{
+    if(S.allwPeriod!=='month')return'<td style="text-align:center;color:var(--di);font-size:11px">–</td>';
+    const ep=getEmpParamsAt(u.id,monthDateStr);
+    const lsPct=ep?.ls_pct??100;
+    if(!ep?.monthly_hours||lsPct>=100)return'<td style="text-align:center;color:var(--di);font-size:11px">–</td>';
+    const dailyH=parseFloat(ep.daily_hours)||(ep.monthly_hours/26);
+    const vacDays=lsStats.vacationByEmployee?.[u.id]||0;
+    const holWeekdays=lsStats.holidayWeekdaysInMonth||0;
+    const vacH=vacDays*dailyH, holH=holWeekdays*dailyH;
+    const base=Math.max(0,ep.monthly_hours-vacH-holH);
+    const planbar=Math.round(base*lsPct/100*10)/10;
+    const title=ep.monthly_hours+'h Monatssoll − '+vacDays+'×'+dailyH.toFixed(1)+'h Urlaub − '+holWeekdays+'×'+dailyH.toFixed(1)+'h Feiertag = '+Math.round(base*10)/10+'h × '+lsPct+'% LS-Anteil';
+    return'<td style="text-align:center;font-size:12px" title="'+title+'">'+planbar+'h<div style="font-size:10px;color:var(--di)">'+lsPct+'% LS-Anteil</div></td>';
+  };
+  const allwEmpRow=u=>'<tr><td><div style="display:flex;align-items:center;gap:6px">'+avHtml(u.initials,u.color,22,9)+'<span>'+esc(lastNameFirst(u.name))+'</span></div></td>'+allwCells(u)+allwSollCell(u)+allwPlanbarCell(u)+'</tr>';
   let allwBodyRows='';
   sortedCats.forEach(cat=>{
     const empList=grouped[cat].slice().sort((a,b)=>lastNameOf(a.name).localeCompare(lastNameOf(b.name),'de'));
     const catId='allwcat_'+cat.replace(/\W/g,'_');
     const isExpanded=S._allwCategoryExpanded?.[catId]??true;
     allwBodyRows+='<tr style="cursor:pointer;background:var(--sf2);font-weight:600" onclick="toggleAllwCat(\''+catId+'\')">'
-      +'<td colspan="8" style="padding:8px 12px">'+(isExpanded?'▼':'▶')+' '+esc(cat)+' ('+empList.length+')</td></tr>';
+      +'<td colspan="9" style="padding:8px 12px">'+(isExpanded?'▼':'▶')+' '+esc(cat)+' ('+empList.length+')</td></tr>';
     if(isExpanded)allwBodyRows+=empList.map(allwEmpRow).join('');
   });
 
@@ -1489,6 +1522,7 @@ function renderAllw(){
         <th style="text-align:center">&#127958;&#65039; WE</th><th style="text-align:center">&#128203; C10</th>
         <th style="text-align:center">&#128663; RKT</th><th style="text-align:center" title="Bürodienste">&#127970; B</th>
         <th style="text-align:center" title="Monatssoll minus 8h je Bürodienst — nur bei Monatsansicht">&#128337; Soll LS</th>
+        <th style="text-align:center" title="Monatssoll minus Urlaub/Feiertage, anteilig nach Leitstelle-Anteil % — nur bei Mitarbeitern mit eingeschränktem Anteil und nur bei Monatsansicht">&#9878;&#65039; Planbar LS</th>
       </tr></thead>
       <tbody>${allwBodyRows}
       ${(()=>{
@@ -1509,6 +1543,7 @@ function renderAllw(){
           <td style="text-align:center;color:#14b8a6">${fmt(avg.rkt)}</td>
           <td style="text-align:center;color:#ec4899">${fmt(avg.buero)}</td>
           <td></td>
+          <td></td>
         </tr>
         <tr style="background:rgba(59,109,212,.03);border-bottom:2px solid var(--border)">
           <td style="font-size:11px;color:var(--di)">&#216; pro Monat (Periode)</td>
@@ -1518,6 +1553,7 @@ function renderAllw(){
           <td style="text-align:center;font-size:11px;color:var(--mu)">${fmt(avg.c10/div)}</td>
           <td style="text-align:center;font-size:11px;color:var(--mu)">${fmt(avg.rkt/div)}</td>
           <td style="text-align:center;font-size:11px;color:var(--mu)">${fmt(avg.buero/div)}</td>
+          <td></td>
           <td></td>
         </tr>`;
       })()}
@@ -8210,6 +8246,7 @@ function openDpEmpParamForm(paramId) {
   document.getElementById('dpEpfSpringer').checked = !!p.is_springer;
   document.getElementById('dpEpfMaxNights').value = p.max_nights_per_month||'';
   document.getElementById('dpEpfOfficePct').value = p.office_pct||0;
+  document.getElementById('dpEpfLsPct').value = p.ls_pct??100;
   const hasFdSpringer = !!p.fd_springer_type;
   document.getElementById('dpEpfFdSpringerSection').style.display = p.is_springer ? '' : 'none';
   document.getElementById('dpEpfFdType').value = p.fd_springer_type||'';
@@ -8246,6 +8283,7 @@ function openDpEmpParamFormNew(empId) {
   document.getElementById('dpEpfSpringer').checked = !!latest?.is_springer;
   document.getElementById('dpEpfMaxNights').value = latest?.max_nights_per_month||'';
   document.getElementById('dpEpfOfficePct').value = latest?.office_pct||0;
+  document.getElementById('dpEpfLsPct').value = latest?.ls_pct??100;
   const hasFdSpringer = !!latest?.fd_springer_type;
   document.getElementById('dpEpfFdSpringerSection').style.display = latest?.is_springer ? '' : 'none';
   document.getElementById('dpEpfFdType').value = latest?.fd_springer_type||'';
@@ -8274,6 +8312,7 @@ async function submitDpEmpParamForm() {
     isSpringer,
     maxNightsPerMonth: document.getElementById('dpEpfMaxNights').value ? parseInt(document.getElementById('dpEpfMaxNights').value) : null,
     officePct: parseInt(document.getElementById('dpEpfOfficePct').value)||0,
+    lsPct: document.getElementById('dpEpfLsPct').value!==''?parseInt(document.getElementById('dpEpfLsPct').value):100,
     fdSpringerType: fdType,
     fdSpringerLocation: fdType ? (document.getElementById('dpEpfFdLocation').value||null) : null,
     fdSpringerShiftsPerMonth: fdType ? (parseInt(document.getElementById('dpEpfFdShifts').value)||null) : null,

@@ -311,7 +311,7 @@ router.post('/employee-params', auth, async (req,res) => {
   if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
   const {employeeId,validFrom,monthlyHours,canDoNights,maxNightsPerMonth,doubleNightsAllowed,isSpringer,
          officePct,fdSpringerType,fdSpringerLocation,fdSpringerShiftsPerMonth,dailyHours,profileId,noWeekends,
-         xmasRotationParticipant} = req.body;
+         xmasRotationParticipant,lsPct} = req.body;
   if (!employeeId) return bad(res,'Mitarbeiter erforderlich',400);
 
   // Wenn Profil ausgewählt: Stunden aus Profil ableiten
@@ -327,6 +327,11 @@ router.post('/employee-params', auth, async (req,res) => {
 
   const wh = Math.round(mh / 4.33 * 100) / 100;
   const opct = Math.min(100, Math.max(0, parseInt(officePct)||0));
+  // Anteil der (um Urlaub/Feiertage bereinigten) Sollstunden, der für die
+  // Leitstelle verplant werden darf — z.B. 50 bei Mitarbeitern, die sich die
+  // Stelle mit RKT teilen. 100 = uneingeschränkt planbar (Standard).
+  const lspct = Math.min(100, Math.max(0, parseInt(lsPct)));
+  const lspctVal = Number.isFinite(lspct) ? lspct : 100;
   const fdType = ['FD_to_LS','LS_to_FD'].includes(fdSpringerType) ? fdSpringerType : null;
   const fdLoc  = ['Nord','Süd'].includes(fdSpringerLocation) ? fdSpringerLocation : null;
   const fdSpm  = fdType ? (parseInt(fdSpringerShiftsPerMonth)||null) : null;
@@ -347,8 +352,8 @@ router.post('/employee-params', auth, async (req,res) => {
          max_nights_per_month=$4,double_nights_allowed=$5,is_springer=$6,office_pct=$7,
          fd_springer_type=$8,fd_springer_location=$9,fd_springer_shifts_per_month=$10,
          valid_from=$11,updated_at=NOW(),daily_hours=$13,profile_id=$14,no_weekends=$15,
-         xmas_rotation_participant=$16 WHERE id=$12 RETURNING *`,
-        [mh,wh,canDoNights!==false,maxNightsPerMonth||null,doubleNightsAllowed!==false,!!isSpringer,opct,fdType,fdLoc,fdSpm,vf,existing.id,dh,pid,noWE,xmasPart]
+         xmas_rotation_participant=$16,ls_pct=$17 WHERE id=$12 RETURNING *`,
+        [mh,wh,canDoNights!==false,maxNightsPerMonth||null,doubleNightsAllowed!==false,!!isSpringer,opct,fdType,fdLoc,fdSpm,vf,existing.id,dh,pid,noWE,xmasPart,lspctVal]
       );
       return ok(res,row);
     }
@@ -358,10 +363,10 @@ router.post('/employee-params', auth, async (req,res) => {
           max_nights_per_month,double_nights_allowed,is_springer,office_pct,
           fd_springer_type,fd_springer_location,fd_springer_shifts_per_month,
           valid_from,springer_config,locations,created_by,daily_hours,profile_id,no_weekends,
-          xmas_rotation_participant)
-       VALUES ($1,$2,$3,$4,5,$5,$6,$7,$8,$9,$10,$11,$12,$13,'{}','[]',$14,$15,$16,$17,$18) RETURNING *`,
+          xmas_rotation_participant,ls_pct)
+       VALUES ($1,$2,$3,$4,5,$5,$6,$7,$8,$9,$10,$11,$12,$13,'{}','[]',$14,$15,$16,$17,$18,$19) RETURNING *`,
       [newId(),employeeId,mh,wh,canDoNights!==false,maxNightsPerMonth||null,
-       doubleNightsAllowed!==false,!!isSpringer,opct,fdType,fdLoc,fdSpm,vf,req.uid,dh,pid,noWE,xmasPart]
+       doubleNightsAllowed!==false,!!isSpringer,opct,fdType,fdLoc,fdSpm,vf,req.uid,dh,pid,noWE,xmasPart,lspctVal]
     );
     ok(res,row);
   } catch(e) { console.error(e); bad(res,'Serverfehler',500); }
@@ -372,6 +377,39 @@ router.delete('/employee-params/:id', auth, async (req,res) => {
   try {
     await q('DELETE FROM dp_employee_params WHERE id=$1',[req.params.id]);
     ok(res);
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+// Urlaubstage je Mitarbeiter + Anzahl der auf Werktage (Mo–Fr) fallenden
+// Feiertage in einem Monat — unabhängig von einem konkreten Dienstplan
+// abfragbar (nur nach Datum/Abwesenheitsart gefiltert), damit z.B. die
+// Zulagenverteilung auch ohne fertigen Dienstplan des Monats die planbaren
+// Leitstelle-Stunden (Sollstunden abzüglich Urlaub/Feiertage, anteilig nach
+// ls_pct) berechnen kann.
+router.get('/leave-holiday-stats', auth, async (req,res) => {
+  try {
+    const year = parseInt(req.query.year), month = parseInt(req.query.month);
+    if (!year || !month || month<1 || month>12) return bad(res,'year/month erforderlich',400);
+    const from = `${year}-${String(month).padStart(2,'0')}-01`;
+    const toDate = new Date(year, month, 0); // letzter Tag des Monats
+    const to = toDate.toISOString().slice(0,10);
+    const rows = await q(
+      `SELECT a.employee_id, COUNT(*)::int AS vacation_days
+       FROM dp_assignments a JOIN dp_absence_types t ON t.id=a.absence_type_id
+       WHERE t.code='U' AND a.date>=$1 AND a.date<=$2
+       GROUP BY a.employee_id`,
+      [from, to]
+    );
+    const vacationByEmployee = {};
+    rows.forEach(r=>{ vacationByEmployee[r.employee_id] = r.vacation_days; });
+    const holidays = getAustrianHolidays(year);
+    let holidayWeekdaysInMonth = 0;
+    Object.keys(holidays).forEach(dateStr=>{
+      if (!dateStr.startsWith(`${year}-${String(month).padStart(2,'0')}`)) return;
+      const wd = new Date(dateStr).getDay();
+      if (wd!==0 && wd!==6) holidayWeekdaysInMonth++;
+    });
+    ok(res, { vacationByEmployee, holidayWeekdaysInMonth });
   } catch(e) { bad(res,'Serverfehler',500); }
 });
 

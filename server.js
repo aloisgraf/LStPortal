@@ -870,6 +870,11 @@ async function initDB() {
       contact_id TEXT NOT NULL,
       created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
     )`,
+    // Mitarbeiter, die nur anteilig für die Leitstelle verplant werden dürfen
+    // (z.B. 50:50 mit RKT) — Anteil ihrer Sollstunden (nach Abzug von Urlaub/
+    // Feiertagen), der in die Leitstellen-Planung einfließen darf. 100 =
+    // uneingeschränkt planbar (Standard für alle bestehenden Mitarbeiter).
+    `ALTER TABLE dp_employee_params ADD COLUMN IF NOT EXISTS ls_pct INTEGER NOT NULL DEFAULT 100`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }
