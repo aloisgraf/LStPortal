@@ -5826,11 +5826,11 @@ function renderThemaSummary(inst, canManage) {
     {key:'files',icon:'📎',label:'Dokumente',count:fileCount,last:lastTs(inst.files||[]),html:renderInstanceFilesTab(inst,false)},
   ].sort((a,b)=>b.last-a.last);
   const mostRecentKey = sections.find(s=>s.last>0)?.key;
-  return`<div style="display:flex;flex-direction:column;gap:24px">
-    ${sections.map(s=>`<div>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)">
-        <span style="font-size:14px;font-weight:700">${s.icon} ${s.label} (${s.count})</span>
-        ${s.key===mostRecentKey?`<span style="font-size:10px;color:var(--di);background:#10b98122;padding:1px 7px;border-radius:8px">Letzte Änderung</span>`:''}
+  return`<div style="display:flex;flex-direction:column;gap:20px">
+    ${sections.map(s=>`<div style="background:var(--sf2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;${s.key===mostRecentKey?'box-shadow:0 0 0 2px #10b98155':''}">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid var(--border)">
+        <span style="font-size:15px;font-weight:700">${s.icon} ${s.label} (${s.count})</span>
+        ${s.key===mostRecentKey?`<span style="font-size:10px;font-weight:700;color:#fff;background:#10b981;padding:2px 8px;border-radius:8px">&#9889; Letzte Änderung</span>`:''}
       </div>
       ${s.html}
     </div>`).join('')}
