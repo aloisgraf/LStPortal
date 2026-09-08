@@ -5574,9 +5574,15 @@ function renderMeetings() {
             </div>`:''}
           </div>
           ${activeThemen.length?`<div style="margin-top:5px;display:flex;flex-direction:column;gap:2px">
-            ${activeThemen.map(i=>{const openInThema=(i.items||[]).filter(it=>it.status==='open'||it.status==='redo').length;return`<div style="font-size:11px;color:var(--mu);display:flex;align-items:center;gap:4px">
+            ${activeThemen.map(i=>{
+              const openItems=(i.items||[]).filter(it=>it.status==='open'||it.status==='redo');
+              const highCount=openItems.filter(it=>it.priority==='high').length;
+              const medCount=openItems.filter(it=>it.priority==='medium').length;
+              return`<div style="font-size:11px;color:var(--mu);display:flex;align-items:center;gap:4px">
               <span style="flex-shrink:0">🗒️</span>
-              <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(i.title||'Thema')}${openInThema>0?` (${openInThema})`:''}</span>
+              <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(i.title||'Thema')}${openItems.length>0?` (${openItems.length})`:''}</span>
+              ${highCount>0?`<span style="flex-shrink:0;display:inline-flex;align-items:center;gap:2px" title="${highCount} offen mit Priorität Hoch">🔴${highCount}</span>`:''}
+              ${medCount>0?`<span style="flex-shrink:0;display:inline-flex;align-items:center;gap:2px" title="${medCount} offen mit Priorität Mittel">🟡${medCount}</span>`:''}
             </div>`;}).join('')}
           </div>`:insts.length?`<div style="font-size:11px;color:var(--di);margin-top:3px">Alle Themen abgeschlossen</div>`:''}
           ${open>0?`<div style="margin-top:3px"><span style="font-size:11px;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:10px">${open} offene Punkte</span></div>`:''}
