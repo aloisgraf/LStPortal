@@ -875,6 +875,7 @@ async function initDB() {
     // Feiertagen), der in die Leitstellen-Planung einfließen darf. 100 =
     // uneingeschränkt planbar (Standard für alle bestehenden Mitarbeiter).
     `ALTER TABLE dp_employee_params ADD COLUMN IF NOT EXISTS ls_pct INTEGER NOT NULL DEFAULT 100`,
+    `ALTER TABLE discussion_items ADD COLUMN IF NOT EXISTS priority TEXT NOT NULL DEFAULT 'medium'`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }

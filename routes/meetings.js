@@ -207,14 +207,15 @@ router.delete('/meeting-protocols/:id', auth, async (req, res) => {
 // POST create item in instance
 router.post('/meeting-instances/:id/items', auth, async (req, res) => {
   try {
-    const { title, description, dueDate, meetingDate, delegatedTo, participants, externalParticipants, link, status, result } = req.body;
+    const { title, description, dueDate, meetingDate, delegatedTo, participants, externalParticipants, link, status, result, priority } = req.body;
     if (!title) return bad(res, 'Titel erforderlich', 400);
     const id = newId();
     const validStatus = ['open','done','redo','delegate'].includes(status) ? status : 'open';
+    const validPriority = ['low','medium','high'].includes(priority) ? priority : 'medium';
     await pool.query(
-      `INSERT INTO discussion_items (id, instance_id, title, description, status, due_date, meeting_date, delegated_to, result, link, external_participants, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-      [id, req.params.id, title, description || '', validStatus, dueDate || null, meetingDate || null, delegatedTo || null, result || '', link || null, JSON.stringify(Array.isArray(externalParticipants)?externalParticipants:[]), req.uid]
+      `INSERT INTO discussion_items (id, instance_id, title, description, status, due_date, meeting_date, delegated_to, result, link, external_participants, priority, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+      [id, req.params.id, title, description || '', validStatus, dueDate || null, meetingDate || null, delegatedTo || null, result || '', link || null, JSON.stringify(Array.isArray(externalParticipants)?externalParticipants:[]), validPriority, req.uid]
     );
     // Add participants
     if (Array.isArray(participants)) {
@@ -250,7 +251,8 @@ router.put('/discussion-items/:id', auth, async (req, res) => {
     const meetingOwner = await q1('SELECT created_by FROM meetings WHERE id=$1',[existingItem.meeting_id]);
     const isParticipant = await q1('SELECT id FROM discussion_participants WHERE item_id=$1 AND user_id=$2',[req.params.id,req.uid]);
     if(!req.p.manageUsers && existingItem.created_by!==req.uid && !isParticipant && meetingOwner?.created_by!==req.uid) return bad(res,'Keine Berechtigung',403);
-    const { title, description, status, dueDate, meetingDate, delegatedTo, result, link, externalParticipants } = req.body;
+    const { title, description, status, dueDate, meetingDate, delegatedTo, result, link, externalParticipants, priority } = req.body;
+    const validPriority = ['low','medium','high'].includes(priority) ? priority : null;
     const now = new Date().toISOString();
 
     // Detect status change → add protokoll entry
@@ -273,11 +275,11 @@ router.put('/discussion-items/:id', auth, async (req, res) => {
         title=COALESCE($1,title), description=COALESCE($2,description),
         status=COALESCE($3,status), due_date=$4, meeting_date=$5,
         delegated_to=$6, result=COALESCE($7,result), link=COALESCE($8,link),
-        external_participants=COALESCE($9,external_participants)
-       WHERE id=$10`,
+        external_participants=COALESCE($9,external_participants), priority=COALESCE($10,priority)
+       WHERE id=$11`,
       [title || null, description !== undefined ? description : null, status || null,
        dueDate || null, meetingDate || null, delegatedTo || null, result !== undefined ? result : null,
-       link || null, Array.isArray(externalParticipants) ? JSON.stringify(externalParticipants) : null, req.params.id]
+       link || null, Array.isArray(externalParticipants) ? JSON.stringify(externalParticipants) : null, validPriority, req.params.id]
     );
 
     // Sync content to linked items (title/description/dueDate/delegatedTo — but NOT status/result)

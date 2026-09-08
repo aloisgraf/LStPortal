@@ -1605,18 +1605,6 @@
     <div class="mb2">
       <input type="hidden" id="mfId">
       <div class="fg"><label>Titel *</label><input type="text" id="mfTitle" placeholder="z.B. Technik-Weekly"></div>
-      <div class="fg"><label>Rhythmus</label>
-        <select id="mfRhythm" onchange="onMfTypeChange()">
-          <option value="">Keine Wiederholung</option>
-          <option value="weekly">W&#246;chentlich</option>
-          <option value="biweekly">Alle 2 Wochen</option>
-          <option value="monthly">Monatlich</option>
-          <option value="daily">T&#228;glich</option>
-        </select>
-      </div>
-      <div id="mfRhythmDiv" style="display:none">
-        <div class="fg"><label>Uhrzeit</label><input type="time" id="mfRhythmTime"></div>
-      </div>
       <div class="fg"><label>Beschreibung</label><textarea id="mfDesc" rows="2"></textarea></div>
       <div class="fg"><label>Link (z.B. OneNote)</label><input type="url" id="mfLink" placeholder="https://..."></div>
     </div>
@@ -1708,6 +1696,13 @@
       <input type="hidden" id="itInstanceId">
       <div class="fg"><label>Titel *</label><input type="text" id="itTitle"></div>
       <div class="fg"><label>Beschreibung</label><textarea id="itDesc" rows="4"></textarea></div>
+      <div class="fg"><label>Priorit&#228;t</label>
+        <select id="itPriority">
+          <option value="high">&#128308; Hoch</option>
+          <option value="medium">&#128993; Mittel</option>
+          <option value="low">&#128994; Niedrig</option>
+        </select>
+      </div>
       <div style="display:flex;gap:12px">
         <div class="fg" style="flex:1"><label>F&#228;llig bis</label><input type="date" id="itDueDate"></div>
         <div class="fg" style="flex:1"><label>Besprochen am</label><input type="date" id="itMeetingDate"></div>

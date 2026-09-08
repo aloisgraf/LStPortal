@@ -5564,7 +5564,6 @@ function renderMeetings() {
           if(a.date&&b.date)return a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||'');
           if(a.date)return -1; if(b.date)return 1; return 0;
         });
-        const typeBadge={einmalig:'Einmalig',jour_fixe:'Jour Fixe',ad_hoc:'Ad hoc',ungeplant:'Ungeplant'}[mt.type]||mt.type;
         const canMng=mt._canManage||false;
         return`<div class="meetings-item${S._selMeeting===mt.id?' active':''}" onclick="S._selMeeting='${mt.id}';S._selInstance=null;renderMeetings()">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
@@ -5573,10 +5572,6 @@ function renderMeetings() {
               <button class="btn-s" style="padding:4px 8px;font-size:12px;border-radius:4px;transition:all .2s" title="Bearbeiten" onclick="openMeetingForm('${mt.id}')">✏️</button>
               <button class="btn-s btn-danger" style="padding:4px 8px;font-size:12px;border-radius:4px;transition:all .2s" title="Löschen" onclick="deleteMeeting('${mt.id}')">🗑</button>
             </div>`:''}
-          </div>
-          <div style="display:flex;gap:6px;align-items:center;margin-top:3px;flex-wrap:wrap">
-            <span style="font-size:11px;background:var(--bg2);padding:1px 6px;border-radius:10px;color:var(--mu)">${typeBadge}</span>
-            ${mt.type==='jour_fixe'&&mt.rhythm?`<span style="font-size:11px;color:var(--mu)">${{weekly:'wöchentlich',biweekly:'2-wöchentlich',monthly:'monatlich',daily:'täglich'}[mt.rhythm]||''} ${mt.rhythmTime||''}</span>`:''}
           </div>
           ${activeThemen.length?`<div style="margin-top:5px;display:flex;flex-direction:column;gap:2px">
             ${activeThemen.map(i=>{const openInThema=(i.items||[]).filter(it=>it.status==='open'||it.status==='redo').length;return`<div style="font-size:11px;color:var(--mu);display:flex;align-items:center;gap:4px">
@@ -5628,7 +5623,6 @@ function toggleMeetingArchive(meetingId) {
 }
 function renderMeetingDetail(m, canManage) {
   const inst = S._selInstance ? m.instances.find(x=>x.id===S._selInstance) : null;
-  const rhythmLabels={weekly:'wöchentlich',biweekly:'alle 2 Wochen',monthly:'monatlich',daily:'täglich'};
   const allInst = [...(m.instances||[])].sort((a,b)=>new Date(b.date)-new Date(a.date));
   const activeInst = allInst.filter(i=>i.status!=='done');
   const archivedInst = allInst.filter(i=>i.status==='done');
@@ -5638,12 +5632,10 @@ function renderMeetingDetail(m, canManage) {
       <div>
         <h2 style="margin:0 0 4px;font-size:18px">${esc(m.title)}</h2>
         ${m.description?`<div style="font-size:13px;color:var(--mu)">${esc(m.description)}</div>`:''}
-        ${m.type==='jour_fixe'?`<div style="font-size:12px;color:var(--mu);margin-top:4px">&#128257; ${rhythmLabels[m.rhythm]||m.rhythm||''} ${m.rhythmTime?'um '+m.rhythmTime:''}</div>`:''}
         ${m.link?`<div style="margin-top:6px"><a href="${esc(m.link)}" target="_blank" rel="noopener noreferrer" style="font-size:12px;color:#3b6dd4;text-decoration:none;display:inline-flex;align-items:center;gap:4px"><span>🔗</span><span>${esc(m.link.slice(0,50))}${m.link.length>50?'…':''}</span></a></div>`:''}
       </div>
       <div style="display:flex;gap:8px;flex-shrink:0">
         ${canManage?`<button class="btn-s" onclick="openInstanceForm('${m.id}')">+ Thema</button>`:''}
-        ${canManage&&m.type==='jour_fixe'?`<button class="btn-s" onclick="generateNextInstance('${m.id}')">&#128257; Nächstes Thema</button>`:''}
       </div>
     </div>
     <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:${archivedInst.length?'0':'16px'};overflow-x:auto">
@@ -5875,7 +5867,7 @@ function renderMeetingItemsGrid(inst, canManage, search) {
           <div class="meetings-col-hdr" style="color:${statusColors[st]}">${statusCols[st]} <span style="font-size:11px;opacity:.7">(${items.length})</span></div>
           ${items.length===0?`<div style="font-size:12px;color:var(--mu);padding:8px;text-align:center">${s?'Keine Treffer':'—'}</div>`:''}
           ${items.map(it=>{const deadlineColor=getDeadlineColor(it.dueDate);return`<div class="meetings-card"${it._canEdit?` onclick="openItemForm('${inst.id}','${it.id}')"`:''} style="${it._canEdit?'':'cursor:default'}${deadlineColor?';border-left:4px solid '+deadlineColor:''}">
-            <div style="font-weight:600;font-size:13px;margin-bottom:4px">${esc(it.title)}</div>
+            <div style="font-weight:600;font-size:13px;margin-bottom:4px;display:flex;align-items:center;gap:5px"><span title="Priorität: ${TODO_PRIO[it.priority||'medium'].label}">${TODO_PRIO[it.priority||'medium'].dot}</span>${esc(it.title)}</div>
             ${st==='done'?`<div style="font-size:11px;color:var(--mu);margin-bottom:4px">&#128197; Besprochen am: ${it.meetingDate?fmtDate(it.meetingDate):'ohne Datum'}</div>`:''}
             ${it.description?`<div style="font-size:12px;color:var(--mu);margin-bottom:4px">${esc(it.description.slice(0,80))}${it.description.length>80?'…':''}</div>`:''}
             ${it.result?`<div style="${it.description?'border-top:1px solid var(--border);padding-top:4px;margin-top:4px;':''}font-size:12px;color:var(--mu);margin-bottom:4px"><span style="font-size:10px;font-weight:700;color:var(--di);text-transform:uppercase">Ergebnis</span> ${esc(it.result.slice(0,30))}${it.result.length>30?'…':''}</div>`:''}
@@ -5911,28 +5903,15 @@ function openMeetingForm(id=null) {
   document.getElementById('mfTitle').value = m?.title||'';
   document.getElementById('mfDesc').value = m?.description||'';
   document.getElementById('mfLink').value = m?.link||'';
-  document.getElementById('mfRhythm').value = m?.rhythm||'';
-  document.getElementById('mfRhythmTime').value = m?.rhythmTime||'';
-  document.getElementById('mfRhythmDiv').style.display = m?.rhythm?'':'none';
   openModal('meetingFormOv');
-}
-
-// Ein eigenes "Typ"-Feld gibt es nicht mehr — ob eine Besprechung wiederkehrend
-// ist (bisher "Jour Fixe"), ergibt sich allein daraus, ob ein Rhythmus gewählt
-// wurde; ohne Rhythmus ist sie einmalig.
-function onMfTypeChange() {
-  document.getElementById('mfRhythmDiv').style.display = document.getElementById('mfRhythm').value?'':'none';
 }
 
 async function submitMeetingForm() {
   const id = document.getElementById('mfId').value;
   const title = document.getElementById('mfTitle').value.trim();
   if (!title) return toast('Titel erforderlich','err');
-  const rhythm = document.getElementById('mfRhythm').value;
   const body = {
-    title, type: rhythm ? 'jour_fixe' : 'einmalig',
-    rhythm: rhythm || null,
-    rhythmTime: document.getElementById('mfRhythmTime').value,
+    title, type: 'einmalig', rhythm: null, rhythmTime: '',
     description: document.getElementById('mfDesc').value.trim(),
     link: document.getElementById('mfLink').value.trim() || null,
   };
@@ -5989,13 +5968,6 @@ async function setInstanceStatus(id, status) {
   } catch(e) { toast('Fehler','err'); }
 }
 
-async function generateNextInstance(meetingId) {
-  try {
-    await api('POST','/meetings/'+meetingId+'/next-instance');
-    await fetchData(); renderMeetings(); toast('Nächstes Thema erstellt');
-  } catch(e) { toast('Fehler','err'); }
-}
-
 const ITEM_STATUS_LABEL = {open:'Zu besprechen',done:'Besprochen',redo:'Nochmal besprechen',delegate:'Delegiert'};
 
 function getDeadlineColor(dueDate) {
@@ -6029,6 +6001,7 @@ function openItemForm(instanceId, id=null) {
   document.getElementById('itDueDate').value = item?.dueDate?.slice?.(0,10)||'';
   document.getElementById('itMeetingDate').value = item?.meetingDate?.slice?.(0,10)||'';
   document.getElementById('itStatus').value = item?.status||'open';
+  document.getElementById('itPriority').value = item?.priority||'medium';
   document.getElementById('itResult').value = item?.result||'';
   document.getElementById('itLink').value = item?.link||'';
   document.getElementById('itDelegateTo').style.display = (item?.status)==='delegate'?'':'none';
@@ -6163,7 +6136,8 @@ async function submitItemForm() {
   const externalParticipants = [...document.getElementById('itExtParticipantsList').children].map(el=>el.dataset.extName).filter(Boolean);
   const body = {
     title, description: document.getElementById('itDesc').value.trim(),
-    status, dueDate: document.getElementById('itDueDate').value||null,
+    status, priority: document.getElementById('itPriority').value,
+    dueDate: document.getElementById('itDueDate').value||null,
     meetingDate: document.getElementById('itMeetingDate').value||null,
     delegatedTo: status==='delegate'?document.getElementById('itDelegatedTo').value:null,
     result: document.getElementById('itResult').value.trim(),
