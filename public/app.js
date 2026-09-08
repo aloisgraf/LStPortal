@@ -5721,6 +5721,7 @@ function renderInstanceDetail(inst, meeting, canManage) {
 // hier aus zusätzlich an einzelne Punkte/Protokolle verknüpft werden.
 function renderInstanceFilesTab(inst, canManage) {
   const files = inst.files||[];
+  const fmtBytes=b=>b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB';
   return`
     ${canManage?`<div id="thema-dropzone-${inst.id}" style="border:2px dashed var(--border);border-radius:8px;padding:24px 16px;text-align:center;margin-bottom:14px;background:var(--sf);cursor:pointer;transition:all .2s;color:var(--mu);font-size:13px"
       onclick="document.getElementById('thema-dropinput-${inst.id}').click()"
