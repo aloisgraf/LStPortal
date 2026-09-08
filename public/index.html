@@ -1706,6 +1706,21 @@
   </div>
 </div>
 
+<!-- THEMEN-DOKUMENT: DATUM/ABSENDER BEARBEITEN -->
+<div class="ov" id="instFileEditOv">
+  <div class="modal sm">
+    <div class="mh"><h2>Dokument bearbeiten</h2><button class="mc" onclick="closeModal('instFileEditOv')">&#10005;</button></div>
+    <div class="mb2">
+      <input type="hidden" id="ifeInstanceId">
+      <input type="hidden" id="ifeFileId">
+      <div style="font-size:13px;font-weight:600;margin-bottom:10px" id="ifeName"></div>
+      <div class="fg"><label>Dokumentdatum</label><input type="date" id="ifeDocDate"></div>
+      <div class="fg"><label>Absender</label><input type="text" id="ifeSender" placeholder="z.B. bei E-Mails"></div>
+    </div>
+    <div class="mf"><button class="btn" onclick="submitInstanceFileEdit()">&#10003; Speichern</button></div>
+  </div>
+</div>
+
 <!-- DISCUSSION ITEM FORM MODAL -->
 <div class="ov" id="itemFormOv">
   <div class="modal" style="max-width:560px">

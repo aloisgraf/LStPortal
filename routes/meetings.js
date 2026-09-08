@@ -496,7 +496,7 @@ router.post('/meeting-instances/:id/files', auth, async (req, res) => {
   try {
     const inst = await q1('SELECT id FROM meeting_instances WHERE id=$1', [req.params.id]);
     if (!inst) return bad(res, 'Termin nicht gefunden', 404);
-    const { name, mimeType, data } = req.body;
+    const { name, mimeType, data, docDate, sender } = req.body;
     if (!name?.trim() || !data) return bad(res, 'Dateiname und Daten erforderlich', 400);
     const mime = mimeType || 'application/octet-stream';
     if (!validateMime(mime)) return bad(res, 'Dateityp nicht erlaubt', 400);
@@ -505,13 +505,30 @@ router.post('/meeting-instances/:id/files', auth, async (req, res) => {
     const id = newId();
     const safeName = sanitizeFilename(name.trim());
     await pool.query(
-      `INSERT INTO meeting_instance_files (id,instance_id,filename,original_name,mime_type,size_bytes,uploaded_by,file_data)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [id, req.params.id, safeName, safeName, mime, buf.length, req.uid, buf.toString('base64')]
+      `INSERT INTO meeting_instance_files (id,instance_id,filename,original_name,mime_type,size_bytes,uploaded_by,file_data,doc_date,sender)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      [id, req.params.id, safeName, safeName, mime, buf.length, req.uid, buf.toString('base64'), docDate || null, (sender || '').trim()]
     );
     const row = await q1(
-      'SELECT id,instance_id,original_name,mime_type,size_bytes,uploaded_by,created_at FROM meeting_instance_files WHERE id=$1',
+      'SELECT id,instance_id,original_name,mime_type,size_bytes,uploaded_by,created_at,doc_date,sender FROM meeting_instance_files WHERE id=$1',
       [id]
+    );
+    ok(res, row);
+  } catch (e) { bad(res, 'Serverfehler', 500); }
+});
+
+router.put('/meeting-instances/:id/files/:fid', auth, async (req, res) => {
+  try {
+    const file = await q1('SELECT id FROM meeting_instance_files WHERE id=$1 AND instance_id=$2', [req.params.fid, req.params.id]);
+    if (!file) return bad(res, 'Datei nicht gefunden', 404);
+    const { docDate, sender } = req.body;
+    await pool.query(
+      'UPDATE meeting_instance_files SET doc_date=$1, sender=$2 WHERE id=$3',
+      [docDate || null, (sender || '').trim(), req.params.fid]
+    );
+    const row = await q1(
+      'SELECT id,instance_id,original_name,mime_type,size_bytes,uploaded_by,created_at,doc_date,sender FROM meeting_instance_files WHERE id=$1',
+      [req.params.fid]
     );
     ok(res, row);
   } catch (e) { bad(res, 'Serverfehler', 500); }

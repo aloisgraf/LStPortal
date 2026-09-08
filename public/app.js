@@ -6195,9 +6195,27 @@ function renderThemaSummary(inst, canManage) {
 // hochladbar (auch E-Mails als .msg/.eml — werden wie jede andere Datei
 // einfach als Anhang gespeichert, ohne Auswertung des Inhalts). Können von
 // hier aus zusätzlich an einzelne Punkte/Protokolle verknüpft werden.
+// Art des Dokuments — anhand Mime-Type + Dateiendung, für die Spalte "Art"
+// in der Themen-Dokumente-Tabelle.
+function fileTypeLabel(f) {
+  const mime = f.mimeType||'';
+  const ext = (f.originalName||'').toLowerCase().split('.').pop();
+  if (mime==='message/rfc822' || mime.includes('outlook') || ['msg','eml'].includes(ext)) return 'E-Mail';
+  if (mime==='application/pdf' || ext==='pdf') return 'PDF';
+  if (mime.includes('word') || ['doc','docx'].includes(ext)) return 'Word';
+  if (mime.includes('sheet') || mime.includes('excel') || ['xls','xlsx'].includes(ext)) return 'Excel';
+  if (mime.includes('powerpoint') || mime.includes('presentation') || ['ppt','pptx'].includes(ext)) return 'PowerPoint';
+  if (mime.startsWith('image/')) return 'Bild';
+  if (mime==='text/plain' || ext==='txt') return 'Text';
+  if (mime.includes('zip')) return 'ZIP';
+  return ext ? ext.toUpperCase() : 'Datei';
+}
 function renderInstanceFilesTab(inst, canManage) {
-  const files = inst.files||[];
+  const files = [...(inst.files||[])];
   const fmtBytes=b=>b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB';
+  const sortBy = S._instFilesSortBy==='upload' ? 'upload' : 'doc';
+  const dateOf = f => sortBy==='doc' ? (f.docDate||f.createdAt) : f.createdAt;
+  files.sort((a,b)=>String(dateOf(b)).localeCompare(String(dateOf(a))));
   return`
     ${canManage?`<div id="thema-dropzone-${inst.id}" style="border:2px dashed var(--border);border-radius:8px;padding:24px 16px;text-align:center;margin-bottom:14px;background:var(--sf);cursor:pointer;transition:all .2s;color:var(--mu);font-size:13px"
       onclick="document.getElementById('thema-dropinput-${inst.id}').click()"
@@ -6207,15 +6225,40 @@ function renderInstanceFilesTab(inst, canManage) {
       &#128193; Datei oder E-Mail hierher ziehen, oder klicken zum Auswählen
       <input type="file" multiple id="thema-dropinput-${inst.id}" style="display:none" onchange="uploadInstanceFiles('${inst.id}',this)">
     </div>`:''}
-    ${files.length===0?`<div style="color:var(--mu);font-size:13px;padding:16px 0;text-align:center">Noch keine Dokumente.</div>`:''}
-    <div style="display:flex;flex-direction:column;gap:6px">
-      ${files.map(f=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--sf);border:1px solid var(--border);border-radius:8px">
-        <span style="flex-shrink:0">${fileIcon(f.mimeType)}</span>
-        <a href="/api/meeting-instances/${inst.id}/files/${f.id}" target="_blank" rel="noopener noreferrer" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:var(--tx);text-decoration:none">${esc(f.originalName)}</a>
-        <span style="font-size:11px;color:var(--mu);flex-shrink:0">${fmtBytes(f.sizeBytes||0)}</span>
-        ${canManage?`<button class="btn-d" style="padding:2px 6px;font-size:11px;flex-shrink:0" onclick="deleteInstanceFile('${inst.id}','${f.id}')">&#10005;</button>`:''}
-      </div>`).join('')}
-    </div>`;
+    ${files.length===0?`<div style="color:var(--mu);font-size:13px;padding:16px 0;text-align:center">Noch keine Dokumente.</div>`:`
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12px;color:var(--mu)">
+      <span>Sortieren nach:</span>
+      <button class="mb${sortBy==='doc'?' on':''}" style="padding:3px 9px;font-size:11px" onclick="S._instFilesSortBy='doc';renderMeetings()">Dokumentdatum</button>
+      <button class="mb${sortBy==='upload'?' on':''}" style="padding:3px 9px;font-size:11px" onclick="S._instFilesSortBy='upload';renderMeetings()">Hochladedatum</button>
+    </div>
+    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
+      <thead><tr style="text-align:left;font-size:11px;color:var(--mu);border-bottom:1px solid var(--border)">
+        <th style="padding:4px 8px 6px 0;white-space:nowrap">Datum</th>
+        <th style="padding:4px 8px 6px 0;white-space:nowrap">Art</th>
+        <th style="padding:4px 8px 6px 0">Benennung</th>
+        <th style="padding:4px 8px 6px 0">Absender</th>
+        <th style="padding:4px 8px 6px 0;white-space:nowrap">Größe</th>
+        ${canManage?'<th></th>':''}
+      </tr></thead>
+      <tbody>
+      ${files.map(f=>`<tr style="border-bottom:1px solid var(--border);font-size:12px">
+        <td style="padding:8px 8px 8px 0;white-space:nowrap;vertical-align:top">
+          ${f.docDate?fmtDate(f.docDate):`<span style="color:var(--mu)" title="Kein Dokumentdatum gesetzt — Hochladedatum">${fmtDate(f.createdAt)}</span>`}
+        </td>
+        <td style="padding:8px 8px 8px 0;white-space:nowrap;vertical-align:top">${fileIcon(f.mimeType)} ${esc(fileTypeLabel(f))}</td>
+        <td style="padding:8px 8px 8px 0;vertical-align:top;word-break:break-word">
+          <a href="/api/meeting-instances/${inst.id}/files/${f.id}" target="_blank" rel="noopener noreferrer" style="color:var(--tx);text-decoration:none;font-weight:600">${esc(f.originalName)}</a>
+          <div style="font-size:10px;color:var(--mu);margin-top:2px">Hochgeladen ${fmtDate(f.createdAt)} von ${esc(lastNameFirst(getU(f.uploadedBy)?.name||'?'))}</div>
+        </td>
+        <td style="padding:8px 8px 8px 0;vertical-align:top;word-break:break-word">${f.sender?esc(f.sender):'<span style="color:var(--mu)">–</span>'}</td>
+        <td style="padding:8px 8px 8px 0;white-space:nowrap;vertical-align:top;color:var(--mu)">${fmtBytes(f.sizeBytes||0)}</td>
+        ${canManage?`<td style="padding:8px 0 8px 8px;white-space:nowrap;vertical-align:top">
+          <button class="btn-e" style="padding:2px 6px;font-size:11px" onclick="openInstanceFileEditForm('${inst.id}','${f.id}')" title="Datum/Absender bearbeiten">&#9998;</button>
+          <button class="btn-d" style="padding:2px 6px;font-size:11px" onclick="deleteInstanceFile('${inst.id}','${f.id}')" title="Löschen">&#10005;</button>
+        </td>`:''}
+      </tr>`).join('')}
+      </tbody>
+    </table></div>`}`;
 }
 // Kleine Badge-Zeile mit verknüpften Dokumenten (eigener Thema-Upload oder
 // globales Dokument — Anzeigename/Mime-Type kommen bereits fertig aufgelöst
@@ -6248,7 +6291,19 @@ async function uploadInstanceFiles(instanceId, input) {
       if (f.size > 20*1024*1024) { toast(`⚠️ ${f.name} zu groß (max. 20 MB)`,'err'); continue; }
       const dataUrl = await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(new Error('Lesefehler'));r.readAsDataURL(f);});
       const b64 = dataUrl.split(',')[1];
-      await api('POST','/meeting-instances/'+instanceId+'/files',{name:f.name,mimeType:f.type||'application/octet-stream',data:b64});
+      const body = {name:f.name,mimeType:f.type||'application/octet-stream',data:b64};
+      // Bei E-Mails Absender und Sendedatum automatisch aus der Datei
+      // auslesen (best effort — schlägt die Auswertung fehl, wird die Datei
+      // trotzdem ganz normal als Anhang gespeichert).
+      const ext = f.name.toLowerCase().split('.').pop();
+      if (ext==='msg' || ext==='eml') {
+        try {
+          const parsed = await api('POST','/email/parse',{filename:f.name,data:b64});
+          if (parsed.senderName) body.sender = parsed.senderName;
+          if (parsed.date) body.docDate = parsed.date.slice(0,10);
+        } catch(e) { /* Auswertung optional — Upload läuft trotzdem weiter */ }
+      }
+      await api('POST','/meeting-instances/'+instanceId+'/files', body);
     }
     await fetchData(); renderMeetings(); toast('✅ Dokument(e) hochgeladen');
   } catch(e) { toast('⚠️ '+e.message,'err'); } finally { loading(false); if(input.value!==undefined) input.value=''; }
@@ -6258,6 +6313,28 @@ async function deleteInstanceFile(instanceId, fileId) {
   try {
     await api('DELETE',`/meeting-instances/${instanceId}/files/${fileId}`);
     await fetchData(); renderMeetings(); toast('Gelöscht');
+  } catch(e) { toast('⚠️ '+e.message,'err'); }
+}
+function openInstanceFileEditForm(instanceId, fileId) {
+  const inst = S.meetings.flatMap(m=>m.instances).find(i=>i.id===instanceId);
+  const f = (inst?.files||[]).find(x=>x.id===fileId);
+  if (!f) return;
+  document.getElementById('ifeInstanceId').value = instanceId;
+  document.getElementById('ifeFileId').value = fileId;
+  document.getElementById('ifeName').textContent = f.originalName;
+  document.getElementById('ifeDocDate').value = f.docDate?String(f.docDate).slice(0,10):'';
+  document.getElementById('ifeSender').value = f.sender||'';
+  openModal('instFileEditOv');
+}
+async function submitInstanceFileEdit() {
+  const instanceId = document.getElementById('ifeInstanceId').value;
+  const fileId = document.getElementById('ifeFileId').value;
+  const docDate = document.getElementById('ifeDocDate').value || null;
+  const sender = document.getElementById('ifeSender').value.trim();
+  try {
+    await api('PUT',`/meeting-instances/${instanceId}/files/${fileId}`, {docDate, sender});
+    closeModal('instFileEditOv');
+    await fetchData(); renderMeetings(); toast('Gespeichert');
   } catch(e) { toast('⚠️ '+e.message,'err'); }
 }
 

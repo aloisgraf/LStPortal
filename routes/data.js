@@ -117,7 +117,7 @@ router.get('/', auth, async (req,res) => {
     (instFilesRaw||[]).forEach(f=>{
       instFileById[f.id]=f;
       if(!instFileMap[f.instance_id])instFileMap[f.instance_id]=[];
-      instFileMap[f.instance_id].push({id:f.id,instanceId:f.instance_id,originalName:f.original_name,mimeType:f.mime_type,sizeBytes:f.size_bytes,uploadedBy:f.uploaded_by,createdAt:f.created_at});
+      instFileMap[f.instance_id].push({id:f.id,instanceId:f.instance_id,originalName:f.original_name,mimeType:f.mime_type,sizeBytes:f.size_bytes,uploadedBy:f.uploaded_by,createdAt:f.created_at,docDate:f.doc_date||null,sender:f.sender||''});
     });
     const docLinksByTarget={};
     (docLinksRaw||[]).forEach(l=>{

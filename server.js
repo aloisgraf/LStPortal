@@ -880,6 +880,11 @@ async function initDB() {
     // zuoberst) wird ein Änderungs-Zeitstempel bei Punkten benötigt — bisher
     // gab es nur created_at.
     `ALTER TABLE discussion_items ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`,
+    // Themen-Dokumente: Dokumentdatum (z.B. Versanddatum bei E-Mails, sonst
+    // frei editierbar) und Absender (bei E-Mails automatisch befüllt) — für
+    // die aufgeschlüsselte Tabellenansicht im Dokumente-Reiter.
+    `ALTER TABLE meeting_instance_files ADD COLUMN IF NOT EXISTS doc_date DATE DEFAULT NULL`,
+    `ALTER TABLE meeting_instance_files ADD COLUMN IF NOT EXISTS sender TEXT DEFAULT ''`,
     // Einfache Termine je Thema (Datum, Uhrzeit, Ort, Titel) — eigener Reiter
     // "Termine", chronologisch gereiht.
     `CREATE TABLE IF NOT EXISTS meeting_appointments (

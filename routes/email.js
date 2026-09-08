@@ -24,15 +24,23 @@ function parseMsg(buffer) {
   const subject = pick(fileData, ['subject','Subject']);
   const senderName = pick(fileData, ['senderName','SenderName']);
   let senderEmail = pick(fileData, ['senderSmtpAddress','senderEmail','SenderEmail']);
+  const headers = pick(fileData, ['headers','transportMessageHeaders']);
   if (!isRealEmail(senderEmail)) {
     // Fallback: rohe Internet-Header (falls im .msg erhalten) nach "From:" durchsuchen
-    const headers = pick(fileData, ['headers','transportMessageHeaders']);
     const m = String(headers||'').match(/^From:.*?<?([^\s<>]+@[^\s<>]+)>?\s*$/im);
     senderEmail = m && isRealEmail(m[1]) ? m[1] : '';
   }
   let body = pick(fileData, ['body','Body']);
   if (!body) body = stripHtml(pick(fileData, ['bodyHTML','bodyHtml']));
-  return { subject, senderName, senderEmail, body };
+  // Sendedatum: bevorzugt strukturierte Felder des Parsers, sonst aus den
+  // rohen Internet-Headern (falls im .msg erhalten) das "Date:"-Feld lesen.
+  let date = pick(fileData, ['messageDeliveryTime','clientSubmitTime','creationTime']);
+  if (!date) {
+    const m = String(headers||'').match(/^Date:\s*(.+)$/im);
+    if (m) date = m[1].trim();
+  }
+  const dateIso = date && !isNaN(new Date(date)) ? new Date(date).toISOString() : '';
+  return { subject, senderName, senderEmail, body, date: dateIso };
 }
 
 async function parseEml(buffer) {
@@ -44,6 +52,7 @@ async function parseEml(buffer) {
     senderName: from.name || '',
     senderEmail: from.address || '',
     body: parsed.text || stripHtml(parsed.html || ''),
+    date: parsed.date && !isNaN(parsed.date) ? parsed.date.toISOString() : '',
   };
 }
 
