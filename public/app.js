@@ -5663,7 +5663,7 @@ function renderMeetingDetail(m, canManage) {
 }
 
 function renderInstanceDetail(inst, meeting, canManage) {
-  const tab = S._themaTab==='protocol' ? 'protocol' : 'points';
+  const tab = ['protocol','files'].includes(S._themaTab) ? S._themaTab : 'points';
   const protos=[...(inst.protocols||[])].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
   const openPointsCount=(inst.items||[]).filter(it=>it.status==='open'||it.status==='redo').length;
   return`<div>
