@@ -890,6 +890,46 @@ async function initDB() {
       created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW(),
       updated_at TIMESTAMPTZ DEFAULT NOW()
     )`,
+    // ── WIKI ──────────────────────────────────────────────────────────────
+    // Kleine interne Wissensdatenbank für selten gebrauchtes Wissen (z.B.
+    // "einmal im Jahr"-Funktionen in anderen Programmen, seltene Dienstplan-
+    // Sonderfälle). Artikel-Inhalt wird als Markdown-light-Text gespeichert
+    // (nicht als rohes HTML) und beim Anzeigen serverseitig nie interpretiert
+    // — die Umwandlung in HTML passiert rein clientseitig über eine
+    // Escape-zuerst-dann-formatieren-Pipeline, wodurch XSS über Artikelinhalte
+    // ausgeschlossen ist, ohne eine separate HTML-Sanitizer-Bibliothek zu
+    // benötigen.
+    `CREATE TABLE IF NOT EXISTS wiki_categories (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL,
+      icon TEXT DEFAULT '📚', color TEXT DEFAULT '#3b6dd4',
+      sort_order INTEGER DEFAULT 0,
+      created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS wiki_articles (
+      id TEXT PRIMARY KEY, category_id TEXT DEFAULT NULL,
+      title TEXT NOT NULL, tags TEXT DEFAULT '[]',
+      body TEXT NOT NULL DEFAULT '',
+      version INTEGER NOT NULL DEFAULT 1,
+      created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_by TEXT DEFAULT NULL, updated_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
+    // Jede gespeicherte Vorversion eines Artikels (vor dem Überschreiben
+    // archiviert) — ermöglicht Versionshistorie samt Wiederherstellung.
+    `CREATE TABLE IF NOT EXISTS wiki_article_versions (
+      id TEXT PRIMARY KEY,
+      article_id TEXT NOT NULL REFERENCES wiki_articles(id) ON DELETE CASCADE,
+      version INTEGER NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL DEFAULT '',
+      tags TEXT DEFAULT '[]',
+      edited_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
+    // Über den Editor hochgeladene Bilder — werden per Markdown-Bild-Syntax
+    // (![Alt](/api/wiki-images/:id)) im Artikeltext referenziert.
+    `CREATE TABLE IF NOT EXISTS wiki_images (
+      id TEXT PRIMARY KEY,
+      filename TEXT NOT NULL, mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+      size_bytes INTEGER NOT NULL DEFAULT 0, file_data TEXT,
+      uploaded_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }
@@ -984,6 +1024,7 @@ app.use('/api/dp', require('./routes/dp'));
 app.use('/api/dp', require('./routes/dp-christmas'));
 app.use('/api',   require('./routes/todos'));
 app.use('/api',   require('./routes/contacts'));
+app.use('/api',   require('./routes/wiki'));
 app.use('/api',   require('./routes/sop'));
 app.use('/api',   require('./routes/lockers'));
 app.use('/api',   require('./routes/departments'));

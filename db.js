@@ -46,6 +46,7 @@ const { isUserActive } = require('./lib/dp-rules');
 const NAV_TABS = [
   {key:'home', label:'Übersicht'},
   {key:'docs', label:'Dokumente'},
+  {key:'wiki', label:'Wiki'},
   {key:'meetings', label:'Besprechungen'},
   {key:'todos', label:'Todos'},
   {key:'contacts', label:'Kontakte'},

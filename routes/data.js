@@ -10,7 +10,7 @@ router.get('/', auth, async (req,res) => {
     const canManageDp = roles.some(r=>['admin','leitung','dienstplanung'].includes(r));
     const canManageSpint = roles.some(r=>['admin','leitung','technik'].includes(r));
     const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
-           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw,dpQualificationsRaw,dpShiftPrefsRaw,dpProtocolRaw,todosRaw,todoItemsRaw,todoAssigneesRaw,myDpPlanIdsRaw,todoNotificationsRaw,contactsRaw,sopTemplatesRaw,sopItemsRaw,sopRunsRaw,sopRunItemsRaw,lockersRaw,sopBranchOptionsRaw,departmentsRaw,lockerCategoriesRaw,chatThreadsRaw,chatMessagesRaw,chatReadsRaw,protocolsRaw,todoNotesRaw,instFilesRaw,docLinksRaw,contactLinksRaw,appointmentsRaw] = await Promise.all([
+           tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw,dpQualificationsRaw,dpShiftPrefsRaw,dpProtocolRaw,todosRaw,todoItemsRaw,todoAssigneesRaw,myDpPlanIdsRaw,todoNotificationsRaw,contactsRaw,sopTemplatesRaw,sopItemsRaw,sopRunsRaw,sopRunItemsRaw,lockersRaw,sopBranchOptionsRaw,departmentsRaw,lockerCategoriesRaw,chatThreadsRaw,chatMessagesRaw,chatReadsRaw,protocolsRaw,todoNotesRaw,instFilesRaw,docLinksRaw,contactLinksRaw,appointmentsRaw,wikiCatsRaw,wikiArticlesRaw] = await Promise.all([
       q('SELECT id,name,initials,roles,color,must_change_pw,last_seen,category,email,username,hire_date,termination_date,dp_relevant,is_test_user FROM users ORDER BY name'),
       q('SELECT * FROM categories ORDER BY sort_order,label'),
       q('SELECT * FROM tags ORDER BY label'),
@@ -90,6 +90,8 @@ router.get('/', auth, async (req,res) => {
       q('SELECT * FROM meeting_doc_links').catch(()=>[]),
       q('SELECT * FROM meeting_contact_links').catch(()=>[]),
       q('SELECT * FROM meeting_appointments ORDER BY date,time').catch(()=>[]),
+      q('SELECT * FROM wiki_categories ORDER BY sort_order,name').catch(()=>[]),
+      q('SELECT * FROM wiki_articles ORDER BY updated_at DESC').catch(()=>[]),
     ]);
 
     const tkViewMap = new Map((tkViewsRaw||[]).map(v=>[v.ticket_id, v.viewed_at]));
@@ -358,6 +360,14 @@ router.get('/', auth, async (req,res) => {
         phone1:c.phone1||'', phone2:c.phone2||'', company:c.company||'',
         responsibleFor:c.responsible_for||'', availability:c.availability||'',
         createdBy:c.created_by, createdAt:c.created_at,
+      })),
+      wikiCategories: (wikiCatsRaw||[]).map(c=>({id:c.id,name:c.name,icon:c.icon,color:c.color,sortOrder:c.sort_order})),
+      wikiArticles: (wikiArticlesRaw||[]).map(a=>({
+        id:a.id, categoryId:a.category_id||null, title:a.title,
+        tags:(()=>{try{return JSON.parse(a.tags||'[]');}catch{return [];}})(),
+        body:a.body||'', version:a.version,
+        createdBy:a.created_by, createdAt:a.created_at,
+        updatedBy:a.updated_by||a.created_by, updatedAt:a.updated_at,
       })),
       // Notfall-Checklisten: Nicht-Manager sehen nur die jeweils freigegebene+
       // aktive Version jeder Checkliste; der technische Leiter (manageSop)

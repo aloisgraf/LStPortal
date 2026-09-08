@@ -88,6 +88,7 @@ let S={
   events:[],users:[],categories:[],tags:[],allowances:[],tickets:[],ticketSubcategories:[],noteTemplates:[],stationSessions:[],stationShifts:[],
   stationOutages:[],links:[],rolePermissions:[],_onBreak:false,
   docs:[],docCategories:[],_docFilter:'all',_docSearch:'',
+  wikiArticles:[],wikiCategories:[],_wikiCatFilter:'all',_wikiSearch:'',_selWikiArticle:null,_wikiEditing:false,
   meetings:[], _selMeeting:null, _selInstance:null,
   tkBatchMode:false,tkBatchSel:new Set(),_tkFeedFilter:'all',_tkTab:'details',tkGroupBy:'dept',tkFiltSubcat:'',
   checklists:[],messages:[],notifications:[],abrechnung:{einspringer:[],homeoffice:[]},dienstplaene:[],
@@ -147,6 +148,7 @@ async function fetchData(){
     S.noteTemplates=data.noteTemplates||[];S.stationShifts=data.stationShifts||[];S.stationSessions=data.stationSessions||[];
     S.stationOutages=data.stationOutages||[];S.links=data.portalLinks||[];S.rolePermissions=data.rolePermissions||[];
     S.docs=data.docs||[];S.docCategories=data.docCategories||[];
+    S.wikiArticles=data.wikiArticles||[];S.wikiCategories=data.wikiCategories||[];
     S.meetings=data.meetings||[];
     S.dpShiftTypes=data.dpShiftTypes||[];
     S.dpAbsenceTypes=data.dpAbsenceTypes||[];
@@ -395,7 +397,7 @@ function restoreNavSectionState() {
   }
 }
 // Alle Sidebar-Reiter (id="ni-<key>") — muss mit db.js NAV_TABS übereinstimmen.
-const NAV_TAB_IDS=['home','sop','docs','meetings','todos','contacts','schedule','allw','homeoffice','vacation','diensttausch','abrechnung','dienstplaene','zahnarzt','platz','links','tickets','tickets_closed','tickets_cancelled','tickets_deleted','checklists','dp','dp-config','dp-christmas','dp-mine','messages','messages_sent','news','statistik','spint','chat'];
+const NAV_TAB_IDS=['home','sop','docs','wiki','meetings','todos','contacts','schedule','allw','homeoffice','vacation','diensttausch','abrechnung','dienstplaene','zahnarzt','platz','links','tickets','tickets_closed','tickets_cancelled','tickets_deleted','checklists','dp','dp-config','dp-christmas','dp-mine','messages','messages_sent','news','statistik','spint','chat'];
 // Zusätzlich zur (abschaltbaren) Reiter-Sichtbarkeit weiterhin hart verdrahtete
 // Mindestanforderungen für die Dienstplanungs-/Statistik-Reiter — ein Reiter
 // ist nur sichtbar, wenn BEIDES zutrifft.
@@ -446,6 +448,7 @@ function renderMain(){
   else if(S.view==='platz')renderPlatz();
   else if(S.view==='links')renderLinks();
   else if(S.view==='docs')renderDocs();
+  else if(S.view==='wiki')renderWiki();
   else if(S.view==='statistik')renderStatistik();
   else if(S.view==='meetings')renderMeetings();
   else if(S.view==='dp')renderDP();
@@ -2842,7 +2845,7 @@ const RIGHTS_ROLES_LIST=['admin','leitung','dienstplanung','schichtleiter','tech
 // (Frontend hat keinen Zugriff auf db.js), Reihenfolge/Gruppierung entspricht
 // der Sidebar.
 const RIGHTS_NAV_TABS=[
-  {key:'home',label:'\u00dcbersicht'},{key:'sop',label:'Notfall-Checklisten'},{key:'docs',label:'Dokumente'},{key:'meetings',label:'Besprechungen'},{key:'todos',label:'Todos'},{key:'contacts',label:'Kontakte'},
+  {key:'home',label:'\u00dcbersicht'},{key:'sop',label:'Notfall-Checklisten'},{key:'docs',label:'Dokumente'},{key:'wiki',label:'Wiki'},{key:'meetings',label:'Besprechungen'},{key:'todos',label:'Todos'},{key:'contacts',label:'Kontakte'},
   {key:'schedule',label:'Dienstplan (Kalender)'},{key:'allw',label:'Zulagendienste'},{key:'homeoffice',label:'Homeoffice'},{key:'vacation',label:'Urlaubs\u00fcbersicht'},
   {key:'diensttausch',label:'Diensttausch'},{key:'abrechnung',label:'Abrechnung'},{key:'dienstplaene',label:'Dienstpl\u00e4ne'},
   {key:'zahnarzt',label:'Dienstplan Zahn\u00e4rzte'},{key:'platz',label:'Platz\u00fcbersicht'},{key:'links',label:'Links'},
@@ -3344,7 +3347,7 @@ async function silentRefresh(){
       S.messages=data.messages||[];S.notifications=data.notifications||[];
       S.allowances=data.allowances||[];S.checklists=data.checklists||[];
       S.abrechnung=data.abrechnung||{einspringer:[],homeoffice:[]};S.dienstplaene=data.dienstplaene||[];S.diensttausch=data.diensttausch||[];S.homeoffice=data.homeoffice||{slots:[],config:[],boxes:[],dienste:[]};S.vacationConfig=data.vacationConfig||[];S.diensttausch=data.diensttausch||[];
-      S.stationSessions=data.stationSessions||[];S.stationShifts=data.stationShifts||[];S.stationOutages=data.stationOutages||[];S.links=data.portalLinks||[];S.docs=data.docs||[];S.docCategories=data.docCategories||[];S.rolePermissions=data.rolePermissions||[];S.meetings=data.meetings||[];S.contacts=data.contacts||[];S.todos=data.todos||[];
+      S.stationSessions=data.stationSessions||[];S.stationShifts=data.stationShifts||[];S.stationOutages=data.stationOutages||[];S.links=data.portalLinks||[];S.docs=data.docs||[];S.docCategories=data.docCategories||[];S.wikiArticles=data.wikiArticles||[];S.wikiCategories=data.wikiCategories||[];S.rolePermissions=data.rolePermissions||[];S.meetings=data.meetings||[];S.contacts=data.contacts||[];S.todos=data.todos||[];
       S.sopTemplates=data.sopTemplates||[];S.sopRuns=data.sopRuns||[];
       S.lockers=data.lockers||[];
       S.departments=data.departments||[];
@@ -3369,6 +3372,7 @@ async function silentRefresh(){
       else if(S.view==='platz')renderPlatz();
       else if(S.view==='links')renderLinks();
       else if(S.view==='docs')renderDocs();
+      else if(S.view==='wiki')renderWiki();
       else if(S.view==='meetings')renderMeetings();
       else if(S.view==='todos')renderTodos();
       else if(S.view==='sop'&&(S._sopView==='run'||S._sopView==='runlist'))renderSop();
@@ -5536,6 +5540,356 @@ async function deleteDocCat(id,name){
 // ── MEETINGS ─────────────────────────────────────────────────────────────────
 const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 function fmtDate(d){if(!d)return'';var p=String(d).slice(0,10);return p.slice(8)+'.'+p.slice(5,7)+'.'+p.slice(0,4);}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WIKI — kleine interne Wissensdatenbank für selten gebrauchtes Wissen (z.B.
+// "einmal im Jahr"-Funktionen in anderen Programmen, seltene Dienstplan-
+// Sonderfälle). Artikel werden als Markdown-light-Text gespeichert; die
+// Anzeige läuft über wikiMarkdownToHtml(), das zuerst den GESAMTEN Text via
+// esc() escaped und danach nur feste, kontrollierte Regeln auf den bereits
+// HTML-sicheren Text anwendet — Artikelinhalte können dadurch nie eigenes
+// HTML/JS einschleusen, ganz ohne separate Sanitizer-Bibliothek.
+// ═══════════════════════════════════════════════════════════════════════════
+
+function wikiCanManage() { return !!S.p.addGeneral; }
+
+function renderWiki() {
+  if (S._selWikiArticle) return renderWikiArticlePage();
+  renderWikiList();
+}
+
+function renderWikiList() {
+  const canManage = wikiCanManage();
+  const cats = S.wikiCategories||[];
+  const search = (S._wikiSearch||'').toLowerCase().trim();
+  const filt = S._wikiCatFilter||'all';
+  let articles = [...(S.wikiArticles||[])];
+  if (filt==='__none__') articles = articles.filter(a=>!a.categoryId);
+  else if (filt!=='all') articles = articles.filter(a=>a.categoryId===filt);
+  if (search) articles = articles.filter(a=>
+    a.title.toLowerCase().includes(search) ||
+    (a.tags||[]).some(t=>t.toLowerCase().includes(search)) ||
+    wikiStripMarkdown(a.body).toLowerCase().includes(search)
+  );
+  articles.sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt));
+
+  document.getElementById('main').innerHTML = `
+    <div class="ph"><div class="pt">&#128218; Wiki</div>
+      <div style="display:flex;gap:8px">
+        ${canManage?`<button class="btn-s" onclick="openWikiCategoryForm()">+ Kategorie</button>`:''}
+        ${canManage?`<button class="btn-add" onclick="openWikiArticleEditor()">+ Neuer Artikel</button>`:''}
+      </div>
+    </div>
+    <div class="docs-layout">
+      <div class="docs-sidebar">
+        <div class="docs-cat-item${filt==='all'?' active':''}" onclick="S._wikiCatFilter='all';renderWiki()">&#128218; Alle <span class="docs-cat-cnt">${(S.wikiArticles||[]).length}</span></div>
+        ${cats.map(c=>{
+          const n=(S.wikiArticles||[]).filter(a=>a.categoryId===c.id).length;
+          return `<div class="docs-cat-item${filt===c.id?' active':''}" onclick="S._wikiCatFilter='${c.id}';renderWiki()" style="${filt===c.id?'border-left-color:'+c.color+';':''}">
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.icon} ${esc(c.name)}</span>
+            <span class="docs-cat-cnt">${n}</span>
+            ${canManage?`<span style="display:flex;gap:2px;flex-shrink:0" onclick="event.stopPropagation()">
+              <button class="btn-s" style="padding:1px 4px;font-size:10px" onclick="openWikiCategoryForm('${c.id}')" title="Bearbeiten">&#9998;</button>
+              <button class="btn-d" style="padding:1px 4px;font-size:10px" onclick="deleteWikiCategory('${c.id}')" title="Löschen">&#10005;</button>
+            </span>`:''}
+          </div>`;
+        }).join('')}
+        <div class="docs-cat-item${filt==='__none__'?' active':''}" onclick="S._wikiCatFilter='__none__';renderWiki()">&#128193; Ohne Kategorie <span class="docs-cat-cnt">${(S.wikiArticles||[]).filter(a=>!a.categoryId).length}</span></div>
+      </div>
+      <div>
+        <input type="text" placeholder="&#128269; Suchen (Titel, Tags, Inhalt) …" value="${esc(S._wikiSearch||'')}" oninput="S._wikiSearch=this.value;renderWiki()" style="width:100%;padding:8px 12px;font-size:13px;border:1px solid var(--border);border-radius:var(--r);background:var(--sf);color:var(--tx);box-sizing:border-box;margin-bottom:14px">
+        ${articles.length===0?`<div style="color:var(--mu);font-size:13px;padding:24px;text-align:center">${(S.wikiArticles||[]).length===0?'Noch keine Wiki-Artikel angelegt.':'Keine Artikel gefunden.'}</div>`:''}
+        <div style="display:flex;flex-direction:column;gap:10px">
+          ${articles.map(a=>{
+            const cat = cats.find(c=>c.id===a.categoryId);
+            const u = getU(a.updatedBy);
+            return `<div class="doc-row" style="cursor:pointer;flex-direction:column;align-items:stretch" onclick="S._selWikiArticle='${a.id}';renderWiki()">
+              <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+                <span class="doc-title">${esc(a.title)}</span>
+                ${cat?`<span style="font-size:11px;background:var(--bg2);padding:1px 7px;border-radius:10px;color:var(--mu);flex-shrink:0">${cat.icon} ${esc(cat.name)}</span>`:''}
+              </div>
+              <div class="doc-meta">Zuletzt geändert von ${u?esc(lastNameFirst(u.name)):'?'} &middot; ${fdt(a.updatedAt)}</div>
+              ${(a.tags||[]).length?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">${a.tags.map(t=>`<span style="font-size:10px;background:var(--bg2);padding:1px 6px;border-radius:8px;color:var(--mu)">#${esc(t)}</span>`).join('')}</div>`:''}
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderWikiArticlePage() {
+  const a = (S.wikiArticles||[]).find(x=>x.id===S._selWikiArticle);
+  if (!a) { S._selWikiArticle=null; renderWiki(); return; }
+  if (S._wikiEditing) { renderWikiArticleEditor(a); return; }
+  const canManage = wikiCanManage();
+  const cat = (S.wikiCategories||[]).find(c=>c.id===a.categoryId);
+  const creator = getU(a.createdBy), editor = getU(a.updatedBy);
+  document.getElementById('main').innerHTML = `
+    <div style="padding:20px;max-width:900px;margin:0 auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px">
+        <a href="javascript:void(0)" onclick="S._selWikiArticle=null;renderWiki()" style="font-size:12px;color:var(--mu);text-decoration:none">&larr; Zur Übersicht</a>
+        <div style="display:flex;gap:8px">
+          <button class="btn-s" onclick="openWikiVersionHistory('${a.id}')" title="Versionshistorie">&#128337; v${a.version}</button>
+          ${canManage?`<button class="btn-s" onclick="S._wikiEditing=true;renderWiki()">&#9998; Bearbeiten</button>`:''}
+          ${canManage?`<button class="btn-d" onclick="deleteWikiArticle('${a.id}')">&#128465;</button>`:''}
+        </div>
+      </div>
+      <h2 style="margin:0 0 6px;font-size:22px">${esc(a.title)}</h2>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--mu);margin-bottom:8px">
+        ${cat?`<span style="background:var(--bg2);padding:1px 8px;border-radius:10px">${cat.icon} ${esc(cat.name)}</span>`:''}
+        <span>Erstellt von ${creator?esc(lastNameFirst(creator.name)):'?'} &middot; ${fdt(a.createdAt)}</span>
+        ${a.updatedAt!==a.createdAt?`<span>&middot; Zuletzt geändert von ${editor?esc(lastNameFirst(editor.name)):'?'} &middot; ${fdt(a.updatedAt)}</span>`:''}
+      </div>
+      ${(a.tags||[]).length?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:16px">${a.tags.map(t=>`<span style="font-size:11px;background:var(--bg2);padding:2px 8px;border-radius:10px;color:var(--mu)">#${esc(t)}</span>`).join('')}</div>`:''}
+      <div class="wiki-body" style="border-top:1px solid var(--border);padding-top:16px">${wikiMarkdownToHtml(a.body)}</div>
+    </div>`;
+}
+
+function openWikiArticleEditor() {
+  S._selWikiArticle = null; S._wikiEditing = true; S._wikiPreview = false;
+  renderWiki();
+}
+function wikiCancelEdit() {
+  S._wikiEditing = false; S._wikiPreview = false;
+  renderWiki();
+}
+
+function renderWikiArticleEditor(article) {
+  const cats = S.wikiCategories||[];
+  document.getElementById('main').innerHTML = `
+    <div style="padding:20px;max-width:900px;margin:0 auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <a href="javascript:void(0)" onclick="wikiCancelEdit()" style="font-size:12px;color:var(--mu);text-decoration:none">&larr; Abbrechen</a>
+        <button class="btn" onclick="submitWikiArticle('${article?.id||''}')">&#10003; Speichern</button>
+      </div>
+      <div class="fg"><label>Titel *</label><input type="text" id="wkTitle" value="${article?esc(article.title):''}" placeholder="z.B. Jahresabschluss in XY erstellen"></div>
+      <div style="display:flex;gap:12px">
+        <div class="fg" style="flex:1"><label>Kategorie</label>
+          <select id="wkCategory">
+            <option value="">– Keine –</option>
+            ${cats.map(c=>`<option value="${c.id}"${article?.categoryId===c.id?' selected':''}>${c.icon} ${esc(c.name)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="fg" style="flex:2"><label>Tags (Komma-getrennt)</label>
+          <input type="text" id="wkTags" value="${esc((article?.tags||[]).join(', '))}" placeholder="z.B. jahresabschluss, selten gebraucht">
+        </div>
+      </div>
+      <div class="fg">
+        <label>Inhalt</label>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-bottom:0;background:var(--sf);border:1px solid var(--border);border-bottom:none;border-radius:8px 8px 0 0;padding:6px">
+          <button type="button" class="btn-s" onclick="wikiWrapSelection('**','**')" title="Fett"><b>F</b></button>
+          <button type="button" class="btn-s" onclick="wikiWrapSelection('*','*')" title="Kursiv"><i>K</i></button>
+          <button type="button" class="btn-s" onclick="wikiInsertPrefix('## ')" title="Überschrift">H2</button>
+          <button type="button" class="btn-s" onclick="wikiInsertPrefix('### ')" title="Unter-Überschrift">H3</button>
+          <button type="button" class="btn-s" onclick="wikiInsertPrefix('- ')" title="Aufzählung">&#8226; Liste</button>
+          <button type="button" class="btn-s" onclick="wikiInsertPrefix('1. ')" title="Nummerierte Liste">1. Liste</button>
+          <button type="button" class="btn-s" onclick="wikiWrapSelection('\`','\`')" title="Code">&lt;/&gt;</button>
+          <button type="button" class="btn-s" onclick="wikiInsertLink()" title="Link">&#128279; Link</button>
+          <button type="button" class="btn-s" onclick="document.getElementById('wkImgInput').click()" title="Bild einfügen">&#128247; Bild</button>
+          <input type="file" id="wkImgInput" accept="image/*" style="display:none" onchange="wikiInsertImage(this)">
+          <span style="flex:1"></span>
+          <button type="button" class="btn-s" id="wkPreviewBtn" onclick="wikiTogglePreview()">${S._wikiPreview?'&#9998; Bearbeiten':'&#128065; Vorschau'}</button>
+        </div>
+        <textarea id="wkBody" rows="18" placeholder="Freitext mit leichter Formatierung: **fett**, *kursiv*, ## Überschrift, - Liste, [Link](https://...) …" style="width:100%;box-sizing:border-box;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:13px;border-radius:0 0 8px 8px;${S._wikiPreview?'display:none':''}"
+          ondragover="event.preventDefault();this.style.borderColor='var(--acc)'" ondragleave="this.style.borderColor='var(--border)'"
+          ondrop="event.preventDefault();this.style.borderColor='var(--border)';wikiHandleImageDrop(event)"
+        >${article?esc_ta(article.body):''}</textarea>
+        <div id="wkPreview" class="wiki-body" style="border:1px solid var(--border);border-radius:0 0 8px 8px;padding:14px;min-height:200px;${S._wikiPreview?'':'display:none'}">${S._wikiPreview?wikiMarkdownToHtml(article?article.body:''):''}</div>
+        <small style="color:var(--mu);display:block;margin-top:6px">Bilder können auch direkt per Drag&amp;Drop in das Textfeld gezogen werden.</small>
+      </div>
+    </div>`;
+}
+// Innerhalb eines <textarea>...</textarea>-Inhalts muss nur "</textarea"
+// unschädlich gemacht werden (kein &-Escaping nötig/gewünscht, sonst
+// erschiene "&amp;" im Editor statt "&") — esc() ist hier bewusst zu viel.
+function esc_ta(s) { return String(s||'').replace(/<\/textarea/gi,'&lt;/textarea'); }
+
+function _wkTextarea() { return document.getElementById('wkBody'); }
+function wikiWrapSelection(pre, post) {
+  const ta = _wkTextarea(); if (!ta) return;
+  const s = ta.selectionStart, e = ta.selectionEnd, value = ta.value;
+  const sel = value.slice(s,e) || 'Text';
+  ta.value = value.slice(0,s) + pre + sel + post + value.slice(e);
+  ta.focus(); ta.selectionStart = s+pre.length; ta.selectionEnd = s+pre.length+sel.length;
+}
+function wikiInsertPrefix(prefix) {
+  const ta = _wkTextarea(); if (!ta) return;
+  const s = ta.selectionStart, value = ta.value;
+  const lineStart = value.lastIndexOf('\n', s-1)+1;
+  ta.value = value.slice(0,lineStart) + prefix + value.slice(lineStart);
+  ta.focus(); ta.selectionStart = ta.selectionEnd = s+prefix.length;
+}
+function wikiInsertLink() {
+  const url = prompt('Link-URL (https://...):');
+  if (!url?.trim()) return;
+  const ta = _wkTextarea(); if (!ta) return;
+  const s = ta.selectionStart, e = ta.selectionEnd, value = ta.value;
+  const label = value.slice(s,e) || 'Link';
+  const insert = `[${label}](${url.trim()})`;
+  ta.value = value.slice(0,s) + insert + value.slice(e);
+  ta.focus(); ta.selectionStart = ta.selectionEnd = s+insert.length;
+}
+async function wikiInsertImage(input) {
+  const file = input.files?.[0];
+  if (file) await wikiUploadAndInsertImage(file);
+  input.value = '';
+}
+async function wikiHandleImageDrop(event) {
+  const file = [...(event.dataTransfer?.files||[])].find(f=>f.type.startsWith('image/'));
+  if (file) await wikiUploadAndInsertImage(file);
+}
+async function wikiUploadAndInsertImage(file) {
+  if (file.size > 8*1024*1024) return toast('⚠️ Bild zu groß (max. 8 MB)','err');
+  loading(true);
+  try {
+    const dataUrl = await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(new Error('Lesefehler'));r.readAsDataURL(file);});
+    const b64 = dataUrl.split(',')[1];
+    const result = await api('POST','/wiki-images',{name:file.name,mimeType:file.type||'image/png',data:b64});
+    const ta = _wkTextarea();
+    const insert = `\n![${file.name.replace(/[[\]]/g,'')}](/api/wiki-images/${result.id})\n`;
+    if (ta) {
+      const s = ta.selectionStart, value = ta.value;
+      ta.value = value.slice(0,s) + insert + value.slice(s);
+      ta.focus(); ta.selectionStart = ta.selectionEnd = s+insert.length;
+    }
+    toast('✅ Bild eingefügt');
+  } catch(e) { toast('⚠️ '+e.message,'err'); } finally { loading(false); }
+}
+function wikiTogglePreview() {
+  S._wikiPreview = !S._wikiPreview;
+  const ta=_wkTextarea(), pv=document.getElementById('wkPreview'), btn=document.getElementById('wkPreviewBtn');
+  if (!ta||!pv) return;
+  if (S._wikiPreview) { pv.innerHTML = wikiMarkdownToHtml(ta.value); ta.style.display='none'; pv.style.display=''; if(btn)btn.innerHTML='&#9998; Bearbeiten'; }
+  else { ta.style.display=''; pv.style.display='none'; if(btn)btn.innerHTML='&#128065; Vorschau'; }
+}
+
+async function submitWikiArticle(id) {
+  const title = document.getElementById('wkTitle').value.trim();
+  if (!title) return toast('Titel erforderlich','err');
+  const categoryId = document.getElementById('wkCategory').value || null;
+  const tags = document.getElementById('wkTags').value.split(',').map(t=>t.trim()).filter(Boolean);
+  const body = document.getElementById('wkBody').value;
+  try {
+    const result = id ? await api('PUT','/wiki-articles/'+id, {title,categoryId,tags,body})
+                       : await api('POST','/wiki-articles', {title,categoryId,tags,body});
+    S._wikiEditing = false; S._wikiPreview = false; S._selWikiArticle = result.id;
+    await fetchData(); renderWiki(); toast('✅ Artikel gespeichert');
+  } catch(e) { toast('⚠️ '+e.message,'err'); }
+}
+async function deleteWikiArticle(id) {
+  if (!confirm('Artikel wirklich löschen? Das kann nicht rückgängig gemacht werden.')) return;
+  try {
+    await api('DELETE','/wiki-articles/'+id);
+    S._selWikiArticle = null;
+    await fetchData(); renderWiki(); toast('Gelöscht');
+  } catch(e) { toast('⚠️ '+e.message,'err'); }
+}
+
+function openWikiCategoryForm(id=null) {
+  const c = id ? (S.wikiCategories||[]).find(x=>x.id===id) : null;
+  document.getElementById('wkCatFormTitle').textContent = c ? 'Kategorie bearbeiten' : 'Neue Kategorie';
+  document.getElementById('wkCatId').value = c?.id||'';
+  document.getElementById('wkCatName').value = c?.name||'';
+  document.getElementById('wkCatIcon').value = c?.icon||'📚';
+  document.getElementById('wkCatColor').value = c?.color||'#3b6dd4';
+  openModal('wikiCatFormOv');
+}
+async function submitWikiCategoryForm() {
+  const id = document.getElementById('wkCatId').value;
+  const name = document.getElementById('wkCatName').value.trim();
+  if (!name) return toast('Name erforderlich','err');
+  const body = { name, icon: document.getElementById('wkCatIcon').value.trim()||'📚', color: document.getElementById('wkCatColor').value };
+  try {
+    if (id) await api('PUT','/wiki-categories/'+id, body);
+    else await api('POST','/wiki-categories', body);
+    closeModal('wikiCatFormOv');
+    await fetchData(); renderWiki(); toast('Gespeichert');
+  } catch(e) { toast('⚠️ '+e.message,'err'); }
+}
+async function deleteWikiCategory(id) {
+  if (!confirm('Kategorie löschen? Zugehörige Artikel bleiben erhalten, verlieren aber die Zuordnung.')) return;
+  try {
+    await api('DELETE','/wiki-categories/'+id);
+    if (S._wikiCatFilter===id) S._wikiCatFilter='all';
+    await fetchData(); renderWiki(); toast('Gelöscht');
+  } catch(e) { toast('⚠️ '+e.message,'err'); }
+}
+
+async function openWikiVersionHistory(articleId) {
+  try {
+    const versions = await api('GET','/wiki-articles/'+articleId+'/versions');
+    const a = (S.wikiArticles||[]).find(x=>x.id===articleId);
+    const html = `<div style="font-size:12px;color:var(--mu);margin-bottom:10px">Aktuelle Version: v${a?.version}</div>` +
+      (versions.length===0?'<div style="color:var(--mu);font-size:13px">Keine älteren Versionen vorhanden.</div>':'') +
+      versions.map(v=>{
+        const u = getU(v.edited_by);
+        return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+          <div><b>v${v.version}</b> — ${esc(v.title)}<div style="font-size:11px;color:var(--mu)">${u?esc(lastNameFirst(u.name)):'?'} &middot; ${fdt(v.created_at)}</div></div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            <button class="btn-s" onclick="viewWikiVersion('${articleId}','${v.id}')">Ansehen</button>
+            ${wikiCanManage()?`<button class="btn-s" onclick="restoreWikiVersion('${articleId}','${v.id}')">Wiederherstellen</button>`:''}
+          </div>
+        </div>`;
+      }).join('');
+    document.getElementById('wikiVersionsBody').innerHTML = html;
+    openModal('wikiVersionsOv');
+  } catch(e) { toast('⚠️ '+e.message,'err'); }
+}
+async function viewWikiVersion(articleId, versionId) {
+  try {
+    const v = await api('GET',`/wiki-articles/${articleId}/versions/${versionId}`);
+    document.getElementById('wikiVersionsBody').innerHTML = `
+      <button class="btn-s" onclick="openWikiVersionHistory('${articleId}')" style="margin-bottom:10px">&larr; Zurück zur Liste</button>
+      <h3 style="margin:0 0 6px">${esc(v.title)} <span style="font-size:12px;color:var(--mu);font-weight:400">(v${v.version})</span></h3>
+      <div class="wiki-body" style="border-top:1px solid var(--border);padding-top:10px">${wikiMarkdownToHtml(v.body)}</div>`;
+  } catch(e) { toast('⚠️ '+e.message,'err'); }
+}
+async function restoreWikiVersion(articleId, versionId) {
+  if (!confirm('Diese Version wiederherstellen? Der aktuelle Stand wird dabei als neue Version archiviert.')) return;
+  try {
+    await api('POST',`/wiki-articles/${articleId}/restore/${versionId}`);
+    closeModal('wikiVersionsOv');
+    await fetchData(); renderWiki(); toast('✅ Version wiederhergestellt');
+  } catch(e) { toast('⚠️ '+e.message,'err'); }
+}
+
+// Sicherer Markdown-light-Renderer: escaped zuerst den KOMPLETTEN Text via
+// esc() und wendet erst danach eine feste Menge an Formatierungs-Regeln auf
+// den bereits HTML-sicheren Text an — dadurch gibt es keinen Weg, über
+// Artikelinhalte eigenes HTML/JS einzuschleusen (kein Sanitizer nötig).
+function wikiMarkdownToHtml(text) {
+  if (!text?.trim()) return '<p style="color:var(--mu)">(Kein Inhalt)</p>';
+  let html = esc(text);
+  // Bilder (vor Links wegen gleicher Klammer-Syntax mit führendem !) — nur
+  // eigene Wiki-Bild-URLs zulassen.
+  html = html.replace(/!\[([^\]]*)\]\(\/api\/wiki-images\/([a-zA-Z0-9_-]+)\)/g, '<img src="/api/wiki-images/$2" alt="$1" style="max-width:100%;border-radius:8px;margin:8px 0">');
+  // Links — nur http/https
+  html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  // Code, Fett, Kursiv
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+  html = html.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '<i>$1</i>');
+  // Überschriften, Zitat, Trennlinie (Zeilenanfang)
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+  html = html.replace(/^---$/gm, '<hr>');
+  // Listen: aufeinanderfolgende "- "/"1. "-Zeilen zu einer Liste zusammenfassen
+  html = html.replace(/(^|\n)((?:- .+(?:\n|$))+)/g, (m,pre,block)=>
+    pre+'<ul>'+block.trim().split('\n').map(l=>'<li>'+l.replace(/^- /,'')+'</li>').join('')+'</ul>');
+  html = html.replace(/(^|\n)((?:\d+\. .+(?:\n|$))+)/g, (m,pre,block)=>
+    pre+'<ol>'+block.trim().split('\n').map(l=>'<li>'+l.replace(/^\d+\. /,'')+'</li>').join('')+'</ol>');
+  // Absätze: doppelte Zeilenumbrüche = neuer Absatz, einzelne = <br>
+  html = html.split(/\n{2,}/).map(block=>{
+    if (/^<(h1|h2|h3|ul|ol|blockquote|hr)/.test(block.trim())) return block;
+    return block.trim() ? '<p>'+block.replace(/\n/g,'<br>')+'</p>' : '';
+  }).join('');
+  return html;
+}
+function wikiStripMarkdown(text) {
+  return String(text||'').replace(/[#*`>_-]/g,' ').replace(/\[([^\]]*)\]\([^)]*\)/g,'$1').replace(/\s+/g,' ');
+}
 
 function renderMeetings() {
   const canCreateMeeting = S.p.addGeneral || S.p.manageUsers;

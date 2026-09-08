@@ -128,6 +128,7 @@
       <div class="nsh open" id="genHdr" onclick="toggleNS('gen')"><span>&#128194; Allgemein</span><span class="arr">&#9660;</span></div>
       <div class="nsub open" id="genSub">
         <div class="ni" id="ni-docs" onclick="setView('docs')">&#128193; Dokumente</div>
+        <div class="ni" id="ni-wiki" onclick="setView('wiki')">&#128218; Wiki</div>
         <div class="ni" id="ni-meetings" onclick="setView('meetings')">&#128483;&#65039; Besprechungen</div>
         <div class="ni" id="ni-todos" onclick="setView('todos')">&#9989; Todos</div>
         <div class="ni" id="ni-contacts" onclick="setView('contacts')">&#128222; Kontakte</div>
@@ -2193,6 +2194,30 @@
         <button class="btn-p" onclick="submitDocVersion()">Version hochladen</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- WIKI CATEGORY FORM MODAL -->
+<div class="ov" id="wikiCatFormOv">
+  <div class="modal sm">
+    <div class="mh"><h2 id="wkCatFormTitle">Kategorie</h2><button class="mc" onclick="closeModal('wikiCatFormOv')">&#10005;</button></div>
+    <div class="mb2">
+      <input type="hidden" id="wkCatId">
+      <div class="fg"><label>Name *</label><input type="text" id="wkCatName" placeholder="z.B. Dienstplanung"></div>
+      <div style="display:flex;gap:12px">
+        <div class="fg" style="flex:1"><label>Icon (Emoji)</label><input type="text" id="wkCatIcon" placeholder="📚"></div>
+        <div class="fg" style="flex:1"><label>Farbe</label><input type="color" id="wkCatColor" value="#3b6dd4" style="width:100%;height:36px;padding:2px"></div>
+      </div>
+    </div>
+    <div class="mf"><button class="btn" onclick="submitWikiCategoryForm()">&#10003; Speichern</button></div>
+  </div>
+</div>
+
+<!-- WIKI VERSIONS MODAL -->
+<div class="ov" id="wikiVersionsOv">
+  <div class="modal">
+    <div class="mh"><h2>&#128337; Versionshistorie</h2><button class="mc" onclick="closeModal('wikiVersionsOv')">&#10005;</button></div>
+    <div class="mb2" id="wikiVersionsBody"></div>
   </div>
 </div>
 

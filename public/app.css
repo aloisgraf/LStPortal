@@ -485,6 +485,20 @@ details.dash-card > summary { list-style: none; cursor: pointer; display: flex; 
 .doc-ver-badge{font-size:10px;padding:2px 7px;border-radius:10px;background:var(--acc);color:var(--act);font-weight:700}
 .doc-actions{display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap;align-items:flex-start}
 @media(max-width:768px){.docs-layout{grid-template-columns:1fr;gap:12px;padding:0 12px 20px}.docs-sidebar{position:static;display:flex;flex-wrap:wrap;border-radius:8px}.docs-cat-item{flex:0 0 auto;border-left:none;border-bottom:3px solid transparent;padding:7px 12px;font-size:12px}.docs-cat-item.active{border-bottom-color:var(--acc);border-left-color:transparent}}
+
+.wiki-body{font-size:14px;line-height:1.65;color:var(--tx);word-break:break-word}
+.wiki-body h1{font-size:20px;margin:18px 0 8px}
+.wiki-body h2{font-size:17px;margin:16px 0 8px}
+.wiki-body h3{font-size:15px;margin:14px 0 6px}
+.wiki-body h1:first-child,.wiki-body h2:first-child,.wiki-body h3:first-child{margin-top:0}
+.wiki-body p{margin:0 0 10px}
+.wiki-body ul,.wiki-body ol{margin:0 0 10px;padding-left:22px}
+.wiki-body li{margin:2px 0}
+.wiki-body blockquote{margin:0 0 10px;padding:6px 14px;border-left:3px solid var(--acc);background:var(--sf2);color:var(--mu)}
+.wiki-body code{background:var(--sf2);border-radius:4px;padding:1px 5px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.9em}
+.wiki-body hr{border:none;border-top:1px solid var(--border);margin:16px 0}
+.wiki-body a{color:var(--acc)}
+.wiki-body img{display:block}
 /* ── BESPRECHUNGS-TRACKER ── */
 .meetings-layout{display:flex;height:calc(100vh - 56px);overflow:hidden}
 .meetings-sidebar{width:260px;min-width:200px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
