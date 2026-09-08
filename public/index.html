@@ -1687,6 +1687,24 @@
   </div>
 </div>
 
+<!-- APPOINTMENT FORM MODAL -->
+<div class="ov" id="apptFormOv">
+  <div class="modal sm">
+    <div class="mh"><h2 id="apptFormTitle">Termin</h2><div style="display:flex;gap:4px"><button class="mc" id="apptDeleteBtn" onclick="deleteAppointment()" style="display:none" title="Löschen">&#128465;&#65039;</button><button class="mc" onclick="closeModal('apptFormOv')">&#10005;</button></div></div>
+    <div class="mb2">
+      <input type="hidden" id="apId">
+      <input type="hidden" id="apInstanceId">
+      <div class="fg"><label>Titel *</label><input type="text" id="apTitle" placeholder="z.B. Vor-Ort-Termin"></div>
+      <div style="display:flex;gap:12px">
+        <div class="fg" style="flex:1"><label>Datum *</label><input type="date" id="apDate"></div>
+        <div class="fg" style="flex:1"><label>Uhrzeit</label><input type="time" id="apTime"></div>
+      </div>
+      <div class="fg"><label>Ort</label><input type="text" id="apLocation" placeholder="z.B. Besprechungsraum 1"></div>
+    </div>
+    <div class="mf"><button class="btn" onclick="submitAppointmentForm()">&#10003; Speichern</button></div>
+  </div>
+</div>
+
 <!-- DISCUSSION ITEM FORM MODAL -->
 <div class="ov" id="itemFormOv">
   <div class="modal" style="max-width:560px">

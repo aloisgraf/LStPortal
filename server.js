@@ -876,6 +876,20 @@ async function initDB() {
     // uneingeschränkt planbar (Standard für alle bestehenden Mitarbeiter).
     `ALTER TABLE dp_employee_params ADD COLUMN IF NOT EXISTS ls_pct INTEGER NOT NULL DEFAULT 100`,
     `ALTER TABLE discussion_items ADD COLUMN IF NOT EXISTS priority TEXT NOT NULL DEFAULT 'medium'`,
+    // Für die Zusammenfassungs-Seite eines Themas (jüngst geänderter Bereich
+    // zuoberst) wird ein Änderungs-Zeitstempel bei Punkten benötigt — bisher
+    // gab es nur created_at.
+    `ALTER TABLE discussion_items ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`,
+    // Einfache Termine je Thema (Datum, Uhrzeit, Ort, Titel) — eigener Reiter
+    // "Termine", chronologisch gereiht.
+    `CREATE TABLE IF NOT EXISTS meeting_appointments (
+      id TEXT PRIMARY KEY,
+      instance_id TEXT NOT NULL REFERENCES meeting_instances(id) ON DELETE CASCADE,
+      title TEXT NOT NULL, date DATE NOT NULL, time TEXT DEFAULT '',
+      location TEXT DEFAULT '',
+      created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }

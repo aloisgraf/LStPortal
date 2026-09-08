@@ -275,7 +275,8 @@ router.put('/discussion-items/:id', auth, async (req, res) => {
         title=COALESCE($1,title), description=COALESCE($2,description),
         status=COALESCE($3,status), due_date=$4, meeting_date=$5,
         delegated_to=$6, result=COALESCE($7,result), link=COALESCE($8,link),
-        external_participants=COALESCE($9,external_participants), priority=COALESCE($10,priority)
+        external_participants=COALESCE($9,external_participants), priority=COALESCE($10,priority),
+        updated_at=NOW()
        WHERE id=$11`,
       [title || null, description !== undefined ? description : null, status || null,
        dueDate || null, meetingDate || null, delegatedTo || null, result !== undefined ? result : null,
@@ -593,6 +594,49 @@ router.post('/meetings/contact-links', auth, async (req, res) => {
 router.delete('/meeting-contact-links/:id', auth, async (req, res) => {
   try {
     await pool.query('DELETE FROM meeting_contact_links WHERE id=$1', [req.params.id]);
+    ok(res, { deleted: true });
+  } catch (e) { bad(res, 'Serverfehler', 500); }
+});
+
+// ── TERMINE (einfache Termine je Thema: Datum, Uhrzeit, Ort, Titel) ────────
+
+router.post('/meeting-instances/:id/appointments', auth, async (req, res) => {
+  try {
+    const inst = await q1('SELECT id FROM meeting_instances WHERE id=$1', [req.params.id]);
+    if (!inst) return bad(res, 'Termin-Thema nicht gefunden', 404);
+    const { title, date, time, location } = req.body;
+    if (!title?.trim()) return bad(res, 'Titel erforderlich', 400);
+    if (!date) return bad(res, 'Datum erforderlich', 400);
+    const id = newId();
+    await pool.query(
+      `INSERT INTO meeting_appointments (id, instance_id, title, date, time, location, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [id, req.params.id, title.trim(), date, time || '', (location || '').trim(), req.uid]
+    );
+    const row = await q1('SELECT * FROM meeting_appointments WHERE id=$1', [id]);
+    ok(res, row);
+  } catch (e) { bad(res, 'Serverfehler', 500); }
+});
+
+router.put('/meeting-appointments/:id', auth, async (req, res) => {
+  try {
+    const existing = await q1('SELECT id FROM meeting_appointments WHERE id=$1', [req.params.id]);
+    if (!existing) return bad(res, 'Nicht gefunden', 404);
+    const { title, date, time, location } = req.body;
+    if (title !== undefined && !title.trim()) return bad(res, 'Titel erforderlich', 400);
+    await pool.query(
+      `UPDATE meeting_appointments SET title=COALESCE($1,title), date=COALESCE($2,date),
+       time=COALESCE($3,time), location=COALESCE($4,location), updated_at=NOW() WHERE id=$5`,
+      [title?.trim() || null, date || null, time !== undefined ? time : null, location !== undefined ? location.trim() : null, req.params.id]
+    );
+    const row = await q1('SELECT * FROM meeting_appointments WHERE id=$1', [req.params.id]);
+    ok(res, row);
+  } catch (e) { bad(res, 'Serverfehler', 500); }
+});
+
+router.delete('/meeting-appointments/:id', auth, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM meeting_appointments WHERE id=$1', [req.params.id]);
     ok(res, { deleted: true });
   } catch (e) { bad(res, 'Serverfehler', 500); }
 });

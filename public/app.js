@@ -5663,19 +5663,23 @@ function renderMeetingDetail(m, canManage) {
 }
 
 function renderInstanceDetail(inst, meeting, canManage) {
-  const tab = ['protocol','files'].includes(S._themaTab) ? S._themaTab : 'points';
+  const tab = ['protocol','files','appointments','summary'].includes(S._themaTab) ? S._themaTab : 'points';
   const protos=[...(inst.protocols||[])].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
   const openPointsCount=(inst.items||[]).filter(it=>it.status==='open'||it.status==='redo').length;
+  const apptCount=(inst.appointments||[]).length;
   return`<div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-      <div style="display:flex;gap:0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;gap:0;border-bottom:1px solid var(--border);flex-wrap:wrap">
+        <div onclick="S._themaTab='summary';renderMeetings()" style="cursor:pointer;padding:6px 12px;font-size:12px;font-weight:600;${tab==='summary'?'border-bottom:2px solid var(--acc);color:var(--acc)':'color:var(--mu)'}">🧾 Zusammenfassung</div>
         <div onclick="S._themaTab='points';renderMeetings()" style="cursor:pointer;padding:6px 12px;font-size:12px;font-weight:600;${tab==='points'?'border-bottom:2px solid var(--acc);color:var(--acc)':'color:var(--mu)'}">📋 Punkte (${openPointsCount})</div>
         <div onclick="S._themaTab='protocol';renderMeetings()" style="cursor:pointer;padding:6px 12px;font-size:12px;font-weight:600;${tab==='protocol'?'border-bottom:2px solid var(--acc);color:var(--acc)':'color:var(--mu)'}">📖 Protokolle (${protos.length})</div>
         <div onclick="S._themaTab='files';renderMeetings()" style="cursor:pointer;padding:6px 12px;font-size:12px;font-weight:600;${tab==='files'?'border-bottom:2px solid var(--acc);color:var(--acc)':'color:var(--mu)'}">📎 Dokumente (${(inst.files||[]).length})</div>
+        <div onclick="S._themaTab='appointments';renderMeetings()" style="cursor:pointer;padding:6px 12px;font-size:12px;font-weight:600;${tab==='appointments'?'border-bottom:2px solid var(--acc);color:var(--acc)':'color:var(--mu)'}">🗓️ Termine (${apptCount})</div>
       </div>
       <div style="display:flex;gap:8px">
         ${canManage&&tab==='points'?`<button class="btn-add" onclick="openItemForm('${inst.id}')">+ Punkt</button>`:''}
         ${canManage&&tab==='protocol'?`<button class="btn-add" onclick="openProtocolForm('${inst.id}')">+ Protokoll</button>`:''}
+        ${canManage&&tab==='appointments'?`<button class="btn-add" onclick="openAppointmentForm('${inst.id}')">+ Termin</button>`:''}
         ${canManage&&inst.status!=='done'?`<button class="btn-s" style="background:#10b981;color:#fff" onclick="setInstanceStatus('${inst.id}','done')">&#10003; Abschließen</button>`:''}
         ${canManage&&inst.status==='done'?`<button class="btn-s" style="background:#f59e0b;color:#fff" onclick="setInstanceStatus('${inst.id}','planned')">↩ Wiederöffnen</button>`:''}
         ${canManage?`<button class="btn-d" style="padding:4px 8px" onclick="deleteInstance('${inst.id}')">&#128465;</button>`:''}
@@ -5685,7 +5689,18 @@ function renderInstanceDetail(inst, meeting, canManage) {
     ${tab==='points'?`
     <input class="srch" type="text" id="meetingItemSearch" placeholder="🔍 Punkte durchsuchen …" value="${esc(S._meetingItemSearch||'')}" oninput="filterMeetingItems(this.value)" style="width:100%;margin-bottom:12px;box-sizing:border-box">
     <div id="meetingItemsGrid">${renderMeetingItemsGrid(inst, canManage, S._meetingItemSearch||'')}</div>
-    `:tab==='protocol'?`
+    `:tab==='protocol'?protocolsListHtml(inst, canManage)
+    :tab==='appointments'?appointmentsListHtml(inst, canManage)
+    :tab==='summary'?renderThemaSummary(inst, canManage)
+    :renderInstanceFilesTab(inst, canManage)}
+  </div>`;
+}
+
+// Protokolle-Liste — als eigene Funktion, damit sie sowohl im Protokolle-Tab
+// als auch (kompakt) auf der Zusammenfassungs-Seite verwendet werden kann.
+function protocolsListHtml(inst, canManage) {
+  const protos=[...(inst.protocols||[])].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  return`
     ${protos.length===0?`<div style="color:var(--mu);font-size:13px;padding:16px 0;text-align:center">Noch keine Protokolle.</div>`:''}
     <div style="display:flex;flex-direction:column;gap:10px">
       ${protos.map(p=>`<div class="meetings-card" style="cursor:default">
@@ -5710,8 +5725,115 @@ function renderInstanceDetail(inst, meeting, canManage) {
         ${docContactLinkBadgesHtml(p)}
         ${p.body?`<div style="font-size:12px;color:var(--tx);margin-top:8px;white-space:pre-wrap;border-top:1px solid var(--border);padding-top:8px;max-height:240px;overflow-y:auto">${esc(p.body)}</div>`:''}
       </div>`).join('')}
-    </div>
-    `:renderInstanceFilesTab(inst, canManage)}
+    </div>`;
+}
+
+// Termine: chronologisch (nächster zuerst), vergangene ans Ende und
+// durchgestrichen; je näher der Termin, desto auffälliger die Kennzeichnung
+// (heute am stärksten, dann morgen, dann 2/3 Tage).
+function appointmentUrgencyStyle(dateStr) {
+  const today=new Date(); today.setHours(0,0,0,0);
+  const d=new Date(dateStr); d.setHours(0,0,0,0);
+  const days=Math.round((d-today)/(1000*60*60*24));
+  if(days<0) return {past:true};
+  if(days===0) return {label:'Heute',bg:'#fee2e2',color:'#991b1b',border:'#ef4444'};
+  if(days===1) return {label:'Morgen',bg:'#ffedd5',color:'#9a3412',border:'#f97316'};
+  if(days===2) return {label:'In 2 Tagen',bg:'#fef3c7',color:'#92400e',border:'#f59e0b'};
+  if(days===3) return {label:'In 3 Tagen',bg:'#fef9c3',color:'#854d0e',border:'#eab308'};
+  return null;
+}
+function appointmentsListHtml(inst, canManage) {
+  const appts=[...(inst.appointments||[])].sort((a,b)=>(a.date+String(a.time||'')).localeCompare(b.date+String(b.time||'')));
+  const upcoming=appts.filter(a=>!appointmentUrgencyStyle(a.date)?.past);
+  const past=appts.filter(a=>appointmentUrgencyStyle(a.date)?.past).reverse();
+  const renderAppt=a=>{
+    const st=appointmentUrgencyStyle(a.date);
+    const isPast=st?.past;
+    return`<div class="meetings-card" style="cursor:default;${isPast?'opacity:.55':''}${st&&!isPast?';background:'+st.bg+';border-color:'+st.border:''}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span style="font-weight:600;font-size:13px;${isPast?'text-decoration:line-through':''}${st&&!isPast?';color:'+st.color:''}">${esc(a.title)}</span>
+          ${st&&!isPast?`<span style="font-size:10px;font-weight:700;color:${st.color};background:${st.bg};border:1px solid ${st.border};padding:1px 6px;border-radius:8px">${st.label}</span>`:''}
+        </div>
+        ${canManage?`<div style="display:flex;gap:4px;flex-shrink:0">
+          <button class="btn-e" style="padding:2px 6px;font-size:11px" onclick="openAppointmentForm('${inst.id}','${a.id}')">&#9998;</button>
+          <button class="btn-d" style="padding:2px 6px;font-size:11px" onclick="deleteAppointment('${a.id}')">&#10005;</button>
+        </div>`:''}
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;font-size:11px;color:${isPast?'var(--mu)':(st?st.color:'var(--mu)')}">
+        <span>&#128197; ${fmtDate(a.date)}${a.time?' '+a.time:''}</span>
+        ${a.location?`<span>&#128205; ${esc(a.location)}</span>`:''}
+      </div>
+    </div>`;
+  };
+  if(appts.length===0)return`<div style="color:var(--mu);font-size:13px;padding:16px 0;text-align:center">Noch keine Termine.</div>`;
+  return`<div style="display:flex;flex-direction:column;gap:10px">
+    ${upcoming.map(renderAppt).join('')}
+    ${past.length?`<div style="font-size:11px;color:var(--mu);margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">Vergangene Termine</div>${past.map(renderAppt).join('')}`:''}
+  </div>`;
+}
+function openAppointmentForm(instanceId, id=null) {
+  const inst = S.meetings.flatMap(m=>m.instances).find(i=>i.id===instanceId);
+  const appt = id ? (inst?.appointments||[]).find(a=>a.id===id) : null;
+  document.getElementById('apptFormTitle').textContent = appt ? 'Termin bearbeiten' : 'Neuer Termin';
+  document.getElementById('apId').value = appt?.id||'';
+  document.getElementById('apInstanceId').value = instanceId;
+  document.getElementById('apTitle').value = appt?.title||'';
+  document.getElementById('apDate').value = appt?.date?.slice?.(0,10)||'';
+  document.getElementById('apTime').value = appt?.time||'';
+  document.getElementById('apLocation').value = appt?.location||'';
+  document.getElementById('apptDeleteBtn').style.display = appt ? '' : 'none';
+  openModal('apptFormOv');
+}
+async function submitAppointmentForm() {
+  const id = document.getElementById('apId').value;
+  const instanceId = document.getElementById('apInstanceId').value;
+  const title = document.getElementById('apTitle').value.trim();
+  if (!title) return toast('Titel erforderlich','err');
+  const date = document.getElementById('apDate').value;
+  if (!date) return toast('Datum erforderlich','err');
+  const body = { title, date, time: document.getElementById('apTime').value, location: document.getElementById('apLocation').value.trim() };
+  try {
+    if (id) await api('PUT','/meeting-appointments/'+id, body);
+    else await api('POST','/meeting-instances/'+instanceId+'/appointments', body);
+    closeModal('apptFormOv');
+    await fetchData(); renderMeetings(); toast('Termin gespeichert');
+  } catch(e) { toast('⚠️ '+e.message,'err'); }
+}
+async function deleteAppointment(id) {
+  id = id || document.getElementById('apId').value;
+  if (!id || !confirm('Termin löschen?')) return;
+  try {
+    await api('DELETE','/meeting-appointments/'+id);
+    closeModal('apptFormOv');
+    await fetchData(); renderMeetings(); toast('Gelöscht');
+  } catch(e) { toast('⚠️ '+e.message,'err'); }
+}
+
+// Zusammenfassung: alle vier Bereiche eines Themas auf einer Seite, sortiert
+// danach, welcher Bereich zuletzt geändert wurde (jüngste Änderung zuoberst).
+// Bereiche ohne jegliche Einträge landen unten, ohne "Letzte Änderung"-Hinweis.
+function renderThemaSummary(inst, canManage) {
+  const openPointsCount=(inst.items||[]).filter(it=>it.status==='open'||it.status==='redo').length;
+  const protoCount=(inst.protocols||[]).length;
+  const fileCount=(inst.files||[]).length;
+  const apptCount=(inst.appointments||[]).length;
+  const lastTs=arr=>arr.reduce((max,x)=>{const t=new Date(x.updatedAt||x.createdAt).getTime();return isNaN(t)?max:Math.max(max,t);},0);
+  const sections=[
+    {key:'protocol',icon:'📖',label:'Protokolle',count:protoCount,last:lastTs(inst.protocols||[]),html:protocolsListHtml(inst,canManage)},
+    {key:'appointments',icon:'🗓️',label:'Termine',count:apptCount,last:lastTs(inst.appointments||[]),html:appointmentsListHtml(inst,canManage)},
+    {key:'points',icon:'📋',label:'Punkte',count:openPointsCount,last:lastTs(inst.items||[]),html:renderMeetingItemsGrid(inst,canManage,'')},
+    {key:'files',icon:'📎',label:'Dokumente',count:fileCount,last:lastTs(inst.files||[]),html:renderInstanceFilesTab(inst,false)},
+  ].sort((a,b)=>b.last-a.last);
+  const mostRecentKey = sections.find(s=>s.last>0)?.key;
+  return`<div style="display:flex;flex-direction:column;gap:24px">
+    ${sections.map(s=>`<div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)">
+        <span style="font-size:14px;font-weight:700">${s.icon} ${s.label} (${s.count})</span>
+        ${s.key===mostRecentKey?`<span style="font-size:10px;color:var(--di);background:#10b98122;padding:1px 7px;border-radius:8px">Letzte Änderung</span>`:''}
+      </div>
+      ${s.html}
+    </div>`).join('')}
   </div>`;
 }
 
