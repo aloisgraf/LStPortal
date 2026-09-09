@@ -6878,25 +6878,70 @@ function openProtocolForm(instanceId, id=null) {
   document.getElementById('pfExtAttendeeInput').value = '';
   document.getElementById('pfReleased').checked = !!proto?.released;
   document.getElementById('protoDeleteBtn').style.display = proto ? '' : 'none';
+  document.getElementById('pfAutosaveIndicator').textContent = '';
   renderLinkSections('pf', proto, instanceId);
   openModal('protoFormOv');
+  startProtoAutosave(proto?.id||null);
+}
+function collectProtocolFormBody() {
+  const extNames = [...document.getElementById('pfExtAttendeesList').children].map(el=>el.dataset.extName).filter(Boolean);
+  const attendees = Array.from(document.getElementById('pfAttendees').selectedOptions).map(o=>o.value)
+    .concat(extNames.map(n=>EXT_ATTENDEE_PREFIX+n));
+  return {
+    title: document.getElementById('pfTitle').value.trim(),
+    date: document.getElementById('pfDate').value || null,
+    time: document.getElementById('pfTime').value,
+    location: document.getElementById('pfLocation').value.trim(),
+    attendees,
+    body: document.getElementById('pfBody').value,
+    released: document.getElementById('pfReleased').checked,
+  };
+}
+// Automatisches Zwischenspeichern eines offenen Protokolls: läuft nur für
+// bereits bestehende Protokolle (bei einem noch nicht angelegten neuen
+// Protokoll gäbe es keine ID zum Speichern), rührt dabei aber ausschließlich
+// die Werte an, die ohnehin schon im Formular stehen — Textfeld, Cursor und
+// Fokus des Nutzers bleiben unangetastet, da nichts am DOM der Eingabefelder
+// verändert wird (nur ein separater, kleiner Statustext im Modal-Header).
+// Bricht die Schleife selbst ab, sobald das Modal (auf welchem Weg auch
+// immer, z.B. Escape-Taste) nicht mehr offen ist.
+let _protoAutosaveTimer = null;
+let _protoAutosaveId = null;
+function startProtoAutosave(id) {
+  stopProtoAutosave();
+  if (!id) return;
+  _protoAutosaveId = id;
+  _protoAutosaveTimer = setInterval(()=>autosaveProtocol(id), 20000);
+}
+function stopProtoAutosave() {
+  if (_protoAutosaveTimer) { clearInterval(_protoAutosaveTimer); _protoAutosaveTimer = null; }
+  _protoAutosaveId = null;
+}
+function closeProtocolForm() {
+  stopProtoAutosave();
+  closeModal('protoFormOv');
+}
+async function autosaveProtocol(id) {
+  if (_protoAutosaveId !== id) return;
+  const modal = document.getElementById('protoFormOv');
+  if (!modal?.classList.contains('open')) { stopProtoAutosave(); return; }
+  const body = collectProtocolFormBody();
+  if (!body.title) return; // Titel gerade leer — nichts speichern, nächster Versuch in 20s
+  try {
+    await api('PUT','/meeting-protocols/'+id, body);
+    const ind = document.getElementById('pfAutosaveIndicator');
+    if (ind) ind.textContent = '💾 automatisch gespeichert ' + new Date().toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'});
+  } catch(e) { /* still editing — nächster Versuch in 20s, Nutzer nicht mit Fehlermeldung stören */ }
 }
 async function submitProtocolForm() {
   const id = document.getElementById('pfId').value;
   const instanceId = document.getElementById('pfInstanceId').value;
-  const title = document.getElementById('pfTitle').value.trim();
-  if (!title) return toast('⚠️ Überschrift erforderlich','err');
-  const extNames = [...document.getElementById('pfExtAttendeesList').children].map(el=>el.dataset.extName).filter(Boolean);
-  const attendees = Array.from(document.getElementById('pfAttendees').selectedOptions).map(o=>o.value)
-    .concat(extNames.map(n=>EXT_ATTENDEE_PREFIX+n));
-  const body = {
-    title, date: document.getElementById('pfDate').value || null, time: document.getElementById('pfTime').value,
-    location: document.getElementById('pfLocation').value.trim(), attendees, body: document.getElementById('pfBody').value,
-    released: document.getElementById('pfReleased').checked,
-  };
+  const body = collectProtocolFormBody();
+  if (!body.title) return toast('⚠️ Überschrift erforderlich','err');
   try {
     if (id) await api('PUT','/meeting-protocols/'+id, body);
     else await api('POST','/meeting-instances/'+instanceId+'/protocols', body);
+    stopProtoAutosave();
     closeModal('protoFormOv');
     await fetchData(); renderMeetings(); toast('✅ Protokoll gespeichert');
   } catch(e) { toast('⚠️ '+e.message,'err'); }
@@ -6907,6 +6952,7 @@ async function deleteProtocol(id) {
   if (!confirm('Protokoll löschen?')) return;
   try {
     await api('DELETE','/meeting-protocols/'+id);
+    stopProtoAutosave();
     closeModal('protoFormOv');
     await fetchData(); renderMeetings(); toast('✅ Protokoll gelöscht');
   } catch(e) { toast('⚠️ '+e.message,'err'); }

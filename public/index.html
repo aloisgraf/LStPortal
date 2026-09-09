@@ -1643,7 +1643,7 @@
 <!-- PROTOKOLL FORM MODAL -->
 <div class="ov" id="protoFormOv">
   <div class="modal wide">
-    <div class="mh"><h2 id="protoFormTitle">Protokoll</h2><div style="display:flex;gap:4px"><button class="mc" id="protoDeleteBtn" onclick="deleteProtocol()" style="display:none" title="Löschen">&#128465;&#65039;</button><button class="mc" onclick="closeModal('protoFormOv')">&#10005;</button></div></div>
+    <div class="mh"><h2 id="protoFormTitle">Protokoll</h2><div style="display:flex;align-items:center;gap:8px"><span id="pfAutosaveIndicator" style="font-size:11px;color:var(--mu);font-weight:400"></span><button class="mc" id="protoDeleteBtn" onclick="deleteProtocol()" style="display:none" title="Löschen">&#128465;&#65039;</button><button class="mc" onclick="closeProtocolForm()">&#10005;</button></div></div>
     <div class="mb2">
       <input type="hidden" id="pfId">
       <input type="hidden" id="pfInstanceId">
