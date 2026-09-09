@@ -3374,7 +3374,11 @@ async function silentRefresh(){
       else if(S.view==='docs')renderDocs();
       else if(S.view==='wiki')renderWiki();
       else if(S.view==='meetings')renderMeetings();
-      else if(S.view==='todos')renderTodos();
+      // Während eine Notiz gerade bearbeitet wird, NICHT automatisch neu
+      // rendern — sonst würde die Textbox durch den Hintergrund-Refresh
+      // (alle 30s) auf den ursprünglichen Text zurückgesetzt und ein noch
+      // ungespeicherter Bearbeitungsstand ginge verloren.
+      else if(S.view==='todos'&&!S._editingTodoNoteId)renderTodos();
       else if(S.view==='sop'&&(S._sopView==='run'||S._sopView==='runlist'))renderSop();
       else if(S.view==='chat')renderChatList();
       // Offene Ticket-Detailansicht ist ein Modal (nicht Teil von S.view) und
@@ -5554,7 +5558,17 @@ function fmtDate(d){if(!d)return'';var p=String(d).slice(0,10);return p.slice(8)
 function wikiCanManage() { return !!S.p.addGeneral; }
 
 function renderWiki() {
-  if (S._selWikiArticle) return renderWikiArticlePage();
+  // Wichtig: S._wikiEditing zuerst prüfen — beim Anlegen eines NEUEN Artikels
+  // ist S._selWikiArticle (noch) null, daher darf die Editor-Ansicht nicht
+  // (wie zuvor) nur über renderWikiArticlePage() erreichbar sein, sonst
+  // landet man beim Klick auf "+ Neuer Artikel" ohne jede Reaktion wieder
+  // in der Listenansicht.
+  if (S._wikiEditing) {
+    const article = S._selWikiArticle ? (S.wikiArticles||[]).find(x=>x.id===S._selWikiArticle) : null;
+    renderWikiArticleEditor(article);
+    return;
+  }
+  if (S._selWikiArticle) { renderWikiArticlePage(); return; }
   renderWikiList();
 }
 
@@ -6077,9 +6091,85 @@ function protocolsListHtml(inst, canManage) {
           const u=getU(a);return u?`<span class="av-sm" style="background:${u.color}" title="${esc(lastNameFirst(u.name))}">${esc(u.initials)}</span>`:'';
         }).join('')}</div>`:''}
         ${docContactLinkBadgesHtml(p)}
-        ${p.body?`<div style="font-size:12px;color:var(--tx);margin-top:8px;white-space:pre-wrap;border-top:1px solid var(--border);padding-top:8px;max-height:240px;overflow-y:auto">${esc(p.body)}</div>`:''}
+        ${p.body?`<div id="protoBody-${p.id}" onmouseup="protoBodySelectionHandler('${p.id}')" style="font-size:12px;color:var(--tx);margin-top:8px;white-space:pre-wrap;border-top:1px solid var(--border);padding-top:8px;max-height:240px;overflow-y:auto">${esc(p.body)}</div>
+        <div id="protoTodoBar-${p.id}" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;padding:8px 10px;background:var(--sf2);border:1px solid var(--border);border-radius:6px;font-size:11px">
+          <span>&#128204; Markiert: „<span class="sel-preview" style="font-style:italic"></span>“</span>
+          <button class="btn-s" style="font-size:11px;padding:2px 8px" onclick="createTodoFromProtocol('${p.id}')">+ Als ToDo erzeugen</button>
+        </div>`:''}
+        ${protocolLinkedTodoHtml(p.id)}
       </div>`).join('')}
     </div>`;
+}
+
+// Markierung im Protokolltext → "Als ToDo erzeugen": beim Loslassen der
+// Maustaste prüfen, ob innerhalb DIESES Protokolltexts (nicht irgendwo
+// anders auf der Seite) gerade Text markiert ist, und wenn ja die kleine
+// Aktionsleiste mit einer Vorschau der Markierung einblenden.
+function protoBodySelectionHandler(protocolId) {
+  const sel = window.getSelection();
+  const text = sel && sel.rangeCount>0 ? sel.toString().trim() : '';
+  const bodyEl = document.getElementById('protoBody-'+protocolId);
+  const bar = document.getElementById('protoTodoBar-'+protocolId);
+  if (!bar || !bodyEl) return;
+  if (text && bodyEl.contains(sel.anchorNode) && bodyEl.contains(sel.focusNode)) {
+    if (!S._protoSelText) S._protoSelText = {};
+    S._protoSelText[protocolId] = text;
+    bar.style.display = 'flex';
+    bar.querySelector('.sel-preview').textContent = text.length>80?text.slice(0,80)+'…':text;
+  } else {
+    bar.style.display = 'none';
+  }
+}
+async function createTodoFromProtocol(protocolId) {
+  const text = (S._protoSelText||{})[protocolId];
+  if (!text?.trim()) return toast('Bitte zuerst Text im Protokoll markieren','err');
+  try {
+    await api('POST','/todos/from-protocol',{protocolId, text: text.trim()});
+    await fetchData(); renderMeetings(); toast('✅ ToDo-Punkt erstellt');
+  } catch(e) { toast('⚠️ '+e.message,'err'); }
+}
+// Zeigt (falls vorhanden) das mit diesem Protokoll verknüpfte ToDo samt
+// seiner Punkte und Zuständigkeiten direkt neben dem Protokolltext an.
+function protocolLinkedTodoHtml(protocolId) {
+  const todo = (S.todos||[]).find(t=>t.meeting_protocol_id===protocolId);
+  if (!todo) return '';
+  const items = todo.items||[];
+  return `<div style="margin-top:10px;padding:10px;background:var(--sf2);border:1px solid var(--border);border-radius:8px">
+    <div style="font-size:12px;font-weight:700;margin-bottom:6px">&#9989; Verknüpftes ToDo: <a href="javascript:void(0)" onclick="openTodoFromMeeting('${todo.id}')" style="color:var(--acc);text-decoration:none">${esc(todo.title)}</a></div>
+    ${items.length===0?`<div style="font-size:11px;color:var(--mu)">Noch keine Punkte.</div>`:`
+    <div style="display:flex;flex-direction:column;gap:4px">
+      ${items.map(it=>{
+        const assignee = (it.assignees||[])[0] ? getU(it.assignees[0].user_id) : null;
+        return `<div style="font-size:12px;display:flex;align-items:center;gap:6px">
+          <span style="${it.is_done?'text-decoration:line-through;color:var(--mu)':''}">${esc(it.title)}</span>
+          ${assignee?`<span class="av-sm" style="background:${assignee.color}" title="${esc(lastNameFirst(assignee.name))}">${esc(assignee.initials)}</span>`:'<span style="font-size:10px;color:var(--mu)">niemand zugewiesen</span>'}
+        </div>`;
+      }).join('')}
+    </div>`}
+  </div>`;
+}
+function openTodoFromMeeting(todoId) {
+  S._selTodo = todoId;
+  setView('todos');
+}
+// Sucht Besprechung/Thema/Protokoll zu einer Protokoll-ID, um vom
+// verknüpften ToDo aus direkt dorthin zurückzuspringen.
+function findProtocolContext(protocolId) {
+  for (const m of S.meetings||[]) {
+    for (const inst of m.instances||[]) {
+      const p = (inst.protocols||[]).find(x=>x.id===protocolId);
+      if (p) return {meeting:m, instance:inst, protocol:p};
+    }
+  }
+  return null;
+}
+function openMeetingProtocolFromTodo(protocolId) {
+  const ctx = findProtocolContext(protocolId);
+  if (!ctx) return toast('Besprechung nicht gefunden (evtl. keine Berechtigung)','err');
+  S._selMeeting = ctx.meeting.id;
+  S._selInstance = ctx.instance.id;
+  S._themaTab = 'protocol';
+  setView('meetings');
 }
 
 // Termine: chronologisch (nächster zuerst), vergangene ans Ende und
@@ -9550,6 +9640,7 @@ function renderTodoDetail(t) {
           <span style="font-size:12px;color:${statusColor};font-weight:600">${statusLabel}</span>
           ${assignee ? `<span style="font-size:12px;color:var(--mu)">👤 ${esc(lastNameFirst(assignee.name))}</span>` : ''}
           ${creator ? `<span style="font-size:12px;color:var(--di)">erstellt von ${esc(lastNameFirst(creator.name))}</span>` : ''}
+          ${t.meeting_protocol_id ? `<span style="font-size:12px;color:var(--mu)">&#128214; <a href="javascript:void(0)" onclick="openMeetingProtocolFromTodo('${t.meeting_protocol_id}')" style="color:var(--acc);text-decoration:none">aus Besprechungsprotokoll</a></span>` : ''}
         </div>
         ${t.description ? `<div style="margin-top:8px;font-size:13px;color:var(--mu)">${esc(t.description)}</div>` : ''}
       </div>
@@ -9597,7 +9688,7 @@ function renderTodoNotesFeed(t){
     const isEditing=S._editingTodoNoteId===n.id;
     const body=isEditing
       ?`<div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">
-          <textarea id="todoNoteEditInput-${n.id}" rows="3" style="font-size:13px;width:100%;box-sizing:border-box">${esc(n.text)}</textarea>
+          <textarea id="todoNoteEditInput-${n.id}" rows="3" style="font-size:13px;width:100%;box-sizing:border-box" oninput="S._editingTodoNoteDraft=this.value">${esc(S._editingTodoNoteDraft??n.text)}</textarea>
           <div style="display:flex;gap:6px">
             <button class="btn-p" style="font-size:11px;padding:3px 10px" onclick="saveEditTodoNote('${t.id}','${n.id}')">Speichern</button>
             <button class="btn-s" style="font-size:11px;padding:3px 10px" onclick="cancelEditTodoNote()">Abbrechen</button>
@@ -9616,14 +9707,14 @@ function renderTodoNotesFeed(t){
     </div>`;
   }).join('');
 }
-function startEditTodoNote(noteId){S._editingTodoNoteId=noteId;renderTodos();const ta=document.getElementById('todoNoteEditInput-'+noteId);if(ta){ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);}}
-function cancelEditTodoNote(){S._editingTodoNoteId=null;renderTodos();}
+function startEditTodoNote(noteId){S._editingTodoNoteId=noteId;S._editingTodoNoteDraft=null;renderTodos();const ta=document.getElementById('todoNoteEditInput-'+noteId);if(ta){ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);}}
+function cancelEditTodoNote(){S._editingTodoNoteId=null;S._editingTodoNoteDraft=null;renderTodos();}
 async function saveEditTodoNote(todoId,noteId){
   const ta=document.getElementById('todoNoteEditInput-'+noteId);if(!ta)return;
   const text=ta.value.trim();if(!text)return;
   try{
     await api('PUT','/todos/'+todoId+'/notes/'+noteId,{text});
-    S._editingTodoNoteId=null;await fetchData();renderTodos();toast('✅ Notiz aktualisiert');
+    S._editingTodoNoteId=null;S._editingTodoNoteDraft=null;await fetchData();renderTodos();toast('✅ Notiz aktualisiert');
   }catch(e){toast('⚠️ '+e.message,'err');}
 }
 async function deleteTodoNote(todoId,noteId){

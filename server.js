@@ -885,6 +885,10 @@ async function initDB() {
     // die aufgeschlüsselte Tabellenansicht im Dokumente-Reiter.
     `ALTER TABLE meeting_instance_files ADD COLUMN IF NOT EXISTS doc_date DATE DEFAULT NULL`,
     `ALTER TABLE meeting_instance_files ADD COLUMN IF NOT EXISTS sender TEXT DEFAULT ''`,
+    // Verknüpfung: aus markiertem Protokolltext erzeugtes ToDo — ein Protokoll
+    // hat höchstens ein zugehöriges ToDo (Titel = Protokoll-Überschrift),
+    // jede markierte Textstelle wird darin als eigener Punkt abgelegt.
+    `ALTER TABLE todos ADD COLUMN IF NOT EXISTS meeting_protocol_id TEXT DEFAULT NULL`,
     // Einfache Termine je Thema (Datum, Uhrzeit, Ort, Titel) — eigener Reiter
     // "Termine", chronologisch gereiht.
     `CREATE TABLE IF NOT EXISTS meeting_appointments (

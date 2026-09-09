@@ -34,6 +34,38 @@ router.post('/todos', auth, async (req,res) => {
   } catch(e) { bad(res,'Serverfehler',500); }
 });
 
+// ToDo-Punkt aus markiertem Protokolltext erzeugen. Ein Protokoll hat
+// höchstens ein zugehöriges ToDo (Titel = Protokoll-Überschrift, per
+// meeting_protocol_id verknüpft) — wird beim ersten markierten Text neu
+// angelegt, danach werden weitere Markierungen als weitere Punkte in
+// dasselbe ToDo eingefügt.
+router.post('/todos/from-protocol', auth, async (req,res) => {
+  const {protocolId, text} = req.body;
+  if (!protocolId) return bad(res,'protocolId erforderlich',400);
+  if (!text?.trim()) return bad(res,'Text erforderlich',400);
+  try {
+    const proto = await q1('SELECT * FROM meeting_protocols WHERE id=$1',[protocolId]);
+    if (!proto) return bad(res,'Protokoll nicht gefunden',404);
+    let todo = await q1('SELECT * FROM todos WHERE meeting_protocol_id=$1',[protocolId]);
+    if (!todo) {
+      todo = await q1(
+        `INSERT INTO todos (id,title,meeting_protocol_id,created_by) VALUES ($1,$2,$3,$4) RETURNING *`,
+        [newId(), proto.title || 'Protokoll', protocolId, req.uid]
+      );
+    }
+    const itemId = newId();
+    const item = await q1(
+      `INSERT INTO todo_items (id,todo_id,title,created_by) VALUES ($1,$2,$3,$4) RETURNING *`,
+      [itemId, todo.id, text.trim(), req.uid]
+    );
+    await q1(
+      `INSERT INTO todo_item_assignees (id,item_id,user_id,assigned_by) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+      [newId(), itemId, req.uid, req.uid]
+    ).catch(()=>{});
+    ok(res, {todoId: todo.id, itemId: item.id});
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
 // pg liefert DATE-Spalten als Date-Objekt zurück; Vergleiche gegen den vom
 // Client gesendeten "YYYY-MM-DD"-String wären sonst IMMER ungleich (falscher
 // Typ), auch wenn sich das Datum gar nicht geändert hat — würde ständig
