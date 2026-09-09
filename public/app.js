@@ -6141,7 +6141,8 @@ function protocolLinkedTodoHtml(protocolId) {
       ${items.map(it=>{
         const assignee = (it.assignees||[])[0] ? getU(it.assignees[0].user_id) : null;
         return `<div style="font-size:12px;display:flex;align-items:center;gap:6px">
-          <span style="${it.is_done?'text-decoration:line-through;color:var(--mu)':''}">${esc(it.title)}</span>
+          <span style="flex-shrink:0">${it.is_done?'☑':'☐'}</span>
+          <span style="flex:1;${it.is_done?'text-decoration:line-through;color:var(--mu)':''}">${esc(it.title)}</span>
           ${assignee?`<span class="av-sm" style="background:${assignee.color}" title="${esc(lastNameFirst(assignee.name))}">${esc(assignee.initials)}</span>`:'<span style="font-size:10px;color:var(--mu)">niemand zugewiesen</span>'}
         </div>`;
       }).join('')}
