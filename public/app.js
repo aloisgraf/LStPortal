@@ -3246,16 +3246,29 @@ function playJarvisBoot(){
 // Bildvorlage zu benötigen.
 // ══════════════════════════════════════════
 let _brainRAF=null,_brainNodes=null,_brainPulses=null,_brainResizeBound=false,_brainStart=0;
+let _brainClockTimer=null;
+function _brainClockTick(){
+  const el=document.getElementById('brainClock');
+  if(!el)return;
+  const days=['So','Mo','Di','Mi','Do','Fr','Sa'];
+  const now=new Date();
+  const d=days[now.getDay()]+'. '+String(now.getDate()).padStart(2,'0')+'.'+String(now.getMonth()+1).padStart(2,'0')+'.'+now.getFullYear();
+  const t=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
+  el.textContent=d+'  ·  '+t;
+}
 function openBrainScreensaver(){
   const ov=document.getElementById('brainScreensaverOv');
   if(!ov)return;
   ov.style.display='block';
   startBrainAnimation();
+  _brainClockTick();
+  if(!_brainClockTimer)_brainClockTimer=setInterval(_brainClockTick,1000);
 }
 function closeBrainScreensaver(){
   const ov=document.getElementById('brainScreensaverOv');
   if(ov)ov.style.display='none';
   stopBrainAnimation();
+  if(_brainClockTimer){clearInterval(_brainClockTimer);_brainClockTimer=null;}
 }
 function _brainInside(nx,ny){
   const lobes=[
@@ -3271,25 +3284,52 @@ function _brainInside(nx,ny){
   }
   return false;
 }
+// Feste Bahn-Ellipsen rings um das Gehirn, auf denen kleine Kügelchen mit
+// Leuchtspur umlaufen — unabhängig von den Gehirn-Knoten, rein dekorativ.
+function _brainMakeOrbits(scale){
+  const defs=[
+    {rx:1.15,ry:0.55,tilt:-0.35,speed:0.17,n:2},
+    {rx:1.30,ry:0.80,tilt: 0.55,speed:-0.12,n:2},
+    {rx:0.95,ry:1.15,tilt: 1.25,speed:0.10,n:1},
+    {rx:1.45,ry:0.62,tilt:-1.05,speed:-0.08,n:2},
+    {rx:1.05,ry:1.35,tilt: 0.15,speed:0.13,n:1},
+  ];
+  return defs.map(d=>({
+    rx:d.rx*scale, ry:d.ry*scale, tilt:d.tilt, speed:d.speed,
+    balls:Array.from({length:d.n},(_,i)=>({phase:(i/d.n)*Math.PI*2+Math.random()*0.6})),
+  }));
+}
+function _brainOrbitPoint(cx,cy,orbit,angle){
+  const ex=orbit.rx*Math.cos(angle), ey=orbit.ry*Math.sin(angle);
+  const c=Math.cos(orbit.tilt), s=Math.sin(orbit.tilt);
+  return {x:cx+ex*c-ey*s, y:cy+ex*s+ey*c};
+}
 function startBrainAnimation(){
   const canvas=document.getElementById('brainCanvas');
   if(!canvas||_brainRAF)return;
   const ctx=canvas.getContext('2d');
-  let w,h,cx,cy,scale;
-  const resize=()=>{w=canvas.width=innerWidth;h=canvas.height=innerHeight;cx=w/2;cy=h/2;scale=Math.min(w,h)*0.42;};
+  let w,h,cx,cy,scale,orbits;
+  const resize=()=>{w=canvas.width=innerWidth;h=canvas.height=innerHeight;cx=w/2;cy=h/2;scale=Math.min(w,h)*0.34;orbits=_brainMakeOrbits(scale);};
   resize();
   if(!_brainResizeBound){window.addEventListener('resize',resize);_brainResizeBound=true;}
   const reduced=!!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  const N=Math.max(140,Math.min(260,Math.floor((innerWidth*innerHeight)/8000)));
+  // Deutlich dichter besetzt, damit die Gehirnform klar erkennbar wird statt
+  // nur einzelner verstreuter Punkte.
+  const N=Math.max(260,Math.min(480,Math.floor((innerWidth*innerHeight)/4200)));
   _brainNodes=[];
   let attempts=0;
   while(_brainNodes.length<N&&attempts<N*40){
     attempts++;
     const nx=Math.random()*2-1, ny=(Math.random()*2-1)*0.9;
     if(_brainInside(nx,ny)){
-      _brainNodes.push({nx,ny,phase:Math.random()*Math.PI*2,speed:0.4+Math.random()*0.6,amp:0.01+Math.random()*0.015,r:1+Math.random()*1.6});
+      _brainNodes.push({nx,ny,phase:Math.random()*Math.PI*2,speed:0.4+Math.random()*0.6,amp:0.008+Math.random()*0.012,r:0.8+Math.random()*1.5});
     }
   }
+  const lobes=[
+    {cx:-0.34,cy:-0.06,rx:0.60,ry:0.50},
+    {cx: 0.34,cy:-0.06,rx:0.60,ry:0.50},
+    {cx: 0,   cy: 0.46,rx:0.20,ry:0.26},
+  ];
   _brainPulses=[];
   _brainStart=performance.now();
   let lastPulseAt=0;
@@ -3298,11 +3338,42 @@ function startBrainAnimation(){
     if(!ov||ov.style.display==='none'){_brainRAF=null;return;}
     const t=(now-_brainStart)/1000;
     const grad=ctx.createRadialGradient(cx,cy,scale*0.1,cx,cy,Math.max(w,h)*0.75);
-    grad.addColorStop(0,'rgba(24,16,0,1)');
+    grad.addColorStop(0,'rgba(28,18,0,1)');
     grad.addColorStop(1,'rgba(0,0,0,1)');
     ctx.fillStyle=grad;
     ctx.fillRect(0,0,w,h);
     const breath=reduced?1:1+Math.sin(t*0.6)*0.025;
+
+    // Weiche Volumen-Füllung je Hemisphäre, damit die Form auch ohne Punkte
+    // schon als zusammenhängendes "Gehirn" lesbar ist.
+    for(const l of lobes){
+      const lx=cx+l.cx*scale*breath, ly=cy+l.cy*scale*breath;
+      const lr=Math.max(l.rx,l.ry)*scale*breath;
+      const lg=ctx.createRadialGradient(lx,ly,lr*0.1,lx,ly,lr*1.05);
+      lg.addColorStop(0,'rgba(212,160,40,0.16)');
+      lg.addColorStop(1,'rgba(212,160,40,0)');
+      ctx.fillStyle=lg;
+      ctx.beginPath();ctx.ellipse(lx,ly,l.rx*scale*breath,l.ry*scale*breath,0,0,Math.PI*2);ctx.fill();
+    }
+
+    // Sichtbare Gehirn-Kontur je Lappen (inkl. Wackel-Kante wie in _brainInside).
+    ctx.shadowColor='rgba(255,200,60,0.6)';
+    ctx.shadowBlur=8;
+    ctx.strokeStyle='rgba(224,185,90,0.5)';
+    ctx.lineWidth=1.3;
+    for(const l of lobes){
+      ctx.beginPath();
+      for(let i=0;i<=72;i++){
+        const ang=(i/72)*Math.PI*2;
+        const wob=1+0.07*Math.sin(ang*7+1.1)+0.04*Math.sin(ang*13+2.4);
+        const nx=l.cx+Math.cos(ang)*l.rx*wob, ny=l.cy+Math.sin(ang)*l.ry*wob;
+        const x=cx+nx*scale*breath, y=cy+ny*scale*breath;
+        i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+      }
+      ctx.closePath();ctx.stroke();
+    }
+    ctx.shadowBlur=0;
+
     const pts=_brainNodes.map(p=>{
       const jx=reduced?0:Math.sin(t*p.speed+p.phase)*p.amp;
       const jy=reduced?0:Math.cos(t*p.speed*0.8+p.phase)*p.amp;
@@ -3312,19 +3383,21 @@ function startBrainAnimation(){
     for(let i=0;i<pts.length;i++){
       for(let j=i+1;j<pts.length;j++){
         const dx=pts[i].x-pts[j].x, dy=pts[i].y-pts[j].y;
-        if(Math.abs(dx)>46||Math.abs(dy)>46)continue;
+        if(Math.abs(dx)>34||Math.abs(dy)>34)continue;
         const d=Math.hypot(dx,dy);
-        if(d<46){
-          ctx.strokeStyle=`rgba(212,175,55,${(1-d/46)*0.35})`;
+        if(d<34){
+          ctx.strokeStyle=`rgba(212,175,55,${(1-d/34)*0.3})`;
           ctx.beginPath();ctx.moveTo(pts[i].x,pts[i].y);ctx.lineTo(pts[j].x,pts[j].y);ctx.stroke();
         }
       }
     }
     ctx.shadowColor='rgba(255,200,60,0.8)';
-    ctx.shadowBlur=6;
+    ctx.shadowBlur=5;
     ctx.fillStyle='rgba(255,215,110,0.85)';
     for(const p of pts){ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();}
     ctx.shadowBlur=0;
+
+    // Innere Synapsen-Impulse (kurze Blitze zwischen benachbarten Knoten).
     if(!reduced&&now-lastPulseAt>90&&_brainPulses.length<14){
       lastPulseAt=now;
       const a=pts[Math.floor(Math.random()*pts.length)];
@@ -3332,20 +3405,51 @@ function startBrainAnimation(){
       for(const b of pts){
         if(b===a)continue;
         const d=Math.hypot(a.x-b.x,a.y-b.y);
-        if(d<60&&d<bestD){bestD=d;best=b;}
+        if(d<45&&d<bestD){bestD=d;best=b;}
       }
       if(best)_brainPulses.push({ax:a.x,ay:a.y,bx:best.x,by:best.y,start:now,dur:400+Math.random()*400});
     }
     _brainPulses=_brainPulses.filter(p=>now-p.start<p.dur);
     ctx.shadowColor='#fff3c4';
-    ctx.shadowBlur=12;
+    ctx.shadowBlur=10;
     ctx.fillStyle='rgba(255,245,200,0.95)';
     for(const p of _brainPulses){
       const f=(now-p.start)/p.dur;
       const x=p.ax+(p.bx-p.ax)*f, y=p.ay+(p.by-p.ay)*f;
-      ctx.beginPath();ctx.arc(x,y,2.4,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(x,y,2,0,Math.PI*2);ctx.fill();
     }
     ctx.shadowBlur=0;
+
+    // Äußere Umlaufbahnen: sichtbare Bahnlinien rings um das Gehirn, auf
+    // denen kleine goldene Kügelchen mit Leuchtspur permanent kreisen.
+    ctx.setLineDash([3,7]);
+    for(const orbit of orbits){
+      ctx.save();
+      ctx.translate(cx,cy);ctx.rotate(orbit.tilt);
+      ctx.strokeStyle='rgba(212,175,55,0.22)';
+      ctx.lineWidth=1;
+      ctx.beginPath();ctx.ellipse(0,0,orbit.rx*breath,orbit.ry*breath,0,0,Math.PI*2);ctx.stroke();
+      ctx.restore();
+    }
+    ctx.setLineDash([]);
+    if(!reduced){
+      for(const orbit of orbits){
+        for(const ball of orbit.balls){
+          const ang=ball.phase+t*orbit.speed;
+          for(let trail=6;trail>=0;trail--){
+            const ta=ang-trail*0.05*Math.sign(orbit.speed||1);
+            const pt=_brainOrbitPoint(cx,cy,{rx:orbit.rx*breath,ry:orbit.ry*breath,tilt:orbit.tilt},ta);
+            const alpha=(1-trail/7)*0.9;
+            ctx.beginPath();
+            ctx.fillStyle=trail===0?'rgba(255,245,205,'+alpha+')':'rgba(255,210,110,'+alpha*0.5+')';
+            if(trail===0){ctx.shadowColor='#ffe9a8';ctx.shadowBlur=10;}else{ctx.shadowBlur=0;}
+            ctx.arc(pt.x,pt.y,trail===0?2.6:1.6,0,Math.PI*2);
+            ctx.fill();
+          }
+        }
+      }
+      ctx.shadowBlur=0;
+    }
     _brainRAF=requestAnimationFrame(tick);
   }
   _brainRAF=requestAnimationFrame(tick);
