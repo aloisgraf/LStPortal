@@ -6282,9 +6282,9 @@ function renderInstanceDetail(inst, meeting, canManage) {
           <option value="file">📎 Dokument</option>
           <option value="appointment">🗓️ Termin</option>
         </select>`:''}
-        ${canManage&&inst.status!=='done'?`<button class="btn-s" style="color:#10b981;border-color:#10b98155" onclick="setInstanceStatus('${inst.id}','done')">&#10003; Abschließen</button>`:''}
-        ${canManage&&inst.status==='done'?`<button class="btn-s" style="color:#f59e0b;border-color:#f59e0b55" onclick="setInstanceStatus('${inst.id}','planned')">↩ Wiederöffnen</button>`:''}
-        ${canManage?`<button class="btn-d" style="padding:4px 8px" onclick="deleteInstance('${inst.id}')">&#128465;</button>`:''}
+        ${canManage&&inst.status!=='done'?`<button class="btn-s" style="padding:4px 8px;color:#10b981" onclick="setInstanceStatus('${inst.id}','done')" title="Thema abschließen">&#10003;</button>`:''}
+        ${canManage&&inst.status==='done'?`<button class="btn-s" style="padding:4px 8px;color:#f59e0b" onclick="setInstanceStatus('${inst.id}','planned')" title="Wiederöffnen">↩</button>`:''}
+        ${canManage?`<button class="btn-d" style="padding:4px 8px" onclick="deleteInstance('${inst.id}')" title="Löschen">&#128465;</button>`:''}
       </div>
     </div>
     ${inst.notes?`<div style="font-size:13px;color:var(--mu);margin-bottom:12px">${esc(inst.notes)}</div>`:''}
