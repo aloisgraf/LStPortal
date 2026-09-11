@@ -3237,6 +3237,125 @@ function playJarvisBoot(){
   el.classList.add('play');
   setTimeout(()=>el.classList.remove('play'),1150);
 }
+// ══════════════════════════════════════════
+// BILDSCHIRMSCHONER: goldenes neuronales Gehirn mit fliegenden Synapsen —
+// rein dekoratives Easter-Egg, leichtgewichtiges Canvas ohne externe Lib.
+// Die Punktwolke wird per Ablehnungs-Stichprobe innerhalb dreier
+// überlappender, leicht "wackliger" Ellipsen (zwei Hemisphären + Hirnstamm)
+// erzeugt, damit sie organisch wie ein Gehirn aussieht, ohne eine echte
+// Bildvorlage zu benötigen.
+// ══════════════════════════════════════════
+let _brainRAF=null,_brainNodes=null,_brainPulses=null,_brainResizeBound=false,_brainStart=0;
+function openBrainScreensaver(){
+  const ov=document.getElementById('brainScreensaverOv');
+  if(!ov)return;
+  ov.style.display='block';
+  startBrainAnimation();
+}
+function closeBrainScreensaver(){
+  const ov=document.getElementById('brainScreensaverOv');
+  if(ov)ov.style.display='none';
+  stopBrainAnimation();
+}
+function _brainInside(nx,ny){
+  const lobes=[
+    {cx:-0.34,cy:-0.06,rx:0.60,ry:0.50},
+    {cx: 0.34,cy:-0.06,rx:0.60,ry:0.50},
+    {cx: 0,   cy: 0.46,rx:0.20,ry:0.26},
+  ];
+  for(const l of lobes){
+    const dx=nx-l.cx,dy=ny-l.cy;
+    const ang=Math.atan2(dy,dx);
+    const wob=1+0.07*Math.sin(ang*7+1.1)+0.04*Math.sin(ang*13+2.4);
+    if((dx*dx)/(l.rx*l.rx*wob*wob)+(dy*dy)/(l.ry*l.ry*wob*wob)<=1)return true;
+  }
+  return false;
+}
+function startBrainAnimation(){
+  const canvas=document.getElementById('brainCanvas');
+  if(!canvas||_brainRAF)return;
+  const ctx=canvas.getContext('2d');
+  let w,h,cx,cy,scale;
+  const resize=()=>{w=canvas.width=innerWidth;h=canvas.height=innerHeight;cx=w/2;cy=h/2;scale=Math.min(w,h)*0.42;};
+  resize();
+  if(!_brainResizeBound){window.addEventListener('resize',resize);_brainResizeBound=true;}
+  const reduced=!!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const N=Math.max(140,Math.min(260,Math.floor((innerWidth*innerHeight)/8000)));
+  _brainNodes=[];
+  let attempts=0;
+  while(_brainNodes.length<N&&attempts<N*40){
+    attempts++;
+    const nx=Math.random()*2-1, ny=(Math.random()*2-1)*0.9;
+    if(_brainInside(nx,ny)){
+      _brainNodes.push({nx,ny,phase:Math.random()*Math.PI*2,speed:0.4+Math.random()*0.6,amp:0.01+Math.random()*0.015,r:1+Math.random()*1.6});
+    }
+  }
+  _brainPulses=[];
+  _brainStart=performance.now();
+  let lastPulseAt=0;
+  function tick(now){
+    const ov=document.getElementById('brainScreensaverOv');
+    if(!ov||ov.style.display==='none'){_brainRAF=null;return;}
+    const t=(now-_brainStart)/1000;
+    const grad=ctx.createRadialGradient(cx,cy,scale*0.1,cx,cy,Math.max(w,h)*0.75);
+    grad.addColorStop(0,'rgba(24,16,0,1)');
+    grad.addColorStop(1,'rgba(0,0,0,1)');
+    ctx.fillStyle=grad;
+    ctx.fillRect(0,0,w,h);
+    const breath=reduced?1:1+Math.sin(t*0.6)*0.025;
+    const pts=_brainNodes.map(p=>{
+      const jx=reduced?0:Math.sin(t*p.speed+p.phase)*p.amp;
+      const jy=reduced?0:Math.cos(t*p.speed*0.8+p.phase)*p.amp;
+      return {x:cx+(p.nx+jx)*scale*breath, y:cy+(p.ny+jy)*scale*breath, r:p.r};
+    });
+    ctx.lineWidth=1;
+    for(let i=0;i<pts.length;i++){
+      for(let j=i+1;j<pts.length;j++){
+        const dx=pts[i].x-pts[j].x, dy=pts[i].y-pts[j].y;
+        if(Math.abs(dx)>46||Math.abs(dy)>46)continue;
+        const d=Math.hypot(dx,dy);
+        if(d<46){
+          ctx.strokeStyle=`rgba(212,175,55,${(1-d/46)*0.35})`;
+          ctx.beginPath();ctx.moveTo(pts[i].x,pts[i].y);ctx.lineTo(pts[j].x,pts[j].y);ctx.stroke();
+        }
+      }
+    }
+    ctx.shadowColor='rgba(255,200,60,0.8)';
+    ctx.shadowBlur=6;
+    ctx.fillStyle='rgba(255,215,110,0.85)';
+    for(const p of pts){ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();}
+    ctx.shadowBlur=0;
+    if(!reduced&&now-lastPulseAt>90&&_brainPulses.length<14){
+      lastPulseAt=now;
+      const a=pts[Math.floor(Math.random()*pts.length)];
+      let best=null,bestD=Infinity;
+      for(const b of pts){
+        if(b===a)continue;
+        const d=Math.hypot(a.x-b.x,a.y-b.y);
+        if(d<60&&d<bestD){bestD=d;best=b;}
+      }
+      if(best)_brainPulses.push({ax:a.x,ay:a.y,bx:best.x,by:best.y,start:now,dur:400+Math.random()*400});
+    }
+    _brainPulses=_brainPulses.filter(p=>now-p.start<p.dur);
+    ctx.shadowColor='#fff3c4';
+    ctx.shadowBlur=12;
+    ctx.fillStyle='rgba(255,245,200,0.95)';
+    for(const p of _brainPulses){
+      const f=(now-p.start)/p.dur;
+      const x=p.ax+(p.bx-p.ax)*f, y=p.ay+(p.by-p.ay)*f;
+      ctx.beginPath();ctx.arc(x,y,2.4,0,Math.PI*2);ctx.fill();
+    }
+    ctx.shadowBlur=0;
+    _brainRAF=requestAnimationFrame(tick);
+  }
+  _brainRAF=requestAnimationFrame(tick);
+}
+function stopBrainAnimation(){
+  if(_brainRAF){cancelAnimationFrame(_brainRAF);_brainRAF=null;}
+  const canvas=document.getElementById('brainCanvas');
+  const ctx=canvas?.getContext('2d');
+  if(ctx)ctx.clearRect(0,0,canvas.width,canvas.height);
+}
 function openModal(id){document.getElementById(id)?.classList.add('open');}
 function closeModal(id){document.getElementById(id)?.classList.remove('open');}
 function eyeToggle(inputId,btn){const inp=document.getElementById(inputId);const show=inp.type==='password';inp.type=show?'text':'password';btn.textContent=show?'\uD83D\uDE48':'\uD83D\uDC41';}
@@ -3244,7 +3363,7 @@ function toast(msg,type='',dur=3200){const t=document.createElement('div');t.cla
 const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOr','clFormOv','attachClOv','changelogOv','dpOv','rejectEinspOv','helpOv','msgFormOv','msgDetOv','gSearchOv','stLoginOv','docFormOv','docVerOv','docHistOv','docCatOv','dpReportModal','deptOv','spintCatOv','spintCatFormOv','protoFormOv','viewAsOv'];
 document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();openGSearch();return;}
-  if(e.key==='Escape'){ALL_MODALS.forEach(closeModal);closeGSearch();}
+  if(e.key==='Escape'){ALL_MODALS.forEach(closeModal);closeGSearch();if(document.getElementById('brainScreensaverOv')?.style.display==='block')closeBrainScreensaver();}
 });
 ALL_MODALS.forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('click',e=>{if(e.target===el)closeModal(id);});});
 document.addEventListener('click',e=>{if(!e.target.closest('.note-input-wrap'))document.getElementById('mentionSug')?.classList.remove('open');});
@@ -3382,7 +3501,7 @@ async function silentRefresh(){
       // rendern — sonst würde die Textbox durch den Hintergrund-Refresh
       // (alle 30s) auf den ursprünglichen Text zurückgesetzt und ein noch
       // ungespeicherter Bearbeitungsstand ginge verloren.
-      else if(S.view==='todos'&&!S._editingTodoNoteId)renderTodos();
+      else if(S.view==='todos'&&!S._editingTodoNoteId&&!S._editingTodoCommentId)renderTodos();
       else if(S.view==='sop'&&(S._sopView==='run'||S._sopView==='runlist'))renderSop();
       else if(S.view==='chat')renderChatList();
       // Offene Ticket-Detailansicht ist ein Modal (nicht Teil von S.view) und
@@ -6052,8 +6171,15 @@ function renderInstanceDetail(inst, meeting, canManage) {
         ${canManage&&tab==='points'?`<button class="btn-add" onclick="openItemForm('${inst.id}')">+ Punkt</button>`:''}
         ${canManage&&tab==='protocol'?`<button class="btn-add" onclick="openProtocolForm('${inst.id}')">+ Protokoll</button>`:''}
         ${canManage&&tab==='appointments'?`<button class="btn-add" onclick="openAppointmentForm('${inst.id}')">+ Termin</button>`:''}
-        ${canManage&&inst.status!=='done'?`<button class="btn-s" style="background:#10b981;color:#fff" onclick="setInstanceStatus('${inst.id}','done')">&#10003; Abschließen</button>`:''}
-        ${canManage&&inst.status==='done'?`<button class="btn-s" style="background:#f59e0b;color:#fff" onclick="setInstanceStatus('${inst.id}','planned')">↩ Wiederöffnen</button>`:''}
+        ${canManage&&tab==='summary'?`<select onchange="summaryQuickAdd('${inst.id}',this.value);this.value=''" style="padding:5px 10px;font-size:13px;border-radius:var(--r);border:1px solid var(--border);background:var(--acc);color:var(--act);font-weight:600;cursor:pointer">
+          <option value="">+ Neu…</option>
+          <option value="point">📋 Punkt</option>
+          <option value="protocol">📖 Protokoll</option>
+          <option value="file">📎 Dokument</option>
+          <option value="appointment">🗓️ Termin</option>
+        </select>`:''}
+        ${canManage&&inst.status!=='done'?`<button class="btn-s" style="color:#10b981;border-color:#10b98155" onclick="setInstanceStatus('${inst.id}','done')">&#10003; Abschließen</button>`:''}
+        ${canManage&&inst.status==='done'?`<button class="btn-s" style="color:#f59e0b;border-color:#f59e0b55" onclick="setInstanceStatus('${inst.id}','planned')">↩ Wiederöffnen</button>`:''}
         ${canManage?`<button class="btn-d" style="padding:4px 8px" onclick="deleteInstance('${inst.id}')">&#128465;</button>`:''}
       </div>
     </div>
@@ -6078,12 +6204,13 @@ function protocolsListHtml(inst, canManage) {
       ${protos.map(p=>`<div class="meetings-card" style="cursor:default">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <span style="font-size:13px" title="${p.type==='note'?'Notiz':'Protokoll'}">${p.type==='note'?'📝':'📖'}</span>
             <span style="font-weight:600;font-size:13px">${esc(p.title)}</span>
             ${p.released?`<span class="bdg" style="font-size:10px;background:#10b98122;color:#10b981">&#128274; Freigegeben</span>`:''}
           </div>
           ${canManage?`<div style="display:flex;gap:4px;flex-shrink:0">
-            <button class="btn-e" style="padding:2px 6px;font-size:11px" onclick="openProtocolForm('${inst.id}','${p.id}')">&#9998;</button>
-            <button class="btn-d" style="padding:2px 6px;font-size:11px" onclick="deleteProtocol('${p.id}')">&#10005;</button>
+            <button class="btn-e" style="padding:4px 9px;font-size:15px" onclick="openProtocolForm('${inst.id}','${p.id}')" title="Bearbeiten">&#9998;</button>
+            <button class="btn-d" style="padding:4px 9px;font-size:15px" onclick="deleteProtocol('${p.id}')" title="Löschen">&#10005;</button>
           </div>`:''}
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;font-size:11px;color:var(--mu)">
@@ -6095,7 +6222,7 @@ function protocolsListHtml(inst, canManage) {
           const u=getU(a);return u?`<span class="av-sm" style="background:${u.color}" title="${esc(lastNameFirst(u.name))}">${esc(u.initials)}</span>`:'';
         }).join('')}</div>`:''}
         ${docContactLinkBadgesHtml(p)}
-        ${p.body?`<div id="protoBody-${p.id}" onmouseup="protoBodySelectionHandler('${p.id}')" style="font-size:12px;color:var(--tx);margin-top:8px;white-space:pre-wrap;border-top:1px solid var(--border);padding-top:8px;max-height:240px;overflow-y:auto">${esc(p.body)}</div>
+        ${p.body?`<div id="protoBody-${p.id}" onmouseup="protoBodySelectionHandler('${p.id}')" style="font-size:12px;color:var(--tx);margin-top:8px;white-space:pre-wrap;border-top:1px solid var(--border);padding-top:8px;max-height:240px;overflow-y:auto">${protoBodyToHtml(p.body)}</div>
         <div id="protoTodoBar-${p.id}" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;padding:8px 10px;background:var(--sf2);border:1px solid var(--border);border-radius:6px;font-size:11px">
           <span>&#128204; Markiert: „<span class="sel-preview" style="font-style:italic"></span>“</span>
           <button class="btn-s" style="font-size:11px;padding:2px 8px" onclick="createTodoFromProtocol('${p.id}')">+ Als ToDo erzeugen</button>
@@ -6109,6 +6236,17 @@ function protocolsListHtml(inst, canManage) {
 // Maustaste prüfen, ob innerhalb DIESES Protokolltexts (nicht irgendwo
 // anders auf der Seite) gerade Text markiert ist, und wenn ja die kleine
 // Aktionsleiste mit einer Vorschau der Markierung einblenden.
+// Ganz leichtes Markup für Protokoll-/Notiztext: eine Zeile, die mit "# "
+// beginnt, wird fett als Überschrift dargestellt. Escaped zuerst den
+// kompletten Text (XSS-sicher) und wendet erst danach diese einzige Regel
+// an — bewusst kein größerer Editor/Markdown-Umfang.
+function protoBodyToHtml(text) {
+  if (!text) return '';
+  return esc(text).split('\n').map(line=>{
+    const m = line.match(/^#\s?(.*)$/);
+    return m ? `<b style="font-size:1.05em">${m[1]}</b>` : line;
+  }).join('\n');
+}
 function protoBodySelectionHandler(protocolId) {
   const sel = window.getSelection();
   const text = sel && sel.rangeCount>0 ? sel.toString().trim() : '';
@@ -6262,6 +6400,18 @@ async function deleteAppointment(id) {
 // Zusammenfassung: alle vier Bereiche eines Themas auf einer Seite, sortiert
 // danach, welcher Bereich zuletzt geändert wurde (jüngste Änderung zuoberst).
 // Bereiche ohne jegliche Einträge landen unten, ohne "Letzte Änderung"-Hinweis.
+function summaryQuickAdd(instanceId, type) {
+  if (!type) return;
+  if (type==='point') openItemForm(instanceId);
+  else if (type==='protocol') openProtocolForm(instanceId);
+  else if (type==='appointment') openAppointmentForm(instanceId);
+  else if (type==='file') {
+    const input = document.createElement('input');
+    input.type = 'file'; input.multiple = true;
+    input.onchange = () => uploadInstanceFiles(instanceId, input);
+    input.click();
+  }
+}
 function renderThemaSummary(inst, canManage) {
   const openPointsCount=(inst.items||[]).filter(it=>it.status==='open'||it.status==='redo').length;
   const protoCount=(inst.protocols||[]).length;
@@ -6867,9 +7017,16 @@ function addProtoExternalAttendee() {
 function openProtocolForm(instanceId, id=null) {
   const inst = S.meetings.flatMap(m=>m.instances).find(i=>i.id===instanceId);
   const proto = id ? (inst?.protocols||[]).find(p=>p.id===id) : null;
-  document.getElementById('protoFormTitle').textContent = proto ? 'Protokoll bearbeiten' : 'Neues Protokoll';
+  const isNote = (proto?.type||'protocol')==='note';
+  document.getElementById('protoFormTitle').textContent = proto ? (isNote?'Notiz bearbeiten':'Protokoll bearbeiten') : 'Neuer Eintrag';
   document.getElementById('pfId').value = proto?.id||'';
   document.getElementById('pfInstanceId').value = instanceId;
+  document.getElementById('pfTypeProtocol').checked = !isNote;
+  document.getElementById('pfTypeNote').checked = isNote;
+  // Art (Protokoll/Notiz) wird bei Neuanlage gewählt und ist danach fix, da
+  // sich der Feldumfang strukturell unterscheidet.
+  document.getElementById('pfTypeProtocol').disabled = !!proto;
+  document.getElementById('pfTypeNote').disabled = !!proto;
   document.getElementById('pfTitle').value = proto?.title||'';
   document.getElementById('pfDate').value = proto?.date?.slice?.(0,10)||'';
   document.getElementById('pfTime').value = proto?.time||'';
@@ -6884,23 +7041,34 @@ function openProtocolForm(instanceId, id=null) {
   document.getElementById('pfReleased').checked = !!proto?.released;
   document.getElementById('protoDeleteBtn').style.display = proto ? '' : 'none';
   document.getElementById('pfAutosaveIndicator').textContent = '';
+  onProtoTypeChange();
   renderLinkSections('pf', proto, instanceId);
   openModal('protoFormOv');
   startProtoAutosave(proto?.id||null);
 }
 function collectProtocolFormBody() {
+  const isNote = document.getElementById('pfTypeNote').checked;
   const extNames = [...document.getElementById('pfExtAttendeesList').children].map(el=>el.dataset.extName).filter(Boolean);
   const attendees = Array.from(document.getElementById('pfAttendees').selectedOptions).map(o=>o.value)
     .concat(extNames.map(n=>EXT_ATTENDEE_PREFIX+n));
   return {
+    type: isNote ? 'note' : 'protocol', // wird beim Update ignoriert, zählt nur bei Neuanlage
     title: document.getElementById('pfTitle').value.trim(),
     date: document.getElementById('pfDate').value || null,
     time: document.getElementById('pfTime').value,
-    location: document.getElementById('pfLocation').value.trim(),
-    attendees,
+    location: isNote ? '' : document.getElementById('pfLocation').value.trim(),
+    attendees: isNote ? [] : attendees,
     body: document.getElementById('pfBody').value,
     released: document.getElementById('pfReleased').checked,
   };
+}
+// Notiz zeigt nur Überschrift/Datum/Uhrzeit/Text/Verknüpfungen/Freigeben —
+// Ort und Teilnehmer sind Protokoll-spezifisch und werden ausgeblendet.
+function onProtoTypeChange() {
+  const isNote = document.getElementById('pfTypeNote').checked;
+  document.getElementById('pfProtocolOnlyFields').style.display = isNote ? 'none' : '';
+  document.getElementById('pfBodyLabel').textContent = isNote ? 'Notiztext' : 'Protokolltext';
+  document.getElementById('pfReleasedLabel').innerHTML = isNote ? '&#128274; Notiz freigeben' : '&#128274; Protokoll freigeben';
 }
 // Automatisches Zwischenspeichern eines offenen Protokolls: läuft nur für
 // bereits bestehende Protokolle (bei einem noch nicht angelegten neuen
@@ -9641,7 +9809,7 @@ function renderTodoDetail(t) {
           ${esc(item.title)}
           ${item.due_date ? `<span style="font-size:11px;color:${itemDeadlineColor||'#64748b'};font-weight:${itemDeadlineColor?'600':'400'};margin-left:8px">📅 ${String(item.due_date).slice(0,10)}</span>` : ''}
         </div>
-        <textarea id="todo-comment-${item.id}" class="todo-ci-textarea" rows="1" placeholder="Kommentar…" ${canEditItem?`onblur="saveTodoItemComment('${t.id}','${item.id}')"`:''} ${canEditItem?'':'readonly'}>${esc(item.comment||'')}</textarea>
+        <textarea id="todo-comment-${item.id}" class="todo-ci-textarea" rows="1" placeholder="Kommentar…" ${canEditItem?`onfocus="S._editingTodoCommentId='${item.id}'" onblur="saveTodoItemComment('${t.id}','${item.id}')"`:''} ${canEditItem?'':'readonly'}>${esc(item.comment||'')}</textarea>
         ${assigneeNames ? `<div class="todo-ci-meta">👤 ${assigneeNames}</div>` : ''}
         ${item.is_done && doneUser ? `<div class="todo-ci-meta">Erledigt von ${esc(lastNameFirst(doneUser.name))} · ${item.done_at?String(item.done_at).slice(0,16).replace('T',' '):''}</div>` : ''}
         ${convertedHtml}
@@ -9934,6 +10102,7 @@ async function toggleTodoItem(todoId, itemId, isDone) {
 }
 
 async function saveTodoItemComment(todoId, itemId) {
+  if (S._editingTodoCommentId === itemId) S._editingTodoCommentId = null;
   const el = document.getElementById('todo-comment-'+itemId);
   if (!el) return;
   const comment = el.value;

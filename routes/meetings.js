@@ -162,19 +162,23 @@ router.delete('/meeting-instances/:id', auth, async (req, res) => {
 
 router.post('/meeting-instances/:id/protocols', auth, async (req, res) => {
   try {
-    const { title, date, time, location, attendees, body, released } = req.body;
+    const { title, date, time, location, attendees, body, released, type } = req.body;
     if (!title?.trim()) return bad(res, 'Titel erforderlich', 400);
+    const entryType = type === 'note' ? 'note' : 'protocol';
     const id = newId();
     await pool.query(
-      `INSERT INTO meeting_protocols (id, instance_id, title, date, time, location, attendees, body, released, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-      [id, req.params.id, title.trim(), date || null, time || '', location || '', JSON.stringify(attendees || []), body || '', !!released, req.uid]
+      `INSERT INTO meeting_protocols (id, instance_id, title, date, time, location, attendees, body, released, type, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [id, req.params.id, title.trim(), date || null, time || '', entryType==='note'?'':(location || ''), entryType==='note'?'[]':JSON.stringify(attendees || []), body || '', !!released, entryType, req.uid]
     );
     const row = await q1('SELECT * FROM meeting_protocols WHERE id=$1', [id]);
     ok(res, row);
   } catch (e) { bad(res, 'Serverfehler', 500); }
 });
 
+// "type" (Protokoll/Notiz) wird hier absichtlich NIE übernommen — die Art
+// wird bei Anlage festgelegt und ist danach fix, damit sich Feldstruktur
+// und Anzeige eines bestehenden Eintrags nicht nachträglich ändern.
 router.put('/meeting-protocols/:id', auth, async (req, res) => {
   try {
     const existing = await q1('SELECT * FROM meeting_protocols WHERE id=$1', [req.params.id]);

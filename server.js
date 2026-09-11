@@ -838,6 +838,11 @@ async function initDB() {
     // Freigegebene Protokolle sind für ihre Teilnehmer lesbar (read-only),
     // auch wenn diese sonst keinen Zugriff auf die Besprechung haben.
     `ALTER TABLE meeting_protocols ADD COLUMN IF NOT EXISTS released BOOLEAN DEFAULT false`,
+    // Neben vollen Protokollen gibt es auch einfache "Notizen" (weniger
+    // Felder — kein Ort, keine Teilnehmerliste). Die Art wird bei Anlage
+    // festgelegt und ist danach fix (siehe PUT /meeting-protocols/:id —
+    // "type" wird dort bewusst nie aktualisiert).
+    `ALTER TABLE meeting_protocols ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'protocol'`,
     // Themen-eigene Dokumente (Drag&Drop von Dateien/E-Mails direkt ins
     // Thema) — getrennt von den globalen "Dokumente"; können zusätzlich zu
     // Dokumenten aus dem Dokumente-Modul an einzelne Punkte/Protokolle
