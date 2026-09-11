@@ -1,52 +1,151 @@
 'use strict';
+const path = require('path');
+const fs   = require('fs');
 const router = require('express').Router();
 const { q, q1, newId, pool, getUser, logAct, canSeeTk, canEditTk, nextTicketNumber, auditNote, createNotification, parseMentions } = require('../db');
 const { auth, ok, bad } = require('../middleware');
+const { sanitizeFilename, validateMime, assertUnderDir } = require('../fileutil');
+const { mailUser } = require('../lib/mailer');
+const { triggerBackgroundAiSuggest } = require('./ai');
+
+const UPLOAD_DIR = path.resolve(__dirname, '..', 'uploads', 'ticket-files');
+try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch(e) {}
 
 
 router.post('/', auth, async (req,res) => {
   try {
-    const {title,description,department,tags,priority,status,bucket,assigneeId,parentTicketId} = req.body;
+    const {title,description,subcategory,tags,priority,status,bucket,assigneeId,parentTicketId,dueDate,reporter,aiSearch} = req.body;
+    let {department} = req.body;
     if (!title?.trim()) return bad(res,'Titel erforderlich');
+    // Kindticket übernimmt IMMER den Fachbereich des Elterntickets — verhindert
+    // inkonsistente Zuordnungen (Kind in Technik, Eltern in Leitung o.ä.)
+    if (parentTicketId) {
+      const parent = await q1('SELECT department FROM tickets WHERE id=$1',[parentTicketId]);
+      if (parent) department = parent.department;
+    }
     const id=newId(), number=await nextTicketNumber();
-    await pool.query('INSERT INTO tickets (id,number,title,description,department,tags,priority,status,bucket,assignee_id,parent_ticket_id,created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
-      [id,number,title.trim(),description||'',department||'technik',JSON.stringify(tags||[]),priority||'medium',status||'open',bucket||'',assigneeId||null,parentTicketId||null,req.uid]);
+    const subcat = subcategory||'';
+    // Standardmäßig öffentlich (auch ohne Zuständigen im eigenen Fachbereich
+    // sichtbar/übernehmbar) — nur wenn explizit "privat" gewählt wird, bleibt
+    // das Ticket privat (siehe canSeeTk in db.js, das dieses Flag konsequent
+    // respektiert statt es bei fehlendem Zuständigen zu überschreiben).
+    const isPublic = req.body.isPublic!==undefined ? !!req.body.isPublic : true;
+    await pool.query('INSERT INTO tickets (id,number,title,description,department,subcategory,tags,priority,status,bucket,assignee_id,parent_ticket_id,created_by,due_date,reporter,is_public) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)',
+      [id,number,title.trim(),description||'',department||'technik',subcat,JSON.stringify(tags||[]),priority||'medium',status||'open',bucket||'',assigneeId||null,parentTicketId||null,req.uid,dueDate||null,(reporter||'').trim(),isPublic]);
     const uname = (await getUser(req.uid))?.name||'?';
-    await auditNote(id,req.uid,`✅ Ticket erstellt von ${uname}`);
+    await auditNote(id,req.uid,`✅ Ticket erstellt von ${uname}${subcat?' ['+subcat+']':''}`);
     const deptUsers = await q('SELECT id FROM users WHERE roles @> $1::jsonb AND id != $2',
       [JSON.stringify([department]), req.uid]);
     for (const u of deptUsers)
       await createNotification(u.id,'new_ticket',`Neues Ticket in ${department}: ${title.trim()}`,id,null,req.uid);
-    if (assigneeId && assigneeId!==req.uid)
+    if (subcat) {
+      // Nur echte Beschwerden (is_complaint) lösen die Beschwerde-Benachrichtigung aus
+      const scRow = await q1('SELECT is_complaint FROM ticket_subcategories WHERE label=$1 AND department=$2',
+        [subcat, department||'technik']);
+      if (scRow?.is_complaint) {
+        const subcatUsers = await q(
+          "SELECT DISTINCT id FROM users WHERE (roles::text LIKE '%schichtleiter%' OR roles::text LIKE '%leitung%' OR roles::text LIKE '%qm%') AND id != $1",
+          [req.uid]);
+        for (const u of subcatUsers)
+          await createNotification(u.id,'new_ticket',`Neue Beschwerde: ${title.trim()}`,id,null,req.uid);
+      }
+    }
+    if (assigneeId && assigneeId!==req.uid) {
       await createNotification(assigneeId,'assigned',`Dir wurde zugewiesen: ${title.trim()}`,id,null,req.uid);
+      mailUser(assigneeId, `[${number}] Dir wurde ein Ticket zugewiesen`,
+        `dir wurde das Ticket "${title.trim()}" (${number}) zugewiesen.`).catch(()=>{});
+    }
     await logAct(req.uid,req.user.name,'create_ticket',{number,title:title.trim()});
     // Eigene Tickets direkt als gesehen markieren
     await pool.query(`INSERT INTO ticket_views (ticket_id,user_id,viewed_at) VALUES ($1,$2,NOW()) ON CONFLICT (ticket_id,user_id) DO UPDATE SET viewed_at=NOW()`,
       [id,req.uid]).catch(()=>{});
+    // Läuft NUR, wenn explizit über den "Speichern mit KI-Suche"-Button
+    // ausgelöst (aiSearch===true) — nicht bei jeder normalen Anlage.
+    if (aiSearch) triggerBackgroundAiSuggest({table:'tickets',id,type:'Ticket',title:title.trim(),description:description||''});
     ok(res,{id,number});
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 router.put('/:id', auth, async (req,res) => {
   try {
     const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
     if (!tk) return bad(res,'Nicht gefunden',404);
     if (!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
+    if (tk.locked_for_approval) return bad(res,'Ticket ist zur Freigabe gesperrt — nur Notizen sind möglich, bis die Freigabe erfolgt ist.',423);
     const b=req.body, setClauses=[], vals=[];
     const add=(col,val)=>{ vals.push(val); setClauses.push(`${col}=$${vals.length}`); };
     const uname=(await getUser(req.uid))?.name||'?';
     const PL={low:'Gering',medium:'Mittel',high:'Hoch'};
-    const SL={open:'Offen',in_progress:'In Bearbeitung',on_hold:'Zurückgestellt',closed:'Abgeschlossen'};
-    const DL={technik:'Technik',leitung:'Leitung',dienstplanung:'Dienstplanung',ausbildung:'Ausbildung',qm:'QM'};
-    if (b.status!==undefined&&b.status!==tk.status) await auditNote(tk.id,req.uid,`🔄 Status: ${SL[tk.status]} → ${SL[b.status]} (${uname})`);
-    if (b.priority!==undefined&&b.priority!==tk.priority) await auditNote(tk.id,req.uid,`⚡ Priorität: ${PL[tk.priority]} → ${PL[b.priority]} (${uname})`);
-    if (b.department!==undefined&&b.department!==tk.department) await auditNote(tk.id,req.uid,`🏢 Fachbereich: ${DL[tk.department]} → ${DL[b.department]} (${uname})`);
-    if (b.assigneeId!==undefined&&b.assigneeId!==tk.assignee_id) {
-      const oldN=tk.assignee_id?(await getUser(tk.assignee_id))?.name||'?':'niemand';
-      const newN=b.assigneeId?(await getUser(b.assigneeId))?.name||'?':'niemand';
-      const msg = b.assigneeId===req.uid ? `🙋 ${uname} hat das Ticket übernommen` : `👤 Zuständigkeit: ${oldN} → ${newN} (${uname})`;
-      await auditNote(tk.id,req.uid,msg);
-      if (b.assigneeId && b.assigneeId!==req.uid)
+    const SL={open:'Offen',in_progress:'In Bearbeitung',on_hold:'Zurückgestellt',closed:'Abgeschlossen',cancelled:'Storniert'};
+    const DL={frei:'Frei',technik:'Technik',leitung:'Leitung',dienstplanung:'Dienstplanung',ausbildung:'Ausbildung',qm:'QM'};
+    const BL={urgent:'Dringend',week:'Diese Woche',sched:'Dienstplanung',wait:'Wartet',it:'IT',proj:'Projekte',org:'Organisation',ideas:'Ideen'};
+    const fmtDate = d => d ? new Date(d).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
+
+    // Kindticket übernimmt IMMER den Fachbereich des Elterntickets. Greift beim
+    // Setzen/Wechseln eines Elterntickets, bei einem abweichenden manuellen
+    // Fachbereichs-Versuch, und heilt nebenbei bereits bestehende Inkonsistenzen
+    // (Kind ↔ Eltern in unterschiedlichen Fachbereichen), sobald das Ticket
+    // irgendwie bearbeitet wird.
+    const parentIdChanged = b.parentTicketId!==undefined && (b.parentTicketId||null)!==(tk.parent_ticket_id||null);
+    const effectiveParentId = b.parentTicketId!==undefined ? (b.parentTicketId||null) : (tk.parent_ticket_id||null);
+    if (effectiveParentId) {
+      const parent = await q1('SELECT department FROM tickets WHERE id=$1',[effectiveParentId]);
+      if (parent && (parentIdChanged || (b.department!==undefined&&b.department!==parent.department) || tk.department!==parent.department)) {
+        b.department = parent.department;
+      }
+    }
+
+    // Feldänderungen protokollieren. Trenner ist NICHT ':', da alt/neu freier
+    // Nutzertext sind (z.B. Ticket-Titel enthalten häufig selbst einen
+    // Doppelpunkt) — ein reiner ':'-Trenner würde den Wert dahinter beim
+    // Anzeigen (_parseAudit im Frontend) abschneiden.
+    const AUDIT_SEP = '\u0001';
+    const auditField = (field, from, to) => auditNote(tk.id, req.uid, `FIELD${AUDIT_SEP}${field}${AUDIT_SEP}${from}${AUDIT_SEP}${to}`);
+
+    // Audit: alle relevanten Feldänderungen protokollieren
+    if (b.status!==undefined&&b.status!==tk.status) {
+      await auditField('status', SL[tk.status]||tk.status, SL[b.status]||b.status);
+      if (tk.assignee_id && tk.assignee_id!==req.uid)
+        mailUser(tk.assignee_id, `[${tk.number}] Status geändert: ${SL[b.status]||b.status}`,
+          `beim Ticket "${tk.title}" (${tk.number}) wurde der Status von "${SL[tk.status]||tk.status}" auf "${SL[b.status]||b.status}" geändert.`).catch(()=>{});
+    }
+    if (b.priority!==undefined&&b.priority!==tk.priority)
+      await auditField('priority', PL[tk.priority]||tk.priority, PL[b.priority]||b.priority);
+    if (b.department!==undefined&&b.department!==tk.department)
+      await auditField('department', DL[tk.department]||tk.department, DL[b.department]||b.department);
+    if (b.title!==undefined&&b.title!==tk.title)
+      await auditField('title', tk.title, b.title);
+    if (b.bucket!==undefined&&(b.bucket||'')!==(tk.bucket||''))
+      await auditField('bucket', BL[tk.bucket]||tk.bucket||'—', BL[b.bucket]||b.bucket||'—');
+    if (b.isPublic!==undefined&&!!b.isPublic!==!!tk.is_public)
+      await auditField('visibility', tk.is_public?'Öffentlich':'Privat', b.isPublic?'Öffentlich':'Privat');
+    if (b.subcategory!==undefined&&(b.subcategory||'')!==(tk.subcategory||''))
+      await auditField('subcategory', tk.subcategory||'—', b.subcategory||'—');
+    if (b.reporter!==undefined&&(b.reporter||'')!==(tk.reporter||''))
+      await auditField('reporter', tk.reporter||'—', b.reporter||'—');
+    if (b.dueDate!==undefined&&(b.dueDate||null)!==(tk.due_date?tk.due_date.toISOString?.().slice(0,10)||String(tk.due_date).slice(0,10):null))
+      await auditField('due_date', fmtDate(tk.due_date), fmtDate(b.dueDate));
+    if (b.snoozedUntil!==undefined&&(b.snoozedUntil||null)!==(tk.snoozed_until?String(tk.snoozed_until).slice(0,10):null))
+      await auditField('snoozed_until', fmtDate(tk.snoozed_until), fmtDate(b.snoozedUntil));
+    if (b.assigneeId!==undefined&&(b.assigneeId||null)!==(tk.assignee_id||null)) {
+      const oldN=tk.assignee_id?(await getUser(tk.assignee_id))?.name||'?':'—';
+      const newN=b.assigneeId?(await getUser(b.assigneeId))?.name||'?':'—';
+      await auditField('assignee', oldN, newN);
+      if (b.assigneeId && b.assigneeId!==req.uid) {
         await createNotification(b.assigneeId,'assigned',`Dir wurde zugewiesen: ${tk.title}`,tk.id,null,req.uid);
+        mailUser(b.assigneeId, `[${tk.number}] Dir wurde ein Ticket zugewiesen`,
+          `dir wurde das Ticket "${tk.title}" (${tk.number}) zugewiesen.`).catch(()=>{});
+      }
+    }
+    if (b.parentTicketId!==undefined&&(b.parentTicketId||null)!==(tk.parent_ticket_id||null)) {
+      const oldP=tk.parent_ticket_id?(await q1('SELECT number FROM tickets WHERE id=$1',[tk.parent_ticket_id]))?.number||'?':'—';
+      const newP=b.parentTicketId?(await q1('SELECT number FROM tickets WHERE id=$1',[b.parentTicketId]))?.number||'?':'—';
+      await auditField('parent', oldP, newP);
+    }
+    if (b.tags!==undefined) {
+      const oldTags=(()=>{try{return JSON.parse(tk.tags||'[]');}catch{return[];}})();
+      const newTags=b.tags||[];
+      if (JSON.stringify([...oldTags].sort())!==JSON.stringify([...newTags].sort()))
+        await auditField('tags', String(oldTags.length), String(newTags.length));
     }
     if (b.title!==undefined) add('title',b.title);
     if (b.description!==undefined) add('description',b.description);
@@ -58,15 +157,38 @@ router.put('/:id', auth, async (req,res) => {
     if (b.isPublic!==undefined) add('is_public',!!b.isPublic);
     if (b.assigneeId!==undefined) add('assignee_id',b.assigneeId||null);
     if (b.parentTicketId!==undefined) add('parent_ticket_id',b.parentTicketId||null);
+    if (b.subcategory!==undefined) add('subcategory',b.subcategory||'');
+    if (b.reporter!==undefined) add('reporter',b.reporter||'');
+    if (b.dueDate!==undefined) add('due_date',b.dueDate||null);
+    if (b.snoozedUntil!==undefined) add('snoozed_until',b.snoozedUntil||null);
     if (!setClauses.length) return ok(res);
     add('updated_at',new Date().toISOString());
     vals.push(req.params.id);
     await pool.query(`UPDATE tickets SET ${setClauses.join(',')} WHERE id=$${vals.length}`,vals);
     await pool.query(`INSERT INTO ticket_views (ticket_id,user_id,viewed_at) VALUES ($1,$2,NOW()) ON CONFLICT (ticket_id,user_id) DO UPDATE SET viewed_at=NOW()`,
       [req.params.id,req.uid]).catch(()=>{});
+
+    // KI-Suche läuft NUR, wenn explizit über den "Speichern mit KI-Suche"-
+    // Button ausgelöst (aiSearch===true) — nicht bei jeder normalen
+    // Ticketänderung (Status, Priorität, Zuständigkeit usw.).
+    if (b.aiSearch) {
+      triggerBackgroundAiSuggest({table:'tickets',id:req.params.id,type:'Ticket',
+        title:b.title!==undefined?b.title:tk.title, description:b.description!==undefined?b.description:tk.description});
+    }
+
+    // Fachbereich-Änderung an bestehende Kindtickets weiterreichen, damit die
+    // Zuordnung konsistent bleibt (Kind folgt immer dem Elternticket)
+    if (b.department!==undefined) {
+      const children = await q('SELECT id,department FROM tickets WHERE parent_ticket_id=$1',[req.params.id]);
+      for (const child of children) {
+        if (child.department===b.department) continue;
+        await pool.query('UPDATE tickets SET department=$1,updated_at=NOW() WHERE id=$2',[b.department,child.id]);
+        await auditNote(child.id,req.uid,`FIELD:department:${DL[child.department]||child.department}:${DL[b.department]||b.department}`);
+      }
+    }
     await logAct(req.uid,req.user.name,'update_ticket',{id:req.params.id});
     ok(res);
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 router.delete('/:id', auth, async (req,res) => {
   try {
@@ -77,7 +199,7 @@ router.delete('/:id', auth, async (req,res) => {
     await pool.query('DELETE FROM tickets WHERE id=$1',[req.params.id]);
     await logAct(req.uid,req.user.name,'delete_ticket',{id:req.params.id});
     ok(res);
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 router.post('/:id/notes', auth, async (req,res) => {
   try {
@@ -86,12 +208,31 @@ router.post('/:id/notes', auth, async (req,res) => {
     if (!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
     const text=req.body?.text?.trim();
     if (!text) return bad(res,'Text erforderlich');
+    // Todo-Kennzeichnung: Standard "Info" (kein Status), optional "Noch offen",
+    // "closing" (Abschlussnachricht), "cancel" (Stornierungsnachricht) oder
+    // "approval" (Freigabe-Anfrage — sperrt das Ticket bis zur Freigabe durch
+    // die im Text per @Name markierte Person). Status-Schließen erfolgt in
+    // den ersten beiden Fällen separat per PUT.
+    const reqTodoStatus = req.body?.todoStatus;
+    const todoStatus = ['open','closing','cancel','approval'].includes(reqTodoStatus) ? reqTodoStatus : null;
     const id=newId(), now=new Date().toISOString();
     const allUsers = await q('SELECT id,name FROM users');
     const mentioned = parseMentions(text, allUsers);
     const mentionedIds = mentioned.map(u=>u.id);
-    await pool.query('INSERT INTO ticket_notes (id,ticket_id,text,author_id,note_type,created_at,mentioned_users) VALUES ($1,$2,$3,$4,$5,$6,$7)',
-      [id,req.params.id,text,req.uid,'note',now,JSON.stringify(mentionedIds)]);
+    let approver = null;
+    if (todoStatus==='approval') {
+      if (tk.locked_for_approval) return bad(res,'Ticket ist bereits zur Freigabe gesperrt');
+      approver = mentioned[0];
+      if (!approver) return bad(res,'Bitte im Text mit @Name die Person markieren, die freigeben muss');
+    }
+    await pool.query('INSERT INTO ticket_notes (id,ticket_id,text,author_id,note_type,created_at,mentioned_users,todo_status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+      [id,req.params.id,text,req.uid,'note',now,JSON.stringify(mentionedIds),todoStatus]);
+    if (approver) {
+      await pool.query('UPDATE tickets SET locked_for_approval=true,approval_user_id=$1,approval_requested_by=$2,approval_requested_at=NOW() WHERE id=$3',
+        [approver.id,req.uid,req.params.id]);
+      const requesterName=(await getUser(req.uid))?.name||'?';
+      await auditNote(tk.id,req.uid,`🔒 Freigabe angefordert bei ${approver.name} (von ${requesterName})`);
+    }
     // Add mentioned users to ticket so they can see it
     try {
       if(mentionedIds.length){
@@ -109,9 +250,136 @@ router.post('/:id/notes', auth, async (req,res) => {
     for (const u of mentioned) {
       if (u.id === req.uid) continue;
       await createNotification(u.id,'mention',`${author?.name||'?'} erwähnte dich in ${tk.number}`,tk.id,id,req.uid);
+      mailUser(u.id, `[${tk.number}] Du wurdest erwähnt`,
+        `${author?.name||'?'} hat dich in einem Eintrag zum Ticket "${tk.title}" (${tk.number}) erwähnt:\n\n"${text}"`).catch(()=>{});
     }
-    ok(res,{id,createdAt:now});
-  } catch(e) { bad(res,e.message,500); }
+    // Zuständigen informieren, wenn jemand anderes einen Eintrag hinzufügt
+    if (tk.assignee_id && tk.assignee_id!==req.uid && !mentionedIds.includes(tk.assignee_id)) {
+      mailUser(tk.assignee_id, `[${tk.number}] Neuer Eintrag in deinem Ticket`,
+        `${author?.name||'?'} hat einen neuen Eintrag zum Ticket "${tk.title}" (${tk.number}) hinzugefügt:\n\n"${text}"`).catch(()=>{});
+    }
+    ok(res,{id,createdAt:now,todoStatus});
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+// Freigabe erteilen: nur die im "Zur Freigabe"-Eintrag markierte Person (oder
+// ein Admin) darf freigeben. Wird als regulärer (nicht nur Audit-)Eintrag
+// protokolliert, damit "Freigegeben von …" auch in der normalen Konversation
+// sichtbar bleibt, nicht nur in der Historie.
+router.post('/:id/approve', auth, async (req,res) => {
+  try {
+    const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
+    if (!tk) return bad(res,'Nicht gefunden',404);
+    if (!tk.locked_for_approval) return bad(res,'Ticket ist nicht zur Freigabe gesperrt');
+    if (tk.approval_user_id!==req.uid && !req.p.manageUsers) return bad(res,'Nur die angefragte Person kann freigeben',403);
+    await pool.query('UPDATE tickets SET locked_for_approval=false,approval_user_id=NULL,approval_requested_by=NULL,approval_requested_at=NULL,updated_at=NOW() WHERE id=$1',[req.params.id]);
+    const uname=(await getUser(req.uid))?.name||'?';
+    await pool.query('INSERT INTO ticket_notes (id,ticket_id,text,author_id,note_type,todo_status) VALUES ($1,$2,$3,$4,$5,$6)',
+      [newId(),tk.id,`✅ Freigegeben von ${uname}`,req.uid,'note','approved']);
+    ok(res);
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+// Freigabe-Anfrage zurückziehen: nur die Person, die die Freigabe angefordert
+// hat (oder ein Admin), kann die Sperre ohne tatsächliche Freigabe wieder
+// aufheben — im Unterschied zu /approve, das nur die angefragte Person selbst
+// auslösen darf.
+router.post('/:id/withdraw-approval', auth, async (req,res) => {
+  try {
+    const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
+    if (!tk) return bad(res,'Nicht gefunden',404);
+    if (!tk.locked_for_approval) return bad(res,'Ticket ist nicht zur Freigabe gesperrt');
+    if (tk.approval_requested_by!==req.uid && !req.p.manageUsers) return bad(res,'Nur die anfordernde Person kann die Anfrage zurückziehen',403);
+    await pool.query('UPDATE tickets SET locked_for_approval=false,approval_user_id=NULL,approval_requested_by=NULL,approval_requested_at=NULL,updated_at=NOW() WHERE id=$1',[req.params.id]);
+    const uname=(await getUser(req.uid))?.name||'?';
+    await pool.query('INSERT INTO ticket_notes (id,ticket_id,text,author_id,note_type,todo_status) VALUES ($1,$2,$3,$4,$5,$6)',
+      [newId(),tk.id,`🔓 Freigabe-Anfrage zurückgezogen von ${uname}`,req.uid,'note','approval_withdrawn']);
+    ok(res);
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+// Todo-Checkbox umschalten UND/ODER Text bearbeiten. Text-Bearbeitung nur
+// durch den Autor selbst oder manageUsers, Protokolleinträge (audit) sind
+// grundsätzlich unveränderlich. Jede Textänderung wird zusätzlich als eigener
+// Protokoll-Eintrag in der Historie festgehalten (alt → neu, vollständig).
+router.put('/:id/notes/:noteId', auth, async (req,res) => {
+  try {
+    const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
+    if (!tk) return bad(res,'Nicht gefunden',404);
+    if (!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
+    const note = await q1('SELECT * FROM ticket_notes WHERE id=$1 AND ticket_id=$2',[req.params.noteId,req.params.id]);
+    if (!note) return bad(res,'Nicht gefunden',404);
+    const {todoStatus, text} = req.body;
+
+    if (todoStatus !== undefined) {
+      if (note.todo_status!=='open' && note.todo_status!=='done')
+        return bad(res,'Nur Noch-offen-Einträge können umgeschaltet werden');
+      if (todoStatus!=='open' && todoStatus!=='done') return bad(res,'todoStatus muss open oder done sein');
+      await pool.query('UPDATE ticket_notes SET todo_status=$1 WHERE id=$2',[todoStatus,req.params.noteId]);
+      return ok(res,{todoStatus});
+    }
+
+    if (text !== undefined) {
+      if (note.note_type==='audit') return bad(res,'Protokolleinträge können nicht bearbeitet werden',403);
+      if (note.author_id!==req.uid && !req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+      const newText = text.trim();
+      if (!newText) return bad(res,'Text erforderlich');
+      if (newText===note.text) return ok(res,{text:newText});
+      const now = new Date().toISOString();
+      await pool.query('UPDATE ticket_notes SET text=$1,edited_at=$2 WHERE id=$3',[newText,now,req.params.noteId]);
+      const uname=(await getUser(req.uid))?.name||'?';
+      await auditNote(tk.id,req.uid,`✏️ Eintrag von ${uname} bearbeitet: "${note.text}" → "${newText}"`);
+      return ok(res,{text:newText,editedAt:now});
+    }
+
+    return bad(res,'Keine Änderung angegeben');
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+router.delete('/:id/notes/:noteId', auth, async (req,res) => {
+  try {
+    const note = await q1('SELECT * FROM ticket_notes WHERE id=$1 AND ticket_id=$2',[req.params.noteId,req.params.id]);
+    if (!note) return bad(res,'Nicht gefunden',404);
+    if (note.author_id!==req.uid && !req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+    if (note.note_type==='audit') return bad(res,'Protokolleinträge können nicht gelöscht werden',403);
+    const uname=(await getUser(req.uid))?.name||'?';
+    const deletedText = note.text||'';
+    await pool.query('DELETE FROM ticket_notes WHERE id=$1',[req.params.noteId]);
+    await auditNote(req.params.id,req.uid,`🗑️ Eintrag von ${uname} gelöscht: "${deletedText}"`);
+    ok(res);
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+// ── TEILNEHMER ── explizit hinzugefügte User sehen das Ticket unabhängig von
+// Fachbereich/Sichtbarkeit (siehe db.js canSeeTk). Nur wer das Ticket
+// bearbeiten darf, kann Teilnehmer hinzufügen/entfernen.
+router.put('/:id/participants', auth, async (req,res) => {
+  try {
+    const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
+    if (!tk) return bad(res,'Nicht gefunden',404);
+    if (!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
+    if (tk.locked_for_approval) return bad(res,'Ticket ist zur Freigabe gesperrt',423);
+    const { userId, action } = req.body;
+    if (!userId || (action!=='add' && action!=='remove'))
+      return bad(res,'userId und action (add/remove) erforderlich');
+    const target = await getUser(userId);
+    if (!target) return bad(res,'Benutzer nicht gefunden',404);
+    const current = (()=>{try{return JSON.parse(tk.participants||'[]');}catch{return[];}})();
+    const updated = action==='add'
+      ? (current.includes(userId) ? current : [...current, userId])
+      : current.filter(id=>id!==userId);
+    await pool.query('UPDATE tickets SET participants=$1,updated_at=NOW() WHERE id=$2',[JSON.stringify(updated),req.params.id]);
+    const uname=(await getUser(req.uid))?.name||'?';
+    await auditNote(tk.id,req.uid, action==='add'
+      ? `👥 ${target.name} als Teilnehmer hinzugefügt (von ${uname})`
+      : `👥 ${target.name} als Teilnehmer entfernt (von ${uname})`);
+    if (action==='add' && userId!==req.uid) {
+      await createNotification(userId,'mention',`${uname} hat dich zum Ticket ${tk.number} hinzugefügt`,tk.id,null,req.uid);
+      mailUser(userId, `[${tk.number}] Du wurdest zum Ticket hinzugefügt`,
+        `${uname} hat dich als Teilnehmer zum Ticket "${tk.title}" (${tk.number}) hinzugefügt.`).catch(()=>{});
+    }
+    ok(res, {participants: updated});
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 
 // TICKET CHECKLISTS
@@ -119,6 +387,7 @@ router.post('/:id/checklists', auth, async (req,res) => {
   try {
     const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
     if (!tk||!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
+    if (tk.locked_for_approval) return bad(res,'Ticket ist zur Freigabe gesperrt',423);
     const tmpl = await q1('SELECT * FROM checklist_templates WHERE id=$1',[req.body.templateId]);
     if (!tmpl) return bad(res,'Vorlage nicht gefunden',404);
     const items = await q('SELECT * FROM checklist_template_items WHERE template_id=$1 ORDER BY sort_order',[tmpl.id]);
@@ -129,21 +398,59 @@ router.post('/:id/checklists', auth, async (req,res) => {
         [newId(),clId,item.text,item.item_type||'check',item.sort_order]);
     await auditNote(req.params.id,req.uid,`📋 Checkliste angehängt: "${tmpl.name}"`);
     ok(res,{id:clId});
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 router.delete('/:id/checklists/:cid', auth, async (req,res) => {
   try {
     const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
     if (!tk||!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
+    if (tk.locked_for_approval) return bad(res,'Ticket ist zur Freigabe gesperrt',423);
     await pool.query('DELETE FROM ticket_checklist_items WHERE checklist_id=$1',[req.params.cid]);
     await pool.query('DELETE FROM ticket_checklists WHERE id=$1',[req.params.cid]);
     ok(res);
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+router.put('/:id/checklists/:cid/sync', auth, async (req,res) => {
+  try {
+    const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
+    if (!tk||!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
+    if (tk.locked_for_approval) return bad(res,'Ticket ist zur Freigabe gesperrt',423);
+    const cl = await q1('SELECT * FROM ticket_checklists WHERE id=$1',[req.params.cid]);
+    if (!cl||!cl.template_id) return bad(res,'Keine Vorlage verknüpft',400);
+    const tmpl = await q1('SELECT * FROM checklist_templates WHERE id=$1',[cl.template_id]);
+    if (!tmpl) return bad(res,'Vorlage nicht gefunden',404);
+    const tplItems = await q('SELECT * FROM checklist_template_items WHERE template_id=$1 ORDER BY sort_order',[cl.template_id]);
+    const existing = await q('SELECT * FROM ticket_checklist_items WHERE checklist_id=$1',[req.params.cid]);
+    // match by text to preserve completion state
+    const existMap = {};
+    for (const e of existing) existMap[e.text] = e;
+    const tplTexts = new Set(tplItems.map(i=>i.text));
+    // delete items no longer in template
+    for (const e of existing) {
+      if (!tplTexts.has(e.text))
+        await pool.query('DELETE FROM ticket_checklist_items WHERE id=$1',[e.id]);
+    }
+    // add new items, update sort_order for existing
+    for (const ti of tplItems) {
+      if (existMap[ti.text]) {
+        await pool.query('UPDATE ticket_checklist_items SET sort_order=$1,item_type=$2 WHERE id=$3',
+          [ti.sort_order, ti.item_type||'check', existMap[ti.text].id]);
+      } else {
+        await pool.query('INSERT INTO ticket_checklist_items (id,checklist_id,text,item_type,sort_order) VALUES ($1,$2,$3,$4,$5)',
+          [newId(), req.params.cid, ti.text, ti.item_type||'check', ti.sort_order]);
+      }
+    }
+    // update checklist name in case template was renamed
+    await pool.query('UPDATE ticket_checklists SET name=$1 WHERE id=$2',[tmpl.name, req.params.cid]);
+    await auditNote(req.params.id, req.uid, `🔄 Checkliste aktualisiert: "${tmpl.name}"`);
+    ok(res);
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 router.put('/:id/checklists/:cid/items/:iid', auth, async (req,res) => {
   try {
     const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
     if (!tk||!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
+    if (tk.locked_for_approval) return bad(res,'Ticket ist zur Freigabe gesperrt',423);
     const item = await q1('SELECT * FROM ticket_checklist_items WHERE id=$1',[req.params.iid]);
     if (!item) return bad(res,'Item nicht gefunden',404);
     const {completed, userNote} = req.body;
@@ -155,11 +462,37 @@ router.put('/:id/checklists/:cid/items/:iid', auth, async (req,res) => {
     else if (userNote !== undefined)
       await pool.query('UPDATE ticket_checklist_items SET user_note=$1 WHERE id=$2',[userNote,req.params.iid]);
     ok(res);
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 
 // CHECKLIST TEMPLATES
 // ── TICKET ANSEHEN ──
+router.delete('/:id', auth, async (req,res) => {
+  try {
+    const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
+    if (!tk) return bad(res,'Nicht gefunden',404);
+    if (!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
+    const activeChildren = await q(
+      'SELECT id FROM tickets WHERE parent_ticket_id=$1 AND (is_deleted IS NOT TRUE) AND status NOT IN (\'closed\',\'cancelled\')',
+      [req.params.id]
+    );
+    if (activeChildren.length > 0)
+      return bad(res,`Dieses Ticket hat noch ${activeChildren.length} aktives Unterticket(s). Bitte zuerst die Untertickets abschließen oder löschen.`,409);
+    await pool.query('UPDATE tickets SET is_deleted=true,deleted_at=NOW(),deleted_by=$1 WHERE id=$2',[req.uid,req.params.id]);
+    await auditNote(req.params.id, req.uid, '🗑️ Ticket gelöscht');
+    ok(res);
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+router.put('/:id/restore', auth, async (req,res) => {
+  try {
+    const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
+    if (!tk) return bad(res,'Nicht gefunden',404);
+    if (!req.tp.editAll && !req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+    await pool.query('UPDATE tickets SET is_deleted=false,deleted_at=NULL,deleted_by=NULL WHERE id=$1',[req.params.id]);
+    await auditNote(req.params.id, req.uid, '♻️ Ticket wiederhergestellt');
+    ok(res);
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
 router.put('/:id/view', auth, async (req,res) => {
   try {
     await pool.query(
@@ -168,8 +501,78 @@ router.put('/:id/view', auth, async (req,res) => {
       [req.params.id, req.uid]
     );
     ok(res);
-  } catch(e) { bad(res,e.message,500); }
+  } catch(e) { bad(res,'Serverfehler',500); }
 });
 
+// ── FILE MANAGEMENT ──
+router.post('/:id/files', auth, async (req,res) => {
+  try {
+    const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
+    if (!tk) return bad(res,'Nicht gefunden',404);
+    if (!canSeeTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
+    const {name, mimeType, data} = req.body;
+    if (!name?.trim() || !data) return bad(res,'Dateiname und Daten erforderlich');
+    const mime = mimeType || 'application/octet-stream';
+    if (!validateMime(mime)) return bad(res,'Dateityp nicht erlaubt',400);
+    const buf = Buffer.from(data,'base64');
+    if (buf.length > 20*1024*1024) return bad(res,'Datei zu groß (max. 20 MB)');
+    const id = newId();
+    const safeName = sanitizeFilename(name.trim());
+    const ext = (safeName.split('.').pop()||'bin').toLowerCase().replace(/[^a-z0-9]/g,'');
+    const filename = `${id}.${ext}`;
+    // Dateiinhalt wird in der DB gespeichert (nicht auf der lokalen Festplatte),
+    // da Render-Deploys das lokale Dateisystem zurücksetzen und hochgeladene
+    // Dateien sonst beim nächsten Deploy verloren gehen.
+    await pool.query('INSERT INTO ticket_files (id,ticket_id,filename,original_name,mime_type,size_bytes,uploaded_by,file_data) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+      [id,req.params.id,filename,safeName,mime,buf.length,req.uid,buf.toString('base64')]);
+    const uname=(await getUser(req.uid))?.name||'?';
+    // Als regulärer Eintrag statt nur Audit-Log, damit das Anhängen einer
+    // Datei direkt in der normalen Konversation (Details-Tab) sichtbar ist.
+    await pool.query('INSERT INTO ticket_notes (id,ticket_id,text,author_id,note_type) VALUES ($1,$2,$3,$4,$5)',
+      [newId(),req.params.id,`📎 ${safeName} angehängt (von ${uname})`,req.uid,'note']);
+    ok(res,{id});
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+router.get('/:id/files/:fid', auth, async (req,res) => {
+  try {
+    const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
+    if (!tk) return bad(res,'Nicht gefunden',404);
+    if (!canSeeTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
+    const file = await q1('SELECT * FROM ticket_files WHERE id=$1 AND ticket_id=$2',[req.params.fid,req.params.id]);
+    if (!file) return bad(res,'Datei nicht gefunden',404);
+    // Alt-Dateien (vor der Umstellung auf DB-Speicherung hochgeladen) liegen
+    // ggf. noch auf der lokalen Festplatte, sind aber nach jedem Deploy weg.
+    const filePath = path.join(UPLOAD_DIR, file.filename);
+    assertUnderDir(UPLOAD_DIR, filePath);
+    const onDisk = !file.file_data && fs.existsSync(filePath);
+    if (!file.file_data && !onDisk)
+      return bad(res,'Datei nicht mehr verfügbar (vor Umstellung auf DB-Speicherung hochgeladen) — bitte erneut hochladen',404);
+    const inlineSafe = /^(image\/(jpeg|png|gif|webp)|application\/pdf|text\/plain)$/.test(file.mime_type);
+    res.setHeader('Content-Type', inlineSafe ? file.mime_type : 'application/octet-stream');
+    res.setHeader('X-Content-Type-Options','nosniff');
+    res.setHeader('Content-Disposition',`${inlineSafe?'inline':'attachment'}; filename*=UTF-8''${encodeURIComponent(file.original_name)}`);
+    if (file.file_data) return res.send(Buffer.from(file.file_data,'base64'));
+    res.sendFile(filePath);
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+router.delete('/:id/files/:fid', auth, async (req,res) => {
+  try {
+    const tk = await q1('SELECT * FROM tickets WHERE id=$1',[req.params.id]);
+    if (!tk) return bad(res,'Nicht gefunden',404);
+    if (!canEditTk(req.tp,tk,req.uid)) return bad(res,'Keine Berechtigung',403);
+    if (tk.locked_for_approval) return bad(res,'Ticket ist zur Freigabe gesperrt',423);
+    const file = await q1('SELECT * FROM ticket_files WHERE id=$1 AND ticket_id=$2',[req.params.fid,req.params.id]);
+    if (!file) return bad(res,'Datei nicht gefunden',404);
+    const filePath = path.join(UPLOAD_DIR, file.filename);
+    assertUnderDir(UPLOAD_DIR, filePath);
+    try { fs.unlinkSync(filePath); } catch(e) {}
+    await pool.query('DELETE FROM ticket_files WHERE id=$1',[req.params.fid]);
+    const uname=(await getUser(req.uid))?.name||'?';
+    await auditNote(req.params.id,req.uid,`🗑️ Datei gelöscht: ${file.original_name} von ${uname}`);
+    ok(res);
+  } catch(e) { bad(res,'Serverfehler',500); }
+});
 
 module.exports = router;
