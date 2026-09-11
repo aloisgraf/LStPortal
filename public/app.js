@@ -3372,7 +3372,11 @@ async function silentRefresh(){
       else if(S.view==='platz')renderPlatz();
       else if(S.view==='links')renderLinks();
       else if(S.view==='docs')renderDocs();
-      else if(S.view==='wiki')renderWiki();
+      // Während ein Wiki-Artikel gerade bearbeitet/neu angelegt wird, NICHT
+      // automatisch neu rendern — sonst würde das Formular durch den
+      // Hintergrund-Refresh (alle 30s) geleert, ein noch ungespeicherter
+      // Artikelentwurf ginge verloren (analog zur Notizbearbeitung bei Todos).
+      else if(S.view==='wiki'&&!S._wikiEditing)renderWiki();
       else if(S.view==='meetings')renderMeetings();
       // Während eine Notiz gerade bearbeitet wird, NICHT automatisch neu
       // rendern — sonst würde die Textbox durch den Hintergrund-Refresh
