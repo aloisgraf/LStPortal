@@ -390,7 +390,19 @@
 <!-- TICKET FORM -->
 <div class="ov" id="tkFormOv">
   <div class="modal wide">
-    <div class="mh"><h2 id="tkFT">Neues Ticket</h2><button class="mc" onclick="closeModal('tkFormOv')">&#10005;</button></div>
+    <div class="mh">
+      <h2 id="tkFT">Neues Ticket</h2>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <div id="tkFAdvRow" style="display:flex">
+          <select id="tkFSt" style="font-size:12px;padding:6px 8px;width:auto">
+            <option value="open">Offen</option><option value="in_progress">In Bearbeitung</option>
+            <option value="on_hold">Zur&#252;ckgestellt</option><option value="closed">Abgeschlossen</option>
+          </select>
+        </div>
+        <button class="btn-p" onclick="saveTicket()">&#128190; Speichern</button>
+        <button class="mc" onclick="closeModal('tkFormOv')">&#10005;</button>
+      </div>
+    </div>
     <div class="mb2">
       <input type="hidden" id="tkFId">
       <div class="fg full"><label>Ticketname *</label><input type="text" id="tkFNm"></div>
@@ -410,12 +422,6 @@
       <div class="fr" id="tkFSubcatRow" style="display:none">
         <div class="fg full"><label>Unterkategorie</label><select id="tkFSubcat"><option value="">&#8212; keine &#8212;</option></select></div>
       </div>
-      <div class="fr" id="tkFAdvRow">
-        <div class="fg"><label>Status</label><select id="tkFSt">
-          <option value="open">Offen</option><option value="in_progress">In Bearbeitung</option>
-          <option value="on_hold">Zur&#252;ckgestellt</option><option value="closed">Abgeschlossen</option>
-        </select></div>
-      </div>
       <div class="fr">
         <div class="fg"><label>Tags</label><select id="tkFTags" multiple style="min-height:70px"></select></div>
         <div class="fg"><label>Zust&#228;ndig</label><select id="tkFAsgn"><option value="">&#8212; niemand &#8212;</option></select></div>
@@ -429,7 +435,7 @@
         </div>
       </div>
     </div>
-    <div class="mf"><button class="btn-s" onclick="closeModal('tkFormOv')">Abbrechen</button><button class="btn-s" onclick="saveTicket(true)">&#129302; Speichern mit KI-Suche</button><button class="btn-p" onclick="saveTicket()">&#128190; Speichern</button></div>
+    <div class="mf"><button class="btn-s" onclick="closeModal('tkFormOv')">Abbrechen</button><button class="btn-s" onclick="saveTicket(true)">&#129302; Speichern mit KI-Suche</button></div>
   </div>
 </div>
 
@@ -443,6 +449,7 @@
         <span id="tkDetPrio"></span><span id="tkDetSt"></span>
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0;margin-left:8px">
+        <button id="tkDetCloseBtn" class="btn-ok" style="display:none" title="Abschlie&#223;en" onclick="closeCurrentTicket()">&#10003;</button>
         <button id="tkDetEditBtn" class="btn-e" onclick="editCurrentTicket()">&#10000;</button>
         <button class="mc" onclick="closeModal('tkDetOv')">&#10005;</button>
       </div>

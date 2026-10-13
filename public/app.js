@@ -2152,7 +2152,8 @@ function _parseAudit(text){
   return{field,from,to};
 }
 function _renderFeed(notes,tkId,canEdit,filter){
-  const filtered=notes.filter(n=>filter==='all'?true:filter==='audit'?n.noteType==='audit':n.noteType==='note');
+  const filtered=notes.filter(n=>filter==='all'?true:filter==='audit'?n.noteType==='audit':n.noteType==='note')
+    .slice().sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
   if(!filtered.length)return`<div style="color:var(--di);font-size:12px;padding:8px 0">Keine Einträge.</div>`;
   return filtered.map((n,i)=>{
     const a=getU(n.authorId);
@@ -2257,6 +2258,7 @@ function renderTkDetail(){
   const locked=!!tk.lockedForApproval;
   const canEditFields=canEdit&&!locked;
   document.getElementById('tkDetEditBtn').style.display=canEditFields?'':'none';
+  document.getElementById('tkDetCloseBtn').style.display=(canEditFields&&!isTkClosed(tk))?'':'none';
   const notes=tk.notes||[];
   const tab=S._tkTab||'details';
   const tabBtn=(id,label)=>`<button onclick="S._tkTab='${id}';renderTkDetail()" style="padding:8px 16px;font-size:13px;font-weight:${tab===id?'600':'500'};background:none;border:none;border-bottom:2px solid ${tab===id?'var(--acc)':'transparent'};color:${tab===id?'var(--acc)':'var(--mu)'};cursor:pointer;font-family:inherit;transition:.15s;margin-bottom:-1px">${label}</button>`;
@@ -2425,8 +2427,7 @@ function renderTkDetail(){
     </div>
     ${par?`<div class="tkf"><label>Elternticket</label><div class="subi" onclick="S.currentTicketId='${par.id}';renderTkDetail()" style="margin-top:4px"><span style="font-family:monospace;font-size:11px">${par.number}</span><span style="font-size:12px;flex:1">${par.title.slice(0,22)}</span></div></div>`:''}
     ${canEditFields?`<div class="tkdiv"></div>
-    <button class="btn-s" style="width:100%;justify-content:center;font-size:12px" onclick="openAttachCl('${tk.id}')">&#9745;&#65039; Checkliste anh\u00e4ngen</button>
-    ${!isTkClosed(tk)?`<button class="btn-ok" style="width:100%;justify-content:center;margin-top:4px" onclick="updateTkField('${tk.id}','status','closed')">\u2713 Abschlie\u00dfen</button>`:''}`:''}`;
+    <button class="btn-s" style="width:100%;justify-content:center;font-size:12px" onclick="openAttachCl('${tk.id}')">&#9745;&#65039; Checkliste anh\u00e4ngen</button>`:''}`;
   // KI-Ergebnisse bekommen eine eigene, breitere Spalte links im Fenster
   // statt unter der Beschreibung eingebettet zu sein \u2014 Fenster wird daf\u00fcr
   // automatisch breiter (siehe .modal.xl.wide-ai).
@@ -2535,6 +2536,7 @@ async function deleteNote(tkId,noteId){
   catch(e){toast('\u26A0\uFE0F '+e.message,'err');}
 }
 function editCurrentTicket(){openTkForm(S.currentTicketId);}
+function closeCurrentTicket(){if(S.currentTicketId)updateTkField(S.currentTicketId,'status','closed');}
 function onTkDeptChange(){
   const dept=document.getElementById('tkFDept')?.value||'';
   const subcats=S.ticketSubcategories.filter(s=>s.department===dept);
