@@ -3477,25 +3477,42 @@ document.addEventListener('click',e=>{if(!e.target.closest('.note-input-wrap'))d
 // MutationObserver greift jedes neu ins DOM eingefügte <textarea id="..."> ab,
 // setzt eine zuvor gespeicherte Größe wieder und beobachtet es per
 // ResizeObserver auf künftige manuelle Größenänderungen.
+//
+// WICHTIG: ein einziger, geteilter ResizeObserver statt (wie früher) einer
+// neuen Instanz pro Textarea — die Seite rendert sehr häufig komplett neu
+// (u.a. alle 30s durch den Hintergrund-Refresh), wobei Textareas mit
+// gleicher ID als neue DOM-Elemente ersetzt werden. Mit je einer eigenen
+// Observer-Instanz pro Element wurden die alten (längst aus dem DOM
+// entfernten) Observer nie freigegeben — sie sammelten sich über eine
+// Sitzung hinweg unbegrenzt an und kosteten zunehmend CPU/Speicher (genau
+// das von Nutzern beobachtete "Seite macht nach einer Weile den ganzen PC
+// langsam"). trackedEls merkt sich je ID die aktuell beobachtete
+// Element-Instanz, damit die veraltete per unobserve() freigegeben wird,
+// bevor die neue beobachtet wird — die Zahl aktiver Beobachtungen bleibt
+// dadurch auf die Anzahl gerade sichtbarer Textareas begrenzt.
 (function(){
   const KEY='lst_fieldSizes';
   let sizes; try{sizes=JSON.parse(localStorage.getItem(KEY)||'{}');}catch(e){sizes={};}
   function persist(){try{localStorage.setItem(KEY,JSON.stringify(sizes));}catch(e){}}
-  const seen=new WeakSet();
+  const hasRO=typeof ResizeObserver!=='undefined';
+  const trackedEls={};
+  const ro=hasRO?new ResizeObserver(entries=>{
+    for(const entry of entries){
+      const el=entry.target;
+      if(!el.id)continue;
+      const h=Math.round(entry.contentRect.height);
+      if(h<=0)continue;
+      sizes[el.id]={h};
+    }
+    persist();
+  }):null;
   function track(el){
-    if(!el.id||seen.has(el))return;
-    seen.add(el);
+    if(!el.id||trackedEls[el.id]===el)return;
+    if(ro&&trackedEls[el.id])ro.unobserve(trackedEls[el.id]);
+    trackedEls[el.id]=el;
     const saved=sizes[el.id];
     if(saved?.h)el.style.height=saved.h+'px';
-    if(typeof ResizeObserver==='undefined')return;
-    new ResizeObserver(entries=>{
-      for(const entry of entries){
-        const h=Math.round(entry.contentRect.height);
-        if(h<=0)continue;
-        sizes[el.id]={h};
-        persist();
-      }
-    }).observe(el);
+    if(ro)ro.observe(el);
   }
   function scan(node){
     if(!(node instanceof Element))return;
