@@ -3577,12 +3577,31 @@ document.addEventListener('click',e=>{if(!e.target.closest('.note-input-wrap'))d
     if(saved?.h)el.style.height=saved.h+'px';
     if(ro)ro.observe(el);
   }
+  // Pendant zu track(): wird ein Textfeld aus dem DOM entfernt (z.B. nach
+  // Abbrechen/Speichern einer Notiz-Bearbeitung mit ID "noteEditInput-<id>"
+  // o.ä. je Eintrag EINDEUTIGER ID), muss es auch hier freigegeben werden —
+  // sonst behält der ResizeObserver dauerhaft eine Referenz auf den
+  // losgelösten Knoten, weil track() eine erneut vergebene ID zum Freigeben
+  // voraussetzt, die bei pro-Eintrag eindeutigen IDs nie wieder vorkommt.
+  // Ohne das wächst die Zahl aktiver Beobachtungen über eine Sitzung hinweg
+  // unbegrenzt (z.B. mit jeder bearbeiteten Ticket-/ToDo-Notiz) — das war
+  // genau das bereits einmal behobene Leck, nur für diese IDs nicht erfasst.
+  function untrack(el){
+    if(!el.id||trackedEls[el.id]!==el)return;
+    if(ro)ro.unobserve(el);
+    delete trackedEls[el.id];
+  }
   function scan(node){
     if(!(node instanceof Element))return;
     if(node.tagName==='TEXTAREA')track(node);
     node.querySelectorAll?.('textarea[id]').forEach(track);
   }
-  new MutationObserver(muts=>{muts.forEach(m=>m.addedNodes.forEach(scan));}).observe(document.documentElement,{childList:true,subtree:true});
+  function unscan(node){
+    if(!(node instanceof Element))return;
+    if(node.tagName==='TEXTAREA')untrack(node);
+    node.querySelectorAll?.('textarea[id]').forEach(untrack);
+  }
+  new MutationObserver(muts=>{muts.forEach(m=>{m.addedNodes.forEach(scan);m.removedNodes.forEach(unscan);});}).observe(document.documentElement,{childList:true,subtree:true});
   document.querySelectorAll('textarea[id]').forEach(track);
 })();
 // AUTO-REFRESH
