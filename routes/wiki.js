@@ -1,6 +1,6 @@
 'use strict';
 const router = require('express').Router();
-const { q, q1, newId, pool } = require('../db');
+const { q, q1, newId, pool, parseRoles, canSeeAcl, canEditAcl } = require('../db');
 const { auth, ok, bad } = require('../middleware');
 const { validateMime } = require('../fileutil');
 
@@ -54,21 +54,27 @@ router.delete('/wiki-categories/:id', auth, async (req, res) => {
 // ── ARTIKEL ───────────────────────────────────────────────────────────────
 
 router.get('/wiki-articles', auth, async (req, res) => {
-  try { ok(res, await q('SELECT * FROM wiki_articles ORDER BY updated_at DESC')); }
+  try {
+    const rows = await q('SELECT * FROM wiki_articles ORDER BY updated_at DESC');
+    const roles = parseRoles(req.user.roles);
+    ok(res, rows.filter(a => canSeeAcl(a, req.uid, roles)));
+  }
   catch (e) { bad(res, 'Serverfehler', 500); }
 });
 
 router.post('/wiki-articles', auth, async (req, res) => {
   if (!req.p.addGeneral) return bad(res, 'Keine Berechtigung', 403);
   try {
-    const { title, categoryId, tags, body } = req.body;
+    const { title, categoryId, tags, body, visibleRoles, editableRoles } = req.body;
     if (!title?.trim()) return bad(res, 'Titel erforderlich', 400);
     const tagsJson = JSON.stringify(Array.isArray(tags) ? tags : []);
     const id = newId();
     await pool.query(
-      `INSERT INTO wiki_articles (id,category_id,title,tags,body,version,created_by,updated_by)
-       VALUES ($1,$2,$3,$4,$5,1,$6,$6)`,
-      [id, categoryId || null, title.trim(), tagsJson, body || '', req.uid]
+      `INSERT INTO wiki_articles (id,category_id,title,tags,body,version,created_by,updated_by,visible_roles,editable_roles)
+       VALUES ($1,$2,$3,$4,$5,1,$6,$6,$7,$8)`,
+      [id, categoryId || null, title.trim(), tagsJson, body || '', req.uid,
+       JSON.stringify(Array.isArray(visibleRoles) ? visibleRoles : []),
+       JSON.stringify(Array.isArray(editableRoles) ? editableRoles : [])]
     );
     await pool.query(
       `INSERT INTO wiki_article_versions (id,article_id,version,title,body,tags,edited_by) VALUES ($1,$2,1,$3,$4,$5,$6)`,
@@ -79,11 +85,11 @@ router.post('/wiki-articles', auth, async (req, res) => {
 });
 
 router.put('/wiki-articles/:id', auth, async (req, res) => {
-  if (!req.p.addGeneral) return bad(res, 'Keine Berechtigung', 403);
   try {
     const existing = await q1('SELECT * FROM wiki_articles WHERE id=$1', [req.params.id]);
     if (!existing) return bad(res, 'Nicht gefunden', 404);
-    const { title, categoryId, tags, body } = req.body;
+    if (!canEditAcl(existing, req.uid, parseRoles(req.user.roles), req.p)) return bad(res, 'Keine Berechtigung', 403);
+    const { title, categoryId, tags, body, visibleRoles, editableRoles } = req.body;
     if (title !== undefined && !title.trim()) return bad(res, 'Titel erforderlich', 400);
     // Bisherigen Stand vor dem Überschreiben archivieren.
     await pool.query(
@@ -93,20 +99,26 @@ router.put('/wiki-articles/:id', auth, async (req, res) => {
     const newVersion = existing.version + 1;
     await pool.query(
       `UPDATE wiki_articles SET title=COALESCE($1,title), category_id=$2, tags=COALESCE($3,tags),
-       body=COALESCE($4,body), version=$5, updated_by=$6, updated_at=NOW() WHERE id=$7`,
+       body=COALESCE($4,body), version=$5, updated_by=$6, updated_at=NOW(),
+       visible_roles=COALESCE($7,visible_roles), editable_roles=COALESCE($8,editable_roles) WHERE id=$9`,
       [title?.trim() || null,
        categoryId !== undefined ? (categoryId || null) : existing.category_id,
        tags !== undefined ? JSON.stringify(tags) : null,
        body !== undefined ? body : null,
-       newVersion, req.uid, req.params.id]
+       newVersion, req.uid,
+       Array.isArray(visibleRoles) ? JSON.stringify(visibleRoles) : null,
+       Array.isArray(editableRoles) ? JSON.stringify(editableRoles) : null,
+       req.params.id]
     );
     ok(res, await q1('SELECT * FROM wiki_articles WHERE id=$1', [req.params.id]));
   } catch (e) { bad(res, 'Serverfehler', 500); }
 });
 
 router.delete('/wiki-articles/:id', auth, async (req, res) => {
-  if (!req.p.addGeneral) return bad(res, 'Keine Berechtigung', 403);
   try {
+    const existing = await q1('SELECT * FROM wiki_articles WHERE id=$1', [req.params.id]);
+    if (!existing) return bad(res, 'Nicht gefunden', 404);
+    if (!canEditAcl(existing, req.uid, parseRoles(req.user.roles), req.p)) return bad(res, 'Keine Berechtigung', 403);
     await pool.query('DELETE FROM wiki_articles WHERE id=$1', [req.params.id]);
     ok(res, { deleted: true });
   } catch (e) { bad(res, 'Serverfehler', 500); }
@@ -114,6 +126,8 @@ router.delete('/wiki-articles/:id', auth, async (req, res) => {
 
 router.get('/wiki-articles/:id/versions', auth, async (req, res) => {
   try {
+    const article = await q1('SELECT * FROM wiki_articles WHERE id=$1', [req.params.id]);
+    if (!article || !canSeeAcl(article, req.uid, parseRoles(req.user.roles))) return bad(res, 'Nicht gefunden', 404);
     ok(res, await q(
       'SELECT id,version,title,edited_by,created_at FROM wiki_article_versions WHERE article_id=$1 ORDER BY version DESC',
       [req.params.id]
@@ -123,6 +137,8 @@ router.get('/wiki-articles/:id/versions', auth, async (req, res) => {
 
 router.get('/wiki-articles/:id/versions/:vid', auth, async (req, res) => {
   try {
+    const article = await q1('SELECT * FROM wiki_articles WHERE id=$1', [req.params.id]);
+    if (!article || !canSeeAcl(article, req.uid, parseRoles(req.user.roles))) return bad(res, 'Nicht gefunden', 404);
     const row = await q1('SELECT * FROM wiki_article_versions WHERE id=$1 AND article_id=$2', [req.params.vid, req.params.id]);
     if (!row) return bad(res, 'Nicht gefunden', 404);
     ok(res, row);
@@ -130,10 +146,10 @@ router.get('/wiki-articles/:id/versions/:vid', auth, async (req, res) => {
 });
 
 router.post('/wiki-articles/:id/restore/:vid', auth, async (req, res) => {
-  if (!req.p.addGeneral) return bad(res, 'Keine Berechtigung', 403);
   try {
     const existing = await q1('SELECT * FROM wiki_articles WHERE id=$1', [req.params.id]);
     if (!existing) return bad(res, 'Nicht gefunden', 404);
+    if (!canEditAcl(existing, req.uid, parseRoles(req.user.roles), req.p)) return bad(res, 'Keine Berechtigung', 403);
     const ver = await q1('SELECT * FROM wiki_article_versions WHERE id=$1 AND article_id=$2', [req.params.vid, req.params.id]);
     if (!ver) return bad(res, 'Version nicht gefunden', 404);
     await pool.query(

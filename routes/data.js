@@ -1,6 +1,6 @@
 'use strict';
 const router = require('express').Router();
-const { q, q1, parseRoles, parseTags, canSeeTk, canEditTk, canSeeMsg, pool, isUserActive } = require('../db');
+const { q, q1, parseRoles, parseTags, canSeeTk, canEditTk, canSeeMsg, pool, isUserActive, canSeeAcl, canEditAcl } = require('../db');
 const { auth, ok, bad } = require('../middleware');
 
 // DATA
@@ -51,7 +51,7 @@ router.get('/', auth, async (req,res) => {
       q('SELECT * FROM station_sessions ORDER BY logged_in_at').catch(()=>[]),
       q('SELECT id,ticket_id,original_name,mime_type,size_bytes,uploaded_by,created_at FROM ticket_files ORDER BY created_at DESC').catch(()=>[]),
       q('SELECT * FROM doc_categories ORDER BY sort_order,name').catch(()=>[]),
-      q('SELECT id,category_id,title,description,original_name,mime_type,size_bytes,current_version,uploaded_by,created_at,updated_at FROM documents ORDER BY created_at DESC').catch(()=>[]),
+      q('SELECT id,category_id,title,description,original_name,mime_type,size_bytes,current_version,uploaded_by,created_at,updated_at,visible_roles,editable_roles FROM documents ORDER BY created_at DESC').catch(()=>[]),
       q('SELECT * FROM portal_links ORDER BY sort_order,label').catch(()=>[]),
       q('SELECT * FROM station_outages WHERE end_at IS NULL OR end_at > NOW() ORDER BY created_at').catch(()=>[]),
       q('SELECT * FROM role_permissions').catch(()=>[]),
@@ -324,7 +324,10 @@ router.get('/', auth, async (req,res) => {
       stationShifts: (stShiftsRaw||[]).map(s=>({id:s.id,label:s.label,sortOrder:s.sort_order,serviceStart:s.service_start||'',serviceEnd:s.service_end||'',hasBreak:s.has_break!==false})),
       stationSessions: (stSessionsRaw||[]).map(s=>({id:s.id,stationName:s.station_name,userId:s.user_id,shiftId:s.shift_id,loggedInAt:s.logged_in_at,breakTime:s.break_time||null})),
       docCategories: (docCatsRaw||[]).map(c=>({id:c.id,name:c.name,icon:c.icon,color:c.color,sortOrder:c.sort_order,parentId:c.parent_id||null})),
-      docs: (docsRaw||[]).map(d=>({id:d.id,categoryId:d.category_id,title:d.title,description:d.description||'',originalName:d.original_name,mimeType:d.mime_type,sizeBytes:d.size_bytes,currentVersion:d.current_version,uploadedBy:d.uploaded_by,createdAt:d.created_at,updatedAt:d.updated_at})),
+      docs: (docsRaw||[]).filter(d=>canSeeAcl(d, uid, roles)).map(d=>({id:d.id,categoryId:d.category_id,title:d.title,description:d.description||'',originalName:d.original_name,mimeType:d.mime_type,sizeBytes:d.size_bytes,currentVersion:d.current_version,uploadedBy:d.uploaded_by,createdAt:d.created_at,updatedAt:d.updated_at,
+        visibleRoles:(()=>{try{return JSON.parse(d.visible_roles||'[]');}catch{return [];}})(),
+        editableRoles:(()=>{try{return JSON.parse(d.editable_roles||'[]');}catch{return [];}})(),
+        _canManage:canEditAcl(d, uid, roles, p)})),
       portalLinks: (linksRaw||[]).map(l=>({id:l.id,label:l.label,url:l.url,icon:l.icon,description:l.description,sortOrder:l.sort_order})),
       stationOutages: (stOutagesRaw||[]).map(o=>({id:o.id,stationName:o.station_name,reason:o.reason,startAt:o.start_at,endAt:o.end_at,createdBy:o.created_by})),
       rolePermissions: (rolePermsRaw||[]).map(r=>({role:r.role,permission:r.permission,granted:r.granted})),
@@ -355,19 +358,25 @@ router.get('/', auth, async (req,res) => {
         }));
         return {...t,_canManage:canMng,protokoll,_hasUnreadNotifications:hasUnread,items,ai_result:aiResult,notes};
       }),
-      contacts: (contactsRaw||[]).map(c=>({
+      contacts: (contactsRaw||[]).filter(c=>canSeeAcl(c, uid, roles)).map(c=>({
         id:c.id, title:c.title||'', name:c.name, email:c.email||'',
         phone1:c.phone1||'', phone2:c.phone2||'', company:c.company||'',
         responsibleFor:c.responsible_for||'', availability:c.availability||'',
         createdBy:c.created_by, createdAt:c.created_at,
+        visibleRoles:(()=>{try{return JSON.parse(c.visible_roles||'[]');}catch{return [];}})(),
+        editableRoles:(()=>{try{return JSON.parse(c.editable_roles||'[]');}catch{return [];}})(),
+        _canManage:canEditAcl(c, uid, roles, p),
       })),
       wikiCategories: (wikiCatsRaw||[]).map(c=>({id:c.id,name:c.name,icon:c.icon,color:c.color,sortOrder:c.sort_order})),
-      wikiArticles: (wikiArticlesRaw||[]).map(a=>({
+      wikiArticles: (wikiArticlesRaw||[]).filter(a=>canSeeAcl(a, uid, roles)).map(a=>({
         id:a.id, categoryId:a.category_id||null, title:a.title,
         tags:(()=>{try{return JSON.parse(a.tags||'[]');}catch{return [];}})(),
         body:a.body||'', version:a.version,
         createdBy:a.created_by, createdAt:a.created_at,
         updatedBy:a.updated_by||a.created_by, updatedAt:a.updated_at,
+        visibleRoles:(()=>{try{return JSON.parse(a.visible_roles||'[]');}catch{return [];}})(),
+        editableRoles:(()=>{try{return JSON.parse(a.editable_roles||'[]');}catch{return [];}})(),
+        _canManage:canEditAcl(a, uid, roles, p),
       })),
       // Notfall-Checklisten: Nicht-Manager sehen nur die jeweils freigegebene+
       // aktive Version jeder Checkliste; der technische Leiter (manageSop)

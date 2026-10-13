@@ -944,6 +944,16 @@ async function initDB() {
       size_bytes INTEGER NOT NULL DEFAULT 0, file_data TEXT,
       uploaded_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
     )`,
+    // Rollenbasierte Sichtbarkeits-/Bearbeitungs-Einschränkung je Datensatz
+    // (vom Ersteller/Admin optional gesetzt) — leeres Array ('[]', Standard)
+    // bedeutet "für alle sichtbar" bzw. "mit Allg.-Einträge-Recht bearbeitbar",
+    // identisch zum bisherigen Verhalten vor Einführung dieser Spalten.
+    `ALTER TABLE documents ADD COLUMN IF NOT EXISTS visible_roles TEXT DEFAULT '[]'`,
+    `ALTER TABLE documents ADD COLUMN IF NOT EXISTS editable_roles TEXT DEFAULT '[]'`,
+    `ALTER TABLE wiki_articles ADD COLUMN IF NOT EXISTS visible_roles TEXT DEFAULT '[]'`,
+    `ALTER TABLE wiki_articles ADD COLUMN IF NOT EXISTS editable_roles TEXT DEFAULT '[]'`,
+    `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS visible_roles TEXT DEFAULT '[]'`,
+    `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS editable_roles TEXT DEFAULT '[]'`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }

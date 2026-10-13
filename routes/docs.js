@@ -2,7 +2,7 @@
 const router = require('express').Router();
 const path = require('path');
 const fs = require('fs');
-const { q, q1, newId } = require('../db');
+const { q, q1, newId, parseRoles, canSeeAcl, canEditAcl } = require('../db');
 const { auth, ok, bad } = require('../middleware');
 const { sanitizeFilename, validateMime, assertUnderDir } = require('../fileutil');
 
@@ -92,12 +92,19 @@ router.delete('/doc-categories/:id', auth, async (req, res) => {
 router.get('/docs', auth, async (req, res) => {
   try {
     const rows = await q('SELECT * FROM documents ORDER BY created_at DESC');
-    ok(res, rows);
+    const roles = parseRoles(req.user.roles);
+    ok(res, rows.filter(d=>canSeeAcl(d, req.uid, roles)));
   } catch(e) { bad(res, 'Serverfehler', 500); }
 });
 
+// Erstellen erfordert wie bei Wiki/Kontakten "Allg. Einträge"-Recht — vorher
+// konnte jeder eingeloggte Nutzer org-weit sichtbare Dokumente veröffentlichen;
+// mit der rollenbasierten Sichtbarkeits-/Bearbeitungs-Einschränkung muss das
+// Anlegen selbst mindestens genauso vertrauenswürdig sein wie das spätere
+// Einschränken.
 router.post('/docs', auth, async (req, res) => {
-  const { title, description, categoryId, name: originalName, mimeType, data } = req.body;
+  if (!req.p.addGeneral) return bad(res, 'Keine Berechtigung', 403);
+  const { title, description, categoryId, name: originalName, mimeType, data, visibleRoles, editableRoles } = req.body;
   if (!title) return bad(res, 'Titel erforderlich', 400);
   if (!originalName || !data) return bad(res, 'Datei fehlt', 400);
   const mime = mimeType || 'application/octet-stream';
@@ -114,9 +121,10 @@ router.post('/docs', auth, async (req, res) => {
     // beim nächsten Deploy verloren gehen.
     const b64 = buf.toString('base64');
     const doc = await q1(
-      `INSERT INTO documents (id,category_id,title,description,filename,original_name,mime_type,size_bytes,current_version,uploaded_by,file_data)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,1,$9,$10) RETURNING *`,
-      [id, categoryId||null, title, description||'', filename, safeName, mime, buf.length, req.uid, b64]
+      `INSERT INTO documents (id,category_id,title,description,filename,original_name,mime_type,size_bytes,current_version,uploaded_by,file_data,visible_roles,editable_roles)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,1,$9,$10,$11,$12) RETURNING *`,
+      [id, categoryId||null, title, description||'', filename, safeName, mime, buf.length, req.uid, b64,
+       JSON.stringify(Array.isArray(visibleRoles)?visibleRoles:[]), JSON.stringify(Array.isArray(editableRoles)?editableRoles:[])]
     );
     const vId = newId();
     await q(
@@ -132,6 +140,7 @@ router.get('/docs/:id', auth, async (req, res) => {
   try {
     const doc = await q1('SELECT * FROM documents WHERE id=$1', [req.params.id]);
     if (!doc) return bad(res, 'Nicht gefunden', 404);
+    if (!canSeeAcl(doc, req.uid, parseRoles(req.user.roles))) return bad(res, 'Keine Berechtigung', 403);
     const filePath = path.join(DOCS_DIR, doc.filename);
     assertUnderDir(DOCS_DIR, filePath);
     if (!doc.file_data && !fs.existsSync(filePath))
@@ -149,12 +158,16 @@ router.put('/docs/:id', auth, async (req, res) => {
   try {
     const doc = await q1('SELECT * FROM documents WHERE id=$1', [req.params.id]);
     if (!doc) return bad(res, 'Nicht gefunden', 404);
-    if (doc.uploaded_by !== req.uid && !req.p.manageUsers) return bad(res, 'Keine Berechtigung', 403);
-    const { title, description, categoryId } = req.body;
+    const roles = parseRoles(req.user.roles);
+    if (!canEditAcl(doc, req.uid, roles, req.p)) return bad(res, 'Keine Berechtigung', 403);
+    const { title, description, categoryId, visibleRoles, editableRoles } = req.body;
     if (!title) return bad(res, 'Titel erforderlich', 400);
     const updated = await q1(
-      `UPDATE documents SET title=$1,description=$2,category_id=$3,updated_at=NOW() WHERE id=$4 RETURNING *`,
-      [title, description||'', categoryId||null, req.params.id]
+      `UPDATE documents SET title=$1,description=$2,category_id=$3,updated_at=NOW(),
+       visible_roles=COALESCE($4,visible_roles), editable_roles=COALESCE($5,editable_roles) WHERE id=$6 RETURNING *`,
+      [title, description||'', categoryId||null,
+       Array.isArray(visibleRoles)?JSON.stringify(visibleRoles):null,
+       Array.isArray(editableRoles)?JSON.stringify(editableRoles):null, req.params.id]
     );
     ok(res, updated);
   } catch(e) { bad(res, 'Serverfehler', 500); }
@@ -164,7 +177,7 @@ router.delete('/docs/:id', auth, async (req, res) => {
   try {
     const doc = await q1('SELECT * FROM documents WHERE id=$1', [req.params.id]);
     if (!doc) return bad(res, 'Nicht gefunden', 404);
-    if (doc.uploaded_by !== req.uid && !req.p.manageUsers) return bad(res, 'Keine Berechtigung', 403);
+    if (!canEditAcl(doc, req.uid, parseRoles(req.user.roles), req.p)) return bad(res, 'Keine Berechtigung', 403);
     const versions = await q('SELECT filename FROM document_versions WHERE document_id=$1', [req.params.id]);
     for (const v of versions) {
       const fp = path.join(DOCS_DIR, v.filename);
@@ -184,7 +197,7 @@ router.post('/docs/:id/version', auth, async (req, res) => {
   try {
     const doc = await q1('SELECT * FROM documents WHERE id=$1', [req.params.id]);
     if (!doc) return bad(res, 'Nicht gefunden', 404);
-    if (doc.uploaded_by !== req.uid && !req.p.manageUsers) return bad(res, 'Keine Berechtigung', 403);
+    if (!canEditAcl(doc, req.uid, parseRoles(req.user.roles), req.p)) return bad(res, 'Keine Berechtigung', 403);
     const { name: originalName, mimeType, data } = req.body;
     if (!originalName || !data) return bad(res, 'Datei fehlt', 400);
     const mime = mimeType || 'application/octet-stream';
@@ -212,6 +225,8 @@ router.post('/docs/:id/version', auth, async (req, res) => {
 
 router.get('/docs/:id/versions', auth, async (req, res) => {
   try {
+    const doc = await q1('SELECT * FROM documents WHERE id=$1', [req.params.id]);
+    if (!doc || !canSeeAcl(doc, req.uid, parseRoles(req.user.roles))) return bad(res, 'Nicht gefunden', 404);
     const rows = await q('SELECT * FROM document_versions WHERE document_id=$1 ORDER BY version DESC', [req.params.id]);
     ok(res, rows);
   } catch(e) { bad(res, 'Serverfehler', 500); }
@@ -219,13 +234,14 @@ router.get('/docs/:id/versions', auth, async (req, res) => {
 
 router.get('/docs/:id/versions/:vid', auth, async (req, res) => {
   try {
+    const doc = await q1('SELECT * FROM documents WHERE id=$1', [req.params.id]);
+    if (!doc || !canSeeAcl(doc, req.uid, parseRoles(req.user.roles))) return bad(res, 'Nicht gefunden', 404);
     const ver = await q1('SELECT * FROM document_versions WHERE id=$1 AND document_id=$2', [req.params.vid, req.params.id]);
     if (!ver) return bad(res, 'Nicht gefunden', 404);
     const filePath = path.join(DOCS_DIR, ver.filename);
     assertUnderDir(DOCS_DIR, filePath);
     if (!ver.file_data && !fs.existsSync(filePath))
       return bad(res, 'Datei nicht mehr verfügbar (vor Umstellung auf DB-Speicherung hochgeladen)', 404);
-    const doc = await q1('SELECT mime_type FROM documents WHERE id=$1', [req.params.id]);
     const verMime = ver.mime_type || doc?.mime_type || 'application/octet-stream';
     const inlineSafe = /^(image\/(jpeg|png|gif|webp)|application\/pdf|text\/plain)$/.test(verMime);
     res.setHeader('Content-Type', inlineSafe ? verMime : 'application/octet-stream');

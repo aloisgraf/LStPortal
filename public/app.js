@@ -48,6 +48,28 @@ const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','A
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
 const ROLES=[{id:'admin',label:'Administrator',icon:'\uD83D\uDD11'},{id:'leitung',label:'Leitung',icon:'\u2B50'},{id:'dienstplanung',label:'Dienstplanung',icon:'\uD83D\uDCCB'},{id:'schichtleiter',label:'Schichtleiter',icon:'\uD83D\uDD06'},{id:'technik',label:'Technik',icon:'\uD83D\uDD27'},{id:'ausbildung',label:'Ausbildung',icon:'\uD83C\uDF93'},{id:'qm',label:'QM',icon:'\u2705'},{id:'standard',label:'Standard',icon:'\uD83D\uDC64'}];
+// Gemeinsamer rollenbasierter Sichtbarkeits-/Bearbeitungs-Editor f\u00FCr Dokumente,
+// Wiki-Artikel und Kontakte \u2014 leeres Array = f\u00FCr alle sichtbar/bearbeitbar
+// (heutiges Standardverhalten), wie vom Server in canSeeAcl/canEditAcl (db.js)
+// ausgewertet.
+function aclEditorHtml(idPrefix, visibleRoles, editableRoles) {
+  const vis = visibleRoles||[], ed = editableRoles||[];
+  const row = (name, selected) => ROLES.map(r=>`<label class="rck"><input type="checkbox" name="${name}" value="${r.id}" ${selected.includes(r.id)?'checked':''}><span>${r.icon} ${r.label}</span></label>`).join('');
+  return `<div class="fg full">
+    <label>Sichtbar f\u00FCr (leer = alle)</label>
+    <div id="${idPrefix}Vis" style="display:flex;flex-wrap:wrap;gap:8px">${row('vis',vis)}</div>
+  </div>
+  <div class="fg full">
+    <label>Bearbeitbar von (leer = alle mit Berechtigung)</label>
+    <div id="${idPrefix}Edit" style="display:flex;flex-wrap:wrap;gap:8px">${row('edit',ed)}</div>
+  </div>`;
+}
+function aclReadRoles(idPrefix) {
+  return {
+    visibleRoles: Array.from(document.querySelectorAll('#'+idPrefix+'Vis input:checked')).map(cb=>cb.value),
+    editableRoles: Array.from(document.querySelectorAll('#'+idPrefix+'Edit input:checked')).map(cb=>cb.value),
+  };
+}
 // Fallback bis der erste fetchData()-Aufruf die echten (admin-verwaltbaren)
 // Fachbereiche aus S.departments geliefert hat \u2014 danach werden beide unten
 // in fetchData() neu aufgebaut, alle bestehenden Stellen, die DEPTS/
@@ -4809,11 +4831,12 @@ async function deleteLink(id){
 
 // ── KONTAKTE ──────────────────────────────────────────────────────────────
 function renderContacts(){
-  const canManage=!!S.p.addGeneral;
+  const canAdd=!!S.p.addGeneral;
   const search=(S._contactSearch||'').toLowerCase().trim();
   let list=(S.contacts||[]).slice().sort((a,b)=>a.name.localeCompare(b.name,'de'));
   if(search) list=list.filter(c=>[c.name,c.title,c.company,c.responsibleFor,c.email,c.phone1,c.phone2].some(v=>(v||'').toLowerCase().includes(search)));
   const contactCard=c=>{
+    const canManage=!!c._canManage;
     const lines=[];
     if(c.company) lines.push('<div style="font-size:12px;color:var(--mu)">&#127970; '+esc(c.company)+'</div>');
     if(c.responsibleFor) lines.push('<div style="font-size:12px;color:var(--mu)">&#128736;&#65039; '+esc(c.responsibleFor)+'</div>');
@@ -4832,7 +4855,7 @@ function renderContacts(){
       +'</div>';
   };
   document.getElementById('main').innerHTML=`
-    <div class="ph"><div class="pt">&#128222; Kontakte</div>${canManage?`<button class="btn-p" onclick="openContactForm()">&#65291; Kontakt</button>`:''}</div>
+    <div class="ph"><div class="pt">&#128222; Kontakte</div>${canAdd?`<button class="btn-p" onclick="openContactForm()">&#65291; Kontakt</button>`:''}</div>
     <div style="padding:0 20px 12px">
       <input type="text" class="srch" placeholder="&#128269; Suchen (Name, Firma, Zust&auml;ndigkeit, ...)" value="${(S._contactSearch||'').replace(/"/g,'&quot;')}" oninput="S._contactSearch=this.value;renderContacts()" style="width:100%;max-width:360px">
     </div>
@@ -4853,12 +4876,14 @@ function openContactForm(id){
   document.getElementById('cFPhone2').value=c?.phone2||'';
   document.getElementById('cFEmail').value=c?.email||'';
   document.getElementById('cFAvail').value=c?.availability||'';
+  document.getElementById('cFAcl').innerHTML=aclEditorHtml('cF',c?.visibleRoles,c?.editableRoles);
   openModal('contactOv');
 }
 async function saveContact(){
   const id=document.getElementById('cFId').value;
   const name=document.getElementById('cFName').value.trim();
   if(!name)return toast('⚠️ Name erforderlich','err');
+  const {visibleRoles,editableRoles}=aclReadRoles('cF');
   const body={
     name,
     title:document.getElementById('cFTitle').value.trim(),
@@ -4868,6 +4893,7 @@ async function saveContact(){
     phone2:document.getElementById('cFPhone2').value.trim(),
     email:document.getElementById('cFEmail').value.trim(),
     availability:document.getElementById('cFAvail').value.trim(),
+    visibleRoles, editableRoles,
   };
   try{
     if(id) await api('PUT','/contacts/'+id,body);
@@ -5600,7 +5626,7 @@ function renderDocs(){
   const fileIcon=m=>{if(!m)return'📎';if(m.startsWith('image/'))return'🖼️';if(m==='application/pdf')return'📄';if(m.includes('word')||m.includes('document'))return'📝';if(m.includes('excel')||m.includes('spreadsheet')||m.includes('csv'))return'📊';if(m.includes('zip')||m.includes('compressed')||m.includes('archive'))return'🗜️';if(m.startsWith('video/'))return'🎬';if(m.startsWith('audio/'))return'🎵';return'📎';};
   const catBadge=d=>{const c=cats.find(x=>x.id===d.categoryId);if(!c)return'';return`<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${c.color}22;color:${c.color};border:1px solid ${c.color}44;font-weight:600">${c.icon} ${c.name}</span>`;};
   const isAdmin=S.p?.manageUsers;
-  const canManage=d=>d.uploadedBy===S.currentUser||isAdmin;
+  const canManage=d=>d._canManage;
   document.getElementById('main').innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;padding:24px 20px 0;gap:10px;flex-wrap:wrap">
       <h1 style="margin:0;font-size:20px;font-weight:700">&#128193; Dateiablage</h1>
@@ -5667,6 +5693,7 @@ function openDocForm(docId){
   const sel=document.getElementById('docFCat');
   sel.innerHTML=`<option value="">— Keine Kategorie —</option>${_docCatOptionsIndented()}`;
   if(doc?.categoryId)sel.value=doc.categoryId;
+  document.getElementById('docFAcl').innerHTML=aclEditorHtml('docF',doc?.visibleRoles,doc?.editableRoles);
   openModal('docFormOv');
 }
 async function submitDocForm(){
@@ -5674,8 +5701,9 @@ async function submitDocForm(){
   if(!title){toast('⚠️ Titel erforderlich','err');return;}
   const catId=document.getElementById('docFCat').value||null;
   const desc=document.getElementById('docFDesc').value.trim();
+  const {visibleRoles,editableRoles}=aclReadRoles('docF');
   if(S._editDocId){
-    try{await api('PUT','/docs/'+S._editDocId,{title,description:desc,categoryId:catId});await fetchData();renderDocs();closeModal('docFormOv');toast('✅ Gespeichert');}
+    try{await api('PUT','/docs/'+S._editDocId,{title,description:desc,categoryId:catId,visibleRoles,editableRoles});await fetchData();renderDocs();closeModal('docFormOv');toast('✅ Gespeichert');}
     catch(e){toast('⚠️ '+e.message,'err');}
     return;
   }
@@ -5688,7 +5716,7 @@ async function submitDocForm(){
     const buf=await file.arrayBuffer();const bytes=new Uint8Array(buf);
     let b64='';const chunk=8192;for(let i=0;i<bytes.length;i+=chunk)b64+=String.fromCharCode(...bytes.subarray(i,i+chunk));
     b64=btoa(b64);
-    await api('POST','/docs',{title,description:desc,categoryId:catId,name:file.name,mimeType:file.type||'application/octet-stream',data:b64});
+    await api('POST','/docs',{title,description:desc,categoryId:catId,name:file.name,mimeType:file.type||'application/octet-stream',data:b64,visibleRoles,editableRoles});
     await fetchData();renderDocs();closeModal('docFormOv');toast('✅ Dokument hochgeladen');
   }catch(e){toast('⚠️ '+e.message,'err');}
 }
@@ -5799,7 +5827,7 @@ function fmtDate(d){if(!d)return'';var p=String(d).slice(0,10);return p.slice(8)
 // HTML/JS einschleusen, ganz ohne separate Sanitizer-Bibliothek.
 // ═══════════════════════════════════════════════════════════════════════════
 
-function wikiCanManage() { return !!S.p.addGeneral; }
+function wikiCanManage(article) { return article ? !!article._canManage : !!S.p.addGeneral; }
 
 function renderWiki() {
   // Wichtig: S._wikiEditing zuerst prüfen — beim Anlegen eines NEUEN Artikels
@@ -5879,7 +5907,7 @@ function renderWikiArticlePage() {
   const a = (S.wikiArticles||[]).find(x=>x.id===S._selWikiArticle);
   if (!a) { S._selWikiArticle=null; renderWiki(); return; }
   if (S._wikiEditing) { renderWikiArticleEditor(a); return; }
-  const canManage = wikiCanManage();
+  const canManage = wikiCanManage(a);
   const cat = (S.wikiCategories||[]).find(c=>c.id===a.categoryId);
   const creator = getU(a.createdBy), editor = getU(a.updatedBy);
   document.getElementById('main').innerHTML = `
@@ -5955,6 +5983,7 @@ function renderWikiArticleEditor(article) {
         <div id="wkPreview" class="wiki-body" style="border:1px solid var(--border);border-radius:0 0 8px 8px;padding:14px;min-height:200px;${S._wikiPreview?'':'display:none'}">${S._wikiPreview?wikiMarkdownToHtml(article?article.body:''):''}</div>
         <small style="color:var(--mu);display:block;margin-top:6px">Bilder können auch direkt per Drag&amp;Drop in das Textfeld gezogen werden.</small>
       </div>
+      <div id="wkAcl">${aclEditorHtml('wk',article?.visibleRoles,article?.editableRoles)}</div>
     </div>`;
 }
 // Innerhalb eines <textarea>...</textarea>-Inhalts muss nur "</textarea"
@@ -6027,9 +6056,10 @@ async function submitWikiArticle(id) {
   const categoryId = document.getElementById('wkCategory').value || null;
   const tags = document.getElementById('wkTags').value.split(',').map(t=>t.trim()).filter(Boolean);
   const body = document.getElementById('wkBody').value;
+  const {visibleRoles,editableRoles} = aclReadRoles('wk');
   try {
-    const result = id ? await api('PUT','/wiki-articles/'+id, {title,categoryId,tags,body})
-                       : await api('POST','/wiki-articles', {title,categoryId,tags,body});
+    const result = id ? await api('PUT','/wiki-articles/'+id, {title,categoryId,tags,body,visibleRoles,editableRoles})
+                       : await api('POST','/wiki-articles', {title,categoryId,tags,body,visibleRoles,editableRoles});
     S._wikiEditing = false; S._wikiPreview = false; S._selWikiArticle = result.id;
     await fetchData(); renderWiki(); toast('✅ Artikel gespeichert');
   } catch(e) { toast('⚠️ '+e.message,'err'); }
@@ -6085,7 +6115,7 @@ async function openWikiVersionHistory(articleId) {
           <div><b>v${v.version}</b> — ${esc(v.title)}<div style="font-size:11px;color:var(--mu)">${u?esc(lastNameFirst(u.name)):'?'} &middot; ${fdt(v.created_at)}</div></div>
           <div style="display:flex;gap:6px;flex-shrink:0">
             <button class="btn-s" onclick="viewWikiVersion('${articleId}','${v.id}')">Ansehen</button>
-            ${wikiCanManage()?`<button class="btn-s" onclick="restoreWikiVersion('${articleId}','${v.id}')">Wiederherstellen</button>`:''}
+            ${wikiCanManage(a)?`<button class="btn-s" onclick="restoreWikiVersion('${articleId}','${v.id}')">Wiederherstellen</button>`:''}
           </div>
         </div>`;
       }).join('');
