@@ -6431,7 +6431,7 @@ async function createTodoFromProtocol(protocolId) {
   if (!text?.trim()) return toast('Bitte zuerst Text im Protokoll markieren','err');
   try {
     await api('POST','/todos/from-protocol',{protocolId, text: text.trim()});
-    await fetchData(); renderMeetings(); toast('✅ ToDo-Punkt erstellt');
+    toast('✅ ToDo-Punkt erstellt'); fetchData().then(()=>{if(S.view==='meetings')renderMeetings();});
   } catch(e) { toast('⚠️ '+e.message,'err'); }
 }
 // Zeigt (falls vorhanden) das mit diesem Protokoll verknüpfte ToDo samt
@@ -6548,7 +6548,7 @@ async function submitAppointmentForm() {
     if (id) await api('PUT','/meeting-appointments/'+id, body);
     else await api('POST','/meeting-instances/'+instanceId+'/appointments', body);
     closeModal('apptFormOv');
-    await fetchData(); renderMeetings(); toast('Termin gespeichert');
+    toast('Termin gespeichert'); fetchData().then(()=>{if(S.view==='meetings')renderMeetings();});
   } catch(e) { toast('⚠️ '+e.message,'err'); }
 }
 async function deleteAppointment(id) {
@@ -6557,7 +6557,7 @@ async function deleteAppointment(id) {
   try {
     await api('DELETE','/meeting-appointments/'+id);
     closeModal('apptFormOv');
-    await fetchData(); renderMeetings(); toast('Gelöscht');
+    toast('Gelöscht'); fetchData().then(()=>{if(S.view==='meetings')renderMeetings();});
   } catch(e) { toast('⚠️ '+e.message,'err'); }
 }
 
@@ -6714,14 +6714,14 @@ async function uploadInstanceFiles(instanceId, input) {
       }
       await api('POST','/meeting-instances/'+instanceId+'/files', body);
     }
-    await fetchData(); renderMeetings(); toast('✅ Dokument(e) hochgeladen');
+    toast('✅ Dokument(e) hochgeladen'); fetchData().then(()=>{if(S.view==='meetings')renderMeetings();});
   } catch(e) { toast('⚠️ '+e.message,'err'); } finally { loading(false); if(input.value!==undefined) input.value=''; }
 }
 async function deleteInstanceFile(instanceId, fileId) {
   if (!confirm('Dokument löschen? Bestehende Verknüpfungen zu Punkten/Protokollen werden dabei entfernt.')) return;
   try {
     await api('DELETE',`/meeting-instances/${instanceId}/files/${fileId}`);
-    await fetchData(); renderMeetings(); toast('Gelöscht');
+    toast('Gelöscht'); fetchData().then(()=>{if(S.view==='meetings')renderMeetings();});
   } catch(e) { toast('⚠️ '+e.message,'err'); }
 }
 function openInstanceFileEditForm(instanceId, fileId) {
@@ -6743,7 +6743,7 @@ async function submitInstanceFileEdit() {
   try {
     await api('PUT',`/meeting-instances/${instanceId}/files/${fileId}`, {docDate, sender});
     closeModal('instFileEditOv');
-    await fetchData(); renderMeetings(); toast('Gespeichert');
+    toast('Gespeichert'); fetchData().then(()=>{if(S.view==='meetings')renderMeetings();});
   } catch(e) { toast('⚠️ '+e.message,'err'); }
 }
 
@@ -6791,13 +6791,13 @@ async function addDocLink(kind) {
   const sourceType = sel.slice(0,idx), sourceId = sel.slice(idx+1);
   try {
     await api('POST','/meetings/doc-links',{targetType:kind,targetId,sourceType,sourceId});
-    await fetchData(); renderMeetings(); _refreshOpenLinkForm();
+    fetchData().then(()=>{if(S.view==='meetings'){renderMeetings();_refreshOpenLinkForm();}});
   } catch(e) { toast('⚠️ '+e.message,'err'); }
 }
 async function removeDocLink(linkId) {
   try {
     await api('DELETE','/meeting-doc-links/'+linkId);
-    await fetchData(); renderMeetings(); _refreshOpenLinkForm();
+    fetchData().then(()=>{if(S.view==='meetings'){renderMeetings();_refreshOpenLinkForm();}});
   } catch(e) { toast('⚠️ '+e.message,'err'); }
 }
 async function addContactLink(kind) {
@@ -6807,13 +6807,13 @@ async function addContactLink(kind) {
   if (!targetId || !contactId) return;
   try {
     await api('POST','/meetings/contact-links',{targetType:kind,targetId,contactId});
-    await fetchData(); renderMeetings(); _refreshOpenLinkForm();
+    fetchData().then(()=>{if(S.view==='meetings'){renderMeetings();_refreshOpenLinkForm();}});
   } catch(e) { toast('⚠️ '+e.message,'err'); }
 }
 async function removeContactLink(linkId) {
   try {
     await api('DELETE','/meeting-contact-links/'+linkId);
-    await fetchData(); renderMeetings(); _refreshOpenLinkForm();
+    fetchData().then(()=>{if(S.view==='meetings'){renderMeetings();_refreshOpenLinkForm();}});
   } catch(e) { toast('⚠️ '+e.message,'err'); }
 }
 function renderMeetingItemsGrid(inst, canManage, search) {
@@ -6899,7 +6899,7 @@ async function deleteMeeting(id) {
   try {
     await api('DELETE','/meetings/'+id);
     S._selMeeting=null; S._selInstance=null;
-    await fetchData(); renderMeetings(); toast('Gelöscht');
+    toast('Gelöscht'); fetchData().then(()=>{if(S.view==='meetings')renderMeetings();});
   } catch(e) { toast('Fehler','err'); }
 }
 
@@ -6925,7 +6925,7 @@ async function submitInstanceForm() {
     if (id) await api('PUT','/meeting-instances/'+id, body);
     else await api('POST','/meetings/'+meetingId+'/instances', body);
     closeModal('instanceFormOv');
-    await fetchData(); renderMeetings(); toast('Thema gespeichert');
+    toast('Thema gespeichert'); fetchData().then(()=>{if(S.view==='meetings')renderMeetings();});
   } catch(e) { toast('Fehler','err'); }
 }
 
@@ -6933,7 +6933,7 @@ async function setInstanceStatus(id, status) {
   if (status === 'done' && !confirm('Thema abschließen? Dies kann später rückgängig gemacht werden.')) return;
   try {
     await api('PUT','/meeting-instances/'+id,{status});
-    await fetchData(); renderMeetings();
+    fetchData().then(()=>{if(S.view==='meetings')renderMeetings();});
   } catch(e) { toast('Fehler','err'); }
 }
 
@@ -7129,7 +7129,7 @@ async function submitItemForm() {
       await api('POST','/meeting-instances/'+instanceId+'/items', body);
     }
     closeModal('itemFormOv');
-    await fetchData(); renderMeetings(); toast('Gespeichert');
+    toast('Gespeichert'); fetchData().then(()=>{if(S.view==='meetings')renderMeetings();});
   } catch(e) { toast('Fehler','err'); }
 }
 
@@ -7143,7 +7143,7 @@ async function openFollowupForm(itemId) {
   try {
     await api('POST',`/discussion-items/${itemId}/followup`, {instanceId: instId, dueDate: dueDate||null});
     closeModal('itemFormOv');
-    await fetchData(); renderMeetings(); toast('Folgebesprechung erstellt');
+    toast('Folgebesprechung erstellt'); fetchData().then(()=>{if(S.view==='meetings')renderMeetings();});
   } catch(e) { toast('Fehler','err'); }
 }
 
@@ -7152,7 +7152,7 @@ async function deleteInstance(instanceId) {
   try {
     await api('DELETE','/meeting-instances/'+instanceId);
     S._selInstance = null;
-    await fetchData(); renderMeetings(); toast('Thema gelöscht');
+    toast('Thema gelöscht'); fetchData().then(()=>{if(S.view==='meetings')renderMeetings();});
   } catch(e) { toast('Fehler','err'); }
 }
 
@@ -7280,7 +7280,7 @@ async function submitProtocolForm() {
     else await api('POST','/meeting-instances/'+instanceId+'/protocols', body);
     stopProtoAutosave();
     closeModal('protoFormOv');
-    await fetchData(); renderMeetings(); toast('✅ Protokoll gespeichert');
+    toast('✅ Protokoll gespeichert'); fetchData().then(()=>{if(S.view==='meetings')renderMeetings();});
   } catch(e) { toast('⚠️ '+e.message,'err'); }
 }
 async function deleteProtocol(id) {
@@ -7291,7 +7291,7 @@ async function deleteProtocol(id) {
     await api('DELETE','/meeting-protocols/'+id);
     stopProtoAutosave();
     closeModal('protoFormOv');
-    await fetchData(); renderMeetings(); toast('✅ Protokoll gelöscht');
+    toast('✅ Protokoll gelöscht'); fetchData().then(()=>{if(S.view==='meetings')renderMeetings();});
   } catch(e) { toast('⚠️ '+e.message,'err'); }
 }
 
@@ -7341,7 +7341,7 @@ async function submitMoveItem() {
   try {
     await api('POST',`/discussion-items/${itemId}/move`,{targetInstanceId});
     closeModal('moveItemOv'); closeModal('itemFormOv');
-    await fetchData(); renderMeetings(); toast('Punkt verschoben');
+    toast('Punkt verschoben'); fetchData().then(()=>{if(S.view==='meetings')renderMeetings();});
   } catch(e) { toast('Fehler beim Verschieben','err'); }
 }
 
@@ -7378,7 +7378,7 @@ async function submitCopyItem() {
   try {
     await api('POST',`/discussion-items/${itemId}/copy-to-meeting`,{targetInstanceId});
     closeModal('copyItemOv'); closeModal('itemFormOv');
-    await fetchData(); renderMeetings(); toast('Punkt kopiert und verknüpft');
+    toast('Punkt kopiert und verknüpft'); fetchData().then(()=>{if(S.view==='meetings')renderMeetings();});
   } catch(e) { toast('Fehler beim Kopieren','err'); }
 }
 
@@ -7389,7 +7389,7 @@ async function unlinkItem() {
   try {
     await api('POST',`/discussion-items/${itemId}/unlink`);
     closeModal('itemFormOv');
-    await fetchData(); renderMeetings(); toast('Verknüpfung aufgehoben');
+    toast('Verknüpfung aufgehoben'); fetchData().then(()=>{if(S.view==='meetings')renderMeetings();});
   } catch(e) { toast('Fehler','err'); }
 }
 
@@ -7448,7 +7448,7 @@ async function deleteMeetingItem() {
   try {
     await api('DELETE',`/discussion-items/${itemId}`);
     closeModal('itemFormOv');
-    await fetchData(); renderMeetings(); toast('✅ Punkt gelöscht');
+    toast('✅ Punkt gelöscht'); fetchData().then(()=>{if(S.view==='meetings')renderMeetings();});
   } catch(e) { toast('⚠️ '+e.message,'err'); }
 }
 

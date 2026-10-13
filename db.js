@@ -5,7 +5,12 @@ const crypto   = require('crypto');
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
-  max: 10,
+  // /api/data (der nach praktisch jeder Speicherung erneut vollständig
+  // abgerufen wird) feuert inzwischen weit über 50 Abfragen in einem
+  // Promise.all ab — bei nur 10 gleichzeitigen Verbindungen liefen diese in
+  // mehreren Wellen nacheinander und verzögerten jeden Speichervorgang
+  // messbar. Höherer Pool reduziert die Anzahl Wellen.
+  max: 25,
 });
 
 const q   = (sql, p) => pool.query(sql, p).then(r => r.rows);
