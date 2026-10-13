@@ -152,6 +152,7 @@ let S={
   docs:[],docCategories:[],_docFilter:'all',_docSearch:'',
   wikiArticles:[],wikiCategories:[],_wikiCatFilter:'all',_wikiSearch:'',_selWikiArticle:null,_wikiEditing:false,
   contactCategories:[],_contactCatFilter:'all',
+  game:null,_gameTab:'main',_gameLocalCoins:0,
   meetings:[], _selMeeting:null, _selInstance:null,
   tkBatchMode:false,tkBatchSel:new Set(),_tkFeedFilter:'all',_tkTab:'details',tkGroupBy:'dept',tkFiltSubcat:'',
   checklists:[],messages:[],notifications:[],abrechnung:{einspringer:[],homeoffice:[]},dienstplaene:[],
@@ -390,6 +391,8 @@ async function logout(){
     await api('POST','/auth/logout');
   }catch(e){}finally{loading(false);}
   if(_refreshTimer)clearInterval(_refreshTimer);
+  stopGameTicker();
+  S.game=null;S._gameLocalCoins=0;
   S.currentUser=null;document.getElementById('hdr').style.display='none';document.getElementById('APP').style.display='none';
   document.getElementById('lsel').value='';document.getElementById('lpw').value='';document.getElementById('LS').classList.add('open');
 }
@@ -476,6 +479,10 @@ function applyNavVisibility(){
   });
 }
 function setView(v){
+  // Lokaler Deck-Empire-Ticker läuft nur rein kosmetisch (siehe renderGame()) —
+  // beim Verlassen der Ansicht unbedingt stoppen, sonst bliebe ein setInterval
+  // dauerhaft aktiv, obwohl die Spielseite längst nicht mehr sichtbar ist.
+  if(S.view==='game'&&v!=='game')stopGameTicker();
   S.view=v;
   NAV_TAB_IDS.forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
   applyNavVisibility();
@@ -524,6 +531,7 @@ function renderMain(){
   else if(S.view==='sop')renderSop();
   else if(S.view==='spint')renderSpint();
   else if(S.view==='chat')renderChatList();
+  else if(S.view==='game')renderGame();
 }
 // HOME
 // ── ÜBERSICHT: Alt/Neu-Umschalter ─────────────────────────────────────────────
@@ -10836,3 +10844,263 @@ function onChatMessagesChanged(prevMsgs){
   toast('💬 Neue Nachricht'+(ou?' von '+lastNameFirst(ou.name):'')+'!','chat');
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DESK EMPIRE — kleines Idle-Spiel (Menüpunkt "Spiele" in der Kopfzeile).
+// Der Server (routes/game.js) ist die alleinige Quelle der Wahrheit für
+// Kontostand/Preise/Einnahmen — der Client schickt nur Aktionen (Klick/Kauf)
+// und zeigt zwischen den Server-Antworten lediglich eine kosmetische,
+// lokal hochgerechnete Zahl an (S._gameLocalCoins), niemals maßgeblich.
+// ═══════════════════════════════════════════════════════════════════════════
+let _gameTickerInterval = null;
+function fmtCoins(n) {
+  n = Math.max(0, n||0);
+  if (n >= 1e9) return (n/1e9).toFixed(2).replace('.',',')+' Mrd.';
+  if (n >= 1e6) return (n/1e6).toFixed(2).replace('.',',')+' Mio.';
+  return Math.floor(n).toLocaleString('de-DE');
+}
+function fmtRate(n) {
+  n = Math.max(0, n||0);
+  if (n >= 1e6) return fmtCoins(n);
+  if (n < 10) return n.toFixed(1).replace('.',',');
+  return Math.floor(n).toLocaleString('de-DE');
+}
+async function loadGame() {
+  try {
+    const state = await api('GET','/game/state');
+    _onGameState(state, true);
+  } catch(e) { toast('⚠️ Spiel konnte nicht geladen werden: '+e.message,'err'); }
+}
+function _onGameState(state, isInitialLoad) {
+  S.game = state;
+  S._gameLocalCoins = state.coins;
+  if (isInitialLoad && state.offlineEarnings > 0) {
+    const mins = Math.max(1, Math.round(state.offlineSeconds/60));
+    toast('👋 Willkommen zurück! +'+fmtCoins(state.offlineEarnings)+' Office Coins verdient ('+mins+' Min. offline)','ok',6000);
+  }
+  (state.newAchievements||[]).forEach(a=>toast('🏆 Erfolg freigeschaltet: '+a.icon+' '+a.name,'ok',5000));
+  if (state.leveledUp) toast('⭐ Level '+state.leveledUp+' erreicht!','ok',4000);
+  if (S.view==='game') renderGame();
+  startGameTicker();
+}
+function startGameTicker() {
+  if (_gameTickerInterval) return;
+  let syncCounter=0;
+  _gameTickerInterval = setInterval(()=>{
+    if (!S.game) return;
+    S._gameLocalCoins += S.game.derived.incomePerSecond*0.2;
+    if (S.view==='game') _updateGameCoinDisplay();
+    syncCounter++;
+    if (syncCounter>=100) { syncCounter=0; loadGame(); } // alle ~20s mit Server abgleichen
+  }, 200);
+}
+function stopGameTicker() {
+  if (_gameTickerInterval) { clearInterval(_gameTickerInterval); _gameTickerInterval=null; }
+}
+function _updateGameCoinDisplay() {
+  const el = document.getElementById('gameCoinsDisplay');
+  if (el) el.textContent = fmtCoins(S._gameLocalCoins)+' 🪙';
+}
+function _spawnClickFx(e, text) {
+  const btn = e.currentTarget||e.target;
+  const rect = btn.getBoundingClientRect?.() || {left:0,top:0,width:0};
+  const fx = document.createElement('div');
+  fx.className = 'game-click-fx';
+  fx.textContent = text;
+  fx.style.left = (rect.left + rect.width/2 + (Math.random()*30-15)) + 'px';
+  fx.style.top = rect.top + 'px';
+  document.body.appendChild(fx);
+  fx.addEventListener('animationend', ()=>fx.remove());
+  setTimeout(()=>fx.remove(), 1200); // Sicherheitsnetz, falls animationend nicht feuert
+}
+async function gameClick(e) {
+  if (!S.game) return;
+  S._gameLocalCoins += S.game.derived.clickValue;
+  _updateGameCoinDisplay();
+  _spawnClickFx(e, '+'+fmtCoins(S.game.derived.clickValue));
+  try {
+    const state = await api('POST','/game/click');
+    _onGameState(state, false);
+  } catch(err) { toast('⚠️ '+err.message,'err'); }
+}
+async function gameBuyItem(itemId) {
+  try {
+    const state = await api('POST','/game/buy-item',{itemId});
+    _onGameState(state, false);
+  } catch(e) { toast('⚠️ '+e.message,'err'); }
+}
+async function gameBuyUpgrade(upgradeId) {
+  try {
+    const state = await api('POST','/game/buy-upgrade',{upgradeId});
+    _onGameState(state, false);
+    toast('✅ Upgrade freigeschaltet');
+  } catch(e) { toast('⚠️ '+e.message,'err'); }
+}
+function renderGame() {
+  if (!S.game) {
+    document.getElementById('main').innerHTML = `<div style="padding:60px;text-align:center;color:var(--mu)">⏳ Lade Spielstand…</div>`;
+    loadGame();
+    return;
+  }
+  const g = S.game;
+  const tab = S._gameTab||'main';
+  const xpPct = Math.min(100, Math.round((g.xp/g.xpToNext)*100));
+  const tabBtn=(id,label)=>`<button class="game-tab${tab===id?' active':''}" onclick="S._gameTab='${id}';renderGame()">${label}</button>`;
+  document.getElementById('main').innerHTML = `
+    <div class="game-wrap">
+      <div class="game-hdr">
+        <div class="game-title">🎮 Desk Empire</div>
+        <div class="game-stats">
+          <div class="game-stat"><span class="game-stat-label">Level</span><span class="game-stat-val">${g.level}</span></div>
+          <div class="game-stat"><span class="game-stat-label">Kontostand</span><span class="game-stat-val" id="gameCoinsDisplay">${fmtCoins(S._gameLocalCoins)} 🪙</span></div>
+          <div class="game-stat"><span class="game-stat-label">Pro Sekunde</span><span class="game-stat-val">${fmtRate(g.derived.incomePerSecond)} 🪙/s</span></div>
+        </div>
+      </div>
+      <div class="game-xp-row">
+        <div class="game-xp-bar"><div class="game-xp-fill" style="width:${xpPct}%"></div></div>
+        <div class="game-xp-label">${Math.floor(g.xp)} / ${g.xpToNext} XP bis Level ${g.level+1}</div>
+      </div>
+      <div class="game-tabs">
+        ${tabBtn('main','🏢 Büro')}
+        ${tabBtn('shop','🛒 Shop')}
+        ${tabBtn('achievements','🏆 Erfolge ('+g.achievements.length+'/'+g.catalog.achievements.length+')')}
+        ${tabBtn('stats','📊 Statistik')}
+      </div>
+      <div class="game-body">
+        ${tab==='main'?renderGameMain(g):tab==='shop'?renderGameShop(g):tab==='achievements'?renderGameAchievements(g):renderGameStats(g)}
+      </div>
+    </div>`;
+}
+function renderGameMain(g) {
+  return `
+    <div class="game-office-card">${gameOfficeSceneHtml(g.ownedItems)}</div>
+    <div class="game-click-area">
+      <button class="game-click-btn" onclick="gameClick(event)">💪 Arbeiten <span>+${fmtCoins(g.derived.clickValue)}</span></button>
+      <div style="font-size:12px;color:var(--mu);margin-top:8px">Jeder Klick bringt dir ${fmtCoins(g.derived.clickValue)} Office Coins.</div>
+    </div>`;
+}
+// Modular aufgebaute Büro-Illustration — jedes Möbelstück ist eine eigene
+// SVG-Gruppe, die nur erscheint, wenn der zugehörige Shop-Gegenstand
+// mindestens einmal gekauft wurde. Bewusst flaches, ruhiges 2D-Design statt
+// zufälliger Emojis, damit der Fortschritt optisch nachvollziehbar bleibt.
+function gameOfficeSceneHtml(items) {
+  const has = id => (items[id]||0) > 0;
+  const g = [];
+  // Wand + Boden
+  g.push(`<rect x="0" y="0" width="800" height="230" fill="var(--sf2)"/>`);
+  g.push(`<rect x="0" y="230" width="800" height="90" fill="var(--bg2)"/>`);
+  g.push(`<rect x="0" y="228" width="800" height="3" fill="var(--border)"/>`);
+  // Großraumbüro: zusätzliche Schreibtisch-Silhouetten im Hintergrund
+  if (has('openspace')) {
+    for (let i=0;i<4;i++) {
+      const x=40+i*180;
+      g.push(`<rect x="${x}" y="205" width="70" height="8" rx="2" fill="var(--border)" opacity=".6"/>`);
+    }
+  }
+  // Basis: Schreibtisch, Stuhl, Computer, kleine Pflanze (immer vorhanden)
+  g.push(`<g>
+    <rect x="260" y="150" width="190" height="10" rx="3" fill="#a8763e"/>
+    <rect x="270" y="160" width="8" height="55" fill="#8a5f30"/>
+    <rect x="432" y="160" width="8" height="55" fill="#8a5f30"/>
+    <rect x="300" y="100" width="70" height="52" rx="4" fill="#2b3444"/>
+    <rect x="306" y="106" width="58" height="38" rx="2" fill="#5b8bd6"/>
+    <rect x="325" y="152" width="20" height="8" fill="#2b3444"/>
+    <rect x="310" y="160" width="50" height="6" rx="2" fill="#1f2630"/>
+    <rect x="395" y="130" width="22" height="22" rx="3" fill="#dfe3e8"/>
+    <circle cx="406" cy="155" r="14" fill="#6b7784"/>
+    <rect x="200" y="175" width="34" height="42" rx="6" fill="var(--acc)" opacity=".85"/>
+    <rect x="200" y="167" width="34" height="14" rx="6" fill="var(--acc)"/>
+  </g>`);
+  g.push(gamePlantSvg(130,190,1));
+  // Zimmerpflanze (Shop) — zweite, größere Pflanze
+  if (has('plant')) g.push(gamePlantSvg(610,175,1.3));
+  // Schreibtischlampe
+  if (has('lamp')) g.push(`<g><rect x="372" y="118" width="4" height="34" fill="#44546b"/><path d="M356 118 L390 118 L380 100 L366 100 Z" fill="#f4b740"/></g>`);
+  // Kaffeemaschine
+  if (has('coffee')) g.push(`<g><rect x="470" y="188" width="46" height="14" rx="3" fill="#5b4636"/><rect x="478" y="150" width="30" height="40" rx="4" fill="#caa26b"/><rect x="486" y="156" width="14" height="10" rx="2" fill="#5b4636"/></g>`);
+  // Zweiter Monitor
+  if (has('monitor2')) g.push(`<g><rect x="220" y="104" width="62" height="46" rx="4" fill="#2b3444"/><rect x="226" y="110" width="50" height="34" rx="2" fill="#5b8bd6"/><rect x="246" y="150" width="10" height="7" fill="#2b3444"/></g>`);
+  // Aktenschrank
+  if (has('cabinet')) g.push(`<g><rect x="560" y="120" width="60" height="100" rx="3" fill="#8a97a8"/><rect x="568" y="135" width="44" height="6" fill="#6b7784"/><rect x="568" y="165" width="44" height="6" fill="#6b7784"/><rect x="568" y="195" width="44" height="6" fill="#6b7784"/></g>`);
+  // Zweiter Arbeitsplatz
+  if (has('desk2')) g.push(`<g>
+    <rect x="30" y="160" width="150" height="9" rx="3" fill="#a8763e"/>
+    <rect x="38" y="169" width="7" height="48" fill="#8a5f30"/>
+    <rect x="165" y="169" width="7" height="48" fill="#8a5f30"/>
+    <rect x="60" y="120" width="55" height="40" rx="4" fill="#2b3444"/>
+    <rect x="65" y="125" width="45" height="30" rx="2" fill="#5b8bd6"/>
+    <rect x="15" y="182" width="28" height="36" rx="6" fill="var(--acc)" opacity=".7"/>
+  </g>`);
+  // Meetingbereich
+  if (has('meeting')) g.push(`<g><ellipse cx="700" cy="195" rx="46" ry="16" fill="#c9bfae"/><circle cx="656" cy="188" r="10" fill="var(--acc)" opacity=".7"/><circle cx="744" cy="188" r="10" fill="var(--acc)" opacity=".7"/><circle cx="700" cy="168" r="10" fill="var(--acc)" opacity=".7"/></g>`);
+  // Kleine Büroküche
+  if (has('kitchen')) g.push(`<g><rect x="520" y="200" width="70" height="20" rx="3" fill="#cfd6dd"/><rect x="530" y="185" width="22" height="18" rx="2" fill="#8a97a8"/><circle cx="572" cy="195" r="5" fill="#44546b"/></g>`);
+  // Executive Office — Akzentrahmen signalisiert "High-End"
+  if (has('executive')) {
+    g.push(`<rect x="0" y="0" width="800" height="320" fill="none" stroke="#e6c570" stroke-width="4" rx="10"/>`);
+    g.push(`<g><rect x="690" y="90" width="90" height="60" rx="4" fill="#3b2f23"/><rect x="700" y="98" width="70" height="10" fill="#e6c570" opacity=".6"/><rect x="700" y="112" width="70" height="10" fill="#e6c570" opacity=".6"/><rect x="700" y="126" width="70" height="10" fill="#e6c570" opacity=".6"/></g>`);
+  }
+  return `<svg viewBox="0 0 800 320" preserveAspectRatio="xMidYMax meet" style="width:100%;height:auto;display:block">${g.join('')}</svg>`;
+}
+function gamePlantSvg(x,y,scale) {
+  return `<g transform="translate(${x},${y}) scale(${scale})">
+    <rect x="-14" y="30" width="28" height="26" rx="4" fill="#b4592f"/>
+    <path d="M0 32 C-18 24 -22 2 -10 -8 C-6 -16 6 -16 10 -8 C22 2 18 24 0 32 Z" fill="#4b9f5f"/>
+  </g>`;
+}
+function renderGameShop(g) {
+  const priceOf = id => g.prices.find(p=>p.id===id)?.price ?? 0;
+  const itemCard = it => {
+    const owned = g.ownedItems[it.id]||0;
+    const price = priceOf(it.id);
+    const afford = g.coins >= price;
+    return `<div class="game-shop-card${afford?'':' locked'}">
+      <div class="game-shop-icon">${it.icon}</div>
+      <div class="game-shop-info">
+        <div class="game-shop-name">${esc(it.name)}</div>
+        <div class="game-shop-meta">+${fmtRate(it.rate)} 🪙/s &middot; ${owned} im Besitz</div>
+      </div>
+      <button class="game-shop-buy" ${afford?'':'disabled'} onclick="gameBuyItem('${it.id}')">${fmtCoins(price)} 🪙</button>
+    </div>`;
+  };
+  const upgCard = u => {
+    const owned = g.ownedUpgrades.includes(u.id);
+    const lockedByReq = u.requires && !g.ownedUpgrades.includes(u.requires);
+    const afford = g.coins >= u.cost;
+    return `<div class="game-shop-card${(owned||!afford||lockedByReq)?' locked':''}">
+      <div class="game-shop-icon">⭐</div>
+      <div class="game-shop-info">
+        <div class="game-shop-name">${esc(u.name)}</div>
+        <div class="game-shop-meta">${esc(u.desc)}${lockedByReq?' · Voraussetzung fehlt':''}</div>
+      </div>
+      ${owned?`<span class="game-shop-owned">✓ Freigeschaltet</span>`:`<button class="game-shop-buy" ${(afford&&!lockedByReq)?'':'disabled'} onclick="gameBuyUpgrade('${u.id}')">${fmtCoins(u.cost)} 🪙</button>`}
+    </div>`;
+  };
+  return `
+    <div class="game-shop-section-title">Büroausstattung</div>
+    <div class="game-shop-list">${g.catalog.items.map(itemCard).join('')}</div>
+    <div class="game-shop-section-title" style="margin-top:18px">Upgrades</div>
+    <div class="game-shop-list">${g.catalog.upgrades.map(upgCard).join('')}</div>`;
+}
+function renderGameAchievements(g) {
+  const have = new Set(g.achievements);
+  return `<div class="game-ach-list">${g.catalog.achievements.map(a=>`
+    <div class="game-ach-card${have.has(a.id)?' unlocked':''}">
+      <div class="game-ach-icon">${have.has(a.id)?a.icon:'🔒'}</div>
+      <div class="game-ach-name">${esc(a.name)}</div>
+    </div>`).join('')}</div>`;
+}
+function renderGameStats(g) {
+  const row=(label,val)=>`<div class="game-stats-row"><span>${label}</span><span>${val}</span></div>`;
+  const totalItems = Object.values(g.ownedItems).reduce((a,b)=>a+b,0);
+  return `<div class="game-stats-card">
+    ${row('Level', g.level)}
+    ${row('Aktueller Kontostand', fmtCoins(g.coins)+' 🪙')}
+    ${row('Insgesamt verdient', fmtCoins(g.totalEarned)+' 🪙')}
+    ${row('Einnahmen pro Sekunde', fmtRate(g.derived.incomePerSecond)+' 🪙/s')}
+    ${row('Ertrag pro Klick', fmtCoins(g.derived.clickValue)+' 🪙')}
+    ${row('Gegenstände gekauft', totalItems)}
+    ${row('Upgrades freigeschaltet', g.ownedUpgrades.length+' / '+g.catalog.upgrades.length)}
+    ${row('Erfolge', g.achievements.length+' / '+g.catalog.achievements.length)}
+  </div>`;
+}

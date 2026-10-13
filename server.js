@@ -984,6 +984,24 @@ async function initDB() {
       visible_users TEXT DEFAULT '[]', editable_users TEXT DEFAULT '[]',
       created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
     )`,
+    // "Desk Empire" Idle-Spiel (Menüpunkt "Spiele") — ein Spielstand pro
+    // Nutzer; Economy/Offline-Fortschritt wird ausschließlich serverseitig
+    // berechnet (routes/game.js), der Client liefert nur Aktionen (Klick/
+    // Kauf), nie Kontostände/Zeiten. owned_items/owned_upgrades/achievements
+    // als JSON-Text analog zu den übrigen *_roles-Spalten im Projekt.
+    `CREATE TABLE IF NOT EXISTS game_saves (
+      user_id TEXT PRIMARY KEY,
+      coins DOUBLE PRECISION NOT NULL DEFAULT 10,
+      total_earned DOUBLE PRECISION NOT NULL DEFAULT 10,
+      xp DOUBLE PRECISION NOT NULL DEFAULT 0,
+      level INTEGER NOT NULL DEFAULT 1,
+      owned_items TEXT NOT NULL DEFAULT '{}',
+      owned_upgrades TEXT NOT NULL DEFAULT '[]',
+      achievements TEXT NOT NULL DEFAULT '[]',
+      last_tick_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }
@@ -1112,6 +1130,7 @@ app.use('/api',   require('./routes/email'));
 app.use('/api',   require('./routes/chat'));
 app.use('/api',   require('./routes/push').router);
 app.use('/api',   require('./routes/ai'));
+app.use('/api',   require('./routes/game'));
 
 app.get('*', (req,res) => res.sendFile(path.join(__dirname,'public','index.html')));
 

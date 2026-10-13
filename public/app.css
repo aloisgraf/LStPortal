@@ -620,3 +620,55 @@ details.dash-card > summary { list-style: none; cursor: pointer; display: flex; 
 .todo-ci-textarea:focus{outline:none;border-color:var(--border);background:var(--bg);color:var(--tx)}
 .todo-ci-textarea::placeholder{color:var(--di)}
 .todo-ci.done-item .todo-ci-textarea{text-decoration:none;color:var(--di)}
+
+/* ── DESK EMPIRE (Spiele) ──────────────────────────────────────────────── */
+.game-wrap{max-width:900px;margin:0 auto;padding:20px}
+.game-hdr{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px;margin-bottom:14px}
+.game-title{font-size:19px;font-weight:700}
+.game-stats{display:flex;gap:22px;flex-wrap:wrap}
+.game-stat{display:flex;flex-direction:column;gap:2px;min-width:90px}
+.game-stat-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--mu)}
+.game-stat-val{font-size:16px;font-weight:700;color:var(--tx)}
+.game-xp-row{margin-bottom:16px}
+.game-xp-bar{height:8px;border-radius:5px;background:var(--sf2);overflow:hidden;margin-bottom:4px}
+.game-xp-fill{height:100%;background:var(--acc);border-radius:5px;transition:width .4s ease}
+.game-xp-label{font-size:11px;color:var(--mu)}
+.game-tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:16px;flex-wrap:wrap}
+.game-tab{padding:8px 14px;font-size:13px;font-weight:600;background:none;border:none;border-bottom:2px solid transparent;color:var(--mu);cursor:pointer;font-family:inherit;transition:.15s}
+.game-tab:hover{color:var(--tx)}
+.game-tab.active{color:var(--acc);border-bottom-color:var(--acc)}
+.game-body{min-height:200px}
+.game-office-card{background:var(--sf);border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:var(--sh2);margin-bottom:18px}
+.game-click-area{text-align:center;padding:4px 0 10px}
+.game-click-btn{background:var(--acc);color:var(--act);border:none;border-radius:12px;padding:16px 34px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 4px 14px rgba(59,109,212,.3);transition:transform .12s ease,box-shadow .12s ease}
+.game-click-btn:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(59,109,212,.38)}
+.game-click-btn:active{transform:translateY(1px) scale(.98)}
+.game-click-btn span{margin-left:6px;opacity:.9;font-weight:600}
+.game-click-fx{position:fixed;transform:translate(-50%,0);font-size:15px;font-weight:700;color:var(--acc);pointer-events:none;z-index:500;animation:gameFxRise .8s ease-out forwards}
+@keyframes gameFxRise{0%{opacity:1;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,-42px)}}
+.game-shop-section-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--mu);margin-bottom:8px}
+.game-shop-list{display:flex;flex-direction:column;gap:8px}
+.game-shop-card{display:flex;align-items:center;gap:12px;background:var(--sf);border:1px solid var(--border);border-radius:10px;padding:10px 14px;transition:border-color .15s}
+.game-shop-card.locked{opacity:.55}
+.game-shop-icon{font-size:24px;width:36px;text-align:center;flex-shrink:0}
+.game-shop-info{flex:1;min-width:0}
+.game-shop-name{font-size:13px;font-weight:700;color:var(--tx)}
+.game-shop-meta{font-size:11px;color:var(--mu);margin-top:1px}
+.game-shop-buy{background:var(--acc);color:var(--act);border:none;border-radius:7px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0;white-space:nowrap;transition:.15s}
+.game-shop-buy:disabled{background:var(--sf2);color:var(--di);cursor:not-allowed}
+.game-shop-owned{font-size:12px;font-weight:700;color:var(--ok);flex-shrink:0}
+.game-ach-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+.game-ach-card{display:flex;flex-direction:column;align-items:center;gap:6px;background:var(--sf);border:1px solid var(--border);border-radius:10px;padding:16px 10px;text-align:center;opacity:.55}
+.game-ach-card.unlocked{opacity:1;border-color:var(--acc)}
+.game-ach-icon{font-size:26px}
+.game-ach-name{font-size:12px;font-weight:600;color:var(--tx)}
+.game-stats-card{background:var(--sf);border:1px solid var(--border);border-radius:12px;padding:6px 18px}
+.game-stats-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px}
+.game-stats-row:last-child{border-bottom:none}
+.game-stats-row span:first-child{color:var(--mu)}
+.game-stats-row span:last-child{font-weight:700;color:var(--tx)}
+@media(max-width:640px){
+  .game-hdr{flex-direction:column;align-items:flex-start}
+  .game-stats{gap:14px}
+  .game-click-btn{width:100%}
+}
