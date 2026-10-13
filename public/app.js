@@ -1936,11 +1936,51 @@ function toggleDueHeatPref(on){try{localStorage.setItem('tkDueHeat',on?'on':'off
 // Einstellungen umschaltbar. Default: an (aktuelles Verhalten).
 function getFormPanelPref(){try{return localStorage.getItem('lst_formPanel')!=='0';}catch(e){return true;}}
 function toggleFormPanelPref(on){try{localStorage.setItem('lst_formPanel',on?'1':'0');}catch(e){}toast(on?'✅ Formulare öffnen jetzt als Seitenpanel':'✅ Formulare öffnen jetzt als Fenster');}
+function getPanelWidthPref(){try{const w=parseInt(localStorage.getItem('lst_panelWidth'),10);return(w>=360&&w<=1400)?w:560;}catch(e){return 560;}}
+function setPanelWidthPref(w){try{localStorage.setItem('lst_panelWidth',String(Math.round(w)));}catch(e){}}
 function applyPanelPref(ovId){
   const ov=document.getElementById(ovId);if(!ov)return;
+  const modal=ov.querySelector('.modal');
   const on=getFormPanelPref();
   ov.classList.toggle('panel-r',on);
-  ov.querySelector('.modal')?.classList.toggle('panel-r',on);
+  if(!modal)return;
+  modal.classList.toggle('panel-r',on);
+  if(on){
+    modal.style.width=getPanelWidthPref()+'px';
+    _ensurePanelResizeHandle(modal);
+  } else {
+    modal.style.width='';
+  }
+}
+// Ziehgriff am linken Rand eines Seitenpanels — Breite wird live angepasst
+// und beim Loslassen gemerkt (gilt für alle Seitenpanel-Formulare gemeinsam,
+// da sie denselben Mechanismus/dieselbe Standardbreite teilen).
+function _ensurePanelResizeHandle(modal){
+  if(modal.querySelector('.panel-resize-handle'))return;
+  const handle=document.createElement('div');
+  handle.className='panel-resize-handle';
+  handle.title='Breite ziehen';
+  handle.addEventListener('mousedown',_startPanelResize);
+  modal.insertBefore(handle,modal.firstChild);
+}
+function _startPanelResize(e){
+  e.preventDefault();
+  const handle=e.currentTarget, modal=handle.closest('.modal');
+  if(!modal)return;
+  handle.classList.add('active');
+  const startX=e.clientX, startWidth=modal.getBoundingClientRect().width;
+  function onMove(ev){
+    const w=Math.max(360,Math.min(window.innerWidth-80,startWidth+(startX-ev.clientX)));
+    modal.style.width=w+'px';
+  }
+  function onUp(){
+    document.removeEventListener('mousemove',onMove);
+    document.removeEventListener('mouseup',onUp);
+    handle.classList.remove('active');
+    setPanelWidthPref(modal.getBoundingClientRect().width);
+  }
+  document.addEventListener('mousemove',onMove);
+  document.addEventListener('mouseup',onUp);
 }
 function dueHeatStyle(tk){
   if(!getDueHeatPref()||!tk.dueDate||isTkClosed(tk))return'';

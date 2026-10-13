@@ -208,8 +208,10 @@ td{padding:7px 12px;font-size:13px;vertical-align:middle}
    Bildschirm bleibt sichtbar. Auf Mobile (siehe @media unten) greift
    weiterhin die normale Vollbild-/Bottom-Sheet-Darstellung. */
 .ov.panel-r{justify-content:flex-end;align-items:stretch;background:rgba(0,0,0,.3);backdrop-filter:none}
-.modal.panel-r{width:560px;max-width:92vw;height:100%;max-height:100%;border-radius:0;margin:0;animation:panelSlideIn .22s ease}
+.modal.panel-r{position:relative;width:560px;max-width:92vw;height:100%;max-height:100%;border-radius:0;margin:0;animation:panelSlideIn .22s ease}
 @keyframes panelSlideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
+.panel-resize-handle{position:absolute;top:0;left:-3px;width:7px;height:100%;cursor:col-resize;z-index:10;background:transparent;transition:background .15s}
+.panel-resize-handle:hover,.panel-resize-handle.active{background:var(--acc)}
 /* Schieberegler (iOS-artiger Toggle-Switch) — z.B. für die Einstellung
    "Formulare als Seitenpanel öffnen". */
 .tsw{position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0}
