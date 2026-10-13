@@ -1002,6 +1002,13 @@ async function initDB() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`,
+    // Erweiterung "Mitarbeiter/Betriebskosten/Gesundheit/Zufriedenheit" —
+    // additive Spalten auf derselben Zeile, bestehende Spielstände (coins/
+    // owned_items/...) bleiben unverändert erhalten.
+    `ALTER TABLE game_saves ADD COLUMN IF NOT EXISTS employees TEXT NOT NULL DEFAULT '[]'`,
+    `ALTER TABLE game_saves ADD COLUMN IF NOT EXISTS workstations TEXT NOT NULL DEFAULT '{}'`,
+    `ALTER TABLE game_saves ADD COLUMN IF NOT EXISTS perks TEXT NOT NULL DEFAULT '{}'`,
+    `ALTER TABLE game_saves ADD COLUMN IF NOT EXISTS teambuilding_until TIMESTAMPTZ`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }

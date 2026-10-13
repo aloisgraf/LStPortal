@@ -10962,21 +10962,31 @@ function renderGame() {
       </div>
       <div class="game-tabs">
         ${tabBtn('main','🏢 Büro')}
+        ${tabBtn('employees','🧑‍💼 Mitarbeiter ('+g.workforce.activeCount+'/'+g.maxEmployees+')')}
+        ${tabBtn('office','🪑 Arbeitsplätze')}
+        ${tabBtn('perks','💚 Angebote')}
         ${tabBtn('shop','🛒 Shop')}
         ${tabBtn('achievements','🏆 Erfolge ('+g.achievements.length+'/'+g.catalog.achievements.length+')')}
-        ${tabBtn('stats','📊 Statistik')}
+        ${tabBtn('stats','📊 Finanzen')}
       </div>
       <div class="game-body">
-        ${tab==='main'?renderGameMain(g):tab==='shop'?renderGameShop(g):tab==='achievements'?renderGameAchievements(g):renderGameStats(g)}
+        ${tab==='main'?renderGameMain(g):tab==='employees'?renderGameEmployees(g):tab==='office'?renderGameOffice(g):tab==='perks'?renderGamePerks(g):tab==='shop'?renderGameShop(g):tab==='achievements'?renderGameAchievements(g):renderGameStats(g)}
       </div>
     </div>`;
 }
 function renderGameMain(g) {
+  const net = g.financials.netPerGameHour;
   return `
     <div class="game-office-card">${gameOfficeSceneHtml(g.ownedItems)}</div>
+    <div class="game-overview-strip">
+      <div class="game-stat"><span class="game-stat-label">Mitarbeiter</span><span class="game-stat-val">${g.workforce.activeCount} / ${g.maxEmployees}</span></div>
+      <div class="game-stat"><span class="game-stat-label">⌀ Gesundheit</span><span class="game-stat-val">${Math.round(g.workforce.avgHealth)}%</span></div>
+      <div class="game-stat"><span class="game-stat-label">⌀ Zufriedenheit</span><span class="game-stat-val">${Math.round(g.workforce.avgSatisfaction)}%</span></div>
+      <div class="game-stat"><span class="game-stat-label">Gewinn/Spielstunde</span><span class="game-stat-val" style="color:${net>=0?'var(--ok)':'var(--danger)'}">${net>=0?'+':''}${fmtCoins(net)} 🪙</span></div>
+    </div>
     <div class="game-click-area">
       <button class="game-click-btn" onclick="gameClick(event)">💪 Arbeiten <span>+${fmtCoins(g.derived.clickValue)}</span></button>
-      <div style="font-size:12px;color:var(--mu);margin-top:8px">Jeder Klick bringt dir ${fmtCoins(g.derived.clickValue)} Office Coins.</div>
+      <div style="font-size:12px;color:var(--mu);margin-top:8px">Jeder Klick bringt dir ${fmtCoins(g.derived.clickValue)} Office Coins. 1 Spielstunde = 1 reale Minute.</div>
     </div>`;
 }
 // Modular aufgebaute Büro-Illustration — jedes Möbelstück ist eine eigene
@@ -11077,10 +11087,94 @@ function renderGameShop(g) {
     </div>`;
   };
   return `
-    <div class="game-shop-section-title">Büroausstattung</div>
+    <div class="game-shop-section-title">Deko &amp; Technik (automatische Einnahmen)</div>
     <div class="game-shop-list">${g.catalog.items.map(itemCard).join('')}</div>
     <div class="game-shop-section-title" style="margin-top:18px">Upgrades</div>
     <div class="game-shop-list">${g.catalog.upgrades.map(upgCard).join('')}</div>`;
+}
+function renderGameEmployees(g) {
+  const classCard = c => {
+    const afford = g.coins >= c.hireCost;
+    const full = g.workforce.activeCount >= g.maxEmployees;
+    return `<div class="game-shop-card${(afford&&!full)?'':' locked'}">
+      <div class="game-shop-icon">🧑‍💼</div>
+      <div class="game-shop-info">
+        <div class="game-shop-name">${esc(c.name)}</div>
+        <div class="game-shop-meta">${fmtCoins(c.wage)} 🪙/Spielstunde Gehalt &middot; Produktivität ${c.productivity}</div>
+      </div>
+      <button class="game-shop-buy" ${(afford&&!full)?'':'disabled'} onclick="gameHire('${c.id}')" title="${full?'Kein freier Arbeitsplatz':''}">${fmtCoins(c.hireCost)} 🪙</button>
+    </div>`;
+  };
+  const empRow = e => {
+    const cls = g.catalog.employeeClasses.find(c=>c.id===e.classId);
+    const active = e.status==='active';
+    return `<div class="game-emp-row${active?'':' terminated'}">
+      <div class="game-emp-name">${esc(e.name)} <span class="game-emp-pos">${esc(cls?.name||e.classId)}</span>${active?'':' <span class="game-emp-pos">· gekündigt</span>'}</div>
+      ${active?`
+      <div class="game-emp-bars">
+        <div class="game-emp-bar-lbl">❤️ ${Math.round(e.health)}%</div><div class="game-bar"><div class="game-bar-fill health" style="width:${e.health}%"></div></div>
+        <div class="game-emp-bar-lbl">😊 ${Math.round(e.satisfaction)}%</div><div class="game-bar"><div class="game-bar-fill sat" style="width:${e.satisfaction}%"></div></div>
+      </div>
+      <button class="btn-d" style="font-size:11px;padding:4px 9px" onclick="gameFire('${e.id}')">Kündigen</button>`:''}
+    </div>`;
+  };
+  const activeEmployees = g.employees.filter(e=>e.status==='active');
+  return `
+    <div class="game-shop-section-title">Arbeitsplätze: ${activeEmployees.length} / ${g.maxEmployees} belegt</div>
+    <div class="game-emp-list" style="margin-bottom:18px">
+      ${activeEmployees.length?activeEmployees.map(empRow).join(''):'<div style="color:var(--mu);font-size:13px;padding:8px 0">Noch keine Mitarbeiter eingestellt.</div>'}
+      ${g.employees.filter(e=>e.status!=='active').map(empRow).join('')}
+    </div>
+    <div class="game-shop-section-title">Einstellen</div>
+    <div class="game-shop-list">${g.catalog.employeeClasses.map(classCard).join('')}</div>`;
+}
+function renderGameOffice(g) {
+  const wsCard = w => {
+    const owned = g.workstations[w.id]||0;
+    const afford = g.coins >= w.cost;
+    return `<div class="game-shop-card${afford?'':' locked'}">
+      <div class="game-shop-icon">${w.icon}</div>
+      <div class="game-shop-info">
+        <div class="game-shop-name">${esc(w.name)}</div>
+        <div class="game-shop-meta">${fmtCoins(w.upkeep)} 🪙/Spielstunde laufende Kosten &middot; ${owned} im Besitz</div>
+      </div>
+      <button class="game-shop-buy" ${afford?'':'disabled'} onclick="gameBuyWorkstation('${w.id}')">${fmtCoins(w.cost)} 🪙</button>
+    </div>`;
+  };
+  return `
+    <div class="game-shop-section-title">Arbeitsplätze &amp; Büroausstattung — aktuelle Kapazität: ${g.maxEmployees} Mitarbeiter</div>
+    <div class="game-shop-list">${g.catalog.workstations.map(wsCard).join('')}</div>`;
+}
+function renderGamePerks(g) {
+  const perkCard = p => {
+    const owned = g.perks[p.id]||0;
+    const maxed = owned >= p.maxCount;
+    const afford = g.coins >= p.cost;
+    return `<div class="game-shop-card${(afford&&!maxed)?'':' locked'}">
+      <div class="game-shop-icon">${p.icon}</div>
+      <div class="game-shop-info">
+        <div class="game-shop-name">${esc(p.name)}</div>
+        <div class="game-shop-meta">${fmtCoins(p.upkeep)} 🪙/Spielstunde &middot; ${owned}/${p.maxCount} aktiv</div>
+      </div>
+      ${maxed?`<span class="game-shop-owned">✓ Maximal</span>`:`<button class="game-shop-buy" ${afford?'':'disabled'} onclick="gameBuyPerk('${p.id}')">${fmtCoins(p.cost)} 🪙</button>`}
+    </div>`;
+  };
+  const tbActive = g.teambuildingActive;
+  const tbRemaining = tbActive ? Math.max(0, Math.round((new Date(g.teambuildingUntil).getTime()-Date.now())/60000)) : 0;
+  return `
+    <div class="game-shop-section-title">Mitarbeiterangebote (laufende Kosten pro Spielstunde)</div>
+    <div class="game-shop-list">${g.catalog.perks.map(perkCard).join('')}</div>
+    <div class="game-shop-section-title" style="margin-top:18px">Veranstaltung</div>
+    <div class="game-shop-list">
+      <div class="game-shop-card${(tbActive||g.coins<g.catalog.teambuildingCost)?' locked':''}">
+        <div class="game-shop-icon">🎉</div>
+        <div class="game-shop-info">
+          <div class="game-shop-name">Teambuilding</div>
+          <div class="game-shop-meta">${tbActive?'Aktiv — noch ~'+tbRemaining+' Min.':'Zufriedenheit & Teamleistung zeitlich begrenzt erhöht (6 Spielstunden)'}</div>
+        </div>
+        ${tbActive?`<span class="game-shop-owned">✓ Aktiv</span>`:`<button class="game-shop-buy" ${g.coins>=g.catalog.teambuildingCost?'':'disabled'} onclick="gameStartTeambuilding()">${fmtCoins(g.catalog.teambuildingCost)} 🪙</button>`}
+      </div>
+    </div>`;
 }
 function renderGameAchievements(g) {
   const have = new Set(g.achievements);
@@ -11091,16 +11185,52 @@ function renderGameAchievements(g) {
     </div>`).join('')}</div>`;
 }
 function renderGameStats(g) {
-  const row=(label,val)=>`<div class="game-stats-row"><span>${label}</span><span>${val}</span></div>`;
+  const row=(label,val,color)=>`<div class="game-stats-row"><span>${label}</span><span${color?' style="color:'+color+'"':''}>${val}</span></div>`;
   const totalItems = Object.values(g.ownedItems).reduce((a,b)=>a+b,0);
-  return `<div class="game-stats-card">
-    ${row('Level', g.level)}
-    ${row('Aktueller Kontostand', fmtCoins(g.coins)+' 🪙')}
-    ${row('Insgesamt verdient', fmtCoins(g.totalEarned)+' 🪙')}
-    ${row('Einnahmen pro Sekunde', fmtRate(g.derived.incomePerSecond)+' 🪙/s')}
-    ${row('Ertrag pro Klick', fmtCoins(g.derived.clickValue)+' 🪙')}
-    ${row('Gegenstände gekauft', totalItems)}
-    ${row('Upgrades freigeschaltet', g.ownedUpgrades.length+' / '+g.catalog.upgrades.length)}
-    ${row('Erfolge', g.achievements.length+' / '+g.catalog.achievements.length)}
-  </div>`;
+  const f = g.financials;
+  const net = f.netPerGameHour;
+  return `
+    <div class="game-shop-section-title">Finanzen (pro Spielstunde = pro realer Minute)</div>
+    <div class="game-stats-card" style="margin-bottom:18px">
+      ${row('Automatische Einnahmen (Büro-Gegenstände)', '+'+fmtCoins(f.itemIncomePerGameHour)+' 🪙')}
+      ${row('Einnahmen durch Mitarbeiterleistung', '+'+fmtCoins(f.employeeIncomePerGameHour)+' 🪙')}
+      ${row('Gehälter', '−'+fmtCoins(f.wageCostPerGameHour)+' 🪙')}
+      ${row('Kosten Arbeitsplätze/Ausstattung', '−'+fmtCoins(f.workstationUpkeepPerGameHour)+' 🪙')}
+      ${row('Kosten Mitarbeiterangebote', '−'+fmtCoins(f.perkUpkeepPerGameHour)+' 🪙')}
+      ${row('Gewinn / Verlust', (net>=0?'+':'−')+fmtCoins(Math.abs(net))+' 🪙', net>=0?'var(--ok)':'var(--danger)')}
+    </div>
+    <div class="game-shop-section-title">Allgemein</div>
+    <div class="game-stats-card">
+      ${row('Level', g.level)}
+      ${row('Aktueller Kontostand', fmtCoins(g.coins)+' 🪙')}
+      ${row('Insgesamt verdient', fmtCoins(g.totalEarned)+' 🪙')}
+      ${row('Ertrag pro Klick', fmtCoins(g.derived.clickValue)+' 🪙')}
+      ${row('Gegenstände gekauft', totalItems)}
+      ${row('Upgrades freigeschaltet', g.ownedUpgrades.length+' / '+g.catalog.upgrades.length)}
+      ${row('Mitarbeiter aktiv', g.workforce.activeCount+' / '+g.maxEmployees)}
+      ${row('⌀ Gesundheit Belegschaft', Math.round(g.workforce.avgHealth)+'%')}
+      ${row('⌀ Zufriedenheit Belegschaft', Math.round(g.workforce.avgSatisfaction)+'%')}
+      ${row('Erfolge', g.achievements.length+' / '+g.catalog.achievements.length)}
+    </div>`;
+}
+async function gameHire(classId) {
+  try { const state = await api('POST','/game/hire',{classId}); _onGameState(state,false); toast('✅ Eingestellt'); }
+  catch(e) { toast('⚠️ '+e.message,'err'); }
+}
+async function gameFire(employeeId) {
+  if (!confirm('Mitarbeiter wirklich kündigen?')) return;
+  try { const state = await api('POST','/game/fire',{employeeId}); _onGameState(state,false); toast('Gekündigt'); }
+  catch(e) { toast('⚠️ '+e.message,'err'); }
+}
+async function gameBuyWorkstation(workstationId) {
+  try { const state = await api('POST','/game/buy-workstation',{workstationId}); _onGameState(state,false); }
+  catch(e) { toast('⚠️ '+e.message,'err'); }
+}
+async function gameBuyPerk(perkId) {
+  try { const state = await api('POST','/game/buy-perk',{perkId}); _onGameState(state,false); }
+  catch(e) { toast('⚠️ '+e.message,'err'); }
+}
+async function gameStartTeambuilding() {
+  try { const state = await api('POST','/game/teambuilding'); _onGameState(state,false); toast('🎉 Teambuilding gestartet'); }
+  catch(e) { toast('⚠️ '+e.message,'err'); }
 }

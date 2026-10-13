@@ -672,3 +672,20 @@ details.dash-card > summary { list-style: none; cursor: pointer; display: flex; 
   .game-stats{gap:14px}
   .game-click-btn{width:100%}
 }
+
+/* ── DESK EMPIRE: Mitarbeiter/Betriebswirtschaft-Erweiterung ───────────── */
+.game-overview-strip{display:flex;gap:18px;flex-wrap:wrap;background:var(--sf);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:16px}
+.game-emp-list{display:flex;flex-direction:column;gap:8px}
+.game-emp-row{display:flex;align-items:center;gap:12px;background:var(--sf);border:1px solid var(--border);border-radius:10px;padding:10px 14px;flex-wrap:wrap}
+.game-emp-row.terminated{opacity:.5}
+.game-emp-name{font-size:13px;font-weight:700;color:var(--tx);flex:1;min-width:140px}
+.game-emp-pos{font-size:11px;font-weight:500;color:var(--mu)}
+.game-emp-bars{display:grid;grid-template-columns:auto 90px;gap:4px 8px;align-items:center;font-size:11px;color:var(--mu)}
+.game-bar{width:90px;height:6px;border-radius:4px;background:var(--sf2);overflow:hidden}
+.game-bar-fill{height:100%;border-radius:4px;transition:width .4s ease}
+.game-bar-fill.health{background:#ef4444}
+.game-bar-fill.sat{background:#3b6dd4}
+@media(max-width:640px){
+  .game-overview-strip{gap:12px}
+  .game-emp-row{flex-direction:column;align-items:flex-start}
+}
