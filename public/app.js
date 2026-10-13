@@ -400,6 +400,7 @@ function openPwModal(){
   buildCP('myCR',S.myColor,'pickMyColor');
   document.getElementById('cpw0').value='';document.getElementById('cpw1').value='';document.getElementById('cpw2').value='';
   const dh=document.getElementById('setDueHeat');if(dh)dh.checked=getDueHeatPref();
+  const fp=document.getElementById('setFormPanel');if(fp)fp.checked=getFormPanelPref();
   const myLockers=(S.lockers||[]).filter(l=>l.assigneeType==='user'&&l.assigneeUserId===S.currentUser);
   const lockersBlock=document.getElementById('myLockersBlock');
   if(lockersBlock){
@@ -1930,6 +1931,17 @@ const tkOpenTodoHtml=tk=>{const n=tkOpenTodoCount(tk);return n?`<span style="col
 // Fälligkeits-Färbung: ab 14 Tage vor Fälligkeit von dezentem Orange zu dezentem Rot
 function getDueHeatPref(){try{return localStorage.getItem('tkDueHeat')!=='off';}catch(e){return true;}}
 function toggleDueHeatPref(on){try{localStorage.setItem('tkDueHeat',on?'on':'off');}catch(e){}renderMain();toast(on?'Fälligkeits-Färbung aktiviert':'Fälligkeits-Färbung deaktiviert');}
+// Formulare (Besprechungspunkte/Protokolle/Tickets) als rechtes Seitenpanel
+// statt als zentriertes Fenster — pro Browser per Schieberegler in den
+// Einstellungen umschaltbar. Default: an (aktuelles Verhalten).
+function getFormPanelPref(){try{return localStorage.getItem('lst_formPanel')!=='0';}catch(e){return true;}}
+function toggleFormPanelPref(on){try{localStorage.setItem('lst_formPanel',on?'1':'0');}catch(e){}toast(on?'✅ Formulare öffnen jetzt als Seitenpanel':'✅ Formulare öffnen jetzt als Fenster');}
+function applyPanelPref(ovId){
+  const ov=document.getElementById(ovId);if(!ov)return;
+  const on=getFormPanelPref();
+  ov.classList.toggle('panel-r',on);
+  ov.querySelector('.modal')?.classList.toggle('panel-r',on);
+}
 function dueHeatStyle(tk){
   if(!getDueHeatPref()||!tk.dueDate||isTkClosed(tk))return'';
   const today=new Date();today.setHours(0,0,0,0);
@@ -2632,7 +2644,7 @@ function openTkForm(id,parentId){
   const visWrap=document.getElementById('tkFVisWrap');
   if(visWrap)visWrap.style.display=S.tp.canSetPublic?'':'none';
   renderTkFormVisibility();
-  closeModal('tkDetOv');openModal('tkFormOv');
+  closeModal('tkDetOv');applyPanelPref('tkFormOv');openModal('tkFormOv');
 }
 function renderTkFormVisibility(){
   const btn=document.getElementById('tkFVisBtn');if(!btn)return;
@@ -7205,6 +7217,7 @@ function openItemForm(instanceId, id=null) {
     document.getElementById('itDelegateTo').style.display = this.value==='delegate'?'':'none';
   };
   renderLinkSections('it', item, instanceId);
+  applyPanelPref('itemFormOv');
   openModal('itemFormOv');
 }
 
@@ -7383,6 +7396,7 @@ function openProtocolForm(instanceId, id=null) {
   document.getElementById('pfAutosaveIndicator').textContent = '';
   onProtoTypeChange();
   renderLinkSections('pf', proto, instanceId);
+  applyPanelPref('protoFormOv');
   openModal('protoFormOv');
   startProtoAutosave(proto?.id||null);
 }

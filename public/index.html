@@ -225,6 +225,14 @@
       <div style="border-top:1px solid var(--border);margin:4px 0 8px"></div>
       <div class="fg"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px"><input type="checkbox" id="setDueHeat" onchange="toggleDueHeatPref(this.checked)" style="width:16px;height:16px;cursor:pointer"> &#128293; F&#228;lligkeits-F&#228;rbung in der Ticketliste</label><div style="font-size:11px;color:var(--mu);margin-top:2px;margin-left:24px">F&#228;rbt Tickets ab 14 Tagen vor F&#228;lligkeit dezent orange bis r&#246;tlich ein.</div></div>
       <div style="border-top:1px solid var(--border);margin:4px 0 8px"></div>
+      <div class="fg">
+        <label style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;font-size:13px;font-weight:600;color:var(--tx)">
+          &#128443;&#65039; Formulare als Seitenpanel öffnen
+          <span class="tsw"><input type="checkbox" id="setFormPanel" onchange="toggleFormPanelPref(this.checked)"><span class="tsw-track"></span></span>
+        </label>
+        <div style="font-size:11px;color:var(--mu);margin-top:2px">Besprechungspunkte, Protokolle/Notizen und Tickets öffnen rechts als Seitenpanel statt als Fenster in der Mitte.</div>
+      </div>
+      <div style="border-top:1px solid var(--border);margin:4px 0 8px"></div>
       <div class="fg"><label>&#128276; Push-Benachrichtigungen</label>
         <div style="font-size:11px;color:var(--mu);margin-bottom:6px">F&#252;r neue Chat-Nachrichten. Auf dem iPhone nur nutzbar, wenn die App zuvor &#252;ber "Zum Home-Bildschirm hinzuf&#252;gen" installiert wurde.</div>
         <button class="btn-s" onclick="enablePushNotifications()">&#128276; Aktivieren</button>
@@ -1664,8 +1672,8 @@
 </div>
 
 <!-- PROTOKOLL FORM MODAL -->
-<div class="ov panel-r" id="protoFormOv">
-  <div class="modal wide panel-r">
+<div class="ov" id="protoFormOv">
+  <div class="modal wide">
     <div class="mh"><h2 id="protoFormTitle">Protokoll</h2><div style="display:flex;align-items:center;gap:8px"><span id="pfAutosaveIndicator" style="font-size:11px;color:var(--mu);font-weight:400"></span><button class="btn-p" onclick="submitProtocolForm()">&#10003; Speichern</button><button class="mc" id="protoDeleteBtn" onclick="deleteProtocol()" style="display:none" title="Löschen">&#128465;&#65039;</button><button class="mc" onclick="closeProtocolForm()">&#10005;</button></div></div>
     <div class="mb2">
       <input type="hidden" id="pfId">

@@ -210,6 +210,14 @@ td{padding:7px 12px;font-size:13px;vertical-align:middle}
 .ov.panel-r{justify-content:flex-end;align-items:stretch;background:rgba(0,0,0,.3);backdrop-filter:none}
 .modal.panel-r{width:560px;max-width:92vw;height:100%;max-height:100%;border-radius:0;margin:0;animation:panelSlideIn .22s ease}
 @keyframes panelSlideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
+/* Schieberegler (iOS-artiger Toggle-Switch) — z.B. für die Einstellung
+   "Formulare als Seitenpanel öffnen". */
+.tsw{position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0}
+.tsw input{opacity:0;width:0;height:0;position:absolute}
+.tsw .tsw-track{position:absolute;cursor:pointer;inset:0;background:var(--border);border-radius:22px;transition:.2s}
+.tsw .tsw-track:before{content:'';position:absolute;height:16px;width:16px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.tsw input:checked+.tsw-track{background:var(--acc)}
+.tsw input:checked+.tsw-track:before{transform:translateX(18px)}
 .mh{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--sf);z-index:1}
 .mh h2{font-size:15px;font-weight:700}
 .mc{width:28px;height:28px;background:var(--sf2);border:1px solid var(--border);border-radius:6px;color:var(--mu);cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;transition:.15s}.mc:hover{border-color:var(--danger);color:var(--danger)}
