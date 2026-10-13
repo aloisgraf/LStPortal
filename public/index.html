@@ -1685,8 +1685,21 @@
           </div>
         </div>
       </div>
-      <div class="fg"><label id="pfBodyLabel">Protokolltext</label><textarea id="pfBody" rows="8"></textarea>
-        <small style="color:var(--mu)">Eine Zeile, die mit "# " beginnt, wird fett als Überschrift dargestellt.</small>
+      <div class="fg"><label id="pfBodyLabel">Protokolltext</label>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;background:var(--sf);border:1px solid var(--border);border-bottom:none;border-radius:8px 8px 0 0;padding:6px">
+          <button type="button" class="btn-s" onclick="protoWrapSelection('b')" title="Fett"><b>F</b></button>
+          <button type="button" class="btn-s" onclick="protoInsertListItem()" title="Aufzählung">&#8226; Liste</button>
+          <button type="button" class="btn-s" onclick="protoWrapSelection('big')" title="Größer">A+</button>
+          <button type="button" class="btn-s" onclick="protoWrapSelection('small')" title="Kleiner">A-</button>
+          <span style="width:1px;height:18px;background:var(--border);margin:0 2px"></span>
+          <button type="button" onclick="protoWrapSelection('red')" title="Rot" style="width:18px;height:18px;border-radius:50%;background:#ef4444;border:1px solid var(--border);cursor:pointer;padding:0"></button>
+          <button type="button" onclick="protoWrapSelection('blue')" title="Blau" style="width:18px;height:18px;border-radius:50%;background:#3b82f6;border:1px solid var(--border);cursor:pointer;padding:0"></button>
+          <button type="button" onclick="protoWrapSelection('green')" title="Grün" style="width:18px;height:18px;border-radius:50%;background:#10b981;border:1px solid var(--border);cursor:pointer;padding:0"></button>
+          <button type="button" onclick="protoWrapSelection('orange')" title="Orange" style="width:18px;height:18px;border-radius:50%;background:#f59e0b;border:1px solid var(--border);cursor:pointer;padding:0"></button>
+          <button type="button" onclick="protoWrapSelection('purple')" title="Violett" style="width:18px;height:18px;border-radius:50%;background:#a855f7;border:1px solid var(--border);cursor:pointer;padding:0"></button>
+        </div>
+        <textarea id="pfBody" rows="8" style="border-radius:0 0 8px 8px"></textarea>
+        <small style="color:var(--mu)">Markierten Text auswählen und oben formatieren. Eine Zeile mit "# " am Anfang wird als Überschrift dargestellt, eine Zeile mit "- " als Aufzählungspunkt.</small>
       </div>
       <div class="fg" id="pfLinksSection" style="display:none">
         <label>Verknüpfte Dokumente</label>

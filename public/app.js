@@ -6221,7 +6221,7 @@ function meetingInstTabHtml(m, i, canManage) {
   // ausgewiesen — nur ein echter Endstatus (Abgeschlossen/Abgesagt) zählt.
   const showStatus = i.status==='done' || i.status==='cancelled';
   return`<div class="meetings-inst-tab${S._selInstance===i.id?' active':''}" style="position:relative">
-    <div onclick="S._selInstance='${i.id}';renderMeetings()" style="cursor:pointer;${canManage?'padding-right:18px':''}">
+    <div onclick="S._selInstance='${i.id}';S._themaTab='summary';renderMeetings()" style="cursor:pointer;${canManage?'padding-right:18px':''}">
       <div style="font-size:12px;font-weight:600">🗒️ ${titleLine}</div>
       <div style="display:flex;gap:4px;margin-top:2px;align-items:center;flex-wrap:wrap">
         ${showStatus?`<span style="font-size:10px;color:${statusColor}">${{done:'Abgeschlossen',cancelled:'Abgesagt'}[i.status]||i.status}</span>`:''}
@@ -6361,12 +6361,55 @@ function protocolsListHtml(inst, canManage) {
 // beginnt, wird fett als Überschrift dargestellt. Escaped zuerst den
 // kompletten Text (XSS-sicher) und wendet erst danach diese einzige Regel
 // an — bewusst kein größerer Editor/Markdown-Umfang.
+// Leichtes Markup für Protokoll-/Notiztext: escaped zuerst den KOMPLETTEN
+// Text (XSS-sicher) und wendet erst danach eine feste Menge an Regeln auf
+// den bereits HTML-sicheren Text an — Zeilenweise "# " (Überschrift/fett)
+// und "- " (Aufzählung), dazu inline [b]/[big]/[small] und feste
+// Farb-Tags [red]/[blue]/[green]/[orange]/[purple]. Bewusst kein großer
+// Editor — nur Klammer-Tags, über die kleine Toolbar gesetzt.
+const PROTO_COLORS = {red:'#ef4444', blue:'#3b82f6', green:'#10b981', orange:'#f59e0b', purple:'#a855f7'};
 function protoBodyToHtml(text) {
   if (!text) return '';
-  return esc(text).split('\n').map(line=>{
-    const m = line.match(/^#\s?(.*)$/);
-    return m ? `<b style="font-size:1.05em">${m[1]}</b>` : line;
-  }).join('\n');
+  let html = esc(text);
+  // Zeilenweise: Überschrift und Aufzählung (aufeinanderfolgende "- "-Zeilen
+  // zu einer gemeinsamen Liste zusammenfassen).
+  const lines = html.split('\n');
+  const out = [];
+  let listBuf = null;
+  const flushList = () => { if (listBuf) { out.push('<ul style="margin:4px 0">'+listBuf.join('')+'</ul>'); listBuf = null; } };
+  for (const line of lines) {
+    const li = line.match(/^-\s(.*)$/);
+    if (li) { (listBuf=listBuf||[]).push('<li>'+li[1]+'</li>'); continue; }
+    flushList();
+    const h = line.match(/^#\s?(.*)$/);
+    out.push(h ? `<b style="font-size:1.05em">${h[1]}</b>` : line);
+  }
+  flushList();
+  html = out.join('\n');
+  // Inline-Formatierung
+  html = html.replace(/\[b\](.*?)\[\/b\]/g, '<b>$1</b>');
+  html = html.replace(/\[big\](.*?)\[\/big\]/g, '<span style="font-size:1.4em">$1</span>');
+  html = html.replace(/\[small\](.*?)\[\/small\]/g, '<span style="font-size:0.8em">$1</span>');
+  for (const [name, hex] of Object.entries(PROTO_COLORS)) {
+    html = html.replace(new RegExp('\\['+name+'\\](.*?)\\[/'+name+'\\]', 'g'), `<span style="color:${hex}">$1</span>`);
+  }
+  return html;
+}
+function _pfTextarea() { return document.getElementById('pfBody'); }
+function protoWrapSelection(tag) {
+  const ta = _pfTextarea(); if (!ta) return;
+  const s = ta.selectionStart, e = ta.selectionEnd, value = ta.value;
+  const sel = value.slice(s,e) || 'Text';
+  const pre = `[${tag}]`, post = `[/${tag}]`;
+  ta.value = value.slice(0,s) + pre + sel + post + value.slice(e);
+  ta.focus(); ta.selectionStart = s+pre.length; ta.selectionEnd = s+pre.length+sel.length;
+}
+function protoInsertListItem() {
+  const ta = _pfTextarea(); if (!ta) return;
+  const s = ta.selectionStart, value = ta.value;
+  const lineStart = value.lastIndexOf('\n', s-1)+1;
+  ta.value = value.slice(0,lineStart) + '- ' + value.slice(lineStart);
+  ta.focus(); ta.selectionStart = ta.selectionEnd = s+2;
 }
 function protoBodySelectionHandler(protocolId) {
   const sel = window.getSelection();
