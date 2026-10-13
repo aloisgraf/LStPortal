@@ -288,6 +288,7 @@
       <div class="fg full"><label>Titel</label><input type="text" id="cFTitle" placeholder="z.B. IT-Leiter"></div>
       <div class="fg full"><label>Firma</label><input type="text" id="cFCompany"></div>
       <div class="fg full"><label>Zust&auml;ndig f&uuml;r</label><input type="text" id="cFResp" placeholder="z.B. Netzwerk, Telefonanlage"></div>
+      <div class="fg full"><label>Kategorie</label><select id="cFCat"><option value="">— Keine Kategorie —</option></select></div>
       <div class="fr"><div class="fg"><label>Telefonnummer 1</label><input type="text" id="cFPhone1"></div><div class="fg"><label>Telefonnummer 2</label><input type="text" id="cFPhone2"></div></div>
       <div class="fg full"><label>E-Mail</label><input type="email" id="cFEmail"></div>
       <div class="fg full"><label>Erreichbar</label><input type="text" id="cFAvail" placeholder="z.B. 24/7, B&uuml;rozeiten, Mo-Fr 8-16 Uhr"></div>
@@ -2260,8 +2261,35 @@
         <div class="fg" style="flex:1"><label>Icon (Emoji)</label><input type="text" id="wkCatIcon" placeholder="📚"></div>
         <div class="fg" style="flex:1"><label>Farbe</label><input type="color" id="wkCatColor" value="#3b6dd4" style="width:100%;height:36px;padding:2px"></div>
       </div>
+      <div class="fg"><label>Unterordner von</label><select id="wkCatParent"><option value="">— Kein Unterordner —</option></select></div>
     </div>
     <div class="mf"><button class="btn" onclick="submitWikiCategoryForm()">&#10003; Speichern</button></div>
+  </div>
+</div>
+
+<!-- CONTACT CATEGORY FORM MODAL -->
+<div class="ov" id="contactCatFormOv">
+  <div class="modal sm">
+    <div class="mh"><h2 id="ccCatFormTitle">Kategorie</h2><button class="mc" onclick="closeModal('contactCatFormOv')">&#10005;</button></div>
+    <div class="mb2">
+      <input type="hidden" id="ccCatId">
+      <div class="fg"><label>Name *</label><input type="text" id="ccCatName" placeholder="z.B. Partnerorganisationen"></div>
+      <div style="display:flex;gap:12px">
+        <div class="fg" style="flex:1"><label>Icon (Emoji)</label><input type="text" id="ccCatIcon" placeholder="📇"></div>
+        <div class="fg" style="flex:1"><label>Farbe</label><input type="color" id="ccCatColor" value="#3b6dd4" style="width:100%;height:36px;padding:2px"></div>
+      </div>
+      <div class="fg"><label>Unterordner von</label><select id="ccCatParent"><option value="">— Kein Unterordner —</option></select></div>
+    </div>
+    <div class="mf"><button class="btn" onclick="submitContactCategoryForm()">&#10003; Speichern</button></div>
+  </div>
+</div>
+
+<!-- GEMEINSAMES ORDNER-BERECHTIGUNGEN MODAL (Dokumente/Wiki/Kontakte) -->
+<div class="ov" id="catAclOv">
+  <div class="modal">
+    <div class="mh"><h2 id="catAclTitle">&#128274; Berechtigungen</h2><button class="mc" onclick="closeModal('catAclOv')">&#10005;</button></div>
+    <div class="mb2" id="catAclBody"></div>
+    <div class="mf"><button class="btn-s" onclick="closeModal('catAclOv')">Abbrechen</button><button class="btn-p" onclick="saveCatAcl()">&#128190; Speichern</button></div>
   </div>
 </div>
 

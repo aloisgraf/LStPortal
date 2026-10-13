@@ -201,27 +201,57 @@ async function logAct(uid, name, action, details={}) {
   ).catch(()=>{});
 }
 
-// Rollenbasierte Sichtbarkeits-/Bearbeitungs-Einschränkung für einzelne
-// Datensätze (Dokumente, Wiki-Artikel, Kontakte) — je Datensatz optional vom
-// Ersteller/Admin über "visible_roles"/"editable_roles" (JSON-Array von
-// Rollen-Keys) gesetzt. Leeres Array = Standardverhalten (für alle sichtbar
-// bzw. mit addGeneral bearbeitbar), wie vor Einführung dieser Funktion.
+// Ordner-/Datei-basierte Sichtbarkeits-/Bearbeitungs-Einschränkung für Dokumente,
+// Wiki-Artikel und Kontakte (jeweils optional in Ordnern/Kategorien organisiert).
+// Modell: jeder Datensatz UND jeder Ordner trägt optional visible_roles/
+// visible_users/editable_roles/editable_users (JSON-Arrays). Hat der Datensatz
+// selbst eine Zuweisung (Rolle ODER Nutzer, für "visible" bzw. "editable"
+// getrennt betrachtet), gilt NUR diese — sonst wird die Ordnerkette nach oben
+// durchsucht (parent_id) bis eine Zuweisung gefunden wird. Ist nirgends in der
+// Kette etwas zugewiesen, gilt deny-by-default: nur Ersteller + Admin dürfen
+// sehen/bearbeiten — es gibt bewusst KEINEN "leer = für alle sichtbar"-Shortcut
+// mehr, eine Rolle bekommt nie implizit Zugriff auf alle Einträge.
 const parseRoleList = r => { if(!r) return []; try{ const a = Array.isArray(r)?r:JSON.parse(r); return Array.isArray(a)?a:[]; }catch{ return []; } };
-function canSeeAcl(item, uid, roles) {
-  const creator = item.created_by ?? item.uploaded_by;
-  if (creator === uid) return true;
-  const vis = parseRoleList(item.visible_roles);
-  if (!vis.length) return true;
-  return (roles||[]).some(r => vis.includes(r));
+
+function _aclOwn(item, field) {
+  const roles = parseRoleList(item[field+'_roles']);
+  const users = parseRoleList(item[field+'_users']);
+  return (roles.length || users.length) ? { roles, users } : null;
 }
-function canEditAcl(item, uid, roles, p) {
+// categoriesById: Map/Objekt aller Ordner DESSELBEN Typs (z.B. alle doc_categories),
+// zum Durchlaufen der parent_id-Kette. item.category_id/parent_id verweisen hinein.
+function resolveAcl(item, field, categoriesById) {
+  const own = _aclOwn(item, field);
+  if (own) return own;
+  let catId = item.category_id;
+  const seen = new Set();
+  while (catId && categoriesById && !seen.has(catId)) {
+    seen.add(catId);
+    const cat = categoriesById[catId];
+    if (!cat) break;
+    const found = _aclOwn(cat, field);
+    if (found) return found;
+    catId = cat.parent_id;
+  }
+  return { roles: [], users: [] };
+}
+function canSeeAcl(item, uid, roles, p, categoriesById) {
   if (p?.manageUsers) return true;
   const creator = item.created_by ?? item.uploaded_by;
   if (creator === uid) return true;
-  if (!p?.addGeneral) return false;
-  const ed = parseRoleList(item.editable_roles);
-  if (!ed.length) return true;
-  return (roles||[]).some(r => ed.includes(r));
+  const src = resolveAcl(item, 'visible', categoriesById);
+  if (!src.roles.length && !src.users.length) return false;
+  if (src.users.includes(uid)) return true;
+  return (roles||[]).some(r => src.roles.includes(r));
+}
+function canEditAcl(item, uid, roles, p, categoriesById) {
+  if (p?.manageUsers) return true;
+  const creator = item.created_by ?? item.uploaded_by;
+  if (creator === uid) return true;
+  const src = resolveAcl(item, 'editable', categoriesById);
+  if (!src.roles.length && !src.users.length) return false;
+  if (src.users.includes(uid)) return true;
+  return (roles||[]).some(r => src.roles.includes(r));
 }
 
 module.exports = { pool, q, q1, newId, parseRoles, parseTags, getUser, getUserByUsername, DEPTS, logAct,

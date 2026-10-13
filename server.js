@@ -944,19 +944,75 @@ async function initDB() {
       size_bytes INTEGER NOT NULL DEFAULT 0, file_data TEXT,
       uploaded_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
     )`,
-    // Rollenbasierte Sichtbarkeits-/Bearbeitungs-Einschränkung je Datensatz
-    // (vom Ersteller/Admin optional gesetzt) — leeres Array ('[]', Standard)
-    // bedeutet "für alle sichtbar" bzw. "mit Allg.-Einträge-Recht bearbeitbar",
-    // identisch zum bisherigen Verhalten vor Einführung dieser Spalten.
+    // Ordner-/Datei-basierte Sichtbarkeits-/Bearbeitungs-Einschränkung für
+    // Dokumente, Wiki-Artikel und Kontakte (siehe canSeeAcl/canEditAcl in
+    // db.js): jeder Datensatz UND jeder Ordner (Kategorie) trägt optional
+    // visible_roles/visible_users/editable_roles/editable_users (JSON-Arrays).
+    // Eine Zuweisung am Datensatz selbst gilt exklusiv; sonst erbt er von der
+    // Ordnerkette (parent_id) nach oben; ist nirgends etwas zugewiesen, sehen/
+    // bearbeiten nur Ersteller + Admin den Eintrag (deny-by-default, keine
+    // automatische Sichtbarkeit für irgendeine Rolle).
     `ALTER TABLE documents ADD COLUMN IF NOT EXISTS visible_roles TEXT DEFAULT '[]'`,
     `ALTER TABLE documents ADD COLUMN IF NOT EXISTS editable_roles TEXT DEFAULT '[]'`,
+    `ALTER TABLE documents ADD COLUMN IF NOT EXISTS visible_users TEXT DEFAULT '[]'`,
+    `ALTER TABLE documents ADD COLUMN IF NOT EXISTS editable_users TEXT DEFAULT '[]'`,
     `ALTER TABLE wiki_articles ADD COLUMN IF NOT EXISTS visible_roles TEXT DEFAULT '[]'`,
     `ALTER TABLE wiki_articles ADD COLUMN IF NOT EXISTS editable_roles TEXT DEFAULT '[]'`,
+    `ALTER TABLE wiki_articles ADD COLUMN IF NOT EXISTS visible_users TEXT DEFAULT '[]'`,
+    `ALTER TABLE wiki_articles ADD COLUMN IF NOT EXISTS editable_users TEXT DEFAULT '[]'`,
     `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS visible_roles TEXT DEFAULT '[]'`,
     `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS editable_roles TEXT DEFAULT '[]'`,
+    `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS visible_users TEXT DEFAULT '[]'`,
+    `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS editable_users TEXT DEFAULT '[]'`,
+    `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS category_id TEXT`,
+    `ALTER TABLE doc_categories ADD COLUMN IF NOT EXISTS visible_roles TEXT DEFAULT '[]'`,
+    `ALTER TABLE doc_categories ADD COLUMN IF NOT EXISTS editable_roles TEXT DEFAULT '[]'`,
+    `ALTER TABLE doc_categories ADD COLUMN IF NOT EXISTS visible_users TEXT DEFAULT '[]'`,
+    `ALTER TABLE doc_categories ADD COLUMN IF NOT EXISTS editable_users TEXT DEFAULT '[]'`,
+    `ALTER TABLE wiki_categories ADD COLUMN IF NOT EXISTS parent_id TEXT`,
+    `ALTER TABLE wiki_categories ADD COLUMN IF NOT EXISTS visible_roles TEXT DEFAULT '[]'`,
+    `ALTER TABLE wiki_categories ADD COLUMN IF NOT EXISTS editable_roles TEXT DEFAULT '[]'`,
+    `ALTER TABLE wiki_categories ADD COLUMN IF NOT EXISTS visible_users TEXT DEFAULT '[]'`,
+    `ALTER TABLE wiki_categories ADD COLUMN IF NOT EXISTS editable_users TEXT DEFAULT '[]'`,
+    // Kontakt-Kategorien (Ordner) — analog zu doc_categories/wiki_categories,
+    // ebenfalls mit parent_id für Unterordner.
+    `CREATE TABLE IF NOT EXISTS contact_categories (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL,
+      icon TEXT DEFAULT '📇', color TEXT DEFAULT '#3b6dd4',
+      sort_order INTEGER DEFAULT 0, parent_id TEXT,
+      visible_roles TEXT DEFAULT '[]', editable_roles TEXT DEFAULT '[]',
+      visible_users TEXT DEFAULT '[]', editable_users TEXT DEFAULT '[]',
+      created_by TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }
+
+  // ── Einmalige Rückwirkende Absicherung der Ordner-/Datei-Berechtigungen ──
+  // Vor dieser Umstellung bedeutete ein leeres visible_roles/visible_users
+  // "für alle sichtbar" (Standardverhalten). Die neue Logik (canSeeAcl/
+  // canEditAcl in db.js) ist deny-by-default: ohne jede Zuweisung sehen nur
+  // Ersteller + Admin einen Eintrag. Ohne diese Migration würden ALLE
+  // bestehenden Dokumente/Wiki-Artikel/Kontakte/Ordner beim Deploy für
+  // sämtliche Nutzer (außer Ersteller/Admin) unsichtbar werden. Einmalig
+  // (per Flag-Tabelle) werden daher bestehende, noch nie konfigurierte
+  // Einträge auf "für alle Rollen sichtbar/bearbeitbar" gesetzt — neue
+  // Einträge ab jetzt nutzen regulär das neue deny-by-default-Verhalten.
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS _migration_flags (key TEXT PRIMARY KEY, done_at TIMESTAMPTZ DEFAULT NOW())`);
+    const done = await pool.query(`SELECT 1 FROM _migration_flags WHERE key='acl_backfill_v1'`);
+    if (done.rows.length === 0) {
+      const allRoles = JSON.stringify(['admin','leitung','dienstplanung','schichtleiter','technik','ausbildung','qm','standard']);
+      for (const t of ['documents','wiki_articles','contacts','doc_categories','wiki_categories']) {
+        await pool.query(
+          `UPDATE ${t} SET visible_roles=$1, editable_roles=$1
+           WHERE visible_roles='[]' AND editable_roles='[]' AND visible_users='[]' AND editable_users='[]'`,
+          [allRoles]
+        ).catch(()=>{});
+      }
+      await pool.query(`INSERT INTO _migration_flags(key) VALUES ('acl_backfill_v1')`);
+    }
+  } catch(e) {}
 
   // ── Benutzername-Migration ──
   // Login lief bisher über eine Namens-Auswahlliste (Sicherheits-/Datenschutzproblem:

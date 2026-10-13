@@ -48,27 +48,67 @@ const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','A
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
 const ROLES=[{id:'admin',label:'Administrator',icon:'\uD83D\uDD11'},{id:'leitung',label:'Leitung',icon:'\u2B50'},{id:'dienstplanung',label:'Dienstplanung',icon:'\uD83D\uDCCB'},{id:'schichtleiter',label:'Schichtleiter',icon:'\uD83D\uDD06'},{id:'technik',label:'Technik',icon:'\uD83D\uDD27'},{id:'ausbildung',label:'Ausbildung',icon:'\uD83C\uDF93'},{id:'qm',label:'QM',icon:'\u2705'},{id:'standard',label:'Standard',icon:'\uD83D\uDC64'}];
-// Gemeinsamer rollenbasierter Sichtbarkeits-/Bearbeitungs-Editor f\u00FCr Dokumente,
-// Wiki-Artikel und Kontakte \u2014 leeres Array = f\u00FCr alle sichtbar/bearbeitbar
-// (heutiges Standardverhalten), wie vom Server in canSeeAcl/canEditAcl (db.js)
-// ausgewertet.
-function aclEditorHtml(idPrefix, visibleRoles, editableRoles) {
-  const vis = visibleRoles||[], ed = editableRoles||[];
-  const row = (name, selected) => ROLES.map(r=>`<label class="rck"><input type="checkbox" name="${name}" value="${r.id}" ${selected.includes(r.id)?'checked':''}><span>${r.icon} ${r.label}</span></label>`).join('');
+// Gemeinsamer Sichtbarkeits-/Bearbeitungs-Editor f\u00FCr Dokumente, Wiki-Artikel,
+// Kontakte UND deren Ordner (Kategorien) \u2014 Rollen und/oder einzelne Nutzer
+// zuweisbar. Ohne EIGENE Zuweisung erbt ein Datensatz von seinem Ordner
+// (parent_id-Kette); ist nirgends etwas zugewiesen, sehen/bearbeiten nur
+// Ersteller + Admin (deny-by-default, keine Rolle sieht automatisch alles),
+// siehe canSeeAcl/canEditAcl in db.js.
+function aclEditorHtml(idPrefix, acl) {
+  const vis = acl?.visibleRoles||[], visU = acl?.visibleUsers||[];
+  const ed = acl?.editableRoles||[], edU = acl?.editableUsers||[];
+  const roleRow = (name, selected) => ROLES.map(r=>`<label class="rck"><input type="checkbox" name="${name}" value="${r.id}" ${selected.includes(r.id)?'checked':''}><span>${r.icon} ${r.label}</span></label>`).join('');
+  const userRow = (name, selected) => (S.users||[]).slice().sort((a,b)=>a.name.localeCompare(b.name,'de')).map(u=>`<label class="rck"><input type="checkbox" name="${name}" value="${u.id}" ${selected.includes(u.id)?'checked':''}><span>${esc(lastNameFirst(u.name))}</span></label>`).join('');
   return `<div class="fg full">
-    <label>Sichtbar f\u00FCr (leer = alle)</label>
-    <div id="${idPrefix}Vis" style="display:flex;flex-wrap:wrap;gap:8px">${row('vis',vis)}</div>
+    <label>Sichtbar f\u00FCr Rollen (leer = vom Ordner geerbt, sonst nur Ersteller + Admin)</label>
+    <div id="${idPrefix}VisRoles" style="display:flex;flex-wrap:wrap;gap:8px">${roleRow('visRoles',vis)}</div>
+    <details style="margin-top:6px"><summary style="font-size:12px;color:var(--mu);cursor:pointer">+ einzelne Nutzer</summary>
+      <div id="${idPrefix}VisUsers" style="display:flex;flex-wrap:wrap;gap:8px;max-height:160px;overflow-y:auto;margin-top:6px">${userRow('visUsers',visU)}</div>
+    </details>
   </div>
   <div class="fg full">
-    <label>Bearbeitbar von (leer = alle mit Berechtigung)</label>
-    <div id="${idPrefix}Edit" style="display:flex;flex-wrap:wrap;gap:8px">${row('edit',ed)}</div>
+    <label>Bearbeitbar von Rollen (leer = vom Ordner geerbt, sonst nur Ersteller + Admin)</label>
+    <div id="${idPrefix}EditRoles" style="display:flex;flex-wrap:wrap;gap:8px">${roleRow('editRoles',ed)}</div>
+    <details style="margin-top:6px"><summary style="font-size:12px;color:var(--mu);cursor:pointer">+ einzelne Nutzer</summary>
+      <div id="${idPrefix}EditUsers" style="display:flex;flex-wrap:wrap;gap:8px;max-height:160px;overflow-y:auto;margin-top:6px">${userRow('editUsers',edU)}</div>
+    </details>
   </div>`;
 }
 function aclReadRoles(idPrefix) {
+  const vals = sel => Array.from(document.querySelectorAll(sel)).map(cb=>cb.value);
   return {
-    visibleRoles: Array.from(document.querySelectorAll('#'+idPrefix+'Vis input:checked')).map(cb=>cb.value),
-    editableRoles: Array.from(document.querySelectorAll('#'+idPrefix+'Edit input:checked')).map(cb=>cb.value),
+    visibleRoles: vals('#'+idPrefix+'VisRoles input:checked'),
+    visibleUsers: vals('#'+idPrefix+'VisUsers input:checked'),
+    editableRoles: vals('#'+idPrefix+'EditRoles input:checked'),
+    editableUsers: vals('#'+idPrefix+'EditUsers input:checked'),
   };
+}
+// Gemeinsame Ordner-/Kategorie-Verwaltung f\u00FCr Dokumente, Wiki und Kontakte \u2014
+// Berechtigungen (\uD83D\uDD12-Button je Ordner) laufen f\u00FCr alle drei Module \u00FCber
+// dieselbe Modal/Funktion statt je Modul eigenem Code.
+const CAT_ACL_CONF = {
+  doc:     { path:'/doc-categories',     list:()=>S.docCategories||[],     refresh:()=>{ if(S.view==='docs') { renderDocs(); if(document.getElementById('docCatList')) renderDocCatAdmin(); } } },
+  wiki:    { path:'/wiki-categories',    list:()=>S.wikiCategories||[],    refresh:()=>{ if(S.view==='wiki') renderWiki(); } },
+  contact: { path:'/contact-categories', list:()=>S.contactCategories||[], refresh:()=>{ if(S.view==='contacts') renderContacts(); } },
+};
+function openCatAclModal(type, id) {
+  const conf = CAT_ACL_CONF[type]; if (!conf) return;
+  const cat = conf.list().find(c=>c.id===id); if (!cat) return;
+  S._aclCatType = type; S._aclCatId = id;
+  document.getElementById('catAclTitle').textContent = (cat.icon||'\uD83D\uDCC1')+' '+cat.name;
+  document.getElementById('catAclBody').innerHTML = aclEditorHtml('catAcl', cat);
+  openModal('catAclOv');
+}
+async function saveCatAcl() {
+  const conf = CAT_ACL_CONF[S._aclCatType]; if (!conf) return;
+  const cat = conf.list().find(c=>c.id===S._aclCatId); if (!cat) return;
+  const acl = aclReadRoles('catAcl');
+  try {
+    await api('PUT', conf.path+'/'+cat.id, {name:cat.name, icon:cat.icon, color:cat.color, parentId:cat.parentId||null, ...acl});
+    closeModal('catAclOv');
+    await fetchData(); conf.refresh();
+    toast('\u2705 Berechtigungen gespeichert');
+  } catch(e) { toast('\u26A0\uFE0F '+e.message,'err'); }
 }
 // Fallback bis der erste fetchData()-Aufruf die echten (admin-verwaltbaren)
 // Fachbereiche aus S.departments geliefert hat \u2014 danach werden beide unten
@@ -111,6 +151,7 @@ let S={
   stationOutages:[],links:[],rolePermissions:[],_onBreak:false,
   docs:[],docCategories:[],_docFilter:'all',_docSearch:'',
   wikiArticles:[],wikiCategories:[],_wikiCatFilter:'all',_wikiSearch:'',_selWikiArticle:null,_wikiEditing:false,
+  contactCategories:[],_contactCatFilter:'all',
   meetings:[], _selMeeting:null, _selInstance:null,
   tkBatchMode:false,tkBatchSel:new Set(),_tkFeedFilter:'all',_tkTab:'details',tkGroupBy:'dept',tkFiltSubcat:'',
   checklists:[],messages:[],notifications:[],abrechnung:{einspringer:[],homeoffice:[]},dienstplaene:[],
@@ -182,7 +223,7 @@ async function fetchData(){
     S.dpProtocol=data.dpProtocol||[];
     S.dpEmpRules=data.dpEmpRules||[];
     S.todos=data.todos||[];
-    S.contacts=data.contacts||[];
+    S.contacts=data.contacts||[];S.contactCategories=data.contactCategories||[];
     S.sopTemplates=data.sopTemplates||[];S.sopRuns=data.sopRuns||[];
     S.lockers=data.lockers||[];
     S.departments=data.departments||[];
@@ -3486,7 +3527,7 @@ function openModal(id){document.getElementById(id)?.classList.add('open');}
 function closeModal(id){document.getElementById(id)?.classList.remove('open');}
 function eyeToggle(inputId,btn){const inp=document.getElementById(inputId);const show=inp.type==='password';inp.type=show?'text':'password';btn.textContent=show?'\uD83D\uDE48':'\uD83D\uDC41';}
 function toast(msg,type='',dur=3200){const t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),dur);}
-const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOr','clFormOv','attachClOv','changelogOv','dpOv','rejectEinspOv','helpOv','msgFormOv','msgDetOv','gSearchOv','stLoginOv','docFormOv','docVerOv','docHistOv','docCatOv','dpReportModal','deptOv','spintCatOv','spintCatFormOv','protoFormOv','viewAsOv'];
+const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOr','clFormOv','attachClOv','changelogOv','dpOv','rejectEinspOv','helpOv','msgFormOv','msgDetOv','gSearchOv','stLoginOv','docFormOv','docVerOv','docHistOv','docCatOv','dpReportModal','deptOv','spintCatOv','spintCatFormOv','protoFormOv','viewAsOv','contactOv','wikiCatFormOv','contactCatFormOv','catAclOv'];
 document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();openGSearch();return;}
   if(e.key==='Escape'){ALL_MODALS.forEach(closeModal);closeGSearch();if(document.getElementById('brainScreensaverOv')?.style.display==='block')closeBrainScreensaver();}
@@ -3609,7 +3650,7 @@ async function silentRefresh(){
       S.messages=data.messages||[];S.notifications=data.notifications||[];
       S.allowances=data.allowances||[];S.checklists=data.checklists||[];
       S.abrechnung=data.abrechnung||{einspringer:[],homeoffice:[]};S.dienstplaene=data.dienstplaene||[];S.diensttausch=data.diensttausch||[];S.homeoffice=data.homeoffice||{slots:[],config:[],boxes:[],dienste:[]};S.vacationConfig=data.vacationConfig||[];S.diensttausch=data.diensttausch||[];
-      S.stationSessions=data.stationSessions||[];S.stationShifts=data.stationShifts||[];S.stationOutages=data.stationOutages||[];S.links=data.portalLinks||[];S.docs=data.docs||[];S.docCategories=data.docCategories||[];S.wikiArticles=data.wikiArticles||[];S.wikiCategories=data.wikiCategories||[];S.rolePermissions=data.rolePermissions||[];S.meetings=data.meetings||[];S.contacts=data.contacts||[];S.todos=data.todos||[];
+      S.stationSessions=data.stationSessions||[];S.stationShifts=data.stationShifts||[];S.stationOutages=data.stationOutages||[];S.links=data.portalLinks||[];S.docs=data.docs||[];S.docCategories=data.docCategories||[];S.wikiArticles=data.wikiArticles||[];S.wikiCategories=data.wikiCategories||[];S.rolePermissions=data.rolePermissions||[];S.meetings=data.meetings||[];S.contacts=data.contacts||[];S.contactCategories=data.contactCategories||[];S.todos=data.todos||[];
       S.sopTemplates=data.sopTemplates||[];S.sopRuns=data.sopRuns||[];
       S.lockers=data.lockers||[];
       S.departments=data.departments||[];
@@ -4832,8 +4873,13 @@ async function deleteLink(id){
 // ── KONTAKTE ──────────────────────────────────────────────────────────────
 function renderContacts(){
   const canAdd=!!S.p.addGeneral;
+  const isAdmin=!!S.p?.manageUsers;
+  const cats=S.contactCategories||[];
+  const filt=S._contactCatFilter||'all';
   const search=(S._contactSearch||'').toLowerCase().trim();
   let list=(S.contacts||[]).slice().sort((a,b)=>a.name.localeCompare(b.name,'de'));
+  if(filt==='__none__') list=list.filter(c=>!c.categoryId);
+  else if(filt!=='all') list=list.filter(c=>c.categoryId===filt);
   if(search) list=list.filter(c=>[c.name,c.title,c.company,c.responsibleFor,c.email,c.phone1,c.phone2].some(v=>(v||'').toLowerCase().includes(search)));
   const contactCard=c=>{
     const canManage=!!c._canManage;
@@ -4855,14 +4901,42 @@ function renderContacts(){
       +'</div>';
   };
   document.getElementById('main').innerHTML=`
-    <div class="ph"><div class="pt">&#128222; Kontakte</div>${canAdd?`<button class="btn-p" onclick="openContactForm()">&#65291; Kontakt</button>`:''}</div>
-    <div style="padding:0 20px 12px">
-      <input type="text" class="srch" placeholder="&#128269; Suchen (Name, Firma, Zust&auml;ndigkeit, ...)" value="${(S._contactSearch||'').replace(/"/g,'&quot;')}" oninput="S._contactSearch=this.value;renderContacts()" style="width:100%;max-width:360px">
+    <div class="ph"><div class="pt">&#128222; Kontakte</div>
+      <div style="display:flex;gap:8px">
+        ${canAdd?`<button class="btn-s" onclick="openContactCategoryForm()">&#65291; Kategorie</button>`:''}
+        ${canAdd?`<button class="btn-p" onclick="openContactForm()">&#65291; Kontakt</button>`:''}
+      </div>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;padding:0 20px 20px">
-    ${list.map(contactCard).join('')}
-    ${!list.length?'<div style="color:var(--di);font-size:13px;padding:20px">'+(search?'Keine Kontakte gefunden.':'Noch keine Kontakte eingetragen.')+'</div>':''}
+    <div class="docs-layout">
+      <div class="docs-sidebar">
+        <div class="docs-cat-item${filt==='all'?' active':''}" onclick="S._contactCatFilter='all';renderContacts()">&#128222; Alle <span class="docs-cat-cnt">${(S.contacts||[]).length}</span></div>
+        ${(()=>{const top=cats.filter(c=>!c.parentId);const item=(c,sub)=>{
+          const n=(S.contacts||[]).filter(x=>x.categoryId===c.id).length;
+          return `<div class="docs-cat-item${filt===c.id?' active':''}" onclick="S._contactCatFilter='${c.id}';renderContacts()" style="${filt===c.id?'border-left-color:'+c.color+';':''}${sub?'padding-left:28px':''}">
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.icon} ${esc(c.name)}</span>
+            <span class="docs-cat-cnt">${n}</span>
+            ${canAdd?`<span style="display:flex;gap:2px;flex-shrink:0" onclick="event.stopPropagation()">
+              <button class="btn-s" style="padding:1px 4px;font-size:10px" onclick="openContactCategoryForm('${c.id}')" title="Bearbeiten">&#9998;</button>
+              <button class="btn-s" style="padding:1px 4px;font-size:10px" title="Berechtigungen" onclick="openCatAclModal('contact','${c.id}')">&#128274;</button>
+              <button class="btn-d" style="padding:1px 4px;font-size:10px" onclick="deleteContactCategory('${c.id}')" title="Löschen">&#10005;</button>
+            </span>`:''}
+          </div>`;
+        };return top.flatMap(c=>[item(c,false),...cats.filter(ch=>ch.parentId===c.id).map(ch=>item(ch,true))]).join('');})()}
+        <div class="docs-cat-item${filt==='__none__'?' active':''}" onclick="S._contactCatFilter='__none__';renderContacts()">&#128193; Ohne Kategorie <span class="docs-cat-cnt">${(S.contacts||[]).filter(c=>!c.categoryId).length}</span></div>
+      </div>
+      <div class="docs-main">
+        <input type="text" class="srch" placeholder="&#128269; Suchen (Name, Firma, Zust&auml;ndigkeit, ...)" value="${(S._contactSearch||'').replace(/"/g,'&quot;')}" oninput="S._contactSearch=this.value;renderContacts()" style="width:100%;max-width:360px;margin-bottom:14px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">
+        ${list.map(contactCard).join('')}
+        ${!list.length?'<div style="color:var(--di);font-size:13px;padding:20px">'+(search?'Keine Kontakte gefunden.':'Keine Kontakte in diesem Ordner.')+'</div>':''}
+        </div>
+      </div>
     </div>`;
+}
+function _contactCatOptionsIndented(){
+  const cats=S.contactCategories||[];
+  const top=cats.filter(c=>!c.parentId);
+  return top.flatMap(c=>[c,...cats.filter(ch=>ch.parentId===c.id)]).map(c=>`<option value="${c.id}">${c.parentId?'　↳ ':''}${c.icon} ${esc(c.name)}</option>`).join('');
 }
 function openContactForm(id){
   const c=id?S.contacts.find(x=>x.id===id):null;
@@ -4876,14 +4950,50 @@ function openContactForm(id){
   document.getElementById('cFPhone2').value=c?.phone2||'';
   document.getElementById('cFEmail').value=c?.email||'';
   document.getElementById('cFAvail').value=c?.availability||'';
-  document.getElementById('cFAcl').innerHTML=aclEditorHtml('cF',c?.visibleRoles,c?.editableRoles);
+  const sel=document.getElementById('cFCat');
+  if(sel){ sel.innerHTML=`<option value="">— Keine Kategorie —</option>${_contactCatOptionsIndented()}`; sel.value=c?.categoryId||''; }
+  document.getElementById('cFAcl').innerHTML=aclEditorHtml('cF',c);
   openModal('contactOv');
+}
+function openContactCategoryForm(id=null){
+  const c=id?(S.contactCategories||[]).find(x=>x.id===id):null;
+  document.getElementById('ccCatFormTitle').textContent=c?'Kategorie bearbeiten':'Neue Kategorie';
+  document.getElementById('ccCatId').value=c?.id||'';
+  document.getElementById('ccCatName').value=c?.name||'';
+  document.getElementById('ccCatIcon').value=c?.icon||'📇';
+  document.getElementById('ccCatColor').value=c?.color||'#3b6dd4';
+  const top=(S.contactCategories||[]).filter(x=>!x.parentId && x.id!==id);
+  const parentSel=document.getElementById('ccCatParent');
+  if(parentSel){ parentSel.innerHTML=`<option value="">— Kein Unterordner —</option>${top.map(x=>`<option value="${x.id}">${x.icon} ${esc(x.name)}</option>`).join('')}`; parentSel.value=c?.parentId||''; }
+  openModal('contactCatFormOv');
+}
+async function submitContactCategoryForm(){
+  const id=document.getElementById('ccCatId').value;
+  const name=document.getElementById('ccCatName').value.trim();
+  if(!name) return toast('⚠️ Name erforderlich','err');
+  const parentId=document.getElementById('ccCatParent')?.value||null;
+  const body={ name, icon:document.getElementById('ccCatIcon').value.trim()||'📇', color:document.getElementById('ccCatColor').value, parentId };
+  try{
+    if(id) await api('PUT','/contact-categories/'+id,body);
+    else await api('POST','/contact-categories',body);
+    closeModal('contactCatFormOv');
+    await fetchData(); renderContacts(); toast('✅ Gespeichert');
+  }catch(e){toast('⚠️ '+e.message,'err');}
+}
+async function deleteContactCategory(id){
+  if(!confirm('Kategorie löschen? Zugeordnete Kontakte verlieren nur die Kategorie.'))return;
+  try{
+    await api('DELETE','/contact-categories/'+id);
+    if(S._contactCatFilter===id)S._contactCatFilter='all';
+    await fetchData(); renderContacts(); toast('✅ Gelöscht');
+  }catch(e){toast('⚠️ '+e.message,'err');}
 }
 async function saveContact(){
   const id=document.getElementById('cFId').value;
   const name=document.getElementById('cFName').value.trim();
   if(!name)return toast('⚠️ Name erforderlich','err');
-  const {visibleRoles,editableRoles}=aclReadRoles('cF');
+  const acl=aclReadRoles('cF');
+  const categoryId=document.getElementById('cFCat')?.value||null;
   const body={
     name,
     title:document.getElementById('cFTitle').value.trim(),
@@ -4893,7 +5003,8 @@ async function saveContact(){
     phone2:document.getElementById('cFPhone2').value.trim(),
     email:document.getElementById('cFEmail').value.trim(),
     availability:document.getElementById('cFAvail').value.trim(),
-    visibleRoles, editableRoles,
+    categoryId,
+    ...acl,
   };
   try{
     if(id) await api('PUT','/contacts/'+id,body);
@@ -5693,7 +5804,7 @@ function openDocForm(docId){
   const sel=document.getElementById('docFCat');
   sel.innerHTML=`<option value="">— Keine Kategorie —</option>${_docCatOptionsIndented()}`;
   if(doc?.categoryId)sel.value=doc.categoryId;
-  document.getElementById('docFAcl').innerHTML=aclEditorHtml('docF',doc?.visibleRoles,doc?.editableRoles);
+  document.getElementById('docFAcl').innerHTML=aclEditorHtml('docF',doc);
   openModal('docFormOv');
 }
 async function submitDocForm(){
@@ -5701,9 +5812,9 @@ async function submitDocForm(){
   if(!title){toast('⚠️ Titel erforderlich','err');return;}
   const catId=document.getElementById('docFCat').value||null;
   const desc=document.getElementById('docFDesc').value.trim();
-  const {visibleRoles,editableRoles}=aclReadRoles('docF');
+  const acl=aclReadRoles('docF');
   if(S._editDocId){
-    try{await api('PUT','/docs/'+S._editDocId,{title,description:desc,categoryId:catId,visibleRoles,editableRoles});await fetchData();renderDocs();closeModal('docFormOv');toast('✅ Gespeichert');}
+    try{await api('PUT','/docs/'+S._editDocId,{title,description:desc,categoryId:catId,...acl});await fetchData();renderDocs();closeModal('docFormOv');toast('✅ Gespeichert');}
     catch(e){toast('⚠️ '+e.message,'err');}
     return;
   }
@@ -5716,7 +5827,7 @@ async function submitDocForm(){
     const buf=await file.arrayBuffer();const bytes=new Uint8Array(buf);
     let b64='';const chunk=8192;for(let i=0;i<bytes.length;i+=chunk)b64+=String.fromCharCode(...bytes.subarray(i,i+chunk));
     b64=btoa(b64);
-    await api('POST','/docs',{title,description:desc,categoryId:catId,name:file.name,mimeType:file.type||'application/octet-stream',data:b64,visibleRoles,editableRoles});
+    await api('POST','/docs',{title,description:desc,categoryId:catId,name:file.name,mimeType:file.type||'application/octet-stream',data:b64,...acl});
     await fetchData();renderDocs();closeModal('docFormOv');toast('✅ Dokument hochgeladen');
   }catch(e){toast('⚠️ '+e.message,'err');}
 }
@@ -5782,6 +5893,7 @@ function renderDocCatAdmin(){
     <span style="font-size:18px">${c.parentId?'&#8618; ':''}${c.icon}</span>
     <span style="flex:1;font-size:13px">${c.name}</span>
     <span style="width:18px;height:18px;border-radius:50%;background:${c.color};flex-shrink:0;display:inline-block"></span>
+    <button class="btn-s" style="padding:3px 8px;font-size:11px" title="Berechtigungen" onclick="openCatAclModal('doc','${c.id}')">&#128274;</button>
     <button class="btn-d" style="padding:3px 8px;font-size:11px" onclick="deleteDocCat('${c.id}','${c.name.replace(/'/g,"\\'")}')">&#10005;</button>
   </div>`;
   const html=top.flatMap(c=>[row(c),...cats.filter(ch=>ch.parentId===c.id).map(row)]).join('')
@@ -5869,17 +5981,18 @@ function renderWikiList() {
     <div class="docs-layout">
       <div class="docs-sidebar">
         <div class="docs-cat-item${filt==='all'?' active':''}" onclick="S._wikiCatFilter='all';renderWiki()">&#128218; Alle <span class="docs-cat-cnt">${(S.wikiArticles||[]).length}</span></div>
-        ${cats.map(c=>{
+        ${(()=>{const top=cats.filter(c=>!c.parentId);const item=(c,sub)=>{
           const n=(S.wikiArticles||[]).filter(a=>a.categoryId===c.id).length;
-          return `<div class="docs-cat-item${filt===c.id?' active':''}" onclick="S._wikiCatFilter='${c.id}';renderWiki()" style="${filt===c.id?'border-left-color:'+c.color+';':''}">
+          return `<div class="docs-cat-item${filt===c.id?' active':''}" onclick="S._wikiCatFilter='${c.id}';renderWiki()" style="${filt===c.id?'border-left-color:'+c.color+';':''}${sub?'padding-left:28px':''}">
             <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.icon} ${esc(c.name)}</span>
             <span class="docs-cat-cnt">${n}</span>
             ${canManage?`<span style="display:flex;gap:2px;flex-shrink:0" onclick="event.stopPropagation()">
               <button class="btn-s" style="padding:1px 4px;font-size:10px" onclick="openWikiCategoryForm('${c.id}')" title="Bearbeiten">&#9998;</button>
+              <button class="btn-s" style="padding:1px 4px;font-size:10px" title="Berechtigungen" onclick="openCatAclModal('wiki','${c.id}')">&#128274;</button>
               <button class="btn-d" style="padding:1px 4px;font-size:10px" onclick="deleteWikiCategory('${c.id}')" title="Löschen">&#10005;</button>
             </span>`:''}
           </div>`;
-        }).join('')}
+        };return top.flatMap(c=>[item(c,false),...cats.filter(ch=>ch.parentId===c.id).map(ch=>item(ch,true))]).join('');})()}
         <div class="docs-cat-item${filt==='__none__'?' active':''}" onclick="S._wikiCatFilter='__none__';renderWiki()">&#128193; Ohne Kategorie <span class="docs-cat-cnt">${(S.wikiArticles||[]).filter(a=>!a.categoryId).length}</span></div>
       </div>
       <div>
@@ -5983,7 +6096,7 @@ function renderWikiArticleEditor(article) {
         <div id="wkPreview" class="wiki-body" style="border:1px solid var(--border);border-radius:0 0 8px 8px;padding:14px;min-height:200px;${S._wikiPreview?'':'display:none'}">${S._wikiPreview?wikiMarkdownToHtml(article?article.body:''):''}</div>
         <small style="color:var(--mu);display:block;margin-top:6px">Bilder können auch direkt per Drag&amp;Drop in das Textfeld gezogen werden.</small>
       </div>
-      <div id="wkAcl">${aclEditorHtml('wk',article?.visibleRoles,article?.editableRoles)}</div>
+      <div id="wkAcl">${aclEditorHtml('wk',article)}</div>
     </div>`;
 }
 // Innerhalb eines <textarea>...</textarea>-Inhalts muss nur "</textarea"
@@ -6056,10 +6169,10 @@ async function submitWikiArticle(id) {
   const categoryId = document.getElementById('wkCategory').value || null;
   const tags = document.getElementById('wkTags').value.split(',').map(t=>t.trim()).filter(Boolean);
   const body = document.getElementById('wkBody').value;
-  const {visibleRoles,editableRoles} = aclReadRoles('wk');
+  const acl = aclReadRoles('wk');
   try {
-    const result = id ? await api('PUT','/wiki-articles/'+id, {title,categoryId,tags,body,visibleRoles,editableRoles})
-                       : await api('POST','/wiki-articles', {title,categoryId,tags,body,visibleRoles,editableRoles});
+    const result = id ? await api('PUT','/wiki-articles/'+id, {title,categoryId,tags,body,...acl})
+                       : await api('POST','/wiki-articles', {title,categoryId,tags,body,...acl});
     S._wikiEditing = false; S._wikiPreview = false; S._selWikiArticle = result.id;
     await fetchData(); renderWiki(); toast('✅ Artikel gespeichert');
   } catch(e) { toast('⚠️ '+e.message,'err'); }
@@ -6080,13 +6193,17 @@ function openWikiCategoryForm(id=null) {
   document.getElementById('wkCatName').value = c?.name||'';
   document.getElementById('wkCatIcon').value = c?.icon||'📚';
   document.getElementById('wkCatColor').value = c?.color||'#3b6dd4';
+  const top = (S.wikiCategories||[]).filter(x=>!x.parentId && x.id!==id);
+  const parentSel = document.getElementById('wkCatParent');
+  if (parentSel) { parentSel.innerHTML = `<option value="">— Kein Unterordner —</option>${top.map(x=>`<option value="${x.id}">${x.icon} ${esc(x.name)}</option>`).join('')}`; parentSel.value = c?.parentId||''; }
   openModal('wikiCatFormOv');
 }
 async function submitWikiCategoryForm() {
   const id = document.getElementById('wkCatId').value;
   const name = document.getElementById('wkCatName').value.trim();
   if (!name) return toast('Name erforderlich','err');
-  const body = { name, icon: document.getElementById('wkCatIcon').value.trim()||'📚', color: document.getElementById('wkCatColor').value };
+  const parentId = document.getElementById('wkCatParent')?.value||null;
+  const body = { name, icon: document.getElementById('wkCatIcon').value.trim()||'📚', color: document.getElementById('wkCatColor').value, parentId };
   try {
     if (id) await api('PUT','/wiki-categories/'+id, body);
     else await api('POST','/wiki-categories', body);

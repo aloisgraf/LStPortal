@@ -28,16 +28,23 @@ function extFromMime(mime, originalName) {
 
 // ── DOC CATEGORIES ────────────────────────────────────────────────────────────
 
+async function docCatMap() {
+  const rows = await q('SELECT * FROM doc_categories');
+  const m = {}; rows.forEach(c => m[c.id] = c); return m;
+}
+
 router.get('/doc-categories', auth, async (req, res) => {
   try {
     const rows = await q('SELECT * FROM doc_categories ORDER BY sort_order, name');
-    ok(res, rows);
+    const roles = parseRoles(req.user.roles);
+    const byId = {}; rows.forEach(c => byId[c.id] = c);
+    ok(res, rows.filter(c => canSeeAcl(c, req.uid, roles, req.p, byId)));
   } catch(e) { bad(res, e.message, 500); }
 });
 
 router.post('/doc-categories', auth, async (req, res) => {
   if (!req.p.manageUsers) return bad(res, 'Keine Berechtigung', 403);
-  const { name, icon, color, sortOrder, parentId } = req.body;
+  const { name, icon, color, sortOrder, parentId, visibleRoles, editableRoles, visibleUsers, editableUsers } = req.body;
   if (!name) return bad(res, 'Name erforderlich', 400);
   try {
     if (parentId) {
@@ -46,35 +53,50 @@ router.post('/doc-categories', auth, async (req, res) => {
     }
     const id = newId();
     const row = await q1(
-      `INSERT INTO doc_categories (id,name,icon,color,sort_order,created_by,parent_id) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [id, name, icon||'📁', color||'#3b6dd4', sortOrder||0, req.uid, parentId||null]
+      `INSERT INTO doc_categories (id,name,icon,color,sort_order,created_by,parent_id,visible_roles,editable_roles,visible_users,editable_users)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+      [id, name, icon||'📁', color||'#3b6dd4', sortOrder||0, req.uid, parentId||null,
+       JSON.stringify(Array.isArray(visibleRoles)?visibleRoles:[]), JSON.stringify(Array.isArray(editableRoles)?editableRoles:[]),
+       JSON.stringify(Array.isArray(visibleUsers)?visibleUsers:[]), JSON.stringify(Array.isArray(editableUsers)?editableUsers:[])]
     );
     ok(res, row);
   } catch(e) { bad(res, e.message, 500); }
 });
 
 router.put('/doc-categories/:id', auth, async (req, res) => {
-  if (!req.p.manageUsers) return bad(res, 'Keine Berechtigung', 403);
-  const { name, icon, color, parentId } = req.body;
+  const { name, icon, color, parentId, visibleRoles, editableRoles, visibleUsers, editableUsers } = req.body;
   if (!name) return bad(res, 'Name erforderlich', 400);
   if (parentId === req.params.id) return bad(res, 'Kategorie kann nicht ihr eigener Unterordner sein', 400);
   try {
+    const byId = await docCatMap();
+    const cat = byId[req.params.id];
+    if (!cat) return bad(res, 'Nicht gefunden', 404);
+    if (!canEditAcl(cat, req.uid, parseRoles(req.user.roles), req.p, byId)) return bad(res, 'Keine Berechtigung', 403);
     if (parentId) {
       const parent = await q1('SELECT id FROM doc_categories WHERE id=$1', [parentId]);
       if (!parent) return bad(res, 'Übergeordnete Kategorie nicht gefunden', 400);
     }
     const row = await q1(
-      `UPDATE doc_categories SET name=$1,icon=$2,color=$3,parent_id=$4 WHERE id=$5 RETURNING *`,
-      [name, icon||'📁', color||'#3b6dd4', parentId||null, req.params.id]
+      `UPDATE doc_categories SET name=$1,icon=$2,color=$3,parent_id=$4,
+       visible_roles=COALESCE($5,visible_roles), editable_roles=COALESCE($6,editable_roles),
+       visible_users=COALESCE($7,visible_users), editable_users=COALESCE($8,editable_users) WHERE id=$9 RETURNING *`,
+      [name, icon||'📁', color||'#3b6dd4', parentId||null,
+       Array.isArray(visibleRoles)?JSON.stringify(visibleRoles):null,
+       Array.isArray(editableRoles)?JSON.stringify(editableRoles):null,
+       Array.isArray(visibleUsers)?JSON.stringify(visibleUsers):null,
+       Array.isArray(editableUsers)?JSON.stringify(editableUsers):null,
+       req.params.id]
     );
-    if (!row) return bad(res, 'Nicht gefunden', 404);
     ok(res, row);
   } catch(e) { bad(res, e.message, 500); }
 });
 
 router.delete('/doc-categories/:id', auth, async (req, res) => {
-  if (!req.p.manageUsers) return bad(res, 'Keine Berechtigung', 403);
   try {
+    const byId = await docCatMap();
+    const cat = byId[req.params.id];
+    if (!cat) return bad(res, 'Nicht gefunden', 404);
+    if (!canEditAcl(cat, req.uid, parseRoles(req.user.roles), req.p, byId)) return bad(res, 'Keine Berechtigung', 403);
     const inUse = await q1('SELECT id FROM documents WHERE category_id=$1 LIMIT 1', [req.params.id]);
     if (inUse) {
       // Unlink instead of blocking — set category_id to null
@@ -93,18 +115,19 @@ router.get('/docs', auth, async (req, res) => {
   try {
     const rows = await q('SELECT * FROM documents ORDER BY created_at DESC');
     const roles = parseRoles(req.user.roles);
-    ok(res, rows.filter(d=>canSeeAcl(d, req.uid, roles)));
+    const byId = await docCatMap();
+    ok(res, rows.filter(d=>canSeeAcl(d, req.uid, roles, req.p, byId)));
   } catch(e) { bad(res, 'Serverfehler', 500); }
 });
 
 // Erstellen erfordert wie bei Wiki/Kontakten "Allg. Einträge"-Recht — vorher
 // konnte jeder eingeloggte Nutzer org-weit sichtbare Dokumente veröffentlichen;
-// mit der rollenbasierten Sichtbarkeits-/Bearbeitungs-Einschränkung muss das
-// Anlegen selbst mindestens genauso vertrauenswürdig sein wie das spätere
-// Einschränken.
+// mit der ordner-/datei-basierten Sichtbarkeits-/Bearbeitungs-Einschränkung
+// muss das Anlegen selbst mindestens genauso vertrauenswürdig sein wie das
+// spätere Einschränken.
 router.post('/docs', auth, async (req, res) => {
   if (!req.p.addGeneral) return bad(res, 'Keine Berechtigung', 403);
-  const { title, description, categoryId, name: originalName, mimeType, data, visibleRoles, editableRoles } = req.body;
+  const { title, description, categoryId, name: originalName, mimeType, data, visibleRoles, editableRoles, visibleUsers, editableUsers } = req.body;
   if (!title) return bad(res, 'Titel erforderlich', 400);
   if (!originalName || !data) return bad(res, 'Datei fehlt', 400);
   const mime = mimeType || 'application/octet-stream';
@@ -121,10 +144,11 @@ router.post('/docs', auth, async (req, res) => {
     // beim nächsten Deploy verloren gehen.
     const b64 = buf.toString('base64');
     const doc = await q1(
-      `INSERT INTO documents (id,category_id,title,description,filename,original_name,mime_type,size_bytes,current_version,uploaded_by,file_data,visible_roles,editable_roles)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,1,$9,$10,$11,$12) RETURNING *`,
+      `INSERT INTO documents (id,category_id,title,description,filename,original_name,mime_type,size_bytes,current_version,uploaded_by,file_data,visible_roles,editable_roles,visible_users,editable_users)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,1,$9,$10,$11,$12,$13,$14) RETURNING *`,
       [id, categoryId||null, title, description||'', filename, safeName, mime, buf.length, req.uid, b64,
-       JSON.stringify(Array.isArray(visibleRoles)?visibleRoles:[]), JSON.stringify(Array.isArray(editableRoles)?editableRoles:[])]
+       JSON.stringify(Array.isArray(visibleRoles)?visibleRoles:[]), JSON.stringify(Array.isArray(editableRoles)?editableRoles:[]),
+       JSON.stringify(Array.isArray(visibleUsers)?visibleUsers:[]), JSON.stringify(Array.isArray(editableUsers)?editableUsers:[])]
     );
     const vId = newId();
     await q(
@@ -140,7 +164,7 @@ router.get('/docs/:id', auth, async (req, res) => {
   try {
     const doc = await q1('SELECT * FROM documents WHERE id=$1', [req.params.id]);
     if (!doc) return bad(res, 'Nicht gefunden', 404);
-    if (!canSeeAcl(doc, req.uid, parseRoles(req.user.roles))) return bad(res, 'Keine Berechtigung', 403);
+    if (!canSeeAcl(doc, req.uid, parseRoles(req.user.roles), req.p, await docCatMap())) return bad(res, 'Keine Berechtigung', 403);
     const filePath = path.join(DOCS_DIR, doc.filename);
     assertUnderDir(DOCS_DIR, filePath);
     if (!doc.file_data && !fs.existsSync(filePath))
@@ -159,15 +183,19 @@ router.put('/docs/:id', auth, async (req, res) => {
     const doc = await q1('SELECT * FROM documents WHERE id=$1', [req.params.id]);
     if (!doc) return bad(res, 'Nicht gefunden', 404);
     const roles = parseRoles(req.user.roles);
-    if (!canEditAcl(doc, req.uid, roles, req.p)) return bad(res, 'Keine Berechtigung', 403);
-    const { title, description, categoryId, visibleRoles, editableRoles } = req.body;
+    if (!canEditAcl(doc, req.uid, roles, req.p, await docCatMap())) return bad(res, 'Keine Berechtigung', 403);
+    const { title, description, categoryId, visibleRoles, editableRoles, visibleUsers, editableUsers } = req.body;
     if (!title) return bad(res, 'Titel erforderlich', 400);
     const updated = await q1(
       `UPDATE documents SET title=$1,description=$2,category_id=$3,updated_at=NOW(),
-       visible_roles=COALESCE($4,visible_roles), editable_roles=COALESCE($5,editable_roles) WHERE id=$6 RETURNING *`,
+       visible_roles=COALESCE($4,visible_roles), editable_roles=COALESCE($5,editable_roles),
+       visible_users=COALESCE($6,visible_users), editable_users=COALESCE($7,editable_users) WHERE id=$8 RETURNING *`,
       [title, description||'', categoryId||null,
        Array.isArray(visibleRoles)?JSON.stringify(visibleRoles):null,
-       Array.isArray(editableRoles)?JSON.stringify(editableRoles):null, req.params.id]
+       Array.isArray(editableRoles)?JSON.stringify(editableRoles):null,
+       Array.isArray(visibleUsers)?JSON.stringify(visibleUsers):null,
+       Array.isArray(editableUsers)?JSON.stringify(editableUsers):null,
+       req.params.id]
     );
     ok(res, updated);
   } catch(e) { bad(res, 'Serverfehler', 500); }
@@ -177,7 +205,7 @@ router.delete('/docs/:id', auth, async (req, res) => {
   try {
     const doc = await q1('SELECT * FROM documents WHERE id=$1', [req.params.id]);
     if (!doc) return bad(res, 'Nicht gefunden', 404);
-    if (!canEditAcl(doc, req.uid, parseRoles(req.user.roles), req.p)) return bad(res, 'Keine Berechtigung', 403);
+    if (!canEditAcl(doc, req.uid, parseRoles(req.user.roles), req.p, await docCatMap())) return bad(res, 'Keine Berechtigung', 403);
     const versions = await q('SELECT filename FROM document_versions WHERE document_id=$1', [req.params.id]);
     for (const v of versions) {
       const fp = path.join(DOCS_DIR, v.filename);
@@ -197,7 +225,7 @@ router.post('/docs/:id/version', auth, async (req, res) => {
   try {
     const doc = await q1('SELECT * FROM documents WHERE id=$1', [req.params.id]);
     if (!doc) return bad(res, 'Nicht gefunden', 404);
-    if (!canEditAcl(doc, req.uid, parseRoles(req.user.roles), req.p)) return bad(res, 'Keine Berechtigung', 403);
+    if (!canEditAcl(doc, req.uid, parseRoles(req.user.roles), req.p, await docCatMap())) return bad(res, 'Keine Berechtigung', 403);
     const { name: originalName, mimeType, data } = req.body;
     if (!originalName || !data) return bad(res, 'Datei fehlt', 400);
     const mime = mimeType || 'application/octet-stream';
@@ -226,7 +254,7 @@ router.post('/docs/:id/version', auth, async (req, res) => {
 router.get('/docs/:id/versions', auth, async (req, res) => {
   try {
     const doc = await q1('SELECT * FROM documents WHERE id=$1', [req.params.id]);
-    if (!doc || !canSeeAcl(doc, req.uid, parseRoles(req.user.roles))) return bad(res, 'Nicht gefunden', 404);
+    if (!doc || !canSeeAcl(doc, req.uid, parseRoles(req.user.roles), req.p, await docCatMap())) return bad(res, 'Nicht gefunden', 404);
     const rows = await q('SELECT * FROM document_versions WHERE document_id=$1 ORDER BY version DESC', [req.params.id]);
     ok(res, rows);
   } catch(e) { bad(res, 'Serverfehler', 500); }
@@ -235,7 +263,7 @@ router.get('/docs/:id/versions', auth, async (req, res) => {
 router.get('/docs/:id/versions/:vid', auth, async (req, res) => {
   try {
     const doc = await q1('SELECT * FROM documents WHERE id=$1', [req.params.id]);
-    if (!doc || !canSeeAcl(doc, req.uid, parseRoles(req.user.roles))) return bad(res, 'Nicht gefunden', 404);
+    if (!doc || !canSeeAcl(doc, req.uid, parseRoles(req.user.roles), req.p, await docCatMap())) return bad(res, 'Nicht gefunden', 404);
     const ver = await q1('SELECT * FROM document_versions WHERE id=$1 AND document_id=$2', [req.params.vid, req.params.id]);
     if (!ver) return bad(res, 'Nicht gefunden', 404);
     const filePath = path.join(DOCS_DIR, ver.filename);
