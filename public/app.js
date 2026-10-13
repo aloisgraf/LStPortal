@@ -6325,6 +6325,13 @@ function renderMeetings() {
   // ständig wieder nach oben springen, weil hier alles neu erzeugt wird.
   const _mScrollList = document.querySelector('.meetings-list')?.scrollTop;
   const _mScrollMain = document.querySelector('.meetings-main')?.scrollTop;
+  // Die einzelnen Protokoll-/Notiztexte (#protoBody-<id>) scrollen bei langem
+  // Text unabhängig vom restlichen Bereich — ohne diese eigene Rettung würde
+  // genau DORT beim Lesen/Scrollen ständig wieder nach oben gesprungen,
+  // sowohl im Protokolle-Tab als auch in der Zusammenfassung (die dieselben
+  // Protokoll-Karten einbettet).
+  const _mProtoScrolls = {};
+  document.querySelectorAll('[id^="protoBody-"]').forEach(el=>{ if(el.scrollTop) _mProtoScrolls[el.id]=el.scrollTop; });
   document.getElementById('main').innerHTML = `
 <div class="meetings-layout">
   <div class="meetings-sidebar">
@@ -6376,6 +6383,7 @@ function renderMeetings() {
 </div>`;
   if(_mScrollList!=null){const el=document.querySelector('.meetings-list');if(el)el.scrollTop=_mScrollList;}
   if(_mScrollMain!=null){const el=document.querySelector('.meetings-main');if(el)el.scrollTop=_mScrollMain;}
+  Object.keys(_mProtoScrolls).forEach(id=>{const el=document.getElementById(id);if(el)el.scrollTop=_mProtoScrolls[id];});
 }
 
 function meetingInstTabHtml(m, i, canManage) {
