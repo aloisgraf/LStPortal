@@ -691,7 +691,7 @@ details.dash-card > summary { list-style: none; cursor: pointer; display: flex; 
 }
 
 /* Rolle "Assessment": reine Assessment-Nutzer sehen nur den Assessment-Reiter */
-.asm-only .nav-area>*:not(#ni-assessment),.asm-only #sbf,.asm-only .hdr>.ib2:not(#thBtn):not(.hbg):not(:last-child),.asm-only .hdr>.ibw,.asm-only #qaWrap{display:none!important}
+.asm-only .nav-area>*:not(#ni-assessment),.asm-only #sbf,.asm-only .hdr>.ib2:not(.hbg):not(:last-child),.asm-only .hdr>.ibw,.asm-only .hdr>.upill,.asm-only .sbver,.asm-only #qaWrap{display:none!important}
 /* Assessment (renderAssessment in app.js) */
 .asm-intro{max-width:760px}
 .asm-rules{font-size:12px;color:var(--mu);margin:12px 0 16px 18px;line-height:1.6}

@@ -97,7 +97,7 @@ function asmRenderOverview(){
         <li>Deine Antworten werden laufend gespeichert. Wenn die Verbindung abbricht, melde dich einfach wieder an, die Uhr läuft weiter.</li>
         <li>Handy und weitere Hilfsmittel bleiben weg, es sei denn, die Prüfungsleitung erlaubt etwas anderes.</li>
       </ul>
-      <button class="btn-p" onclick="asmStart()">▶ Assessment starten</button>
+      <button class="btn-p" onclick="asmStart()">▶ Assessment starten – viel Erfolg!</button>
     </div>`;
   }else if(att.status==='running'){
     const s=sections[att.currentSection];
