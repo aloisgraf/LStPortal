@@ -62,10 +62,11 @@ function stateOf(att) {
 }
 
 // Laufende Durchgänge einer älteren Katalogversion passen nicht mehr zu den
-// Abschnitten: verwerfen, der Mitarbeiter beginnt neu.
+// Abschnitten: archivieren (bereits abgegebene Abschnitte bleiben für die
+// Administration einsehbar), der Mitarbeiter beginnt neu.
 async function dropOutdated(att) {
   if (att && att.status === 'running' && att.version !== A.VERSION) {
-    await pool.query('DELETE FROM assessment_attempts WHERE id=$1', [att.id]);
+    await pool.query('UPDATE assessment_attempts SET archived_at=NOW(), section_started_at=NULL WHERE id=$1', [att.id]);
     return null;
   }
   return att;
