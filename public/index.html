@@ -140,7 +140,8 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
 .st-closed{background:rgba(16,185,129,.12);color:var(--ok);border:1px solid rgba(16,185,129,.25)}
 .dp-technik{background:rgba(14,165,233,.12);color:var(--teal)}.dp-leitung{background:rgba(245,158,11,.12);color:var(--warn)}.dp-dienstplanung{background:rgba(59,109,212,.12);color:var(--acc)}.dp-ausbildung{background:rgba(124,58,237,.12);color:var(--info)}.dp-qm{background:rgba(16,185,129,.12);color:var(--ok)}
 .rb{display:inline-flex;align-items:center;padding:1px 6px;border-radius:100px;font-size:10px;font-weight:700}
-.rb-admin{background:rgba(245,158,11,.15);color:#c47a00}.rb-leitung{background:rgba(16,185,129,.12);color:#0d9463}.rb-dienstplanung{background:rgba(59,109,212,.12);color:var(--acc)}.rb-technik{background:rgba(14,165,233,.12);color:var(--teal)}.rb-ausbildung{background:rgba(124,58,237,.12);color:var(--info)}.rb-qm{background:rgba(16,185,129,.12);color:var(--ok)}.rb-standard{background:var(--sf3);color:var(--mu)}
+.rb-admin{background:rgba(245,158,11,.15);color:#c47a00}.rb-leitung{background:rgba(16,185,129,.12);color:#0d9463}.rb-dienstplanung{background:rgba(59,109,212,.12);color:var(--acc)}.rb-technik{background:rgba(14,165,233,.12);color:var(--teal)}.rb-ausbildung{background:rgba(124,58,237,.12);color:var(--info)}.rb-qm{background:rgba(16,185,129,.12);color:var(--ok)}.rb-standard{background:var(--sf3);color:var(--mu)}.rb-assessment{background:rgba(239,68,68,.12);color:var(--danger)}
+.asm-only .nav-area>*:not(#ni-assessment),.asm-only .hdr .ibw,.asm-only #helpBtn,.asm-only #sbf{display:none!important}
 .pub-on{background:rgba(16,185,129,.12);color:var(--ok);border:1px solid rgba(16,185,129,.25)}
 .pub-off{background:var(--sf2);color:var(--mu);border:1px solid var(--border)}
 .blur-cell{filter:blur(4px);user-select:none;pointer-events:none}
@@ -291,7 +292,7 @@ details.dash-card > summary { list-style: none; cursor: pointer; display: flex; 
   <div class="hsp"></div>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;padding-right:4px"><div id="clockDisplay" style="font-size:11px;font-weight:600;color:var(--mu);white-space:nowrap;display:none"></div><div id="lastRefreshDisplay" style="font-size:10px;color:var(--di);white-space:nowrap;display:none">↻ —</div></div>
   <button class="ib2" id="thBtn" onclick="toggleTheme()">&#127769;</button>
-  <button class="ib2" onclick="openModal('helpOv')" title="Hilfe / Anleitung" style="font-weight:700;font-size:13px">?</button>
+  <button class="ib2" id="helpBtn" onclick="openModal('helpOv')" title="Hilfe / Anleitung" style="font-weight:700;font-size:13px">?</button>
   <button class="ib2" id="adminBtn" onclick="openAdminModal()" title="Administration" style="display:none">&#9881;&#65039;</button>
   <div class="ibw">
     <button class="ib2" onclick="setView('messages')" title="Nachrichten">&#9993;&#65039;</button>
@@ -319,6 +320,7 @@ details.dash-card > summary { list-style: none; cursor: pointer; display: flex; 
   <aside class="sb" id="sidebar">
     <div class="nav-area">
       <div class="ni top active" id="ni-home" onclick="setView('home')">&#127968; &#220;bersicht</div>
+      <div class="ni top" id="ni-assessment" onclick="setView('assessment')" style="display:none">&#128221; Assessment</div>
       <div class="ndiv"></div>
       <div class="nsh open" id="dpHdr" onclick="toggleNS('dp')"><span>&#128203; Dienstplan</span><span class="arr">&#9660;</span></div>
       <div class="nsub open" id="dpSub">
@@ -622,7 +624,7 @@ details.dash-card > summary { list-style: none; cursor: pointer; display: flex; 
     </div>
   </div>
 </div>
-<div class="ov" id="ufOv"><div class="modal"><div class="mh"><h2 id="ufT">Benutzer</h2><button class="mc" onclick="backToAdmin('users')">&#10005;</button></div><div class="mb2"><input type="hidden" id="ufId"><div class="fr"><div class="fg"><label>Name *</label><input type="text" id="ufNm"></div><div class="fg"><label>K&#252;rzel *</label><input type="text" id="ufIn" maxlength="3"></div></div><div class="fg full"><label>Rollen</label><div class="role-chks" id="ufRoles"></div></div><div class="fg" id="ufPWRR" style="display:none"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="ufPWRst"> PW zur&#252;cksetzen auf <b>Passwort1</b></label></div><div class="fg"><label>Farbe</label><div class="cr" id="ufCR"></div></div><div id="ufErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div></div><div class="mf"><button class="btn-s" onclick="backToAdmin('users')">Abbrechen</button><button class="btn-p" onclick="saveUser()">&#128190; Speichern</button></div></div></div>
+<div class="ov" id="ufOv"><div class="modal"><div class="mh"><h2 id="ufT">Benutzer</h2><button class="mc" onclick="backToAdmin('users')">&#10005;</button></div><div class="mb2"><input type="hidden" id="ufId"><div class="fr"><div class="fg"><label>Name *</label><input type="text" id="ufNm"></div><div class="fg"><label>K&#252;rzel *</label><input type="text" id="ufIn" maxlength="3"></div></div><div class="fg full"><label>Rollen</label><div class="role-chks" id="ufRoles"></div><div style="font-size:11px;color:var(--mu);margin-top:4px">&#128221; Assessment kann nur mit Administrator kombiniert werden.</div></div><div class="fg" id="ufPWRR" style="display:none"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="ufPWRst"> PW zur&#252;cksetzen auf <b>Passwort1</b></label></div><div class="fg"><label>Farbe</label><div class="cr" id="ufCR"></div></div><div id="ufErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div></div><div class="mf"><button class="btn-s" onclick="backToAdmin('users')">Abbrechen</button><button class="btn-p" onclick="saveUser()">&#128190; Speichern</button></div></div></div>
 <div class="ov" id="cfOv"><div class="modal sm"><div class="mh"><h2 id="cfT">Kategorie</h2><button class="mc" onclick="backToAdmin('cats')">&#10005;</button></div><div class="mb2"><input type="hidden" id="cfId"><div class="fr"><div class="fg"><label>Bezeichnung *</label><input type="text" id="cfLb"></div><div class="fg"><label>Emoji</label><input type="text" id="cfEm" maxlength="4"></div></div><div class="fg"><label>Farbe</label><div class="cr" id="cfCR"></div></div><div id="cfErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div></div><div class="mf"><button class="btn-s" onclick="backToAdmin('cats')">Abbrechen</button><button class="btn-p" onclick="saveCategory()">&#128190; Speichern</button></div></div></div>
 <div class="ov" id="tfOv"><div class="modal sm"><div class="mh"><h2 id="tfT">Tag</h2><button class="mc" onclick="backToAdmin('tags')">&#10005;</button></div><div class="mb2"><input type="hidden" id="tfId"><div class="fg"><label>Bezeichnung *</label><input type="text" id="tfLb"></div><div class="fg"><label>Farbe</label><div class="cr" id="tfCR"></div></div><div id="tfErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div></div><div class="mf"><button class="btn-s" onclick="backToAdmin('tags')">Abbrechen</button><button class="btn-p" onclick="saveTag()">&#128190; Speichern</button></div></div></div>
 
@@ -1467,7 +1469,7 @@ const APP_VERSION='2.2.4';
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
-const ROLES=[{id:'admin',label:'Administrator',icon:'\uD83D\uDD11'},{id:'leitung',label:'Leitung',icon:'\u2B50'},{id:'dienstplanung',label:'Dienstplanung',icon:'\uD83D\uDCCB'},{id:'technik',label:'Technik',icon:'\uD83D\uDD27'},{id:'ausbildung',label:'Ausbildung',icon:'\uD83C\uDF93'},{id:'qm',label:'QM',icon:'\u2705'},{id:'standard',label:'Standard',icon:'\uD83D\uDC64'}];
+const ROLES=[{id:'admin',label:'Administrator',icon:'\uD83D\uDD11'},{id:'leitung',label:'Leitung',icon:'\u2B50'},{id:'dienstplanung',label:'Dienstplanung',icon:'\uD83D\uDCCB'},{id:'technik',label:'Technik',icon:'\uD83D\uDD27'},{id:'ausbildung',label:'Ausbildung',icon:'\uD83C\uDF93'},{id:'qm',label:'QM',icon:'\u2705'},{id:'standard',label:'Standard',icon:'\uD83D\uDC64'},{id:'assessment',label:'Assessment',icon:'\uD83D\uDCDD'}];
 const DEPTS=['technik','leitung','dienstplanung','ausbildung','qm','frei'];
 const DEPT_LABELS={technik:'\uD83D\uDD27 Technik',leitung:'\u2B50 Leitung',dienstplanung:'\uD83D\uDCCB Dienstplanung',ausbildung:'\uD83C\uDF93 Ausbildung',qm:'\u2705 QM',frei:'\uD83C\uDF10 Frei'};
 const PRIORITIES=[{id:'low',label:'\uD83D\uDFE2 Gering',color:'#10b981'},{id:'medium',label:'\uD83D\uDFE1 Mittel',color:'#f59e0b'},{id:'high',label:'\uD83D\uDD34 Hoch',color:'#ef4444'}];
@@ -1487,6 +1489,7 @@ const RM=[
   ['Alle Zulagen',               {admin:1,leitung:1,dienstplanung:1,technik:0,ausbildung:0,qm:0,standard:0}],
   ['Abrechnung alle sehen',      {admin:1,leitung:0,dienstplanung:1,technik:0,ausbildung:0,qm:0,standard:0}],
   ['Aktivit\u00e4tslog sehen',  {admin:1,leitung:0,dienstplanung:0,technik:0,ausbildung:0,qm:0,standard:0}],
+  ['Assessment-Bereich',         {admin:1,leitung:0,dienstplanung:0,technik:0,ausbildung:0,qm:0,standard:0,assessment:1}],
 ];
 let S={
   year:new Date().getFullYear(),month:new Date().getMonth(),
@@ -1533,7 +1536,7 @@ const getCat=id=>S.categories.find(c=>c.id===id);
 const getTag=id=>S.tags.find(t=>t.id===id);
 const getTk=id=>S.tickets.find(t=>t.id===id);
 const getAllw=(uid,year,month)=>S.allowances.find(a=>a.userId===uid&&a.year===year&&a.month===month)||{nd:0,fd:0,fw:0,c10:0};
-const getRoleDef=r=>ROLES.find(x=>x.id===r)||ROLES[6];
+const getRoleDef=r=>ROLES.find(x=>x.id===r)||ROLES.find(x=>x.id==='standard');
 const fd=s=>{if(!s)return'\u2014';const p=s.split('T')[0].split('-');return`${p[2]}.${p[1]}.${p[0]}`;};
 
 function fmtDateShort(s) {
@@ -1614,7 +1617,11 @@ function loginOK(){
   document.getElementById('pillNm').textContent=u?.name||'?';
   const pa=document.getElementById('pillAv');pa.textContent=u?.initials||'?';pa.style.background=(u?.color||'#888')+'22';pa.style.color=u?.color||'#888';
   const ab=document.getElementById('adminBtn');if(ab)ab.style.display=S.p.manageUsers?'flex':'none';
-  loadNews().then(function(){setView('home');});startAutoRefresh();
+  // Assessment: reine Assessment-Nutzer sehen nur diesen Punkt
+  document.body.classList.toggle('asm-only',!!S.p.assessmentOnly);
+  const asmNav=document.getElementById('ni-assessment');if(asmNav)asmNav.style.display=S.p.seeAssessment?'block':'none';
+  if(S.p.assessmentOnly){setView('assessment');}
+  else{loadNews().then(function(){setView('home');});startAutoRefresh();}
   // archivNav for all users
   const archivNav=document.getElementById('ni-news_archiv');
   if(archivNav)archivNav.style.display='block';
@@ -1637,8 +1644,9 @@ async function doChangePW(){
 function toggleSidebar(){const sb=document.getElementById('sidebar'),ov=document.getElementById('sbOv');sb.classList.toggle('open');ov.classList.toggle('open');}
 function toggleNS(id){document.getElementById(id+'Hdr').classList.toggle('open');document.getElementById(id+'Sub').classList.toggle('open');}
 function setView(v){
+  if(S.p.assessmentOnly)v='assessment';
   S.view=v;
-  ['home','schedule','calendar','allw','diensttausch','abrechnung','dienstplaene','tickets','tickets_closed','checklists','messages','messages_sent'].forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
+  ['home','assessment','schedule','calendar','allw','diensttausch','abrechnung','dienstplaene','tickets','tickets_closed','checklists','messages','messages_sent'].forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
   document.getElementById('sidebar').classList.remove('open');document.getElementById('sbOv').classList.remove('open');
   renderSBF();renderMain();
 }
@@ -1681,6 +1689,7 @@ function renderSBF(){
 }
 function renderMain(){
   if(S.view==='home')renderHome();
+  else if(S.view==='assessment')renderAssessment();
   else if(S.view==='schedule')renderSchedule();
   else if(S.view==='calendar')renderCalendar();
   else if(S.view==='homeoffice')renderHomeoffice();
@@ -1694,6 +1703,11 @@ function renderMain(){
   else if(S.view==='tickets'||S.view==='tickets_closed')renderTickets();
   else if(S.view==='checklists')renderChecklists();
   else if(S.view==='messages'||S.view==='messages_sent')renderMessages();
+}
+// ASSESSMENT
+function renderAssessment(){
+  document.getElementById('main').innerHTML=`<div class="ph"><div class="pt">\uD83D\uDCDD Assessment</div></div>
+    <div class="empty">\uD83D\uDEA7 Der Assessment-Bereich wird vorbereitet. Die Inhalte folgen in K\u00fcrze.</div>`;
 }
 // HOME
 function renderHome(){
@@ -2874,8 +2888,16 @@ function openUF(id){
   document.getElementById('ufId').value=u?.id||'';document.getElementById('ufNm').value=u?.name||'';document.getElementById('ufIn').value=u?.initials||'';
   document.getElementById('ufPWRR').style.display=u?'block':'none';document.getElementById('ufPWRst').checked=false;
   document.getElementById('ufErr').textContent='';S.ufColor=u?.color||pal()[0];
-  document.getElementById('ufRoles').innerHTML=ROLES.map(r=>`<label class="rck"><input type="checkbox" value="${r.id}" ${(u?.roles||['standard']).includes(r.id)?'checked':''}><span>${r.icon} ${r.label}</span></label>`).join('');
+  document.getElementById('ufRoles').innerHTML=ROLES.map(r=>`<label class="rck"><input type="checkbox" value="${r.id}" onchange="ufRoleChange(this)" ${(u?.roles||['standard']).includes(r.id)?'checked':''}><span>${r.icon} ${r.label}</span></label>`).join('');
   buildCP('ufCR',S.ufColor,'pickU');closeModal('admOv');openModal('ufOv');
+}
+// Assessment ist exklusiv, nur Administrator darf zusätzlich vergeben sein
+const ASSESSMENT_COMBINABLE=['admin'];
+function ufRoleChange(cb){
+  if(!cb.checked)return;
+  const boxes=Array.from(document.querySelectorAll('#ufRoles input'));
+  if(cb.value==='assessment')boxes.forEach(b=>{if(b.value!=='assessment'&&!ASSESSMENT_COMBINABLE.includes(b.value))b.checked=false;});
+  else if(!ASSESSMENT_COMBINABLE.includes(cb.value))boxes.forEach(b=>{if(b.value==='assessment')b.checked=false;});
 }
 async function saveUser(){
   const name=document.getElementById('ufNm').value.trim(),initials=document.getElementById('ufIn').value.trim().toUpperCase();
@@ -2883,6 +2905,7 @@ async function saveUser(){
   if(!name||!initials){errEl.textContent='\u26A0\uFE0F Name und K\u00fcrzel erforderlich!';return;}
   const roles=Array.from(document.querySelectorAll('#ufRoles input:checked')).map(cb=>cb.value);
   if(!roles.length){errEl.textContent='\u26A0\uFE0F Mindestens eine Rolle!';return;}
+  if(roles.includes('assessment')&&roles.some(r=>r!=='assessment'&&!ASSESSMENT_COMBINABLE.includes(r))){errEl.textContent='\u26A0\uFE0F Assessment kann nur mit Administrator kombiniert werden!';return;}
   const id=document.getElementById('ufId').value;loading(true);
   try{
     if(id)await api('PUT','/users/'+id,{name,initials,roles,color:S.ufColor,resetPassword:document.getElementById('ufPWRst').checked});

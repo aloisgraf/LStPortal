@@ -3,6 +3,7 @@ const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const { q, q1, newId, pool, parseRoles, logAct } = require('../db');
 const { auth, adminOnly, ok, bad } = require('../middleware');
+const { validateRoles } = require('../roles');
 
 
 router.put('/allowances', auth, async (req,res) => {
@@ -160,6 +161,7 @@ router.post('/users', auth, adminOnly, async (req,res) => {
   try {
     const {name,initials,roles,color}=req.body;
     if (!name?.trim()||!initials?.trim()) return bad(res,'Name und Kürzel erforderlich');
+    const roleErr=validateRoles(roles||['standard']); if (roleErr) return bad(res,roleErr);
     const id=newId(), hash=await bcrypt.hash('Passwort1',10);
     await pool.query('INSERT INTO users (id,name,initials,roles,color,pw_hash,must_change_pw) VALUES ($1,$2,$3,$4,$5,$6,true)',
       [id,name.trim(),initials.trim().toUpperCase(),JSON.stringify(roles||['standard']),color||'#64748b',hash]);
@@ -174,6 +176,7 @@ router.put('/users/:id', auth, async (req,res) => {
   try {
     const {name,initials,roles,color,resetPassword}=req.body;
     if (!name?.trim()||!initials?.trim()) return bad(res,'Name und Kürzel erforderlich');
+    const roleErr=validateRoles(roles||['standard']); if (roleErr) return bad(res,roleErr);
     await pool.query('UPDATE users SET name=$1,initials=$2,roles=$3,color=$4 WHERE id=$5',
       [name.trim(),initials.trim().toUpperCase(),JSON.stringify(roles||['standard']),color||'#64748b',req.params.id]);
     if (resetPassword) await pool.query('UPDATE users SET pw_hash=$1,must_change_pw=true WHERE id=$2',

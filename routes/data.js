@@ -7,6 +7,15 @@ const { auth, ok, bad } = require('../middleware');
 router.get('/', auth, async (req,res) => {
   try {
     const uid=req.uid, p=req.p, tp=req.tp, roles=p.roles;
+    // Reine Assessment-Nutzer bekommen nur die eigenen Stammdaten
+    if (p.assessmentOnly) {
+      const u=req.user;
+      return ok(res, {
+        currentUser: uid,
+        permissions: { assessmentOnly:true, seeAssessment:true, seeAllEntries:false, myDepts:[] },
+        users: [{ id:u.id, name:u.name, initials:u.initials, roles:parseRoles(u.roles), color:u.color, mustChangePW:u.must_change_pw, isOnline:true }],
+      });
+    }
     const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
            tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw] = await Promise.all([
       q('SELECT id,name,initials,roles,color,must_change_pw,last_seen FROM users ORDER BY name'),
@@ -64,6 +73,7 @@ router.get('/', auth, async (req,res) => {
         addForOthers:p.addForOthers, addGeneral:p.addGeneral,
         manageUsers:p.manageUsers, seeAllAllw:p.seeAllAllw, editAllw:p.editAllw,
         seeAllAbrechnung:p.seeAllAbrechnung,
+        assessmentOnly:p.assessmentOnly, seeAssessment:p.seeAssessment,
         myDepts:tp.myDepts, seeAllTickets:tp.seeAll,
         canSetPublic:tp.canSetPublic, canAssign:tp.canAssign,
       },
