@@ -1,5 +1,6 @@
 'use strict';
 const { getUser, getP, getTP } = require('./db');
+const { assessmentOnlyAllowed } = require('./roles');
 
 async function auth(req, res, next) {
   if (!req.session?.userId)
@@ -11,6 +12,9 @@ async function auth(req, res, next) {
     req.user = user;
     req.p    = await getP(user.id);
     req.tp   = await getTP(user.id);
+    // Reine Assessment-Nutzer dürfen nur den Assessment-Bereich verwenden
+    if (req.p.assessmentOnly && !assessmentOnlyAllowed(req.originalUrl.split('?')[0]))
+      return res.status(403).json({ success:false, error:'Keine Berechtigung' });
     req.clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || '';
     require('./db').pool.query('UPDATE users SET last_seen=NOW() WHERE id=$1',[user.id]).catch(()=>{});
     next();
@@ -20,8 +24,9 @@ async function auth(req, res, next) {
   }
 }
 
+const assessmentAccess = (req,res,next) => req.p?.seeAssessment ? next() : res.status(403).json({success:false,error:'Keine Berechtigung'});
 const adminOnly = (req,res,next) => req.p?.manageUsers ? next() : res.status(403).json({success:false,error:'Keine Berechtigung'});
 const ok  = (res, data) => res.json({ success:true, data: data??null });
 const bad = (res, msg, code=400) => res.status(code).json({ success:false, error:msg });
 
-module.exports = { auth, adminOnly, ok, bad };
+module.exports = { auth, adminOnly, assessmentAccess, ok, bad };

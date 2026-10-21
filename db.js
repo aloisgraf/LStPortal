@@ -1,6 +1,7 @@
 'use strict';
 const { Pool } = require('pg');
 const crypto   = require('crypto');
+const { isAssessmentOnly, canSeeAssessment } = require('./roles');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -29,8 +30,9 @@ async function getP(uid) {
     manageGeneral: has('admin','leitung','dienstplanung','technik','ausbildung','qm'),
     seeAllAllw: full, editAllw: full,
     canApproveEvents: has('admin','dienstplanung','leitung'),
-    canSendMessages: !has('standard'),
+    canSendMessages: !has('standard') && !isAssessmentOnly(roles),
     seeAllAbrechnung: has('admin','dienstplanung'),
+    assessmentOnly: isAssessmentOnly(roles), seeAssessment: canSeeAssessment(roles),
     roles,
   };
 }
@@ -42,7 +44,7 @@ async function getTP(uid) {
   return {
     seeAll: has('admin','leitung'), editAll: has('admin','leitung'),
     myDepts: DEPTS.filter(d => roles.includes(d)),
-    canSetPublic: !has('standard'), canAssign: !has('standard'),
+    canSetPublic: !has('standard') && !isAssessmentOnly(roles), canAssign: !has('standard') && !isAssessmentOnly(roles),
   };
 }
 
