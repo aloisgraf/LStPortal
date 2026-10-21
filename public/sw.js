@@ -6,8 +6,8 @@
 // zeigen. App-Code (HTML/JS/CSS) wird bewusst network-first geladen, damit
 // niemand nach einem Deploy auf einer veralteten gecachten Version hängen
 // bleibt — nur die (unveränderlichen) Icons sind cache-first.
-const SHELL_CACHE = 'lst-shell-v2';
-const SHELL_FILES = ['/', '/index.html', '/app.css', '/app.js', '/manifest.json'];
+const SHELL_CACHE = 'lst-shell-v3';
+const SHELL_FILES = ['/', '/index.html', '/app.css', '/app.js', '/assessment.js', '/manifest.json'];
 
 self.addEventListener('install', event => {
   self.skipWaiting();
