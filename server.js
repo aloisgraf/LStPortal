@@ -1009,6 +1009,21 @@ async function initDB() {
     `ALTER TABLE game_saves ADD COLUMN IF NOT EXISTS workstations TEXT NOT NULL DEFAULT '{}'`,
     `ALTER TABLE game_saves ADD COLUMN IF NOT EXISTS perks TEXT NOT NULL DEFAULT '{}'`,
     `ALTER TABLE game_saves ADD COLUMN IF NOT EXISTS teambuilding_until TIMESTAMPTZ`,
+    // Assessment (routes/assessment.js) — ein Durchgang pro Mitarbeiter;
+    // Zurücksetzen durch die Administration löscht die Zeile. draft = zuletzt
+    // zwischengespeicherte Antworten des laufenden Abschnitts, results =
+    // ausgewertete Abschnitte (JSON-Text analog zu game_saves).
+    `CREATE TABLE IF NOT EXISTS assessment_attempts (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL UNIQUE,
+      status TEXT NOT NULL DEFAULT 'running',
+      current_section INTEGER NOT NULL DEFAULT 0,
+      section_started_at TIMESTAMPTZ,
+      draft TEXT NOT NULL DEFAULT '{}',
+      results TEXT NOT NULL DEFAULT '[]',
+      started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      finished_at TIMESTAMPTZ
+    )`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }
