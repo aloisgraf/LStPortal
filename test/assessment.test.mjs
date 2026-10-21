@@ -7,8 +7,8 @@ const idx = key => SECTIONS.findIndex(s => s.key === key);
 const qs = key => A.questionsOf(SECTIONS[idx(key)]);
 
 describe('Fragenkatalog', () => {
-  it('dauert insgesamt 90 Minuten', () => {
-    expect(A.TOTAL_MINUTES).toBe(90);
+  it('dauert insgesamt 94 Minuten', () => {
+    expect(A.TOTAL_MINUTES).toBe(94);
   });
   it('hat die vorgegebene Reihenfolge mit der Pause an Position 5', () => {
     expect(SECTIONS.map(s => s.key)).toEqual(['rechtschreibung', 'geografie', 'it', 'motivation', 'pause', 'englisch', 'logik', 'merken', 'rechnen', 'persoenlichkeit', 'abschrift']);
@@ -22,7 +22,7 @@ describe('Fragenkatalog', () => {
     expect(count('englisch')).toBe(25);
     expect(count('logik')).toBe(20);
     expect(count('merken')).toBe(5);
-    expect(count('rechnen')).toBe(15);
+    expect(count('rechnen')).toBe(45);
     expect(count('persoenlichkeit')).toBe(40);
     expect(A.overview().find(s => s.key === 'rechtschreibung').maxPoints).toBe(40);
   });
@@ -61,6 +61,12 @@ describe('Fragenkatalog', () => {
     expect(ans.z12).toBe(11 * 12);
     expect(ans.z13).toBe(64 - 1);
     expect(ans.z14).toBe(5 ** 5);
+  });
+  it('Grundrechnungsarten stimmen', () => {
+    const ans = Object.fromEntries(qs('rechnen').map(q => [q.id, q.answer]));
+    const calc = { mr3: 289 + 315, mr4: 1450 + 780, mr8: 1000 - 456, mr9: 812 - 379, mr13: 25 * 16, mr19: 1200 / 25, mr20: 91 / 13, mr23: 10 ** 3, mr24: Math.sqrt(81), mr26: 3 + 4 * 2, mr27: 20 - 6 / 2, mr28: 5 * 3 + 2 * 4, mr29: 18 / 3 - 1, mr30: 10 + 2 * 5 - 4 };
+    for (const [k, v] of Object.entries(calc)) expect(ans[k], k).toBe(v);
+    expect(Object.keys(ans).filter(k => k.startsWith('mr')).length).toBe(30);
   });
   it('Rechen-Lösungen stimmen', () => {
     const ans = Object.fromEntries(qs('rechnen').map(q => [q.id, q.answer]));

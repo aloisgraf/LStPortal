@@ -23,7 +23,8 @@ function asmIsAnswered(q){
 // und Menü angezeigt. Verlassen (Esc) lässt sich im Browser nicht verhindern:
 // dann deckt ein Hinweis den Test ab, bis wieder Vollbild ist, und das
 // Verlassen wird protokolliert (Admin-Auswertung).
-const asmFsOk=()=>!!document.documentElement.requestFullscreen&&document.fullscreenEnabled!==false;
+// Admins testen ohne Vollbild und dürfen die Pause überspringen.
+const asmFsOk=()=>!ASM.info?.isAdmin&&!!document.documentElement.requestFullscreen&&document.fullscreenEnabled!==false;
 function asmEnterFs(){
   if(!asmFsOk()||document.fullscreenElement)return;
   try{document.documentElement.requestFullscreen({navigationUI:'hide'}).catch(()=>{});}catch(e){}
@@ -113,6 +114,11 @@ function asmRenderOverview(){
       <div class="asm-meta"><span>⏱ ${s.minutes} Minuten</span>${s.count?`<span>❓ ${s.count} Aufgaben</span>`:''}<span>Gesamtzeit verbleibend: <b class="asmTotal">--:--</b></span></div>
       <button class="btn-p" onclick="asmBeginSection(true)">${pause?'☕ Pause beginnen':'▶ Weiter'}</button>
     </div>`;
+  }else if(att.status==='aborted'){
+    body=`<div class="dash-card asm-intro" style="border-top-color:var(--danger)">
+      <div style="font-size:18px;font-weight:800;margin-bottom:6px">⛔ Assessment beendet</div>
+      <div style="font-size:13px;color:var(--mu)">Das Assessment wurde von der Prüfungsleitung beendet (${fdt(att.finishedAt)}). Bitte wende dich an die Prüfungsleitung.</div>
+    </div>`;
   }else{
     body=`<div class="dash-card asm-intro" style="border-top-color:var(--ok)">
       <div style="font-size:18px;font-weight:800;margin-bottom:6px">✅ Assessment abgeschlossen</div>
@@ -120,6 +126,7 @@ function asmRenderOverview(){
     </div>`;
   }
   document.getElementById('main').innerHTML=`<div class="ph"><div class="pt">📝 ${ASM_TITLE}</div></div>${body}${isAdmin?asmCandidatesHtml()+asmResultsHtml():''}`;
+  if(isAdmin)asmAdminLive();
   if(att&&att.status==='running'){asmSetTotal(att);if(ASM.timer)clearInterval(ASM.timer);ASM.timer=setInterval(()=>{if(S.view!=='assessment'){asmStopTimers();return;}asmTickTotal();},500);}
 }
 async function asmStart(){
@@ -166,7 +173,7 @@ function asmRenderSection(){
     body=`<div class="asm-pause-black"><div class="asm-pause-brand">${ASM_TITLE}</div><div class="asm-pause-cup">☕</div><div class="asm-pause-title">PAUSE</div>
       <div class="asm-pause-timer" id="asmPauseTimer">--:--</div>
       <div class="asm-total">Gesamtzeit verbleibend: <b class="asmTotal">--:--</b></div>
-      <button class="btn-p" id="asmPauseBtn" style="visibility:hidden" onclick="asmEnterFs();asmSubmit(true)">▶ Weiter</button></div>`;
+      <button class="btn-p" id="asmPauseBtn" style="visibility:hidden" onclick="asmEnterFs();asmSubmit(true)">▶ Weiter</button>${ASM.info.isAdmin?`<button class="btn-s asm-pause-skip" onclick="asmSubmit(true)">⏭ Pause überspringen (nur Admin)</button>`:''}</div>`;
   }else{
     let num=0;
     sec.blocks.forEach((b,bi)=>{if(!sec.freeOrder&&bi<ASM.block)num+=b.questions.length;});
@@ -372,11 +379,18 @@ function asmQueueDraft(ms){
   if(ASM.draftTimer)clearTimeout(ASM.draftTimer);
   ASM.draftTimer=setTimeout(asmSaveDraft,ms);
 }
+async function asmCheckAborted(){
+  try{
+    const info=await api('GET','/assessment');
+    if(info.attempt?.status==='running'||!ASM.section)return;
+    asmStopTimers();ASM.section=null;renderAssessment();
+  }catch(e){}
+}
 async function asmSaveDraft(){
   if(ASM.draftTimer){clearTimeout(ASM.draftTimer);ASM.draftTimer=null;}
   if(!ASM.section||ASM.submitting)return;
   try{await api('PUT','/assessment/section/draft',{section:ASM.section.index,block:ASM.block,answers:ASM.answers});}
-  catch(e){if(!ASM.saveWarned){ASM.saveWarned=1;toast('⚠️ Speichern fehlgeschlagen: '+e.message,'err');}return false;}
+  catch(e){if(/Kein laufend/.test(e.message)){asmCheckAborted();return false;}if(!ASM.saveWarned){ASM.saveWarned=1;toast('⚠️ Speichern fehlgeschlagen: '+e.message,'err');}return false;}
   ASM.saveWarned=0;return true;
 }
 async function asmNextBlock(){
@@ -406,6 +420,8 @@ function asmTickTotal(){
 function asmTick(){
   asmTickTotal();
   if(S.view!=='assessment'||!ASM.section){asmStopTimers();return;}
+  // Alle 15 s prüfen, ob die Administration den Durchgang abgebrochen hat.
+  if(!ASM.lastCheck||Date.now()-ASM.lastCheck>15000){ASM.lastCheck=Date.now();asmCheckAborted();}
   const left=(ASM.deadline-Date.now())/1000;
   const total=ASM.section.minutes*60;
   const t=document.getElementById('asmTimer'),fill=document.getElementById('asmTimeFill'),bar=document.getElementById('asmBar');
@@ -452,13 +468,16 @@ function asmCandidatesHtml(){
   const rows=candidates.map(c=>{
     const cur=attempts.find(a=>a.userId===c.id&&!a.archivedAt);
     const old=attempts.filter(a=>a.userId===c.id&&a.archivedAt).length;
-    const status=!cur?'<span style="color:var(--mu)">nicht begonnen</span>':cur.status==='finished'?`✅ abgeschlossen ${fdt(cur.finishedAt)}${cur.summary.percent!==null?` · <b>${cur.summary.percent} %</b>`:''}`:`⏳ läuft (Abschnitt ${cur.currentSection+1})`;
+    const status=!cur?'<span style="color:var(--mu)">nicht begonnen</span>':cur.status==='finished'?`✅ abgeschlossen ${fdt(cur.finishedAt)}${cur.summary.percent!==null?` · <b>${cur.summary.percent} %</b>`:''}`
+      :cur.status==='aborted'?`⛔ abgebrochen ${fdt(cur.finishedAt)}`
+      :`<span class="asm-live">● LIVE</span> Abschnitt ${cur.currentSection+1} von ${ASM.info.sections.length}: <b>${esc(cur.sectionTitle||'')}</b>${cur.sectionStarted?'':' <span style="color:var(--mu)">(noch nicht begonnen)</span>'}
+        <div style="color:var(--mu)">Gesamtzeit übrig <b class="asmLive" data-end="${Date.now()+(cur.totalRemainingSeconds||0)*1000}">${asmFmt(cur.totalRemainingSeconds||0)}</b>${cur.remainingSeconds!=null?` · Abschnitt übrig <b class="asmLive" data-end="${Date.now()+cur.remainingSeconds*1000}">${asmFmt(cur.remainingSeconds)}</b>`:''}</div>`;
     return `<tr><td style="text-align:left;font-weight:600">${esc(c.name)}</td><td style="text-align:left;font-size:12px">${status}</td><td style="font-size:12px">${old||'–'}</td>
-      <td style="text-align:right"><button class="btn-s" style="font-size:11px" ${cur?'':'disabled'} onclick="asmResetUser('${c.id}','${esc(c.name).replace(/'/g,'')}')">↺ Assessment zurücksetzen</button></td></tr>`;
+      <td style="text-align:right;white-space:nowrap">${cur?.status==='running'?`<button class="btn-s asm-abort" style="font-size:11px" onclick="asmAbortUser('${c.id}','${esc(c.name).replace(/'/g,'')}')">⛔ Abbrechen</button> `:''}<button class="btn-s" style="font-size:11px" ${cur?'':'disabled'} onclick="asmResetUser('${c.id}','${esc(c.name).replace(/'/g,'')}')">↺ Assessment zurücksetzen</button></td></tr>`;
   }).join('');
-  return `<div class="dash-card" style="border-top-color:var(--acc)">
+  return `<div class="dash-card" id="asmCand" style="border-top-color:var(--acc)">
     <div style="font-size:15px;font-weight:700;margin-bottom:4px">👥 Mitarbeiter mit der Rolle Assessment</div>
-    <div style="font-size:12px;color:var(--mu);margin-bottom:10px">„Assessment zurücksetzen“: der Mitarbeiter kann das Assessment neu machen und sieht den alten Durchgang nicht mehr. Der alte Durchgang bleibt unten in den Ergebnissen archiviert.</div>
+    <div style="font-size:12px;color:var(--mu);margin-bottom:10px">Laufende Durchgänge werden live angezeigt. „Abbrechen“ beendet einen laufenden Durchgang sofort. „Assessment zurücksetzen“: der Mitarbeiter kann das Assessment neu machen und sieht den alten Durchgang nicht mehr. Der alte Durchgang bleibt unten in den Ergebnissen archiviert.</div>
     ${candidates.length?`<div style="overflow-x:auto"><table class="rm-table asm-res"><thead><tr><th style="text-align:left">Mitarbeiter</th><th style="text-align:left">Aktueller Stand</th><th>Archiviert</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty" style="padding:16px">Noch niemand hat die Rolle Assessment.</div>'}
   </div>`;
 }
@@ -469,7 +488,7 @@ function asmResultsHtml(){
     const byKey={};(a.results||[]).forEach(r=>byKey[r.key]=r);
     const pers=(a.results||[]).find(r=>r.dims);
     const ctrl=pers?.dims?.find(d=>d.control);
-    const status=(a.status==='finished'?`✅ ${fdt(a.finishedAt)}`:`⏳ ${a.archivedAt?'abgebrochen':'läuft'} (Abschnitt ${a.currentSection+1})`)+(a.archivedAt?`<div style="color:var(--mu)">📦 archiviert ${fdt(a.archivedAt)}</div>`:'');
+    const status=(a.status==='finished'?`✅ ${fdt(a.finishedAt)}`:a.status==='aborted'?`⛔ abgebrochen ${fdt(a.finishedAt)} (Abschnitt ${a.currentSection+1})`:`⏳ ${a.archivedAt?'abgebrochen':'läuft'} (Abschnitt ${a.currentSection+1})`)+(a.archivedAt?`<div style="color:var(--mu)">📦 archiviert ${fdt(a.archivedAt)}</div>`:'');
     const open=ASM.openResult===a.id;
     return `<tr><td style="text-align:left;font-weight:600">${esc(a.userName)}</td><td style="text-align:left;font-size:11px">${status}${a.outdated?'<div style="color:var(--warn)">alte Version</div>':''}</td>
       ${a.outdated?`<td colspan="${secs.length}" style="font-size:11px;color:var(--mu)">Durchgang mit dem früheren Fragenkatalog</td>`:secs.map(s=>asmPctCell(byKey[s.key])).join('')}
@@ -495,9 +514,9 @@ function asmEventsCell(ev){
 function asmEventsHtml(ev){
   if(!ev?.length)return '';
   const secs=ASM.info.sections;
-  const label={fullscreen_exit:'Vollbild verlassen',tab_hidden:'Tab/Fenster gewechselt'};
+  const label={fullscreen_exit:'Vollbild verlassen',tab_hidden:'Tab/Fenster gewechselt',aborted:'Abgebrochen durch Administration'};
   return `<div class="asm-det-sec"><div class="asm-det-head"><b>⛶ Protokoll</b> – ${ev.length} Ereignis(se)</div><table class="asm-det"><tbody>
-    ${ev.map(e=>`<tr><td style="white-space:nowrap">${fdt(e.at)}</td><td>${esc(label[e.type]||e.type)}</td><td style="color:var(--mu)">${esc(secs[e.section]?.title||'')}</td></tr>`).join('')}</tbody></table></div>`;
+    ${ev.map(e=>`<tr><td style="white-space:nowrap">${fdt(e.at)}</td><td>${esc(label[e.type]||e.type)}${e.by?' ('+esc(e.by)+')':''}</td><td style="color:var(--mu)">${esc(secs[e.section]?.title||'')}</td></tr>`).join('')}</tbody></table></div>`;
 }
 // Details unterhalb der Tabelle (nicht in einer Tabellenzeile), damit sie auf
 // jeder Bildschirmbreite vollständig lesbar sind.
@@ -590,6 +609,24 @@ function asmPlay(id){
   if(ASM._play)clearInterval(ASM._play);
   let k=0;
   ASM._play=setInterval(()=>{k=Math.min(log.length,k+Math.max(1,Math.ceil(log.length/400)));asmShowStep(id,k);if(k>=log.length||!document.getElementById(id)){clearInterval(ASM._play);ASM._play=null;}},40);
+}
+async function asmAbortUser(uid,name){
+  if(!await asmConfirm(`Laufendes Assessment von ${name} jetzt abbrechen? Der aktuelle Abschnitt wird mit dem Zwischenstand gewertet, danach ist kein Weitermachen möglich.`))return;
+  try{await api('POST','/assessment/users/'+uid+'/abort');toast('⛔ Abgebrochen');renderAssessment();}catch(e){toast('⚠️ '+e.message,'err');}
+}
+// Live-Ansicht: Restzeiten sekündlich herunterzählen, Stand alle 10 s neu laden.
+function asmAdminLive(){
+  if(ASM.liveTimer)clearInterval(ASM.liveTimer);
+  let n=0;
+  ASM.liveTimer=setInterval(async()=>{
+    if(S.view!=='assessment'||ASM.running||!ASM.info?.isAdmin){clearInterval(ASM.liveTimer);ASM.liveTimer=null;return;}
+    document.querySelectorAll('.asmLive').forEach(el=>el.textContent=asmFmt((Number(el.dataset.end)-Date.now())/1000));
+    if(++n%10)return;
+    try{
+      ASM.results=await api('GET','/assessment/results');
+      const el=document.getElementById('asmCand');if(el)el.outerHTML=asmCandidatesHtml();
+    }catch(e){}
+  },1000);
 }
 async function asmResetUser(uid,name){
   if(!confirm(`Assessment von ${name} zurücksetzen? ${name} kann das Assessment dann neu machen. Der bisherige Durchgang bleibt für die Administration archiviert.`))return;
