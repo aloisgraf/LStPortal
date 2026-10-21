@@ -112,7 +112,7 @@ function asmRenderOverview(){
       <div style="font-size:17px;font-weight:800;margin:2px 0 6px">${pause?'☕ ':''}${esc(s.title)}</div>
       <div style="font-size:13px;color:var(--mu);margin-bottom:10px">${esc(s.description)}</div>
       <div class="asm-meta"><span>⏱ ${s.minutes} Minuten</span>${s.count?`<span>❓ ${s.count} Aufgaben</span>`:''}<span>Gesamtzeit verbleibend: <b class="asmTotal">--:--</b></span></div>
-      <button class="btn-p" onclick="asmBeginSection(true)">${pause?'☕ Pause beginnen':'▶ Weiter'}</button>
+      <button class="btn-p" onclick="asmBeginSection(true)">${pause?'☕ Pause beginnen':'▶ Weiter'}</button> ${ASM.info.isAdmin?`<button class="btn-s asm-abort asm-self-abort" onclick="asmAbortSelf()">⛔ Abbrechen (Admin)</button>`:''}
     </div>`;
   }else if(att.status==='aborted'){
     body=`<div class="dash-card asm-intro" style="border-top-color:var(--danger)">
@@ -166,14 +166,14 @@ function asmRenderSection(){
   const head=`<div class="asm-bar" id="asmBar"><div class="asm-bar-row">
       <div><div class="asm-brand">${ASM_TITLE}</div><div style="font-size:11px;color:var(--mu);font-weight:600">Abschnitt ${sec.index+1} von ${total}${!sec.freeOrder&&sec.blocks.length>1?` · Block ${ASM.block+1} von ${sec.blocks.length}`:''}</div><div style="font-weight:800">${esc(sec.title)}</div></div>
       <div class="asm-progress" id="asmProgress"></div>
-      <div class="asm-timers"><div class="asm-timer" id="asmTimer">--:--</div><div class="asm-total">Gesamt <b class="asmTotal">--:--</b></div></div>
+      <div class="asm-timers">${ASM.info.isAdmin?`<button class="btn-s asm-abort asm-self-abort asm-bar-abort" onclick="asmAbortSelf()">⛔ Abbrechen (Admin)</button>`:''}<div class="asm-timer" id="asmTimer">--:--</div><div class="asm-total">Gesamt <b class="asmTotal">--:--</b></div></div>
     </div>${asmPaletteHtml()}<div class="asm-timebar"><div id="asmTimeFill"></div></div></div>`;
   let body;
   if(sec.kind==='pause'){
     body=`<div class="asm-pause-black"><div class="asm-pause-brand">${ASM_TITLE}</div><div class="asm-pause-cup">☕</div><div class="asm-pause-title">PAUSE</div>
       <div class="asm-pause-timer" id="asmPauseTimer">--:--</div>
       <div class="asm-total">Gesamtzeit verbleibend: <b class="asmTotal">--:--</b></div>
-      <button class="btn-p" id="asmPauseBtn" style="visibility:hidden" onclick="asmEnterFs();asmSubmit(true)">▶ Weiter</button>${ASM.info.isAdmin?`<button class="btn-s asm-pause-skip" onclick="asmSubmit(true)">⏭ Pause überspringen (nur Admin)</button>`:''}</div>`;
+      <button class="btn-p" id="asmPauseBtn" style="visibility:hidden" onclick="asmEnterFs();asmSubmit(true)">▶ Weiter</button>${ASM.info.isAdmin?`<button class="btn-s asm-pause-skip" onclick="asmSubmit(true)">⏭ Pause überspringen (nur Admin)</button><button class="btn-s asm-pause-skip" onclick="asmAbortSelf()">⛔ Assessment abbrechen (nur Admin)</button>`:''}</div>`;
   }else{
     let num=0;
     sec.blocks.forEach((b,bi)=>{if(!sec.freeOrder&&bi<ASM.block)num+=b.questions.length;});
@@ -611,6 +611,15 @@ function asmPlay(id){
   if(ASM._play)clearInterval(ASM._play);
   let k=0;
   ASM._play=setInterval(()=>{k=Math.min(log.length,k+Math.max(1,Math.ceil(log.length/400)));asmShowStep(id,k);if(k>=log.length||!document.getElementById(id)){clearInterval(ASM._play);ASM._play=null;}},40);
+}
+// Admin bricht den eigenen Testdurchgang ab: wird beendet und gleich
+// archiviert, danach kann er sofort neu starten.
+async function asmAbortSelf(){
+  if(!await asmConfirm('Deinen Testdurchgang abbrechen? Er bleibt in den Ergebnissen archiviert, danach kannst du neu starten.'))return;
+  asmStopTimers();ASM.submitting=false;ASM.section=null;
+  try{await api('POST','/assessment/users/'+S.currentUser+'/abort');await api('POST','/assessment/users/'+S.currentUser+'/reset');toast('⛔ Abgebrochen');}
+  catch(e){toast('⚠️ '+e.message,'err');}
+  renderAssessment();
 }
 async function asmAbortUser(uid,name){
   if(!await asmConfirm(`Laufendes Assessment von ${name} jetzt abbrechen? Der aktuelle Abschnitt wird mit dem Zwischenstand gewertet, danach ist kein Weitermachen möglich.`))return;
