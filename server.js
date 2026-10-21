@@ -1024,6 +1024,8 @@ async function initDB() {
       started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       finished_at TIMESTAMPTZ
     )`,
+    // Katalogversion (lib/assessment.js VERSION); ältere laufende Durchgänge werden verworfen.
+    `ALTER TABLE assessment_attempts ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }

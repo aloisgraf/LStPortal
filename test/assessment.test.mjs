@@ -3,66 +3,94 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const A = require('../lib/assessment');
 const { SECTIONS } = A;
+const idx = key => SECTIONS.findIndex(s => s.key === key);
+const qs = key => A.questionsOf(SECTIONS[idx(key)]);
 
 describe('Fragenkatalog', () => {
-  it('dauert insgesamt 45 Minuten', () => {
-    expect(A.TOTAL_MINUTES).toBe(45);
+  it('dauert insgesamt 88 Minuten', () => {
+    expect(A.TOTAL_MINUTES).toBe(88);
   });
-  it('enthält die fünf Teile in der vorgesehenen Reihenfolge', () => {
-    expect(SECTIONS.map(s => s.key)).toEqual(['kognitiv', 'mathe', 'sprache', 'englisch', 'persoenlichkeit']);
+  it('hat die vorgegebene Reihenfolge mit der Pause an Position 5', () => {
+    expect(SECTIONS.map(s => s.key)).toEqual(['rechtschreibung', 'geografie', 'it', 'motivation', 'pause', 'englisch', 'logik', 'merken', 'rechnen', 'persoenlichkeit', 'abschrift']);
+    expect(SECTIONS[4].kind).toBe('pause');
+    expect(SECTIONS[4].minutes).toBe(5);
+  });
+  it('enthält die Aufgabenzahlen laut Vorgabe', () => {
+    const count = key => qs(key).length;
+    expect(count('geografie')).toBe(30);
+    expect(count('it')).toBe(25);
+    expect(count('englisch')).toBe(25);
+    expect(count('logik')).toBe(15);
+    expect(count('merken')).toBe(5);
+    expect(count('rechnen')).toBe(15);
+    expect(count('persoenlichkeit')).toBe(40);
+    expect(A.overview().find(s => s.key === 'rechtschreibung').maxPoints).toBe(40);
   });
   it('hat eindeutige Frage-IDs und gültige Lösungen', () => {
     const ids = new Set();
-    for (const s of SECTIONS) for (const q of s.questions) {
+    for (const s of SECTIONS) for (const q of A.questionsOf(s)) {
       expect(ids.has(q.id), q.id).toBe(false); ids.add(q.id);
       if (q.type === 'choice') {
         expect(Number.isInteger(q.answer) && q.answer >= 0 && q.answer < q.options.length, q.id).toBe(true);
         expect(new Set(q.options).size, q.id + ' doppelte Optionen').toBe(q.options.length);
       } else if (q.type === 'number') expect(typeof q.answer, q.id).toBe('number');
+      else if (q.type === 'text') expect(q.accept.length, q.id).toBeGreaterThan(0);
       else if (q.type === 'likert') expect(Object.keys(s.dims)).toContain(q.dim);
-      else throw new Error('Unbekannter Typ ' + q.type);
+      else if (!['markwords', 'writing'].includes(q.type)) throw new Error('Unbekannter Typ ' + q.type);
     }
   });
-  it('Merkfragen kommen am Ende ihres Abschnitts', () => {
-    const k = SECTIONS[0].questions;
-    const firstMem = k.findIndex(q => q.memory);
-    expect(firstMem).toBeGreaterThan(0);
-    expect(k.slice(firstMem).every(q => q.memory)).toBe(true);
+  it('jedes der 10 Protokollfehler-Wörter kommt genau einmal im Text vor', () => {
+    const q = qs('rechtschreibung').find(x => x.type === 'markwords');
+    const words = A.tokenize(q.passage).map(A.coreWord);
+    for (const w of Object.keys(q.errors)) expect(words.filter(x => x === w).length, w).toBe(1);
+    expect(Object.keys(q.errors).length).toBe(10);
+  });
+  it('Persönlichkeit: je Skala 6 Aussagen, beide Pole vertreten, 4 Kontrollfragen', () => {
+    const s = SECTIONS[idx('persoenlichkeit')];
+    for (const [k, d] of Object.entries(s.dims)) {
+      const items = qs('persoenlichkeit').filter(q => q.dim === k);
+      if (d.control) { expect(items.length).toBe(4); continue; }
+      expect(items.length, k).toBe(6);
+      expect(new Set(items.map(q => q.pole)), k).toEqual(new Set(['a', 'b']));
+    }
   });
   it('Rechen-Lösungen stimmen', () => {
-    const ans = Object.fromEntries(SECTIONS[1].questions.map(q => [q.id, q.answer]));
-    expect(ans.m1).toBe(17 * 6);
-    expect(ans.m2).toBe(144 / 12 + 7 * 3);
-    expect(ans.m5).toBe(4 * 9 / 6);
-    expect(ans.m6).toBe(240 * 0.85);
-    expect(ans.m9).toBeCloseTo(1000 * 1.1 * 1.1);
-    expect(ans.m10).toBe(18 / 72 * 60);
-    expect(ans.m13).toBe((420 + 380 + 455 + 545) / 4);
+    const ans = Object.fromEntries(qs('rechnen').map(q => [q.id, q.answer]));
+    expect(ans.r3).toBe(1000 - 387);
+    expect(ans.r8).toBe(240 * 0.85);
+    expect(ans.r9).toBe(5 * 72);
+    expect(ans.r10).toBe(18 / 80 * 100);
+    expect(ans.r14).toBe(12 / 90 * 60);
+    expect(ans.r15).toBe(12 * 60 - 40);
   });
 });
 
 describe('publicSection — keine Lösungen an den Client', () => {
-  it('entfernt answer, tol, dim und reverse', () => {
+  it('entfernt answer, accept, errors, tol, dim und pole', () => {
     for (let i = 0; i < SECTIONS.length; i++) {
       const json = JSON.stringify(A.publicSection(i));
-      expect(json).not.toMatch(/"answer"|"tol"|"dim"|"reverse"/);
+      expect(json).not.toMatch(/"answer"|"accept"|"errors"|"tol"|"dim"|"pole"|"passage"/);
     }
+  });
+  it('liefert den Protokolltext als Wortliste', () => {
+    const sec = A.publicSection(idx('rechtschreibung'));
+    expect(sec.freeOrder).toBe(true);
+    expect(sec.blocks[0].questions[0].tokens.join('')).toContain('Verkehrsunfal');
   });
   it('liefert null für unbekannte Abschnitte', () => {
     expect(A.publicSection(99)).toBeNull();
   });
 });
 
-describe('Zeitlimit', () => {
-  const start = new Date('2026-01-01T10:00:00Z');
+describe('Zeitlimit (vergangene Sekunden aus der Datenbank)', () => {
   it('verbleibende Zeit sinkt ab Start', () => {
-    expect(A.remainingSeconds(0, start, start.getTime())).toBe(12 * 60);
-    expect(A.remainingSeconds(0, start, start.getTime() + 60000)).toBe(11 * 60);
+    expect(A.remainingSeconds(0, 0)).toBe(12 * 60);
+    expect(A.remainingSeconds(0, 60)).toBe(11 * 60);
+    expect(A.remainingSeconds(0, null)).toBeNull();
   });
   it('gilt erst nach der Kulanzzeit als abgelaufen', () => {
-    const end = start.getTime() + 12 * 60000;
-    expect(A.isExpired(0, start, end + (A.GRACE_SECONDS - 1) * 1000)).toBe(false);
-    expect(A.isExpired(0, start, end + (A.GRACE_SECONDS + 1) * 1000)).toBe(true);
+    expect(A.isExpired(0, 12 * 60 + A.GRACE_SECONDS - 1)).toBe(false);
+    expect(A.isExpired(0, 12 * 60 + A.GRACE_SECONDS + 1)).toBe(true);
   });
 });
 
@@ -72,32 +100,78 @@ describe('parseNumber — deutsche Eingaben', () => {
   });
 });
 
+describe('Zwischenstand', () => {
+  it('neuere Antworten gewinnen, abgeschlossene Texte bleiben gesperrt', () => {
+    const merged = A.mergeAnswers({ g1: 0, mo1: { text: 'fertig', log: [], done: true } }, { g1: 2, mo1: { text: 'geändert', log: [], done: false } });
+    expect(merged.g1).toBe(2);
+    expect(merged.mo1.text).toBe('fertig');
+  });
+  it('übernimmt Textprotokolle nur in gültiger Form', () => {
+    const i = idx('motivation');
+    const a = A.sanitizeAnswers(i, { mo1: { text: 'Hallo', log: [[100, 0, '', 'H'], ['x', 0, '', 'a'], [200, 1, '', 'allo']], done: true } });
+    expect(a.mo1).toEqual({ text: 'Hallo', log: [[100, 0, '', 'H'], [200, 1, '', 'allo']], done: true });
+  });
+});
+
 describe('scoreSection', () => {
-  it('zählt richtige Antworten und ignoriert unbekannte/ungültige', () => {
-    const r = A.scoreSection(1, { m1: '102', m2: '34', m3: 3, m11: '59,5', m9: '1.210', bogus: 1, m14: 99 });
-    expect(r.scored).toBe(true);
-    expect(r.correct).toBe(4);
-    expect(r.answered).toBe(5);
-    expect(r.details.find(d => d.id === 'm2')).toMatchObject({ correct: false, given: '34', expected: '33' });
-    expect(r.details.find(d => d.id === 'm14').given).toBeNull();
+  it('Rechtschreibung: Punkte fürs Markieren, Verbessern und Abzug für falsche Markierungen', () => {
+    const i = idx('rechtschreibung');
+    const q = qs('rechtschreibung').find(x => x.type === 'markwords');
+    const tokens = A.tokenize(q.passage);
+    const at = w => tokens.findIndex(t => A.coreWord(t) === w);
+    const r = A.scoreSection(i, {
+      rs1: { [at('Verkehrsunfal')]: 'Verkehrsunfall', [at('Bensin')]: 'Bensin', [at('Motorrad')]: 'Motorrad' },
+      sw1: 1, sw2: 1, lt1: 'Reanimation', lt8: 'kohlenmonoxid',
+    });
+    const mw = r.blocks[0].details[0];
+    expect(mw.points).toBe(2 + 1 - 1);
+    expect(mw.falseMarks.map(f => f.word)).toEqual(['Motorrad']);
+    expect(r.points).toBe(2 + 1 + 1);
+    expect(r.max).toBe(40);
+  });
+  it('Protokollaufgabe fällt nie unter 0 Punkte', () => {
+    const i = idx('rechtschreibung');
+    const tokens = A.tokenize(qs('rechtschreibung')[0].passage);
+    const marks = {}; tokens.forEach((t, n) => { if (/\S/.test(t) && n < 40) marks[n] = ''; });
+    expect(A.scoreSection(i, { rs1: marks }).blocks[0].details[0].points).toBe(0);
   });
   it('alle richtigen Antworten ergeben 100 %', () => {
-    for (let i = 0; i < 4; i++) {
-      const all = Object.fromEntries(SECTIONS[i].questions.map(q => [q.id, q.type === 'number' ? String(q.answer) : q.answer]));
-      expect(A.scoreSection(i, all).percent, SECTIONS[i].key).toBe(100);
-    }
+    SECTIONS.forEach((s, i) => {
+      if (!A.overview()[i].scored) return;
+      const all = {};
+      for (const q of A.questionsOf(s)) {
+        if (q.type === 'number') all[q.id] = String(q.answer).replace('.', ',');
+        else if (q.type === 'choice') all[q.id] = q.answer;
+        else if (q.type === 'text') all[q.id] = q.accept[0];
+        else if (q.type === 'markwords') {
+          const tokens = A.tokenize(q.passage);
+          all[q.id] = Object.fromEntries(tokens.map((t, n) => [n, q.errors[A.coreWord(t)]]).filter(([, v]) => v));
+        }
+      }
+      expect(A.scoreSection(i, all).percent, s.key).toBe(100);
+    });
   });
-  it('Persönlichkeit: Mittelwerte je Dimension mit umgepolten Aussagen', () => {
+  it('Persönlichkeit: Pol a ergibt 1, Pol b ergibt 5, Kontrolle wird markiert', () => {
+    const i = idx('persoenlichkeit');
     const ans = {};
-    for (const q of SECTIONS[4].questions) ans[q.id] = q.reverse ? 1 : 5;
-    const r = A.scoreSection(4, ans);
+    for (const q of qs('persoenlichkeit')) ans[q.id] = q.pole === 'a' ? 5 : q.pole === 'b' ? 1 : 5;
+    const r = A.scoreSection(i, ans);
     expect(r.scored).toBe(false);
-    expect(r.dims.every(d => d.score === 5)).toBe(true);
-    const r2 = A.scoreSection(4, {});
-    expect(r2.dims.every(d => d.score === null)).toBe(true);
+    for (const d of r.dims) {
+      if (d.control) expect(d.level).toBe('sehr auffällig');
+      else expect(d.score, d.key).toBe(1);
+    }
+    expect(A.scoreSection(i, {}).dims.every(d => d.score === null)).toBe(true);
   });
-  it('summarize zählt Persönlichkeit nicht mit', () => {
-    const res = [A.scoreSection(1, { m1: '102' }), A.scoreSection(4, { p1: 5 })];
-    expect(A.summarize(res)).toEqual({ correct: 1, total: 15, percent: 7 });
+  it('Texte: Statistik aus dem Änderungsprotokoll', () => {
+    const r = A.scoreSection(idx('abschrift'), { ab1: { text: 'Die Leitstelle', log: [[0, 0, '', 'Die Leitstele'], [5000, 12, 'e', ''], [9000, 12, '', 'le']], done: true } });
+    const d = r.blocks[0].details[0];
+    expect(d.stats).toMatchObject({ words: 2, chars: 14, corrections: 1, deletedChars: 1, seconds: 9 });
+    expect(d.done).toBe(true);
+    expect(r.scored).toBe(false);
+  });
+  it('summarize zählt nur bewertete Abschnitte', () => {
+    const res = [A.scoreSection(idx('geografie'), { g1: 0 }), A.scoreSection(idx('persoenlichkeit'), { p1: 5 })];
+    expect(A.summarize(res)).toEqual({ points: 1, max: 30, percent: 3 });
   });
 });
