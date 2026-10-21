@@ -5,6 +5,7 @@
 // Abschnitts geht es Block für Block mit „Fertig, weiter“ (außer freeOrder).
 // Administratoren sehen zusätzlich die Ergebnisse aller Mitarbeiter.
 // Nutzt die globalen Helfer aus app.js (api, esc, toast, fdt, S).
+const ASM_TITLE='Leitstellen Assessment 2026';
 const ASM={info:null,section:null,answers:{},block:0,deadline:0,timer:null,draftTimer:null,submitting:false,warned:{},results:null,openResult:null,memoUntil:{},prevText:{}};
 function asmStopTimers(){if(ASM.timer){clearInterval(ASM.timer);ASM.timer=null;}if(ASM.draftTimer){clearTimeout(ASM.draftTimer);ASM.draftTimer=null;}}
 const asmFmt=s=>{s=Math.max(0,Math.ceil(s));return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');};
@@ -82,6 +83,8 @@ async function renderAssessment(){
   const att=ASM.info.attempt;
   asmSetRunMode(!!att&&att.status==='running');
   if(att&&att.status==='running'&&att.sectionStarted)return asmBeginSection();
+  // Die Pause startet automatisch, ohne Klick auf „Weiter“.
+  if(att&&att.status==='running'&&ASM.info.sections[att.currentSection]?.kind==='pause')return asmBeginSection();
   asmRenderOverview();
 }
 function asmRenderOverview(){
@@ -89,7 +92,7 @@ function asmRenderOverview(){
   let body;
   if(!att){
     body=`<div class="dash-card asm-intro">
-      <div style="font-size:15px;font-weight:700;margin-bottom:6px">Willkommen zum Assessment</div>
+      <div style="font-size:15px;font-weight:700;margin-bottom:6px">Willkommen zum ${ASM_TITLE}</div>
       <div style="font-size:13px;color:var(--mu);margin-bottom:12px">Das Assessment besteht aus ${sections.length} Abschnitten und dauert insgesamt ca. <b>${totalMinutes} Minuten</b>. Jeder Abschnitt hat ein eigenes Zeitlimit. Läuft die Zeit ab, wird der Abschnitt automatisch abgegeben. Der nächste Abschnitt beginnt erst, wenn du auf „Weiter“ klickst.</div>
       <ul class="asm-rules">
         <li>Pro Frage nur eine Antwort. Unbearbeitete Aufgaben zählen 0 Punkte, Raten lohnt sich (außer bei den Protokollfehlern in Teil 1).</li>
@@ -107,7 +110,7 @@ function asmRenderOverview(){
       <div style="font-size:11px;color:var(--mu);font-weight:600">Als Nächstes: Abschnitt ${att.currentSection+1} von ${sections.length}</div>
       <div style="font-size:17px;font-weight:800;margin:2px 0 6px">${pause?'☕ ':''}${esc(s.title)}</div>
       <div style="font-size:13px;color:var(--mu);margin-bottom:10px">${esc(s.description)}</div>
-      <div class="asm-meta"><span>⏱ ${s.minutes} Minuten</span>${s.count?`<span>❓ ${s.count} Aufgaben</span>`:''}</div>
+      <div class="asm-meta"><span>⏱ ${s.minutes} Minuten</span>${s.count?`<span>❓ ${s.count} Aufgaben</span>`:''}<span>Gesamtzeit verbleibend: <b class="asmTotal">--:--</b></span></div>
       <button class="btn-p" onclick="asmBeginSection(true)">${pause?'☕ Pause beginnen':'▶ Weiter'}</button>
     </div>`;
   }else{
@@ -116,7 +119,8 @@ function asmRenderOverview(){
       <div style="font-size:13px;color:var(--mu)">Vielen Dank! Alle Abschnitte wurden abgegeben (${fdt(att.finishedAt)}). Die Auswertung erfolgt durch die Administration.</div>
     </div>`;
   }
-  document.getElementById('main').innerHTML=`<div class="ph"><div class="pt">📝 Assessment</div></div>${body}${isAdmin?asmCandidatesHtml()+asmResultsHtml():''}`;
+  document.getElementById('main').innerHTML=`<div class="ph"><div class="pt">📝 ${ASM_TITLE}</div></div>${body}${isAdmin?asmCandidatesHtml()+asmResultsHtml():''}`;
+  if(att&&att.status==='running'){asmSetTotal(att);if(ASM.timer)clearInterval(ASM.timer);ASM.timer=setInterval(()=>{if(S.view!=='assessment'){asmStopTimers();return;}asmTickTotal();},500);}
 }
 async function asmStart(){
   if(!await asmConfirm('Assessment jetzt starten? Die Seite wechselt dabei in den Vollbildmodus.'))return;
@@ -131,6 +135,7 @@ async function asmBeginSection(byClick){
     ASM.section=r.section;ASM.answers=r.draft?.answers||{};ASM.block=r.draft?.block||0;
     ASM.warned={};ASM.submitting=false;ASM.memoUntil={};ASM.prevText={};
     ASM.deadline=Date.now()+(r.state.remainingSeconds||0)*1000;
+    asmSetTotal(r.state);
     ASM.sectionStart=ASM.deadline-r.section.minutes*60*1000;
     asmRenderSection();
     if(r.state.remainingSeconds>=r.section.minutes*60-2){document.getElementById('main').scrollTop=0;window.scrollTo(0,0);}
@@ -152,14 +157,15 @@ function asmMemorizing(bi){
 function asmRenderSection(){
   const sec=ASM.section,total=ASM.info.sections.length;
   const head=`<div class="asm-bar" id="asmBar"><div class="asm-bar-row">
-      <div><div style="font-size:11px;color:var(--mu);font-weight:600">Abschnitt ${sec.index+1} von ${total}${!sec.freeOrder&&sec.blocks.length>1?` · Block ${ASM.block+1} von ${sec.blocks.length}`:''}</div><div style="font-weight:800">${esc(sec.title)}</div></div>
+      <div><div class="asm-brand">${ASM_TITLE}</div><div style="font-size:11px;color:var(--mu);font-weight:600">Abschnitt ${sec.index+1} von ${total}${!sec.freeOrder&&sec.blocks.length>1?` · Block ${ASM.block+1} von ${sec.blocks.length}`:''}</div><div style="font-weight:800">${esc(sec.title)}</div></div>
       <div class="asm-progress" id="asmProgress"></div>
-      <div class="asm-timer" id="asmTimer">--:--</div>
+      <div class="asm-timers"><div class="asm-timer" id="asmTimer">--:--</div><div class="asm-total">Gesamt <b class="asmTotal">--:--</b></div></div>
     </div>${asmPaletteHtml()}<div class="asm-timebar"><div id="asmTimeFill"></div></div></div>`;
   let body;
   if(sec.kind==='pause'){
-    body=`<div class="asm-pause-black"><div class="asm-pause-title">PAUSE</div>
+    body=`<div class="asm-pause-black"><div class="asm-pause-brand">${ASM_TITLE}</div><div class="asm-pause-cup">☕</div><div class="asm-pause-title">PAUSE</div>
       <div class="asm-pause-timer" id="asmPauseTimer">--:--</div>
+      <div class="asm-total">Gesamtzeit verbleibend: <b class="asmTotal">--:--</b></div>
       <button class="btn-p" id="asmPauseBtn" style="visibility:hidden" onclick="asmEnterFs();asmSubmit(true)">▶ Weiter</button></div>`;
   }else{
     let num=0;
@@ -202,7 +208,7 @@ function asmInputHtml(q,sec){
   const v=ASM.answers[q.id];
   if(q.type==='choice')return `<div class="asm-opts ${q.compact?'compact':''}">${q.options.map((o,i)=>`<label class="asm-opt"><input type="radio" name="asm_${q.id}" ${v===i?'checked':''} onchange="asmSet('${q.id}',${i})"><span>${esc(o)}</span></label>`).join('')}</div>`;
   if(q.type==='number')return `<input type="text" inputmode="decimal" class="asm-num" placeholder="Antwort" autocomplete="off" value="${esc(v??'')}" oninput="asmSet('${q.id}',this.value)" onkeydown="if(event.key==='Enter')event.preventDefault()">`;
-  if(q.type==='text')return `<input type="text" class="asm-num asm-txt" placeholder="Fachwort" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" value="${esc(v??'')}" oninput="asmSet('${q.id}',this.value)" onkeydown="if(event.key==='Enter')event.preventDefault()">`;
+  if(q.type==='text')return `<input type="text" class="asm-num asm-txt${q.loose?' asm-wide':''}" placeholder="${q.loose?'Antwort':'Fachwort'}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" value="${esc(v??'')}" oninput="asmSet('${q.id}',this.value)" onkeydown="if(event.key==='Enter')event.preventDefault()">`;
   const scale=sec.scale||['1','2','3','4','5'];
   return `<div class="asm-likert">${scale.map((l,i)=>`<label class="asm-lk"><input type="radio" name="asm_${q.id}" ${v===i+1?'checked':''} onchange="asmSet('${q.id}',${i+1})"><b>${i+1}</b><span>${esc(l)}</span></label>`).join('')}</div>`;
 }
@@ -390,7 +396,15 @@ function asmUpdateProgress(){
   const n=qs.filter(asmIsAnswered).length;
   el.textContent=`${n} / ${qs.length} bearbeitet`;
 }
+// Gesamtzeit seit dem Start (nur Anzeige), läuft auch auf den Zwischenseiten.
+function asmSetTotal(st){ASM.totalDeadline=st&&st.totalRemainingSeconds!=null?Date.now()+st.totalRemainingSeconds*1000:0;asmTickTotal();}
+function asmTickTotal(){
+  if(!ASM.totalDeadline)return;
+  const txt=asmFmt((ASM.totalDeadline-Date.now())/1000);
+  document.querySelectorAll('.asmTotal').forEach(e=>e.textContent=txt);
+}
 function asmTick(){
+  asmTickTotal();
   if(S.view!=='assessment'||!ASM.section){asmStopTimers();return;}
   const left=(ASM.deadline-Date.now())/1000;
   const total=ASM.section.minutes*60;

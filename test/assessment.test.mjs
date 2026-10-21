@@ -178,6 +178,10 @@ describe('scoreSection', () => {
     expect(d.done).toBe(true);
     expect(r.scored).toBe(false);
   });
+  it('Kürzel-Abschlussfragen: Freitext tolerant bei Schreibweise', () => {
+    const r = A.scoreSection(idx('geografie'), { gk1: 'salzburg umgebung', gk2: 'Sankt Johann im Pongau', gk3: 'Tamsweg ', gk4: 'Halein', gk5: 'zell am see' });
+    expect(r.blocks[1].details.map(d => d.correct)).toEqual([true, true, true, false, true]);
+  });
   it('summarize zählt nur bewertete Abschnitte', () => {
     const res = [A.scoreSection(idx('geografie'), { g1: 0 }), A.scoreSection(idx('persoenlichkeit'), { p1: 5 })];
     expect(A.summarize(res)).toEqual({ points: 1, max: 35, percent: 3 });

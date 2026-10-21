@@ -14,7 +14,9 @@ const A = require('../lib/assessment');
 
 const parseJson = (t, fb) => { try { return t ? JSON.parse(t) : fb; } catch { return fb; } };
 // elapsed = Sekunden seit Abschnittsbeginn, direkt in der Datenbank gerechnet.
-const SELECT_ATT = `SELECT *, EXTRACT(EPOCH FROM (NOW()-section_started_at))::float AS elapsed FROM assessment_attempts`;
+// total_elapsed = Sekunden seit dem Start des Assessments (Gesamtzeit-Anzeige).
+const SELECT_ATT = `SELECT *, EXTRACT(EPOCH FROM (NOW()-section_started_at))::float AS elapsed,
+  EXTRACT(EPOCH FROM (NOW()-started_at))::float AS total_elapsed FROM assessment_attempts`;
 const getAttempt = uid => q1(`${SELECT_ATT} WHERE user_id=$1 AND archived_at IS NULL`, [uid]);
 // draft = { answers, block } — block = Index des aktuellen Blocks („Fertig, weiter“).
 const draftOf = att => { const d = parseJson(att.draft, {}); return { answers: d.answers || {}, block: Number.isInteger(d.block) ? d.block : 0 }; };
@@ -50,6 +52,8 @@ function stateOf(att) {
     currentSection: att.current_section,
     sectionStarted: !!att.section_started_at,
     remainingSeconds: att.section_started_at ? Math.max(0, A.remainingSeconds(att.current_section, att.elapsed)) : null,
+    // Gesamtzeit: läuft ab dem Start mit, nur zur Anzeige (gewertet wird je Abschnitt).
+    totalRemainingSeconds: att.status === 'running' && att.total_elapsed != null ? Math.max(0, Math.round(A.TOTAL_MINUTES * 60 - att.total_elapsed)) : null,
     version: att.version,
     startedAt: att.started_at, finishedAt: att.finished_at,
   };
@@ -154,7 +158,8 @@ router.post('/section/submit', auth, assessmentAccess, async (req,res) => {
 // ── ADMINISTRATION ───────────────────────────────────────────────────────────
 router.get('/results', auth, adminOnly, async (req,res) => {
   try {
-    const rows = await q(`SELECT a.*, EXTRACT(EPOCH FROM (NOW()-a.section_started_at))::float AS elapsed, u.name AS user_name
+    const rows = await q(`SELECT a.*, EXTRACT(EPOCH FROM (NOW()-a.section_started_at))::float AS elapsed,
+      EXTRACT(EPOCH FROM (NOW()-a.started_at))::float AS total_elapsed, u.name AS user_name
       FROM assessment_attempts a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.started_at DESC`);
     const candidates = await q(`SELECT id, name FROM users WHERE roles ? 'assessment' ORDER BY name`);
     const out = [];
