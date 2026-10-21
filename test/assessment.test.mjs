@@ -7,8 +7,8 @@ const idx = key => SECTIONS.findIndex(s => s.key === key);
 const qs = key => A.questionsOf(SECTIONS[idx(key)]);
 
 describe('Fragenkatalog', () => {
-  it('dauert insgesamt 88 Minuten', () => {
-    expect(A.TOTAL_MINUTES).toBe(88);
+  it('dauert insgesamt 90 Minuten', () => {
+    expect(A.TOTAL_MINUTES).toBe(90);
   });
   it('hat die vorgegebene Reihenfolge mit der Pause an Position 5', () => {
     expect(SECTIONS.map(s => s.key)).toEqual(['rechtschreibung', 'geografie', 'it', 'motivation', 'pause', 'englisch', 'logik', 'merken', 'rechnen', 'persoenlichkeit', 'abschrift']);
@@ -17,10 +17,10 @@ describe('Fragenkatalog', () => {
   });
   it('enthält die Aufgabenzahlen laut Vorgabe', () => {
     const count = key => qs(key).length;
-    expect(count('geografie')).toBe(30);
+    expect(count('geografie')).toBe(35);
     expect(count('it')).toBe(25);
     expect(count('englisch')).toBe(25);
-    expect(count('logik')).toBe(15);
+    expect(count('logik')).toBe(20);
     expect(count('merken')).toBe(5);
     expect(count('rechnen')).toBe(15);
     expect(count('persoenlichkeit')).toBe(40);
@@ -53,6 +53,14 @@ describe('Fragenkatalog', () => {
       expect(items.length, k).toBe(6);
       expect(new Set(items.map(q => q.pole)), k).toEqual(new Set(['a', 'b']));
     }
+  });
+  it('schwere Zahlenreihen stimmen', () => {
+    const ans = Object.fromEntries(qs('logik').map(q => [q.id, q.answer]));
+    expect(ans.z10).toBe(52 + 48);
+    expect(ans.z11).toBe(31 + 5 * 5);
+    expect(ans.z12).toBe(11 * 12);
+    expect(ans.z13).toBe(64 - 1);
+    expect(ans.z14).toBe(5 ** 5);
   });
   it('Rechen-Lösungen stimmen', () => {
     const ans = Object.fromEntries(qs('rechnen').map(q => [q.id, q.answer]));
@@ -172,6 +180,6 @@ describe('scoreSection', () => {
   });
   it('summarize zählt nur bewertete Abschnitte', () => {
     const res = [A.scoreSection(idx('geografie'), { g1: 0 }), A.scoreSection(idx('persoenlichkeit'), { p1: 5 })];
-    expect(A.summarize(res)).toEqual({ points: 1, max: 30, percent: 3 });
+    expect(A.summarize(res)).toEqual({ points: 1, max: 35, percent: 3 });
   });
 });

@@ -15,7 +15,7 @@ const A = require('../lib/assessment');
 const parseJson = (t, fb) => { try { return t ? JSON.parse(t) : fb; } catch { return fb; } };
 // elapsed = Sekunden seit Abschnittsbeginn, direkt in der Datenbank gerechnet.
 const SELECT_ATT = `SELECT *, EXTRACT(EPOCH FROM (NOW()-section_started_at))::float AS elapsed FROM assessment_attempts`;
-const getAttempt = uid => q1(`${SELECT_ATT} WHERE user_id=$1`, [uid]);
+const getAttempt = uid => q1(`${SELECT_ATT} WHERE user_id=$1 AND archived_at IS NULL`, [uid]);
 // draft = { answers, block } — block = Index des aktuellen Blocks („Fertig, weiter“).
 const draftOf = att => { const d = parseJson(att.draft, {}); return { answers: d.answers || {}, block: Number.isInteger(d.block) ? d.block : 0 }; };
 
@@ -75,7 +75,7 @@ router.get('/', auth, assessmentAccess, async (req,res) => {
 router.post('/start', auth, assessmentAccess, async (req,res) => {
   try {
     await dropOutdated(await getAttempt(req.uid));
-    await pool.query(`INSERT INTO assessment_attempts (id,user_id,version) VALUES ($1,$2,$3) ON CONFLICT (user_id) DO NOTHING`, [newId(), req.uid, A.VERSION]);
+    await pool.query(`INSERT INTO assessment_attempts (id,user_id,version) VALUES ($1,$2,$3) ON CONFLICT (user_id) WHERE archived_at IS NULL DO NOTHING`, [newId(), req.uid, A.VERSION]);
     const att = await getAttempt(req.uid);
     if (att.status === 'finished') return bad(res,'Das Assessment wurde bereits abgeschlossen',409);
     await logAct(req.uid, req.user.name, 'assessment_start', {});
@@ -116,6 +116,22 @@ router.put('/section/draft', auth, assessmentAccess, async (req,res) => {
   } catch(e) { console.error('[assessment/draft]', e.message); bad(res,'Serverfehler',500); }
 });
 
+// Protokolliert, wenn der Vollbildmodus verlassen oder der Tab gewechselt
+// wird (verhindern kann das keine Webseite). Höchstens 500 Einträge.
+const EVENT_TYPES = ['fullscreen_exit', 'tab_hidden'];
+router.post('/section/event', auth, assessmentAccess, async (req,res) => {
+  try {
+    const type = req.body?.type;
+    if (!EVENT_TYPES.includes(type)) return bad(res,'Unbekanntes Ereignis');
+    const att = await getAttempt(req.uid);
+    if (!att || att.status !== 'running') return ok(res);
+    const ev = JSON.stringify([{ type, section: att.current_section, at: new Date().toISOString() }]);
+    await pool.query(`UPDATE assessment_attempts SET events=(events::jsonb || $1::jsonb)::text
+      WHERE id=$2 AND jsonb_array_length(events::jsonb) < 500`, [ev, att.id]);
+    ok(res);
+  } catch(e) { console.error('[assessment/event]', e.message); bad(res,'Serverfehler',500); }
+});
+
 // Abgabe: gewertet wird der Zwischenstand zusammen mit den mitgeschickten
 // Antworten. Kommt die Abgabe zu spät, zählt nur der Zwischenstand.
 router.post('/section/submit', auth, assessmentAccess, async (req,res) => {
@@ -140,26 +156,31 @@ router.get('/results', auth, adminOnly, async (req,res) => {
   try {
     const rows = await q(`SELECT a.*, EXTRACT(EPOCH FROM (NOW()-a.section_started_at))::float AS elapsed, u.name AS user_name
       FROM assessment_attempts a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.started_at DESC`);
+    const candidates = await q(`SELECT id, name FROM users WHERE roles ? 'assessment' ORDER BY name`);
     const out = [];
     for (const r of rows) {
-      const att = r.version === A.VERSION ? await expireIfNeeded(r) : r;
+      const att = r.version === A.VERSION && !r.archived_at ? await expireIfNeeded(r) : r;
       const results = parseJson(att.results, []);
       out.push({
         id: att.id, userId: att.user_id, userName: r.user_name || '?', ...stateOf(att),
         outdated: att.version !== A.VERSION, results, summary: A.summarize(results),
+        events: parseJson(att.events, []), archivedAt: att.archived_at,
       });
     }
-    ok(res, out);
+    ok(res, { attempts: out, candidates: candidates.map(c => ({ id: c.id, name: c.name })) });
   } catch(e) { console.error('[assessment/results]', e.message); bad(res,'Serverfehler',500); }
 });
 
-// Zurücksetzen: löscht den Durchgang, der Mitarbeiter kann neu beginnen.
-router.delete('/attempts/:id', auth, adminOnly, async (req,res) => {
+// Zurücksetzen: der aktive Durchgang wird archiviert, der Mitarbeiter kann
+// neu beginnen und sieht den alten nicht mehr. Die Administration sieht ihn
+// weiterhin in den Ergebnissen.
+router.post('/users/:uid/reset', auth, adminOnly, async (req,res) => {
   try {
-    const att = await q1('SELECT a.user_id, u.name FROM assessment_attempts a LEFT JOIN users u ON u.id=a.user_id WHERE a.id=$1', [req.params.id]);
-    if (!att) return bad(res,'Nicht gefunden',404);
-    await pool.query('DELETE FROM assessment_attempts WHERE id=$1', [req.params.id]);
-    await logAct(req.uid, req.user.name, 'assessment_reset', { userId: att.user_id, userName: att.name });
+    const u = await q1('SELECT id, name FROM users WHERE id=$1', [req.params.uid]);
+    if (!u) return bad(res,'Nicht gefunden',404);
+    const r = await pool.query('UPDATE assessment_attempts SET archived_at=NOW() WHERE user_id=$1 AND archived_at IS NULL', [u.id]);
+    if (!r.rowCount) return bad(res,'Kein Durchgang zum Zurücksetzen',409);
+    await logAct(req.uid, req.user.name, 'assessment_reset', { userId: u.id, userName: u.name });
     ok(res);
   } catch(e) { console.error('[assessment/reset]', e.message); bad(res,'Serverfehler',500); }
 });
