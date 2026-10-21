@@ -1026,6 +1026,13 @@ async function initDB() {
     )`,
     // Katalogversion (lib/assessment.js VERSION); ältere laufende Durchgänge werden verworfen.
     `ALTER TABLE assessment_attempts ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1`,
+    // Protokoll: Vollbild verlassen, Tab gewechselt (routes/assessment.js /section/event).
+    `ALTER TABLE assessment_attempts ADD COLUMN IF NOT EXISTS events TEXT NOT NULL DEFAULT '[]'`,
+    // Zurücksetzen archiviert den Durchgang (archived_at) statt ihn zu löschen:
+    // je Mitarbeiter nur ein aktiver Durchgang, beliebig viele archivierte.
+    `ALTER TABLE assessment_attempts ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ`,
+    `ALTER TABLE assessment_attempts DROP CONSTRAINT IF EXISTS assessment_attempts_user_id_key`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS assessment_attempts_active_user ON assessment_attempts(user_id) WHERE archived_at IS NULL`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }

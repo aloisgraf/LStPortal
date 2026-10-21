@@ -18,15 +18,69 @@ function asmIsAnswered(q){
   return true;
 }
 
+// ── Vollbild: läuft ein Durchgang, wird die Seite im Vollbild ohne Kopfzeile
+// und Menü angezeigt. Verlassen (Esc) lässt sich im Browser nicht verhindern:
+// dann deckt ein Hinweis den Test ab, bis wieder Vollbild ist, und das
+// Verlassen wird protokolliert (Admin-Auswertung).
+const asmFsOk=()=>!!document.documentElement.requestFullscreen&&document.fullscreenEnabled!==false;
+function asmEnterFs(){
+  if(!asmFsOk()||document.fullscreenElement)return;
+  try{document.documentElement.requestFullscreen({navigationUI:'hide'}).catch(()=>{});}catch(e){}
+}
+function asmSetRunMode(on){
+  ASM.running=on;
+  document.body.classList.toggle('asm-run',on);
+  if(!on){
+    document.getElementById('asmFsOv')?.remove();
+    if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen().catch(()=>{});
+  }
+  asmCheckFs();
+}
+function asmCheckFs(){
+  const need=ASM.running&&asmFsOk()&&!document.fullscreenElement&&S.view==='assessment';
+  let ov=document.getElementById('asmFsOv');
+  if(!need){ov?.remove();return;}
+  if(ov)return;
+  ov=document.createElement('div');ov.id='asmFsOv';ov.className='asm-fs-ov';
+  ov.innerHTML=`<div><div style="font-size:40px">⛶</div><div style="font-size:18px;font-weight:800;margin:8px 0">Das Assessment läuft im Vollbildmodus</div>
+    <div style="font-size:13px;opacity:.8;margin-bottom:16px">Die Zeit läuft weiter. Das Verlassen des Vollbildmodus wird protokolliert.</div>
+    <button class="btn-p" onclick="asmEnterFs()">⛶ Zurück zum Vollbild</button></div>`;
+  document.body.appendChild(ov);
+}
+// Eigener Bestätigungsdialog: ein Browser-confirm() beendet in Chrome den
+// Vollbildmodus.
+function asmConfirm(msg){
+  return new Promise(resolve=>{
+    const ov=document.createElement('div');ov.className='asm-confirm-ov';
+    ov.innerHTML=`<div class="asm-confirm"><div style="font-size:14px;margin-bottom:16px">${esc(msg)}</div>
+      <div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn-s" data-v="0">Abbrechen</button><button class="btn-p" data-v="1">OK</button></div></div>`;
+    ov.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;ov.remove();resolve(b.dataset.v==='1');});
+    document.body.appendChild(ov);
+    ov.querySelector('.btn-p').focus();
+  });
+}
+function asmLogEvent(type){
+  api('POST','/assessment/section/event',{type}).catch(()=>{});
+}
+document.addEventListener('fullscreenchange',()=>{
+  if(ASM.running&&!document.fullscreenElement&&ASM.wasFs)asmLogEvent('fullscreen_exit');
+  ASM.wasFs=!!document.fullscreenElement;
+  asmCheckFs();
+});
+document.addEventListener('visibilitychange',()=>{
+  if(ASM.running&&document.visibilityState==='hidden')asmLogEvent('tab_hidden');
+});
+
 async function renderAssessment(){
   asmStopTimers();
   const main=document.getElementById('main');
   main.innerHTML='<div class="empty">⏳ Lade Assessment…</div>';
   try{
     ASM.info=await api('GET','/assessment');
-    if(ASM.info.isAdmin){try{ASM.results=await api('GET','/assessment/results');}catch(e){ASM.results=[];}}
+    if(ASM.info.isAdmin){try{ASM.results=await api('GET','/assessment/results');}catch(e){ASM.results={attempts:[],candidates:[]};}}
   }catch(e){main.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`;return;}
   const att=ASM.info.attempt;
+  asmSetRunMode(!!att&&att.status==='running');
   if(att&&att.status==='running'&&att.sectionStarted)return asmBeginSection();
   asmRenderOverview();
 }
@@ -37,7 +91,6 @@ function asmRenderOverview(){
     body=`<div class="dash-card asm-intro">
       <div style="font-size:15px;font-weight:700;margin-bottom:6px">Willkommen zum Assessment</div>
       <div style="font-size:13px;color:var(--mu);margin-bottom:12px">Das Assessment besteht aus ${sections.length} Abschnitten und dauert insgesamt ca. <b>${totalMinutes} Minuten</b>. Jeder Abschnitt hat ein eigenes Zeitlimit. Läuft die Zeit ab, wird der Abschnitt automatisch abgegeben. Der nächste Abschnitt beginnt erst, wenn du auf „Weiter“ klickst.</div>
-      ${asmSectionList(sections,-1)}
       <ul class="asm-rules">
         <li>Pro Frage nur eine Antwort. Unbearbeitete Aufgaben zählen 0 Punkte, Raten lohnt sich (außer bei den Protokollfehlern in Teil 1).</li>
         <li>Innerhalb eines Abschnitts geht es mit „Fertig, weiter“ zum nächsten Block. Zurück geht es nicht.</li>
@@ -55,7 +108,6 @@ function asmRenderOverview(){
       <div style="font-size:17px;font-weight:800;margin:2px 0 6px">${pause?'☕ ':''}${esc(s.title)}</div>
       <div style="font-size:13px;color:var(--mu);margin-bottom:10px">${esc(s.description)}</div>
       <div class="asm-meta"><span>⏱ ${s.minutes} Minuten</span>${s.count?`<span>❓ ${s.count} Aufgaben</span>`:''}</div>
-      ${asmSectionList(sections,att.currentSection)}
       <button class="btn-p" onclick="asmBeginSection(true)">${pause?'☕ Pause beginnen':'▶ Weiter'}</button>
     </div>`;
   }else{
@@ -64,16 +116,15 @@ function asmRenderOverview(){
       <div style="font-size:13px;color:var(--mu)">Vielen Dank! Alle Abschnitte wurden abgegeben (${fdt(att.finishedAt)}). Die Auswertung erfolgt durch die Administration.</div>
     </div>`;
   }
-  document.getElementById('main').innerHTML=`<div class="ph"><div class="pt">📝 Assessment</div></div>${body}${isAdmin?asmResultsHtml():''}`;
-}
-function asmSectionList(sections,current){
-  return `<div class="asm-sec-list">${sections.map((s,i)=>`<div class="asm-sec-row ${i<current?'done':i===current?'cur':''} ${s.kind==='pause'?'pause':''}"><span class="asm-sec-num">${i<current?'✓':s.kind==='pause'?'☕':i+1}</span><span style="flex:1">${esc(s.title)}</span><span style="color:var(--mu)">${s.minutes} Min.</span></div>`).join('')}</div>`;
+  document.getElementById('main').innerHTML=`<div class="ph"><div class="pt">📝 Assessment</div></div>${body}${isAdmin?asmCandidatesHtml()+asmResultsHtml():''}`;
 }
 async function asmStart(){
-  if(!confirm('Assessment jetzt starten?'))return;
+  if(!await asmConfirm('Assessment jetzt starten? Die Seite wechselt dabei in den Vollbildmodus.'))return;
+  asmEnterFs();
   try{await api('POST','/assessment/start');await renderAssessment();}catch(e){toast('⚠️ '+e.message,'err');}
 }
-async function asmBeginSection(){
+async function asmBeginSection(byClick){
+  if(byClick)asmEnterFs();
   asmStopTimers();
   try{
     const r=await api('POST','/assessment/section/begin');
@@ -104,13 +155,12 @@ function asmRenderSection(){
       <div><div style="font-size:11px;color:var(--mu);font-weight:600">Abschnitt ${sec.index+1} von ${total}${!sec.freeOrder&&sec.blocks.length>1?` · Block ${ASM.block+1} von ${sec.blocks.length}`:''}</div><div style="font-weight:800">${esc(sec.title)}</div></div>
       <div class="asm-progress" id="asmProgress"></div>
       <div class="asm-timer" id="asmTimer">--:--</div>
-    </div><div class="asm-timebar"><div id="asmTimeFill"></div></div></div>`;
+    </div>${asmPaletteHtml()}<div class="asm-timebar"><div id="asmTimeFill"></div></div></div>`;
   let body;
   if(sec.kind==='pause'){
-    body=`<div class="dash-card asm-intro asm-pause"><div style="font-size:40px">☕</div>
-      <div style="font-size:18px;font-weight:800;margin:6px 0">Pause</div>
-      <div style="font-size:13px;color:var(--mu);margin-bottom:14px">${esc(sec.description)}</div>
-      <button class="btn-p" id="asmPauseBtn" disabled onclick="asmSubmit(true)">▶ Weiter</button></div>`;
+    body=`<div class="asm-pause-black"><div class="asm-pause-title">PAUSE</div>
+      <div class="asm-pause-timer" id="asmPauseTimer">--:--</div>
+      <button class="btn-p" id="asmPauseBtn" style="visibility:hidden" onclick="asmEnterFs();asmSubmit(true)">▶ Weiter</button></div>`;
   }else{
     let num=0;
     sec.blocks.forEach((b,bi)=>{if(!sec.freeOrder&&bi<ASM.block)num+=b.questions.length;});
@@ -140,6 +190,9 @@ function asmRenderSection(){
 }
 function asmQuestionHtml(q,sec,num){
   if(q.type==='writing')return asmWritingHtml(q);
+  if(q.drag)return `<div class="asm-q compact ${asmIsAnswered(q)?'answered':''}" id="asmQ_${q.id}">
+    <div class="asm-q-main"><span class="asm-q-num">${num}</span><div class="asm-q-text">${esc(q.text)}</div></div>
+    <div class="asm-drop" data-q="${q.id}" onclick="asmDropClick('${q.id}')">${asmDropInner(q)}</div></div>`;
   if(q.type==='markwords')return asmMarkwordsHtml(q);
   return `<div class="asm-q ${q.compact?'compact':''} ${asmIsAnswered(q)?'answered':''}" id="asmQ_${q.id}">
     <div class="asm-q-main"><span class="asm-q-num">${num}</span><div class="asm-q-text">${esc(q.text)}${q.hint?`<div class="asm-q-hint">Hinweis: ${esc(q.hint)}</div>`:''}</div></div>
@@ -158,6 +211,62 @@ function asmSet(id,val){
   const el=document.getElementById('asmQ_'+id);if(el)el.classList.toggle('answered',val!==''&&val!==undefined);
   asmUpdateProgress();
   asmQueueDraft(500);
+}
+
+// ── Zuordnen per Ziehen (choice mit drag): Kürzel aus der Leiste in das
+// Feld ziehen; die Leiste bleibt vollständig. Zeiger-Ereignisse statt HTML5-
+// Drag&Drop, damit es auch mit Touch funktioniert. Antippen + Feld antippen
+// geht ebenfalls.
+// Kürzel-Leiste sitzt in der mitlaufenden Kopfleiste, damit sie beim
+// Scrollen immer greifbar ist.
+function asmPaletteHtml(){
+  if(ASM.section.kind==='pause')return '';
+  const dq=asmCurrentBlocks().flatMap(([b,bi])=>asmMemorizing(bi)?[]:b.questions).find(q=>q.drag);
+  if(!dq)return '';
+  return `<div class="asm-palette">${dq.options.map((o,i)=>`<div class="asm-chip ${ASM.selChip===i?'sel':''}" data-v="${i}" onpointerdown="asmChipDown(event,${i},null)">${esc(o)}</div>`).join('')}</div>`;
+}
+function asmDropInner(q){
+  const v=ASM.answers[q.id];
+  return v===undefined?'<span class="asm-drop-ph">hierher ziehen</span>':`<span class="asm-chip placed" onpointerdown="event.stopPropagation();asmChipDown(event,${v},'${q.id}')">${esc(q.options[v])}</span><button class="asm-drop-x" title="Entfernen" onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();asmPlace('${q.id}',undefined)">✕</button>`;
+}
+function asmPlace(qid,v){
+  const q=asmQuestions(ASM.section).find(x=>x.id===qid);if(!q)return;
+  if(v===undefined)delete ASM.answers[qid];else ASM.answers[qid]=v;
+  const zone=document.querySelector(`.asm-drop[data-q="${qid}"]`);if(zone)zone.innerHTML=asmDropInner(q);
+  document.getElementById('asmQ_'+qid)?.classList.toggle('answered',v!==undefined);
+  asmUpdateProgress();asmQueueDraft(400);
+}
+function asmSelectChip(v){
+  ASM.selChip=ASM.selChip===v?null:v;
+  document.querySelectorAll('.asm-palette .asm-chip').forEach(c=>c.classList.toggle('sel',+c.dataset.v===ASM.selChip));
+}
+function asmDropClick(qid){
+  if(ASM.selChip===null||ASM.selChip===undefined)return;
+  asmPlace(qid,ASM.selChip);
+}
+function asmChipDown(e,v,fromQ){
+  if(e.button>0)return;
+  e.preventDefault();
+  const x0=e.clientX,y0=e.clientY;let ghost=null,over=null;
+  const move=ev=>{
+    if(!ghost&&Math.hypot(ev.clientX-x0,ev.clientY-y0)<6)return;
+    if(!ghost){ghost=document.createElement('div');ghost.className='asm-chip ghost';ghost.textContent=e.target.textContent;document.body.appendChild(ghost);}
+    ghost.style.left=ev.clientX+'px';ghost.style.top=ev.clientY+'px';
+    const z=document.elementFromPoint(ev.clientX,ev.clientY)?.closest('.asm-drop');
+    if(z!==over){over?.classList.remove('over');over=z;over?.classList.add('over');}
+    // Am Rand automatisch scrollen
+    const main=document.getElementById('main');
+    if(ev.clientY<90)main.scrollTop-=12;else if(ev.clientY>innerHeight-50)main.scrollTop+=12;
+  };
+  const up=ev=>{
+    document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);document.removeEventListener('pointercancel',up);
+    over?.classList.remove('over');
+    if(!ghost){if(!fromQ)asmSelectChip(v);return;}
+    ghost.remove();
+    const z=document.elementFromPoint(ev.clientX,ev.clientY)?.closest('.asm-drop');
+    if(z){if(fromQ&&fromQ!==z.dataset.q)asmPlace(fromQ,undefined);asmPlace(z.dataset.q,v);}
+  };
+  document.addEventListener('pointermove',move);document.addEventListener('pointerup',up);document.addEventListener('pointercancel',up);
 }
 
 // ── Fehler im Text markieren (markwords) ──
@@ -245,7 +354,7 @@ function asmDiff(prev,next,caret){
 async function asmFinishWriting(qid){
   const a=ASM.answers[qid]||{text:'',log:[]};
   if(!a.text?.trim()){toast('⚠️ Der Text ist noch leer.','err');return;}
-  if(!confirm('Text jetzt abschließen? Danach kann er nicht mehr verändert werden.'))return;
+  if(!await asmConfirm('Text jetzt abschließen? Danach kann er nicht mehr verändert werden.'))return;
   a.done=true;ASM.answers[qid]=a;
   const qs=asmQuestions(ASM.section);
   if(qs.every(q=>q.type!=='writing'||!q.final||ASM.answers[q.id]?.done))return asmSubmit(true);
@@ -267,7 +376,7 @@ async function asmSaveDraft(){
 async function asmNextBlock(){
   const b=ASM.section.blocks[ASM.block];
   const open=b.questions.filter(q=>!asmIsAnswered(q)).length;
-  if(open&&!confirm(`Noch ${open} Aufgabe(n) in diesem Block unbeantwortet. Trotzdem weiter? Zurück geht es nicht.`))return;
+  if(open&&!await asmConfirm(`Noch ${open} Aufgabe(n) in diesem Block unbeantwortet. Trotzdem weiter? Zurück geht es nicht.`))return;
   ASM.block++;
   await asmSaveDraft();
   asmRenderSection();
@@ -289,7 +398,8 @@ function asmTick(){
   if(t)t.textContent=asmFmt(left);
   if(fill)fill.style.width=Math.max(0,Math.min(100,left/total*100))+'%';
   if(ASM.section.kind==='pause'){
-    const btn=document.getElementById('asmPauseBtn');if(btn&&left<=0)btn.disabled=false;
+    const pt=document.getElementById('asmPauseTimer');if(pt)pt.textContent=asmFmt(left);
+    const btn=document.getElementById('asmPauseBtn');if(btn&&left<=0)btn.style.visibility='visible';
     return;
   }
   if(bar){bar.classList.toggle('warn',left<=120&&left>30);bar.classList.toggle('crit',left<=30);}
@@ -304,10 +414,11 @@ async function asmSubmit(confirmed,timeout){
   if(ASM.submitting||!ASM.section)return;
   if(!confirmed){
     const open=asmQuestions(ASM.section).filter(q=>!asmIsAnswered(q)).length;
-    if(!confirm(open?`Noch ${open} Aufgabe(n) unbeantwortet. Abschnitt trotzdem abgeben?`:'Abschnitt abgeben? Danach sind keine Änderungen mehr möglich.'))return;
+    if(!await asmConfirm(open?`Noch ${open} Aufgabe(n) unbeantwortet. Abschnitt trotzdem abgeben?`:'Abschnitt abgeben? Danach sind keine Änderungen mehr möglich.'))return;
   }
   ASM.submitting=true;asmStopTimers();
   if(timeout)toast('⏱ Zeit abgelaufen – Abschnitt wurde abgegeben.');
+  asmEnterFs();
   try{await api('POST','/assessment/section/submit',{section:ASM.section.index,answers:ASM.answers});}
   catch(e){toast('⚠️ '+e.message,'err');}
   ASM.section=null;
@@ -321,28 +432,66 @@ function asmPctCell(r){
   const c=r.percent>=70?'var(--ok)':r.percent>=50?'var(--warn)':'var(--danger)';
   return `<td><span style="font-weight:700;color:${c}">${r.percent} %</span><div style="font-size:10px;color:var(--mu)">${r.points}/${r.max}${r.late?' · Zeit':''}</div></td>`;
 }
+// Alle Mitarbeiter mit der Rolle Assessment und ihr aktueller Stand.
+function asmCandidatesHtml(){
+  const {attempts=[],candidates=[]}=ASM.results||{};
+  const rows=candidates.map(c=>{
+    const cur=attempts.find(a=>a.userId===c.id&&!a.archivedAt);
+    const old=attempts.filter(a=>a.userId===c.id&&a.archivedAt).length;
+    const status=!cur?'<span style="color:var(--mu)">nicht begonnen</span>':cur.status==='finished'?`✅ abgeschlossen ${fdt(cur.finishedAt)}${cur.summary.percent!==null?` · <b>${cur.summary.percent} %</b>`:''}`:`⏳ läuft (Abschnitt ${cur.currentSection+1})`;
+    return `<tr><td style="text-align:left;font-weight:600">${esc(c.name)}</td><td style="text-align:left;font-size:12px">${status}</td><td style="font-size:12px">${old||'–'}</td>
+      <td style="text-align:right"><button class="btn-s" style="font-size:11px" ${cur?'':'disabled'} onclick="asmResetUser('${c.id}','${esc(c.name).replace(/'/g,'')}')">↺ Assessment zurücksetzen</button></td></tr>`;
+  }).join('');
+  return `<div class="dash-card" style="border-top-color:var(--acc)">
+    <div style="font-size:15px;font-weight:700;margin-bottom:4px">👥 Mitarbeiter mit der Rolle Assessment</div>
+    <div style="font-size:12px;color:var(--mu);margin-bottom:10px">„Assessment zurücksetzen“: der Mitarbeiter kann das Assessment neu machen und sieht den alten Durchgang nicht mehr. Der alte Durchgang bleibt unten in den Ergebnissen archiviert.</div>
+    ${candidates.length?`<div style="overflow-x:auto"><table class="rm-table asm-res"><thead><tr><th style="text-align:left">Mitarbeiter</th><th style="text-align:left">Aktueller Stand</th><th>Archiviert</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty" style="padding:16px">Noch niemand hat die Rolle Assessment.</div>'}
+  </div>`;
+}
 function asmResultsHtml(){
-  const list=ASM.results||[];
+  const list=ASM.results?.attempts||[];
   const secs=ASM.info.sections.filter(s=>s.kind!=='pause');
   const rows=list.map(a=>{
     const byKey={};(a.results||[]).forEach(r=>byKey[r.key]=r);
     const pers=(a.results||[]).find(r=>r.dims);
     const ctrl=pers?.dims?.find(d=>d.control);
-    const status=a.status==='finished'?`✅ ${fdt(a.finishedAt)}`:`⏳ läuft (Abschnitt ${a.currentSection+1})`;
+    const status=(a.status==='finished'?`✅ ${fdt(a.finishedAt)}`:`⏳ ${a.archivedAt?'abgebrochen':'läuft'} (Abschnitt ${a.currentSection+1})`)+(a.archivedAt?`<div style="color:var(--mu)">📦 archiviert ${fdt(a.archivedAt)}</div>`:'');
     const open=ASM.openResult===a.id;
     return `<tr><td style="text-align:left;font-weight:600">${esc(a.userName)}</td><td style="text-align:left;font-size:11px">${status}${a.outdated?'<div style="color:var(--warn)">alte Version</div>':''}</td>
       ${a.outdated?`<td colspan="${secs.length}" style="font-size:11px;color:var(--mu)">Durchgang mit dem früheren Fragenkatalog</td>`:secs.map(s=>asmPctCell(byKey[s.key])).join('')}
       <td>${a.summary.percent!==null?`<b>${a.summary.percent} %</b><div style="font-size:10px;color:var(--mu)">${a.summary.points}/${a.summary.max}</div>`:'–'}</td>
       <td style="font-size:11px">${ctrl?.level?asmLevelBadge(ctrl.level):'–'}</td>
-      <td style="white-space:nowrap"><button class="btn-s" style="font-size:11px" onclick="ASM.openResult=${open?'null':`'${a.id}'`};asmRenderOverview()">${open?'Schließen':'Details'}</button>
-        <button class="btn-d" style="font-size:11px" title="Zurücksetzen" onclick="asmReset('${a.id}','${esc(a.userName).replace(/'/g,'')}')">↺</button></td></tr>
-      ${open?`<tr><td colspan="${secs.length+5}" style="text-align:left;background:var(--sf2)">${asmDetailHtml(a)}</td></tr>`:''}`;
+      <td style="font-size:11px">${asmEventsCell(a.events)}</td>
+      <td style="white-space:nowrap"><button class="btn-s" style="font-size:11px" onclick="ASM.openResult=${open?'null':`'${a.id}'`};asmRenderOverview();${open?'':`document.getElementById('asmDetail')?.scrollIntoView({behavior:'smooth'})`}">${open?'Schließen':'Details'}</button></td></tr>
+`;
   }).join('');
   return `<div class="dash-card" style="border-top-color:var(--info)">
     <div style="font-size:15px;font-weight:700;margin-bottom:4px">📊 Ergebnisse (nur für Administratoren sichtbar)</div>
     <div style="font-size:12px;color:var(--mu);margin-bottom:10px">„Zeit“ = Abschnitt wurde durch Zeitablauf beendet. „Kontrolle“ = Ehrlichkeitskontrolle der Persönlichkeitsfragen. Unter „Details“ siehst du jede Antwort, die Persönlichkeitsprofile und bei den Texten jede einzelne Korrektur.</div>
-    ${list.length?`<div style="overflow-x:auto"><table class="rm-table asm-res"><thead><tr><th style="text-align:left">Mitarbeiter</th><th style="text-align:left">Status</th>${secs.map(s=>`<th>${esc(s.short||s.title)}</th>`).join('')}<th>Gesamt</th><th>Kontrolle</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty" style="padding:16px">Noch keine Durchgänge.</div>'}
+    ${list.length?`<div style="overflow-x:auto"><table class="rm-table asm-res"><thead><tr><th style="text-align:left">Mitarbeiter</th><th style="text-align:left">Status</th>${secs.map(s=>`<th>${esc(s.short||s.title)}</th>`).join('')}<th>Gesamt</th><th>Kontrolle</th><th title="Vollbild verlassen / Tab gewechselt">Vollbild</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty" style="padding:16px">Noch keine Durchgänge.</div>'}
+    ${asmOpenDetailHtml(list)}
   </div>`;
+}
+function asmEventsCell(ev){
+  ev=ev||[];
+  const fs=ev.filter(e=>e.type==='fullscreen_exit').length,tab=ev.filter(e=>e.type==='tab_hidden').length;
+  if(!fs&&!tab)return '<span class="rm-yes">✓</span>';
+  return `<span style="color:var(--warn);font-weight:700">${fs}× / ${tab}×</span>`;
+}
+function asmEventsHtml(ev){
+  if(!ev?.length)return '';
+  const secs=ASM.info.sections;
+  const label={fullscreen_exit:'Vollbild verlassen',tab_hidden:'Tab/Fenster gewechselt'};
+  return `<div class="asm-det-sec"><div class="asm-det-head"><b>⛶ Protokoll</b> – ${ev.length} Ereignis(se)</div><table class="asm-det"><tbody>
+    ${ev.map(e=>`<tr><td style="white-space:nowrap">${fdt(e.at)}</td><td>${esc(label[e.type]||e.type)}</td><td style="color:var(--mu)">${esc(secs[e.section]?.title||'')}</td></tr>`).join('')}</tbody></table></div>`;
+}
+// Details unterhalb der Tabelle (nicht in einer Tabellenzeile), damit sie auf
+// jeder Bildschirmbreite vollständig lesbar sind.
+function asmOpenDetailHtml(list){
+  const a=list.find(x=>x.id===ASM.openResult);
+  if(!a)return '';
+  return `<div class="asm-detail" id="asmDetail"><div class="asm-detail-head"><b>Details: ${esc(a.userName)}</b>${a.archivedAt?` <span style="color:var(--mu)">(archiviert ${fdt(a.archivedAt)})</span>`:''}
+    <button class="btn-s" style="font-size:11px" onclick="ASM.openResult=null;asmRenderOverview()">Schließen</button></div>${asmDetailHtml(a)}</div>`;
 }
 function asmLevelBadge(l){
   const c=l==='unauffällig'?'var(--ok)':l==='auffällig'?'var(--warn)':'var(--danger)';
@@ -366,7 +515,7 @@ function asmDetailHtml(a){
       return h;
     }).join('');
     return `<div class="asm-det-sec">${head}${dims}${blocks}</div>`;
-  }).join('')||'<i>Noch keine Abschnitte abgegeben.</i>';
+  }).join('')+asmEventsHtml(a.events)||'<i>Noch keine Abschnitte abgegeben.</i>';
 }
 function asmDimsHtml(dims){
   return `<div class="asm-dims">${dims.map(d=>d.control
@@ -428,7 +577,7 @@ function asmPlay(id){
   let k=0;
   ASM._play=setInterval(()=>{k=Math.min(log.length,k+Math.max(1,Math.ceil(log.length/400)));asmShowStep(id,k);if(k>=log.length||!document.getElementById(id)){clearInterval(ASM._play);ASM._play=null;}},40);
 }
-async function asmReset(id,name){
-  if(!confirm(`Assessment von ${name} zurücksetzen? Alle Antworten werden gelöscht und der Mitarbeiter kann neu beginnen.`))return;
-  try{await api('DELETE','/assessment/attempts/'+id);toast('✅ Zurückgesetzt');renderAssessment();}catch(e){toast('⚠️ '+e.message,'err');}
+async function asmResetUser(uid,name){
+  if(!confirm(`Assessment von ${name} zurücksetzen? ${name} kann das Assessment dann neu machen. Der bisherige Durchgang bleibt für die Administration archiviert.`))return;
+  try{await api('POST','/assessment/users/'+uid+'/reset');toast('✅ Zurückgesetzt');renderAssessment();}catch(e){toast('⚠️ '+e.message,'err');}
 }
