@@ -47,7 +47,7 @@ async function enablePushNotifications(){
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
-const ROLES=[{id:'admin',label:'Administrator',icon:'\uD83D\uDD11'},{id:'leitung',label:'Leitung',icon:'\u2B50'},{id:'dienstplanung',label:'Dienstplanung',icon:'\uD83D\uDCCB'},{id:'schichtleiter',label:'Schichtleiter',icon:'\uD83D\uDD06'},{id:'technik',label:'Technik',icon:'\uD83D\uDD27'},{id:'ausbildung',label:'Ausbildung',icon:'\uD83C\uDF93'},{id:'qm',label:'QM',icon:'\u2705'},{id:'standard',label:'Standard',icon:'\uD83D\uDC64'}];
+const ROLES=[{id:'admin',label:'Administrator',icon:'\uD83D\uDD11'},{id:'leitung',label:'Leitung',icon:'\u2B50'},{id:'dienstplanung',label:'Dienstplanung',icon:'\uD83D\uDCCB'},{id:'schichtleiter',label:'Schichtleiter',icon:'\uD83D\uDD06'},{id:'technik',label:'Technik',icon:'\uD83D\uDD27'},{id:'ausbildung',label:'Ausbildung',icon:'\uD83C\uDF93'},{id:'qm',label:'QM',icon:'\u2705'},{id:'standard',label:'Standard',icon:'\uD83D\uDC64'},{id:'assessment',label:'Assessment',icon:'\uD83D\uDCDD'}];
 // Gemeinsamer Sichtbarkeits-/Bearbeitungs-Editor f\u00FCr Dokumente, Wiki-Artikel,
 // Kontakte UND deren Ordner (Kategorien) \u2014 Rollen und/oder einzelne Nutzer
 // zuweisbar. Ohne EIGENE Zuweisung erbt ein Datensatz von seinem Ordner
@@ -282,7 +282,7 @@ const getRoleDef=r=>{
   if(known)return known;
   const dep=(S.departments||[]).find(x=>x.id===r);
   if(dep)return{id:dep.id,label:dep.label,icon:dep.emoji||'🏢'};
-  return ROLES[6];
+  return ROLES.find(x=>x.id==='standard');
 };
 const isAssignable=u=>{const r=u?.roles||['standard'];return !(r.length===0||r.every(x=>x==='standard'));}
 const fd=s=>{if(!s)return'\u2014';const p=s.split('T')[0].split('-');return`${p[2]}.${p[1]}.${p[0]}`;};
@@ -372,6 +372,15 @@ function loginOK(){
   const ab=document.getElementById('adminBtn');if(ab)ab.style.display=S.p.manageUsers?'flex':'none';
   const dpNavEl=document.getElementById('ni-dp');if(dpNavEl)dpNavEl.style.display=S.p.canManageDp?'flex':'none';
   restoreNavSectionState();
+  // Rolle "Assessment" (lib/roles.js): reine Assessment-Nutzer sehen nur
+  // diesen einen Reiter — kein News-/Chat-/Auto-Refresh, die APIs dafür sind
+  // serverseitig ohnehin gesperrt.
+  document.body.classList.toggle('asm-only',!!S.p.assessmentOnly);
+  if(S.p.assessmentOnly){
+    setView('assessment');
+    toast('\uD83D\uDC4B Willkommen, '+(u?lastNameFirst(u.name):'')+'!');
+    return;
+  }
   const docLinkId=new URLSearchParams(location.search).get('doc');
   if(docLinkId){try{history.replaceState(null,'',location.pathname);}catch(e){}}
   loadNews().then(function(){
@@ -464,18 +473,19 @@ function restoreNavSectionState() {
   }
 }
 // Alle Sidebar-Reiter (id="ni-<key>") — muss mit db.js NAV_TABS übereinstimmen.
-const NAV_TAB_IDS=['home','sop','docs','wiki','meetings','todos','contacts','schedule','allw','homeoffice','vacation','diensttausch','abrechnung','dienstplaene','zahnarzt','platz','links','tickets','tickets_closed','tickets_cancelled','tickets_deleted','checklists','dp','dp-config','dp-christmas','dp-mine','messages','messages_sent','news','statistik','spint','chat'];
+const NAV_TAB_IDS=['assessment','home','sop','docs','wiki','meetings','todos','contacts','schedule','allw','homeoffice','vacation','diensttausch','abrechnung','dienstplaene','zahnarzt','platz','links','tickets','tickets_closed','tickets_cancelled','tickets_deleted','checklists','dp','dp-config','dp-christmas','dp-mine','messages','messages_sent','news','statistik','spint','chat'];
 // Zusätzlich zur (abschaltbaren) Reiter-Sichtbarkeit weiterhin hart verdrahtete
 // Mindestanforderungen für die Dienstplanungs-/Statistik-Reiter — ein Reiter
 // ist nur sichtbar, wenn BEIDES zutrifft.
-const NAV_BASELINE={statistik:()=>!!S.p?.manageUsers, dp:()=>!!S.p?.canManageDp, 'dp-config':()=>!!S.p?.canManageDp, 'dp-christmas':()=>!!S.p?.canManageDp, spint:()=>!!S.p?.canManageSpint};
+const NAV_BASELINE={assessment:()=>!!S.p?.seeAssessment, statistik:()=>!!S.p?.manageUsers, dp:()=>!!S.p?.canManageDp, 'dp-config':()=>!!S.p?.canManageDp, 'dp-christmas':()=>!!S.p?.canManageDp, spint:()=>!!S.p?.canManageSpint};
 function applyNavVisibility(){
   const tabs=S.p?.tabs||{};
   NAV_TAB_IDS.forEach(id=>{
     const el=document.getElementById('ni-'+id);if(!el)return;
     const baseline=NAV_BASELINE[id]?NAV_BASELINE[id]():true;
     const tabAllowed=tabs[id]!==false; // Default sichtbar, nur ein explizites false blendet aus
-    el.style.display=(baseline&&tabAllowed)?'':'none';
+    const asmOk=!S.p?.assessmentOnly||id==='assessment';
+    el.style.display=(baseline&&tabAllowed&&asmOk)?'':'none';
   });
 }
 function setView(v){
@@ -483,6 +493,7 @@ function setView(v){
   // beim Verlassen der Ansicht unbedingt stoppen, sonst bliebe ein setInterval
   // dauerhaft aktiv, obwohl die Spielseite längst nicht mehr sichtbar ist.
   if(S.view==='game'&&v!=='game')stopGameTicker();
+  if(S.p?.assessmentOnly)v='assessment';
   S.view=v;
   NAV_TAB_IDS.forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
   applyNavVisibility();
@@ -503,6 +514,7 @@ function renderSBF(){
 }
 function renderMain(){
   if(S.view==='home')renderHome();
+  else if(S.view==='assessment')renderAssessment();
   else if(S.view==='schedule')renderSchedule();
   else if(S.view==='homeoffice')renderHomeoffice();
   else if(S.view==='vacation')renderVacation();
@@ -556,6 +568,11 @@ function homeCardWrap(id,title,bodyHtml,accent){
   return '<details class="dash-card" data-cc-id="'+id+'"'+(open?' open':'')+' style="width:100%;box-sizing:border-box;margin-bottom:14px'+accentStyle+'">'
     +'<summary><h3 style="margin:0;display:inline;color:var(--tx)">'+title+'</h3></summary>'
     +bodyHtml+'</details>';
+}
+// ASSESSMENT — Platzhalter, die Inhalte folgen.
+function renderAssessment(){
+  document.getElementById('main').innerHTML=`<div class="ph"><div class="pt">\uD83D\uDCDD Assessment</div></div>
+    <div class="empty">\uD83D\uDEA7 Der Assessment-Bereich wird vorbereitet. Die Inhalte folgen in K\u00fcrze.</div>`;
 }
 function renderHome(){
   if(getHomeVersion()==='new') return renderHomeNew();
@@ -3158,8 +3175,8 @@ function openUF(id){
   // Rolle in ROLES — als zusätzliche Checkboxen anhängen, sonst gibt es keine
   // Möglichkeit, einen Mitarbeiter diesem Fachbereich zuzuordnen.
   const extraDeptRoles=(S.departments||[]).filter(d=>d.id!=='frei'&&!ROLES.some(r=>r.id===d.id));
-  document.getElementById('ufRoles').innerHTML=ROLES.map(r=>`<label class="rck"><input type="checkbox" value="${r.id}" ${(u?.roles||['standard']).includes(r.id)?'checked':''}><span>${r.icon} ${r.label}</span></label>`).join('')
-    +extraDeptRoles.map(d=>`<label class="rck"><input type="checkbox" value="${d.id}" ${(u?.roles||['standard']).includes(d.id)?'checked':''}><span>${d.emoji||'🏢'} ${d.label}</span></label>`).join('');
+  document.getElementById('ufRoles').innerHTML=ROLES.map(r=>`<label class="rck"><input type="checkbox" value="${r.id}" onchange="ufRoleChange(this)" ${(u?.roles||['standard']).includes(r.id)?'checked':''}><span>${r.icon} ${r.label}</span></label>`).join('')
+    +extraDeptRoles.map(d=>`<label class="rck"><input type="checkbox" value="${d.id}" onchange="ufRoleChange(this)" ${(u?.roles||['standard']).includes(d.id)?'checked':''}><span>${d.emoji||'🏢'} ${d.label}</span></label>`).join('');
   // Rechte-Verlauf: reine Nachvollziehbarkeit, nur für bereits bestehende
   // Mitarbeiter sichtbar (bei Neuanlage gibt es noch keinen).
   const histWrap=document.getElementById('ufRoleHistWrap');
@@ -3224,6 +3241,7 @@ async function saveUser(){
   if(!/^[a-z0-9._-]{3,40}$/.test(username)){errEl.textContent='\u26A0\uFE0F Benutzername: min. 3 Zeichen, nur Buchstaben/Zahlen/._-!';return;}
   const roles=Array.from(document.querySelectorAll('#ufRoles input:checked')).map(cb=>cb.value);
   if(!roles.length){errEl.textContent='\u26A0\uFE0F Mindestens eine Rolle!';return;}
+  if(roles.includes('assessment')&&roles.some(r=>r!=='assessment'&&!ASSESSMENT_COMBINABLE.includes(r))){errEl.textContent='\u26A0\uFE0F Assessment kann nur mit Administrator kombiniert werden!';return;}
   const id=document.getElementById('ufId').value;loading(true);
   const dpRelevant=document.getElementById('ufDpRelevant')?document.getElementById('ufDpRelevant').checked:false;
   const isTestUser=document.getElementById('ufIsTestUser')?document.getElementById('ufIsTestUser').checked:false;
@@ -3232,6 +3250,15 @@ async function saveUser(){
     else await api('POST','/users',{name,initials,roles,color:S.ufColor,category,email,username,hireDate,terminationDate,dpRelevant,isTestUser});
     await fetchData();backToAdmin('users');toast('\u2705 Benutzer gespeichert!');
   }catch(e){errEl.textContent='\u26A0\uFE0F '+e.message;}finally{loading(false);}
+}
+// Rolle "Assessment" ist exklusiv (lib/roles.js): daneben ist nur Administrator
+// erlaubt — beim Anhaken werden die unverträglichen Rollen automatisch abgewählt.
+const ASSESSMENT_COMBINABLE=['admin'];
+function ufRoleChange(cb){
+  if(!cb.checked)return;
+  const boxes=Array.from(document.querySelectorAll('#ufRoles input'));
+  if(cb.value==='assessment')boxes.forEach(b=>{if(b.value!=='assessment'&&!ASSESSMENT_COMBINABLE.includes(b.value))b.checked=false;});
+  else if(!ASSESSMENT_COMBINABLE.includes(cb.value))boxes.forEach(b=>{if(b.value==='assessment')b.checked=false;});
 }
 async function delUser(id){if(!confirm('Benutzer l\u00f6schen?'))return;loading(true);try{await api('DELETE','/users/'+id);await fetchData();backToAdmin('users');}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}finally{loading(false);}}
 function openCF(id){const c=id?getCat(id):null;document.getElementById('cfT').textContent=c?'Kategorie bearbeiten':'Kategorie anlegen';document.getElementById('cfId').value=c?.id||'';document.getElementById('cfLb').value=c?.label||'';document.getElementById('cfEm').value=c?.emoji||'\uD83D\uDCCC';document.getElementById('cfErr').textContent='';S.cfColor=c?.color||pal()[2];buildCP('cfCR',S.cfColor,'pickC');closeModal('admOv');openModal('cfOv');}

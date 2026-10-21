@@ -1122,6 +1122,7 @@ app.use('/api/data',     require('./routes/data'));
 app.use('/api/events',   require('./routes/events'));
 app.use('/api/tickets',  require('./routes/tickets'));
 app.use('/api/zahnarzt', require('./routes/zahnarzt'));
+app.use('/api/assessment', require('./routes/assessment'));
 app.use('/api',          require('./routes/docs'));
 app.use('/api',          require('./routes/misc'));
 app.use('/api',          require('./routes/meetings'));

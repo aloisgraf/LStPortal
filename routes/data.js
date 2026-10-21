@@ -7,6 +7,22 @@ const { auth, ok, bad } = require('../middleware');
 router.get('/', auth, async (req,res) => {
   try {
     const uid=req.uid, p=req.p, tp=req.tp, roles=p.roles;
+    // Reine Assessment-Nutzer (lib/roles.js) bekommen nur die eigenen
+    // Stammdaten — keine Tickets, Dienstpläne, Nachrichten usw.
+    if (p.assessmentOnly) {
+      const u = req.user;
+      return ok(res, {
+        currentUser: uid,
+        impersonation: {
+          realIsAdmin: !!req.realIsAdmin,
+          viewingAs: req.session.viewAsUserId ? { id: uid, name: u.name } : null,
+          testUsers: [],
+        },
+        permissions: { assessmentOnly:true, seeAssessment:true, seeAllEntries:false, myDepts:[], roles:p.roles, tabs:{} },
+        users: [{ id:u.id, name:u.name, initials:u.initials, roles:parseRoles(u.roles), color:u.color,
+          mustChangePW:u.must_change_pw, username:u.username, isOnline:true }],
+      });
+    }
     const canManageDp = roles.some(r=>['admin','leitung','dienstplanung'].includes(r));
     const canManageSpint = roles.some(r=>['admin','leitung','technik'].includes(r));
     const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
@@ -213,6 +229,7 @@ router.get('/', auth, async (req,res) => {
         tabs:p.tabs,
         roles: p.roles,
         canManageDp, manageSop:p.manageSop, canManageSpint,
+        assessmentOnly:p.assessmentOnly, seeAssessment:p.seeAssessment,
       },
       users: usersRaw.map(u=>({
         id:u.id, name:u.name, initials:u.initials, roles:parseRoles(u.roles),
