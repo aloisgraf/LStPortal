@@ -7,8 +7,8 @@ const idx = key => SECTIONS.findIndex(s => s.key === key);
 const qs = key => A.questionsOf(SECTIONS[idx(key)]);
 
 describe('Fragenkatalog', () => {
-  it('dauert insgesamt 94 Minuten', () => {
-    expect(A.TOTAL_MINUTES).toBe(94);
+  it('dauert insgesamt 81 Minuten', () => {
+    expect(A.TOTAL_MINUTES).toBe(81);
   });
   it('hat die vorgegebene Reihenfolge mit der Pause an Position 5', () => {
     expect(SECTIONS.map(s => s.key)).toEqual(['rechtschreibung', 'geografie', 'it', 'motivation', 'pause', 'englisch', 'logik', 'merken', 'rechnen', 'persoenlichkeit', 'abschrift']);
@@ -98,13 +98,13 @@ describe('publicSection — keine Lösungen an den Client', () => {
 
 describe('Zeitlimit (vergangene Sekunden aus der Datenbank)', () => {
   it('verbleibende Zeit sinkt ab Start', () => {
-    expect(A.remainingSeconds(0, 0)).toBe(12 * 60);
-    expect(A.remainingSeconds(0, 60)).toBe(11 * 60);
+    expect(A.remainingSeconds(0, 0)).toBe(10 * 60);
+    expect(A.remainingSeconds(0, 60)).toBe(9 * 60);
     expect(A.remainingSeconds(0, null)).toBeNull();
   });
   it('gilt erst nach der Kulanzzeit als abgelaufen', () => {
-    expect(A.isExpired(0, 12 * 60 + A.GRACE_SECONDS - 1)).toBe(false);
-    expect(A.isExpired(0, 12 * 60 + A.GRACE_SECONDS + 1)).toBe(true);
+    expect(A.isExpired(0, 10 * 60 + A.GRACE_SECONDS - 1)).toBe(false);
+    expect(A.isExpired(0, 10 * 60 + A.GRACE_SECONDS + 1)).toBe(true);
   });
 });
 
