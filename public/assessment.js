@@ -490,8 +490,8 @@ function asmResultsHtml(){
     const ctrl=pers?.dims?.find(d=>d.control);
     const status=(a.status==='finished'?`✅ ${fdt(a.finishedAt)}`:a.status==='aborted'?`⛔ abgebrochen ${fdt(a.finishedAt)} (Abschnitt ${a.currentSection+1})`:`⏳ ${a.archivedAt?'abgebrochen':'läuft'} (Abschnitt ${a.currentSection+1})`)+(a.archivedAt?`<div style="color:var(--mu)">📦 archiviert ${fdt(a.archivedAt)}</div>`:'');
     const open=ASM.openResult===a.id;
-    return `<tr><td style="text-align:left;font-weight:600">${esc(a.userName)}</td><td style="text-align:left;font-size:11px">${status}${a.outdated?'<div style="color:var(--warn)">alte Version</div>':''}</td>
-      ${a.outdated?`<td colspan="${secs.length}" style="font-size:11px;color:var(--mu)">Durchgang mit dem früheren Fragenkatalog</td>`:secs.map(s=>asmPctCell(byKey[s.key])).join('')}
+    return `<tr><td style="text-align:left;font-weight:600">${esc(a.userName)}</td><td style="text-align:left;font-size:11px">${status}${a.outdated?'<div style="color:var(--mu)">früherer Fragenkatalog</div>':''}</td>
+      ${secs.map(s=>asmPctCell(byKey[s.key])).join('')}
       <td>${a.summary.percent!==null?`<b>${a.summary.percent} %</b><div style="font-size:10px;color:var(--mu)">${a.summary.points}/${a.summary.max}</div>`:'–'}</td>
       <td style="font-size:11px">${ctrl?.level?asmLevelBadge(ctrl.level):'–'}</td>
       <td style="font-size:11px">${asmEventsCell(a.events)}</td>
@@ -533,15 +533,17 @@ function asmLevelBadge(l){
 const asmMark=ok=>ok?'<span class="rm-yes">✓</span>':'<span style="color:var(--danger);font-weight:700">✗</span>';
 const asmNone='<i style="color:var(--di)">keine Antwort</i>';
 function asmDetailHtml(a){
-  if(a.outdated)return '<i>Details sind für Durchgänge mit dem früheren Fragenkatalog nicht verfügbar.</i>';
-  return (a.results||[]).filter(r=>r.kind!=='pause').map(r=>{
+  // Die Auswertung speichert Fragetext, Antwort und Lösung mit: auch Durchgänge
+  // mit einem früheren Fragenkatalog lassen sich vollständig ansehen.
+  const note=a.outdated?'<div class="asm-det-note">ℹ️ Durchgang mit einem früheren Fragenkatalog – angezeigt werden die Fragen, wie sie damals gestellt wurden.</div>':'';
+  return note+(a.results||[]).filter(r=>r.kind!=='pause').map(r=>{
     const head=`<div class="asm-det-head"><b>${esc(r.title)}</b>${r.scored?` – ${r.points}/${r.max} Punkte (${r.percent} %)`:''}${r.late?' · durch Zeitablauf beendet':''}</div>`;
     const dims=r.dims?asmDimsHtml(r.dims):'';
     const blocks=(r.blocks||[]).map(b=>{
-      const scoredRows=b.details.filter(d=>d.type!=='writing'&&d.type!=='markwords');
+      const det=b.details||[];const scoredRows=det.filter(d=>d.type!=='writing'&&d.type!=='markwords');
       let h=(r.blocks.length>1?`<div class="asm-det-block">${esc(b.title)}${b.max?` – ${b.points}/${b.max}`:''}</div>`:'');
-      b.details.filter(d=>d.type==='markwords').forEach(d=>h+=asmMarkwordsDetail(d));
-      b.details.filter(d=>d.type==='writing').forEach(d=>h+=asmWritingDetail(d));
+      det.filter(d=>d.type==='markwords').forEach(d=>h+=asmMarkwordsDetail(d));
+      det.filter(d=>d.type==='writing').forEach(d=>h+=asmWritingDetail(d));
       if(scoredRows.length)h+=`<table class="asm-det"><tbody>${scoredRows.map(d=>d.type==='likert'
         ?`<tr><td></td><td>${esc(d.text)}</td><td>${d.given===null?asmNone:`<b>${d.given}</b>`}</td><td></td></tr>`
         :`<tr><td>${asmMark(d.correct)}</td><td>${esc(d.text)}</td><td>${d.given===null?asmNone:esc(d.given)}</td><td style="color:var(--mu)">${d.correct?'':'richtig: '+esc(d.expected)}</td></tr>`).join('')}</tbody></table>`;
