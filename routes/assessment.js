@@ -14,7 +14,9 @@ const A = require('../lib/assessment');
 
 const parseJson = (t, fb) => { try { return t ? JSON.parse(t) : fb; } catch { return fb; } };
 // elapsed = Sekunden seit Abschnittsbeginn, direkt in der Datenbank gerechnet.
-const SELECT_ATT = `SELECT *, EXTRACT(EPOCH FROM (NOW()-section_started_at))::float AS elapsed FROM assessment_attempts`;
+// total_elapsed = Sekunden seit dem Start des Assessments (Gesamtzeit-Anzeige).
+const SELECT_ATT = `SELECT *, EXTRACT(EPOCH FROM (NOW()-section_started_at))::float AS elapsed,
+  EXTRACT(EPOCH FROM (NOW()-started_at))::float AS total_elapsed FROM assessment_attempts`;
 const getAttempt = uid => q1(`${SELECT_ATT} WHERE user_id=$1 AND archived_at IS NULL`, [uid]);
 // draft = { answers, block } — block = Index des aktuellen Blocks („Fertig, weiter“).
 const draftOf = att => { const d = parseJson(att.draft, {}); return { answers: d.answers || {}, block: Number.isInteger(d.block) ? d.block : 0 }; };
@@ -50,8 +52,12 @@ function stateOf(att) {
     currentSection: att.current_section,
     sectionStarted: !!att.section_started_at,
     remainingSeconds: att.section_started_at ? Math.max(0, A.remainingSeconds(att.current_section, att.elapsed)) : null,
+    // Gesamtzeit: läuft ab dem Start mit, nur zur Anzeige (gewertet wird je Abschnitt).
+    totalRemainingSeconds: att.status === 'running' && att.total_elapsed != null ? Math.max(0, Math.round(A.TOTAL_MINUTES * 60 - att.total_elapsed)) : null,
+    // Live-Ansicht der Administration: Restzeit des laufenden Abschnitts.
     version: att.version,
     startedAt: att.started_at, finishedAt: att.finished_at,
+    sectionTitle: A.SECTIONS[att.current_section]?.title || null,
   };
 }
 
@@ -77,7 +83,7 @@ router.post('/start', auth, assessmentAccess, async (req,res) => {
     await dropOutdated(await getAttempt(req.uid));
     await pool.query(`INSERT INTO assessment_attempts (id,user_id,version) VALUES ($1,$2,$3) ON CONFLICT (user_id) WHERE archived_at IS NULL DO NOTHING`, [newId(), req.uid, A.VERSION]);
     const att = await getAttempt(req.uid);
-    if (att.status === 'finished') return bad(res,'Das Assessment wurde bereits abgeschlossen',409);
+    if (att.status !== 'running') return bad(res,'Das Assessment wurde bereits abgeschlossen',409);
     await logAct(req.uid, req.user.name, 'assessment_start', {});
     ok(res, stateOf(att));
   } catch(e) { console.error('[assessment/start]', e.message); bad(res,'Serverfehler',500); }
@@ -140,7 +146,7 @@ router.post('/section/submit', auth, assessmentAccess, async (req,res) => {
     if (!att || att.status !== 'running' || !att.section_started_at) return bad(res,'Kein laufender Abschnitt',409);
     if (Number(req.body?.section) !== att.current_section) return bad(res,'Abschnitt ist bereits abgeschlossen',409);
     const sec = A.SECTIONS[att.current_section];
-    if (sec.kind === 'pause' && A.remainingSeconds(att.current_section, att.elapsed) > 2) return bad(res,'Die Pause läuft noch',409);
+    if (sec.kind === 'pause' && !req.p.manageUsers && A.remainingSeconds(att.current_section, att.elapsed) > 2) return bad(res,'Die Pause läuft noch',409);
     const late = A.isExpired(att.current_section, att.elapsed);
     const stored = draftOf(att).answers;
     const answers = late ? stored : A.mergeAnswers(stored, A.sanitizeAnswers(att.current_section, req.body?.answers));
@@ -154,7 +160,8 @@ router.post('/section/submit', auth, assessmentAccess, async (req,res) => {
 // ── ADMINISTRATION ───────────────────────────────────────────────────────────
 router.get('/results', auth, adminOnly, async (req,res) => {
   try {
-    const rows = await q(`SELECT a.*, EXTRACT(EPOCH FROM (NOW()-a.section_started_at))::float AS elapsed, u.name AS user_name
+    const rows = await q(`SELECT a.*, EXTRACT(EPOCH FROM (NOW()-a.section_started_at))::float AS elapsed,
+      EXTRACT(EPOCH FROM (NOW()-a.started_at))::float AS total_elapsed, u.name AS user_name
       FROM assessment_attempts a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.started_at DESC`);
     const candidates = await q(`SELECT id, name FROM users WHERE roles ? 'assessment' ORDER BY name`);
     const out = [];
@@ -183,6 +190,28 @@ router.post('/users/:uid/reset', auth, adminOnly, async (req,res) => {
     await logAct(req.uid, req.user.name, 'assessment_reset', { userId: u.id, userName: u.name });
     ok(res);
   } catch(e) { console.error('[assessment/reset]', e.message); bad(res,'Serverfehler',500); }
+});
+
+// Abbrechen: ein laufender Durchgang wird sofort beendet (Status „aborted“).
+// Ein begonnener Abschnitt wird mit dem Zwischenstand gewertet. Der
+// Mitarbeiter sieht danach nur noch den Hinweis; mit „Zurücksetzen“ kann er
+// neu beginnen.
+router.post('/users/:uid/abort', auth, adminOnly, async (req,res) => {
+  try {
+    const u = await q1('SELECT id, name FROM users WHERE id=$1', [req.params.uid]);
+    if (!u) return bad(res,'Nicht gefunden',404);
+    const att = await getAttempt(u.id);
+    if (!att || att.status !== 'running') return bad(res,'Kein laufender Durchgang',409);
+    const results = parseJson(att.results, []);
+    if (att.section_started_at && att.version === A.VERSION) results.push(A.scoreSection(att.current_section, draftOf(att).answers, { late: false }));
+    const ev = JSON.stringify([{ type: 'aborted', section: att.current_section, at: new Date().toISOString(), by: req.user.name }]);
+    const r = await pool.query(`UPDATE assessment_attempts SET status='aborted', results=$1, draft='{}', section_started_at=NULL,
+        finished_at=NOW(), events=(events::jsonb || $2::jsonb)::text WHERE id=$3 AND status='running'`,
+      [JSON.stringify(results), ev, att.id]);
+    if (!r.rowCount) return bad(res,'Kein laufender Durchgang',409);
+    await logAct(req.uid, req.user.name, 'assessment_abort', { userId: u.id, userName: u.name });
+    ok(res);
+  } catch(e) { console.error('[assessment/abort]', e.message); bad(res,'Serverfehler',500); }
 });
 
 module.exports = router;
