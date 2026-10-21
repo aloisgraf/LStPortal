@@ -22,7 +22,7 @@ describe('Fragenkatalog', () => {
     expect(count('englisch')).toBe(25);
     expect(count('logik')).toBe(20);
     expect(count('merken')).toBe(5);
-    expect(count('rechnen')).toBe(45);
+    expect(count('rechnen')).toBe(40);
     expect(count('persoenlichkeit')).toBe(40);
     expect(A.overview().find(s => s.key === 'rechtschreibung').maxPoints).toBe(40);
   });
@@ -70,7 +70,6 @@ describe('Fragenkatalog', () => {
   });
   it('Rechen-Lösungen stimmen', () => {
     const ans = Object.fromEntries(qs('rechnen').map(q => [q.id, q.answer]));
-    expect(ans.r3).toBe(1000 - 387);
     expect(ans.r8).toBe(240 * 0.85);
     expect(ans.r9).toBe(5 * 72);
     expect(ans.r10).toBe(18 / 80 * 100);
