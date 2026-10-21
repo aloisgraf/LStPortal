@@ -1,5 +1,6 @@
 'use strict';
 const { getUser, getP, getTP } = require('./db');
+const { assessmentOnlyAllowed } = require('./lib/roles');
 
 let _rolePermsCache = null;
 let _rolePermsCacheTime = 0;
@@ -48,6 +49,10 @@ async function auth(req, res, next) {
     req.user = effUser;
     req.p    = effP;
     req.tp   = await getTP(effUser.id, effUser);
+    // Reine Assessment-Nutzer (lib/roles.js) dürfen nur den Assessment-Bereich
+    // verwenden — gilt auch für eine "Ansicht als" auf einen solchen Testuser.
+    if (req.p.assessmentOnly && !assessmentOnlyAllowed(req.originalUrl.split('?')[0]))
+      return res.status(403).json({ success:false, error:'Keine Berechtigung' });
     req.clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || '';
     require('./db').pool.query('UPDATE users SET last_seen=NOW() WHERE id=$1',[effUser.id]).catch(()=>{});
     next();
@@ -57,8 +62,9 @@ async function auth(req, res, next) {
   }
 }
 
+const assessmentAccess = (req,res,next) => req.p?.seeAssessment ? next() : res.status(403).json({success:false,error:'Keine Berechtigung'});
 const adminOnly = (req,res,next) => req.p?.manageUsers ? next() : res.status(403).json({success:false,error:'Keine Berechtigung'});
 const ok  = (res, data) => res.json({ success:true, data: data??null });
 const bad = (res, msg, code=400) => res.status(code).json({ success:false, error:msg });
 
-module.exports = { auth, adminOnly, ok, bad, invalidateRolePermsCache };
+module.exports = { auth, adminOnly, assessmentAccess, ok, bad, invalidateRolePermsCache };

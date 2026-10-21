@@ -3,6 +3,7 @@ const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const { q, q1, newId, pool, parseRoles, logAct, nextTicketNumber, getUser, createNotification } = require('../db');
 const { auth, adminOnly, ok, bad, invalidateRolePermsCache } = require('../middleware');
+const { validateRoles } = require('../lib/roles');
 
 
 router.put('/allowances', auth, async (req,res) => {
@@ -169,6 +170,8 @@ router.post('/users', auth, adminOnly, async (req,res) => {
     const {name,initials,roles,color,category,email,username,hireDate,terminationDate,dpRelevant,isTestUser}=req.body;
     if (!name?.trim()||!initials?.trim()) return bad(res,'Name und Kürzel erforderlich');
     if (!hireDate) return bad(res,'Eintrittsdatum erforderlich');
+    const roleErr = validateRoles(roles||['standard']);
+    if (roleErr) return bad(res,roleErr);
     const uname = normalizeUsername(username);
     if (!isValidUsername(uname)) return bad(res,'Benutzername: min. 3 Zeichen, nur Buchstaben/Zahlen/._-');
     const id=newId(), hash=await bcrypt.hash('Passwort1',10);
@@ -192,6 +195,8 @@ router.put('/users/:id', auth, async (req,res) => {
     const {name,initials,roles,color,resetPassword,category,email,username,hireDate,terminationDate,dpRelevant,isTestUser}=req.body;
     if (!name?.trim()||!initials?.trim()) return bad(res,'Name und Kürzel erforderlich');
     if (!hireDate) return bad(res,'Eintrittsdatum erforderlich');
+    const roleErr = validateRoles(roles||['standard']);
+    if (roleErr) return bad(res,roleErr);
     const uname = normalizeUsername(username);
     if (!isValidUsername(uname)) return bad(res,'Benutzername: min. 3 Zeichen, nur Buchstaben/Zahlen/._-');
     // Rechte-Änderungen werden nur protokolliert (Nachvollziehbarkeit), NICHT

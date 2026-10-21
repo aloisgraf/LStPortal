@@ -1,6 +1,7 @@
 'use strict';
 const { Pool } = require('pg');
 const crypto   = require('crypto');
+const { isAssessmentOnly, canSeeAssessment } = require('./lib/roles');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -81,6 +82,7 @@ const NAV_TABS = [
   {key:'chat', label:'Chat'},
   {key:'news', label:'News'},
   {key:'statistik', label:'Statistik'},
+  {key:'assessment', label:'Assessment'},
 ];
 
 // Wendet dieselbe "Grant gewinnt über Deny"-Merge-Logik wie getP()/overrideMap
@@ -129,6 +131,11 @@ async function getP(uid, userObj=null, overrides=[]) {
     // Leiter" (Rolle technik) + admin/leitung, wie in der Anforderung beschrieben.
     // Ausführen dürfen weiterhin alle angemeldeten Nutzer (kein eigenes Recht nötig).
     manageSop: perm('manageSop', has('admin','technik','leitung')),
+    // Rolle "Assessment" (lib/roles.js): bewusst NICHT über role_permissions
+    // übersteuerbar, damit die serverseitige Sperre nicht versehentlich
+    // aufgehoben werden kann.
+    assessmentOnly: isAssessmentOnly(roles),
+    seeAssessment: canSeeAssessment(roles),
     tabs: getTabVisibility(roles, overrides),
     roles,
   };
