@@ -257,6 +257,16 @@ describe('Zeitauswertung je Abschnitt', () => {
     const r = A.scoreSection(i, {}, { used: limit + 15, late: true, blockAt: {} });
     expect(r.time).toEqual({ limit, used: limit, remaining: 0, expired: true });
     expect(r.blocks[1].used).toBeNull();
+    expect(r.blocks[0].timeUp).toBe(true);
+    expect(r.blocks.slice(1).map(b => b.notReached)).toEqual(['time', 'time']);
+  });
+  it('Zeitablauf im zweiten Block, dritter nicht erreicht', () => {
+    const i = idx('englisch'), limit = SECTIONS[i].minutes * 60;
+    const r = A.scoreSection(i, {}, { used: limit, late: true, blockAt: { 1: 300 } });
+    expect(r.blocks.map(b => [!!b.timeUp, b.notReached || null])).toEqual([[false, null], [true, null], [false, 'time']]);
+    const ab = A.scoreSection(i, {}, { used: 100, aborted: true, blockAt: {} });
+    expect(ab.blocks[2].notReached).toBe('aborted');
+    expect(ab.blocks[0].timeUp).toBeUndefined();
   });
 });
 

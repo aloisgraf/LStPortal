@@ -651,7 +651,7 @@ function asmDetailHtml(a){
     const dims=r.dims?asmDimsHtml(r.dims):'';
     const blocks=(r.blocks||[]).map(b=>{
       const det=b.details||[];const scoredRows=det.filter(d=>d.type!=='writing'&&d.type!=='markwords');
-      let h=(r.blocks.length>1?`<div class="asm-det-block">${esc(b.title)}${b.max?` – ${b.points}/${b.max}`:''}${typeof b.used==='number'?`<span class="asm-det-btime">⏱ ${asmMmss(b.used)} Min.</span>`:''}</div>`:'');
+      let h=(r.blocks.length>1?`<div class="asm-det-block">${esc(b.title)}${b.max?` – ${b.points}/${b.max}`:''}${typeof b.used==='number'?`<span class="asm-det-btime">⏱ ${asmMmss(b.used)} Min.</span>`:''}${b.timeUp?'<span class="asm-det-bflag">⏰ hier war die Zeit aus</span>':''}${b.notReached?`<span class="asm-det-bflag">${b.notReached==='aborted'?'⛔ nicht mehr aufgerufen (abgebrochen)':'⏰ aus Zeitgründen nicht mehr aufgerufen'}</span>`:''}</div>`:'');
       det.filter(d=>d.type==='markwords').forEach(d=>h+=asmMarkwordsDetail(d));
       det.filter(d=>d.type==='writing').forEach(d=>h+=asmWritingDetail(d,a.id,r.key));
       if(scoredRows.length)h+=`<table class="asm-det"><colgroup><col class="c-mark"><col class="c-q"><col class="c-a"><col class="c-sol"><col class="c-btn"></colgroup><tbody>${scoredRows.map(d=>d.type==='likert'
@@ -661,7 +661,7 @@ function asmDetailHtml(a){
       return h;
     }).join('');
     return `<div class="asm-det-sec">${head}${dims}${blocks}</div>`;
-  }).join('')+asmEventsHtml(a.events)||'<i>Noch keine Abschnitte abgegeben.</i>';
+  }).join('')+asmMissingHtml(a)+asmEventsHtml(a.events)||'<i>Noch keine Abschnitte abgegeben.</i>';
 }
 const asmMmss=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
 // Zeitauswertung je Abschnitt: abgelaufen oder wie viel Restzeit übrig war.
@@ -670,6 +670,13 @@ function asmTimeHtml(r){
   const used=`${asmMmss(t.used)} von ${asmMmss(t.limit)} Min. genutzt`;
   const txt=r.aborted?`⛔ abgebrochen nach ${used}`:t.expired?`⏰ Zeit abgelaufen (${asmMmss(t.limit)} Min. voll genutzt)`:`✔ vorzeitig abgegeben, <b>${asmMmss(t.remaining)} Min. Restzeit</b> übrig (${used})`;
   return `<div class="asm-det-time ${t.expired&&!r.aborted?'exp':''}">${txt}</div>`;
+}
+// Abschnitte, die ein abgebrochener Durchgang nicht mehr erreicht hat.
+function asmMissingHtml(a){
+  if(a.status!=='aborted'||a.outdated)return '';
+  const done=new Set((a.results||[]).map(r=>r.key));
+  const secs=ASM.info?.sections||[],last=Math.max(-1,...secs.map((s,i)=>done.has(s.key)?i:-1));
+  return secs.map((s,i)=>s.kind==='pause'||done.has(s.key)||i<last?'':`<div class="asm-det-sec"><div class="asm-det-head"><b>${esc(s.title)}</b></div><div class="asm-det-time exp">⛔ nicht mehr aufgerufen (Durchgang abgebrochen)</div></div>`).join('');
 }
 function asmDimsHtml(dims){
   return `<div class="asm-dims">${dims.map(d=>d.control
