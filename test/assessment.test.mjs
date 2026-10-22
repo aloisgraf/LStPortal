@@ -192,3 +192,23 @@ describe('scoreSection', () => {
     expect(A.summarize(res)).toEqual({ points: 1, max: 35, percent: 3 });
   });
 });
+
+describe('Nachbewertung', () => {
+  it('setzt falsche Antworten auf richtig und rechnet Punkte neu', () => {
+    const i = idx('geografie');
+    const r = [A.scoreSection(i, { gk4: 'Halein' })];
+    const before = r[0].points;
+    const out = A.applyOverrides(r, { 'geografie/gk4': { correct: true, by: 'Admin', at: 'x' } });
+    const d = out[0].blocks[1].details.find(x => x.id === 'gk4');
+    expect(d.correct).toBe(true);
+    expect(d.override).toEqual({ by: 'Admin', at: 'x', original: false });
+    expect(out[0].points).toBe(before + 1);
+    expect(A.summarize(out).points).toBe(before + 1);
+    expect(r[0].points).toBe(before);
+  });
+  it('ignoriert Texte, Protokollaufgabe und unbekannte Fragen', () => {
+    const r = [A.scoreSection(idx('abschrift'), {})];
+    expect(A.applyOverrides(r, { 'abschrift/ab1': { correct: true } })[0].points).toBe(0);
+    expect(A.applyOverrides(r, {})).toBe(r);
+  });
+});

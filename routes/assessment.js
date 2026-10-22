@@ -168,7 +168,8 @@ router.get('/results', auth, adminOnly, async (req,res) => {
     const out = [];
     for (const r of rows) {
       const att = r.version === A.VERSION && !r.archived_at ? await expireIfNeeded(r) : r;
-      const results = parseJson(att.results, []);
+      const overrides = parseJson(att.overrides, {});
+      const results = A.applyOverrides(parseJson(att.results, []), overrides);
       out.push({
         id: att.id, userId: att.user_id, userName: r.user_name || '?', ...stateOf(att),
         outdated: att.version !== A.VERSION, results, summary: A.summarize(results),
@@ -191,6 +192,27 @@ router.post('/users/:uid/reset', auth, adminOnly, async (req,res) => {
     await logAct(req.uid, req.user.name, 'assessment_reset', { userId: u.id, userName: u.name });
     ok(res);
   } catch(e) { console.error('[assessment/reset]', e.message); bad(res,'Serverfehler',500); }
+});
+
+// Nachbewertung einer einzelnen Antwort. correct=true/false setzt die Wertung,
+// correct=null nimmt die Korrektur zurück.
+router.put('/attempts/:id/override', auth, adminOnly, async (req,res) => {
+  try {
+    const { section, qid, correct } = req.body || {};
+    if (typeof section !== 'string' || typeof qid !== 'string' || ![true, false, null].includes(correct)) return bad(res,'Ungültige Angaben');
+    const att = await q1('SELECT a.id, a.results, a.overrides, u.name AS user_name FROM assessment_attempts a LEFT JOIN users u ON u.id=a.user_id WHERE a.id=$1', [req.params.id]);
+    if (!att) return bad(res,'Nicht gefunden',404);
+    const r = parseJson(att.results, []).find(x => x.key === section);
+    const d = r && (r.blocks || []).flatMap(b => b.details || []).find(x => x.id === qid);
+    if (!d || !A.OVERRIDABLE.includes(d.type)) return bad(res,'Diese Antwort kann nicht nachbewertet werden',409);
+    const overrides = parseJson(att.overrides, {});
+    const key = A.overrideKey(section, qid);
+    if (correct === null || correct === d.correct) delete overrides[key];
+    else overrides[key] = { correct, by: req.user.name, at: new Date().toISOString() };
+    await pool.query('UPDATE assessment_attempts SET overrides=$1 WHERE id=$2', [JSON.stringify(overrides), att.id]);
+    await logAct(req.uid, req.user.name, 'assessment_override', { attemptId: att.id, userName: att.user_name, section, qid, correct });
+    ok(res);
+  } catch(e) { console.error('[assessment/override]', e.message); bad(res,'Serverfehler',500); }
 });
 
 // Abbrechen: ein laufender Durchgang wird sofort beendet (Status „aborted“).
