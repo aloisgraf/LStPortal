@@ -136,6 +136,19 @@ router.put('/section/draft', auth, assessmentAccess, async (req,res) => {
 
 // Protokolliert, wenn der Vollbildmodus verlassen oder der Tab gewechselt
 // wird (verhindern kann das keine Webseite). Höchstens 500 Einträge.
+// Gerätestatus für die Live-Ansicht der Administration: Akkustand in Prozent
+// und ob geladen wird. Browser ohne Battery-API (Safari, Firefox) melden
+// level=null.
+router.put('/device', auth, assessmentAccess, async (req,res) => {
+  try {
+    const lv = req.body?.level;
+    const level = typeof lv === 'number' && lv >= 0 && lv <= 1 ? Math.round(lv * 100) : null;
+    const dev = JSON.stringify({ level, charging: req.body?.charging === true, at: new Date().toISOString() });
+    await pool.query(`UPDATE assessment_attempts SET device=$1 WHERE user_id=$2 AND archived_at IS NULL AND status='running'`, [dev, req.uid]);
+    ok(res);
+  } catch(e) { console.error('[assessment/device]', e.message); bad(res,'Serverfehler',500); }
+});
+
 const EVENT_TYPES = ['fullscreen_exit', 'tab_hidden'];
 router.post('/section/event', auth, assessmentAccess, async (req,res) => {
   try {
@@ -184,7 +197,7 @@ router.get('/results', auth, adminOnly, async (req,res) => {
       out.push({
         id: att.id, userId: att.user_id, userName: r.user_name || '?', ...stateOf(att),
         outdated: att.version !== A.VERSION, results, summary: A.summarize(results),
-        events: parseJson(att.events, []), archivedAt: att.archived_at,
+        events: parseJson(att.events, []), archivedAt: att.archived_at, device: parseJson(att.device, {}),
       });
     }
     ok(res, { attempts: out, candidates: candidates.map(c => ({ id: c.id, name: c.name })) });

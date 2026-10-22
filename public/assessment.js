@@ -131,7 +131,7 @@ function asmRenderOverview(){
   }
   document.getElementById('main').innerHTML=`<div class="ph"><div class="pt">📝 ${ASM_TITLE}</div></div>${body}${isAdmin?asmCandidatesHtml()+asmResultsHtml():''}`;
   if(isAdmin)asmAdminLive();
-  if(att&&att.status==='running'){asmSetTotal(att);if(ASM.timer)clearInterval(ASM.timer);ASM.timer=setInterval(()=>{if(S.view!=='assessment'){asmStopTimers();return;}asmTickTotal();},500);}
+  if(att&&att.status==='running'){asmSendDevice();asmSetTotal(att);if(ASM.timer)clearInterval(ASM.timer);ASM.timer=setInterval(()=>{if(S.view!=='assessment'){asmStopTimers();return;}asmTickTotal();},500);}
 }
 async function asmStart(from){
   const at=from>0?` ab Abschnitt ${from+1}`:'';
@@ -187,7 +187,7 @@ function asmRenderSection(){
     let num=0;
     sec.blocks.forEach((b,bi)=>{if(!sec.freeOrder&&bi<ASM.block)num+=b.questions.length;});
     body=asmCurrentBlocks().map(([b,bi])=>{
-      let h=`<div class="asm-block"><div class="asm-block-title">${esc(b.title)}</div>${b.instruction?`<div class="asm-block-ins">${esc(b.instruction)}</div>`:''}`;
+      let h=`<div class="asm-block"><div class="asm-block-title">${esc(b.title)}</div>${b.instruction?`<div class="asm-block-ins">${esc(b.instruction)}</div>`:''}${b.video?`<div class="asm-video"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(b.video)}?rel=0&modestbranding=1" title="${esc(b.title)}" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>`:''}`;
       if(asmMemorizing(bi)){
         h+=`<div class="dash-card asm-memo"><div style="font-weight:700;margin-bottom:8px">🧠 ${esc(b.memorize.text)}</div>
           <ul>${b.memorize.facts.map(f=>`<li>${esc(f)}</li>`).join('')}</ul>
@@ -224,7 +224,7 @@ function asmInputHtml(q,sec){
   const v=ASM.answers[q.id];
   if(q.type==='choice')return `<div class="asm-opts ${q.compact?'compact':''}">${q.options.map((o,i)=>`<label class="asm-opt"><input type="radio" name="asm_${q.id}" ${v===i?'checked':''} onchange="asmSet('${q.id}',${i})"><span>${esc(o)}</span></label>`).join('')}</div>`;
   if(q.type==='number')return `<input type="text" inputmode="decimal" class="asm-num" placeholder="Antwort" autocomplete="off" value="${esc(v??'')}" oninput="asmSet('${q.id}',this.value)" onkeydown="if(event.key==='Enter')event.preventDefault()">${q.unit?`<span class="asm-unit">${esc(q.unit)}</span>`:''}`;
-  if(q.type==='text')return `<input type="text" class="asm-num asm-txt${q.loose?' asm-wide':''}" placeholder="${q.loose?'Antwort':'Fachwort'}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" value="${esc(v??'')}" oninput="asmSet('${q.id}',this.value)" onkeydown="if(event.key==='Enter')event.preventDefault()">`;
+  if(q.type==='text')return `<input type="text" class="asm-num asm-txt${q.open?' asm-open':q.loose?' asm-wide':''}" placeholder="${q.loose||q.open?'Antwort':'Fachwort'}" maxlength="300" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" value="${esc(v??'')}" oninput="asmSet('${q.id}',this.value)" onkeydown="if(event.key==='Enter')event.preventDefault()">`;
   const scale=sec.scale||['1','2','3','4','5'];
   return `<div class="asm-likert">${scale.map((l,i)=>`<label class="asm-lk"><input type="radio" name="asm_${q.id}" ${v===i+1?'checked':''} onchange="asmSet('${q.id}',${i+1})"><b>${i+1}</b><span>${esc(l)}</span></label>`).join('')}</div>`;
 }
@@ -388,6 +388,13 @@ function asmQueueDraft(ms){
   if(ASM.draftTimer)clearTimeout(ASM.draftTimer);
   ASM.draftTimer=setTimeout(asmSaveDraft,ms);
 }
+// Akkustand an die Live-Ansicht melden (nur Chrome/Edge/Android kennen die
+// Battery-API; sonst wird „unbekannt“ gemeldet).
+async function asmSendDevice(){
+  let level=null,charging=false;
+  try{if(navigator.getBattery){const b=await navigator.getBattery();level=b.level;charging=b.charging;}}catch(e){}
+  api('PUT','/assessment/device',{level,charging}).catch(()=>{});
+}
 async function asmCheckAborted(){
   try{
     const info=await api('GET','/assessment');
@@ -431,6 +438,7 @@ function asmTick(){
   if(S.view!=='assessment'||!ASM.section){asmStopTimers();return;}
   // Alle 15 s prüfen, ob die Administration den Durchgang abgebrochen hat.
   if(!ASM.lastCheck||Date.now()-ASM.lastCheck>15000){ASM.lastCheck=Date.now();asmCheckAborted();}
+  if(!ASM.lastDev||Date.now()-ASM.lastDev>30000){ASM.lastDev=Date.now();asmSendDevice();}
   const left=(ASM.deadline-Date.now())/1000;
   const total=ASM.section.minutes*60;
   const t=document.getElementById('asmTimer'),fill=document.getElementById('asmTimeFill'),bar=document.getElementById('asmBar');
@@ -472,6 +480,14 @@ function asmPctCell(r){
   return `<td><span style="font-weight:700;color:${c}">${r.percent} %</span><div style="font-size:10px;color:var(--mu)">${r.points}/${r.max}${r.late?' · Zeit':''}</div></td>`;
 }
 // Alle Mitarbeiter mit der Rolle Assessment und ihr aktueller Stand.
+function asmBatteryHtml(d){
+  if(!d?.at)return '🔋 –';
+  const age=Math.round((Date.now()-new Date(d.at))/60000);
+  const stale=age>=2?` <span title="Letzte Meldung vor ${age} Min.">(vor ${age} Min.)</span>`:'';
+  if(d.level===null||d.level===undefined)return `🔋 unbekannt${stale}`;
+  const c=d.level<=15&&!d.charging?'var(--danger)':d.level<=30&&!d.charging?'var(--warn)':'inherit';
+  return `<b style="color:${c}">${d.charging?'⚡':'🔋'} ${d.level} %</b>${d.charging?' lädt':''}${stale}`;
+}
 function asmCandidatesHtml(){
   const {attempts=[],candidates=[]}=ASM.results||{};
   const rows=candidates.map(c=>{
@@ -480,7 +496,7 @@ function asmCandidatesHtml(){
     const status=!cur?'<span style="color:var(--mu)">nicht begonnen</span>':cur.status==='finished'?`✅ abgeschlossen ${fdt(cur.finishedAt)}${cur.summary.percent!==null?` · <b>${cur.summary.percent} %</b>`:''}`
       :cur.status==='aborted'?`⛔ abgebrochen ${fdt(cur.finishedAt)}`
       :`<span class="asm-live">● LIVE</span> Abschnitt ${cur.currentSection+1} von ${ASM.info.sections.length}: <b>${esc(cur.sectionTitle||'')}</b>${cur.sectionStarted?'':' <span style="color:var(--mu)">(noch nicht begonnen)</span>'}
-        <div style="color:var(--mu)">Gesamtzeit übrig <b class="asmLive" data-end="${Date.now()+(cur.totalRemainingSeconds||0)*1000}">${asmFmt(cur.totalRemainingSeconds||0)}</b>${cur.remainingSeconds!=null?` · Abschnitt übrig <b class="asmLive" data-end="${Date.now()+cur.remainingSeconds*1000}">${asmFmt(cur.remainingSeconds)}</b>`:''}</div>`;
+        <div style="color:var(--mu)">${asmBatteryHtml(cur.device)} · Gesamtzeit übrig <b class="asmLive" data-end="${Date.now()+(cur.totalRemainingSeconds||0)*1000}">${asmFmt(cur.totalRemainingSeconds||0)}</b>${cur.remainingSeconds!=null?` · Abschnitt übrig <b class="asmLive" data-end="${Date.now()+cur.remainingSeconds*1000}">${asmFmt(cur.remainingSeconds)}</b>`:''}</div>`;
     return `<tr><td style="text-align:left;font-weight:600">${esc(c.name)}</td><td style="text-align:left;font-size:12px">${status}</td><td style="font-size:12px">${old||'–'}</td>
       <td style="text-align:right;white-space:nowrap">${cur?.status==='running'?`<button class="btn-s asm-abort" style="font-size:11px" onclick="asmAbortUser('${c.id}','${esc(c.name).replace(/'/g,'')}')">⛔ Abbrechen</button> `:''}<button class="btn-s" style="font-size:11px" ${cur?'':'disabled'} onclick="asmResetUser('${c.id}','${esc(c.name).replace(/'/g,'')}')">↺ Assessment zurücksetzen</button></td></tr>`;
   }).join('');
