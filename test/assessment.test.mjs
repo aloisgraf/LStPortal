@@ -108,7 +108,7 @@ describe('Zeitlimit (vergangene Sekunden aus der Datenbank)', () => {
 });
 
 describe('parseNumber — deutsche Eingaben', () => {
-  it.each([['59,5', 59.5], ['1.210', 1210], ['1210 €', 1210], ['25 %', 25], ['33', 33], ['59.5', 59.5], ['abc', null], ['', null]])('%s → %s', (inp, out) => {
+  it.each([['59,5', 59.5], ['1.210', 1210], ['1210 €', 1210], ['25 %', 25], ['33', 33], ['59.5', 59.5], ['abc', null], ['', null], ['30 Liter', 30], ['ca. 8 min', 8], ['22,5 %', 22.5], ['12 Std 30 min', null]])('%s → %s', (inp, out) => {
     expect(A.parseNumber(inp)).toBe(out);
   });
 });

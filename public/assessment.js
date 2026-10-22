@@ -214,7 +214,7 @@ function asmQuestionHtml(q,sec,num){
 function asmInputHtml(q,sec){
   const v=ASM.answers[q.id];
   if(q.type==='choice')return `<div class="asm-opts ${q.compact?'compact':''}">${q.options.map((o,i)=>`<label class="asm-opt"><input type="radio" name="asm_${q.id}" ${v===i?'checked':''} onchange="asmSet('${q.id}',${i})"><span>${esc(o)}</span></label>`).join('')}</div>`;
-  if(q.type==='number')return `<input type="text" inputmode="decimal" class="asm-num" placeholder="Antwort" autocomplete="off" value="${esc(v??'')}" oninput="asmSet('${q.id}',this.value)" onkeydown="if(event.key==='Enter')event.preventDefault()">`;
+  if(q.type==='number')return `<input type="text" inputmode="decimal" class="asm-num" placeholder="Antwort" autocomplete="off" value="${esc(v??'')}" oninput="asmSet('${q.id}',this.value)" onkeydown="if(event.key==='Enter')event.preventDefault()">${q.unit?`<span class="asm-unit">${esc(q.unit)}</span>`:''}`;
   if(q.type==='text')return `<input type="text" class="asm-num asm-txt${q.loose?' asm-wide':''}" placeholder="${q.loose?'Antwort':'Fachwort'}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" value="${esc(v??'')}" oninput="asmSet('${q.id}',this.value)" onkeydown="if(event.key==='Enter')event.preventDefault()">`;
   const scale=sec.scale||['1','2','3','4','5'];
   return `<div class="asm-likert">${scale.map((l,i)=>`<label class="asm-lk"><input type="radio" name="asm_${q.id}" ${v===i+1?'checked':''} onchange="asmSet('${q.id}',${i+1})"><b>${i+1}</b><span>${esc(l)}</span></label>`).join('')}</div>`;
