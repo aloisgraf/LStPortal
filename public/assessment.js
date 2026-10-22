@@ -618,7 +618,7 @@ function asmPlay(id){
   const log=ASM._logs?.[id];if(!log)return;
   if(ASM._play)clearInterval(ASM._play);
   let k=0;
-  ASM._play=setInterval(()=>{k=Math.min(log.length,k+Math.max(1,Math.ceil(log.length/400)));asmShowStep(id,k);if(k>=log.length||!document.getElementById(id)){clearInterval(ASM._play);ASM._play=null;}},40);
+  ASM._play=setInterval(()=>{k=Math.min(log.length,k+Math.max(1,Math.ceil(log.length/400)));asmShowStep(id,k);if(k>=log.length||!document.getElementById(id)){clearInterval(ASM._play);ASM._play=null;}},80);
 }
 // Admin bricht den eigenen Testdurchgang ab: wird beendet und gleich
 // archiviert, danach kann er sofort neu starten.
