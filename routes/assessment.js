@@ -51,6 +51,7 @@ function stateOf(att) {
     status: att.status,
     currentSection: att.current_section,
     sectionStarted: !!att.section_started_at,
+    submitted: parseJson(att.results, []).length,
     remainingSeconds: att.section_started_at ? Math.max(0, A.remainingSeconds(att.current_section, att.elapsed)) : null,
     // Gesamtzeit: läuft ab dem Start mit, nur zur Anzeige (gewertet wird je Abschnitt).
     totalRemainingSeconds: att.status === 'running' && att.total_elapsed != null ? Math.max(0, Math.round(A.TOTAL_MINUTES * 60 - att.total_elapsed)) : null,
@@ -82,7 +83,17 @@ router.get('/', auth, assessmentAccess, async (req,res) => {
 router.post('/start', auth, assessmentAccess, async (req,res) => {
   try {
     await dropOutdated(await getAttempt(req.uid));
-    await pool.query(`INSERT INTO assessment_attempts (id,user_id,version) VALUES ($1,$2,$3) ON CONFLICT (user_id) WHERE archived_at IS NULL DO NOTHING`, [newId(), req.uid, A.VERSION]);
+    // Admins können zum Testen ab einem bestimmten Abschnitt starten. Die
+    // übersprungenen Minuten werden vom Startzeitpunkt abgezogen, damit die
+    // Gesamtzeit-Anzeige stimmt.
+    let from = 0;
+    if (req.p.manageUsers && req.body?.startSection !== undefined) {
+      from = Number(req.body.startSection);
+      if (!Number.isInteger(from) || from < 0 || from >= A.SECTIONS.length) return bad(res,'Ungültiger Abschnitt');
+    }
+    const skipped = A.SECTIONS.slice(0, from).reduce((n, s) => n + s.minutes, 0);
+    await pool.query(`INSERT INTO assessment_attempts (id,user_id,version,current_section,started_at) VALUES ($1,$2,$3,$4,NOW()-make_interval(mins => $5))
+      ON CONFLICT (user_id) WHERE archived_at IS NULL DO NOTHING`, [newId(), req.uid, A.VERSION, from, skipped]);
     const att = await getAttempt(req.uid);
     if (att.status !== 'running') return bad(res,'Das Assessment wurde bereits abgeschlossen',409);
     await logAct(req.uid, req.user.name, 'assessment_start', {});
