@@ -143,13 +143,13 @@ router.put('/device', auth, assessmentAccess, async (req,res) => {
   try {
     const lv = req.body?.level;
     const level = typeof lv === 'number' && lv >= 0 && lv <= 1 ? Math.round(lv * 100) : null;
-    const dev = JSON.stringify({ level, charging: req.body?.charging === true, at: new Date().toISOString() });
+    const dev = JSON.stringify({ level, charging: req.body?.charging === true, fullscreen: req.body?.fullscreen === true, focused: req.body?.focused !== false, at: new Date().toISOString() });
     await pool.query(`UPDATE assessment_attempts SET device=$1 WHERE user_id=$2 AND archived_at IS NULL AND status='running'`, [dev, req.uid]);
     ok(res);
   } catch(e) { console.error('[assessment/device]', e.message); bad(res,'Serverfehler',500); }
 });
 
-const EVENT_TYPES = ['fullscreen_exit', 'tab_hidden'];
+const EVENT_TYPES = ['fullscreen_exit', 'tab_hidden', 'window_blur', 'shortcut_blocked'];
 router.post('/section/event', auth, assessmentAccess, async (req,res) => {
   try {
     const type = req.body?.type;

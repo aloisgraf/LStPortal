@@ -67,11 +67,38 @@ function asmLogEvent(type){
 document.addEventListener('fullscreenchange',()=>{
   if(ASM.running&&!document.fullscreenElement&&ASM.wasFs)asmLogEvent('fullscreen_exit');
   ASM.wasFs=!!document.fullscreenElement;
+  // Keyboard-Lock (Chrome/Edge): im Vollbild landen Browser-Kürzel wie
+  // Strg+T/N/W bei der Seite statt beim Browser und werden unten gesperrt.
+  try{if(document.fullscreenElement&&ASM.running)navigator.keyboard?.lock?.().catch(()=>{});else navigator.keyboard?.unlock?.();}catch(e){}
   asmCheckFs();
+  asmSendDevice();
 });
 document.addEventListener('visibilitychange',()=>{
   if(ASM.running&&document.visibilityState==='hidden')asmLogEvent('tab_hidden');
+  if(ASM.running)asmSendDevice();
 });
+// Fenster verlassen (z. B. Alt+Tab). Ein Klick ins Notruf-Video verschiebt den
+// Fokus nur in den eingebetteten Player und zählt nicht.
+window.addEventListener('blur',()=>{
+  if(!ASM.running||!asmFsOk())return;
+  setTimeout(()=>{if(document.activeElement?.tagName==='IFRAME'||document.visibilityState==='hidden')return;asmLogEvent('window_blur');asmSendDevice();},0);
+});
+// Während des Durchgangs: Kürzel für neue Tabs/Fenster, Tabwechsel und
+// Schließen sperren, Kontextmenü und Mittelklick unterbinden. Kürzel, die das
+// Betriebssystem abfängt (Alt+Tab, Windows-Taste), erreicht die Seite nicht.
+const ASM_BLOCK_KEYS=new Set(['t','n','w','tab','pageup','pagedown','1','2','3','4','5','6','7','8','9','l','o','h','j','s','p','r','f5']);
+document.addEventListener('keydown',e=>{
+  if(!ASM.running||!asmFsOk())return;
+  const k=(e.key||'').toLowerCase();
+  if(((e.ctrlKey||e.metaKey)&&ASM_BLOCK_KEYS.has(k))||k==='f5'||(e.altKey&&['arrowleft','arrowright','home'].includes(k))){
+    e.preventDefault();e.stopPropagation();
+    asmLogEvent('shortcut_blocked');
+    toast('🔒 Neue Tabs und Fenster sind während des Assessments gesperrt.');
+  }
+},true);
+document.addEventListener('contextmenu',e=>{if(ASM.running&&asmFsOk())e.preventDefault();},true);
+document.addEventListener('auxclick',e=>{if(ASM.running&&asmFsOk()&&e.button===1)e.preventDefault();},true);
+window.addEventListener('beforeunload',e=>{if(ASM.running&&asmFsOk()){e.preventDefault();e.returnValue='';}});
 
 async function renderAssessment(){
   asmStopTimers();
@@ -393,7 +420,7 @@ function asmQueueDraft(ms){
 async function asmSendDevice(){
   let level=null,charging=false;
   try{if(navigator.getBattery){const b=await navigator.getBattery();level=b.level;charging=b.charging;}}catch(e){}
-  api('PUT','/assessment/device',{level,charging}).catch(()=>{});
+  api('PUT','/assessment/device',{level,charging,fullscreen:!!document.fullscreenElement,focused:document.visibilityState==='visible'&&document.hasFocus()}).catch(()=>{});
 }
 async function asmCheckAborted(){
   try{
@@ -480,6 +507,13 @@ function asmPctCell(r){
   return `<td><span style="font-weight:700;color:${c}">${r.percent} %</span><div style="font-size:10px;color:var(--mu)">${r.points}/${r.max}${r.late?' · Zeit':''}</div></td>`;
 }
 // Alle Mitarbeiter mit der Rolle Assessment und ihr aktueller Stand.
+function asmFocusHtml(a){
+  const d=a.device||{},ev=a.events||[];
+  const n=t=>ev.filter(e=>e.type===t).length;
+  const state=!d.at?'':d.focused===false?'<b style="color:var(--danger)">⚠ nicht auf der Seite</b>':d.fullscreen?'⛶ Vollbild':'<b style="color:var(--warn)">⚠ kein Vollbild</b>';
+  const cnt=[[n('fullscreen_exit'),'× Vollbild verlassen'],[n('tab_hidden')+n('window_blur'),'× Tab/Fenster gewechselt'],[n('shortcut_blocked'),'× gesperrtes Kürzel']].filter(([c])=>c).map(([c,t])=>c+t).join(', ');
+  return [state,cnt?`<span style="color:var(--warn)">${cnt}</span>`:''].filter(Boolean).join(' · ')||'–';
+}
 function asmBatteryHtml(d){
   if(!d?.at)return '🔋 –';
   const age=Math.round((Date.now()-new Date(d.at))/60000);
@@ -496,7 +530,7 @@ function asmCandidatesHtml(){
     const status=!cur?'<span style="color:var(--mu)">nicht begonnen</span>':cur.status==='finished'?`✅ abgeschlossen ${fdt(cur.finishedAt)}${cur.summary.percent!==null?` · <b>${cur.summary.percent} %</b>`:''}`
       :cur.status==='aborted'?`⛔ abgebrochen ${fdt(cur.finishedAt)}`
       :`<span class="asm-live">● LIVE</span> Abschnitt ${cur.currentSection+1} von ${ASM.info.sections.length}: <b>${esc(cur.sectionTitle||'')}</b>${cur.sectionStarted?'':' <span style="color:var(--mu)">(noch nicht begonnen)</span>'}
-        <div style="color:var(--mu)">${asmBatteryHtml(cur.device)} · Gesamtzeit übrig <b class="asmLive" data-end="${Date.now()+(cur.totalRemainingSeconds||0)*1000}">${asmFmt(cur.totalRemainingSeconds||0)}</b>${cur.remainingSeconds!=null?` · Abschnitt übrig <b class="asmLive" data-end="${Date.now()+cur.remainingSeconds*1000}">${asmFmt(cur.remainingSeconds)}</b>`:''}</div>`;
+        <div style="color:var(--mu)">${asmBatteryHtml(cur.device)} · ${asmFocusHtml(cur)} · Gesamtzeit übrig <b class="asmLive" data-end="${Date.now()+(cur.totalRemainingSeconds||0)*1000}">${asmFmt(cur.totalRemainingSeconds||0)}</b>${cur.remainingSeconds!=null?` · Abschnitt übrig <b class="asmLive" data-end="${Date.now()+cur.remainingSeconds*1000}">${asmFmt(cur.remainingSeconds)}</b>`:''}</div>`;
     return `<tr><td style="text-align:left;font-weight:600">${esc(c.name)}</td><td style="text-align:left;font-size:12px">${status}</td><td style="font-size:12px">${old||'–'}</td>
       <td style="text-align:right;white-space:nowrap">${cur?.status==='running'?`<button class="btn-s asm-abort" style="font-size:11px" onclick="asmAbortUser('${c.id}','${esc(c.name).replace(/'/g,'')}')">⛔ Abbrechen</button> `:''}<button class="btn-s" style="font-size:11px" ${cur?'':'disabled'} onclick="asmResetUser('${c.id}','${esc(c.name).replace(/'/g,'')}')">↺ Assessment zurücksetzen</button></td></tr>`;
   }).join('');
@@ -532,14 +566,14 @@ function asmResultsHtml(){
 }
 function asmEventsCell(ev){
   ev=ev||[];
-  const fs=ev.filter(e=>e.type==='fullscreen_exit').length,tab=ev.filter(e=>e.type==='tab_hidden').length;
+  const fs=ev.filter(e=>e.type==='fullscreen_exit').length,tab=ev.filter(e=>e.type==='tab_hidden'||e.type==='window_blur').length;
   if(!fs&&!tab)return '<span class="rm-yes">✓</span>';
   return `<span style="color:var(--warn);font-weight:700">${fs}× / ${tab}×</span>`;
 }
 function asmEventsHtml(ev){
   if(!ev?.length)return '';
   const secs=ASM.info.sections;
-  const label={fullscreen_exit:'Vollbild verlassen',tab_hidden:'Tab/Fenster gewechselt',aborted:'Abgebrochen durch Administration'};
+  const label={fullscreen_exit:'Vollbild verlassen',tab_hidden:'Tab/Fenster gewechselt',window_blur:'Fenster verlassen (z. B. Alt+Tab)',shortcut_blocked:'Gesperrtes Tastenkürzel versucht (neuer Tab o. Ä.)',aborted:'Abgebrochen durch Administration'};
   return `<div class="asm-det-sec"><div class="asm-det-head"><b>⛶ Protokoll</b> – ${ev.length} Ereignis(se)</div><table class="asm-det"><tbody>
     ${ev.map(e=>`<tr><td style="white-space:nowrap">${fdt(e.at)}</td><td>${esc(label[e.type]||e.type)}${e.by?' ('+esc(e.by)+')':''}</td><td style="color:var(--mu)">${esc(secs[e.section]?.title||'')}</td></tr>`).join('')}</tbody></table></div>`;
 }
