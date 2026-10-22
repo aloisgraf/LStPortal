@@ -259,3 +259,27 @@ describe('Zeitauswertung je Abschnitt', () => {
     expect(r.blocks[1].used).toBeNull();
   });
 });
+
+describe('Bewertungsraster für Texte', () => {
+  const res = () => [A.scoreSection(idx('motivation'), { mo1: { text: 'Ich will helfen', log: [], done: true } })];
+  it('ohne Bewertung zählt der Text nicht', () => {
+    const r = A.applyRatings(res(), {})[0];
+    expect(r.scored).toBe(false);
+    expect(r.blocks[0].details[0].rubric.length).toBe(5);
+    expect(A.summarize([r]).max).toBe(0);
+  });
+  it('bewertete Kriterien fließen ins Ergebnis', () => {
+    const r = A.applyRatings(res(), { 'motivation/mo1': { scores: { inhalt: 3, aufbau: 1, bogus: 3, sprache: 7 }, by: 'X', at: 't' } })[0];
+    expect(r.scored).toBe(true);
+    expect(r.points).toBe(4);
+    expect(r.max).toBe(6);
+    expect(r.percent).toBe(67);
+  });
+  it('Abschrift: Fehler gegen das Original, Rest zählt nicht', () => {
+    expect(A.compareCopy('Der Hund lauft schnell', 'Der Hund läuft schnell über die Wiese')).toMatchObject({ typedWords: 4, reachedWords: 4, errors: 1, rate: 25 });
+    expect(A.compareCopy('Der läuft schnell über', 'Der Hund läuft schnell über die Wiese')).toMatchObject({ errors: 1, reachedWords: 5 });
+    expect(A.compareCopy('egal', '')).toBeNull();
+    const r = A.applyRatings([A.scoreSection(idx('abschrift'), { ab1: { text: 'a b', log: [], done: true } })], {}, { original: 'a c d' })[0];
+    expect(r.blocks[0].details[0].copy).toMatchObject({ errors: 1 });
+  });
+});

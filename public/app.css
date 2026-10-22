@@ -818,3 +818,13 @@ body.asm-run .asm-bar{box-shadow:var(--sh)}
 .asm-det-time{font-size:12px;color:var(--mu);margin:2px 0 8px}
 .asm-det-time.exp{color:var(--danger)}
 .asm-det-btime{font-weight:500;color:var(--mu);font-size:11px;margin-left:8px}
+.asm-wd-auto{margin:6px 0}
+.asm-rb{margin:8px 0 10px}
+.asm-rb-tab td{vertical-align:middle}
+.asm-rb-hint{font-size:10px;color:var(--mu);font-weight:400}
+.asm-rb-pts{text-align:right;white-space:nowrap;width:190px}
+.asm-rb-btn{width:28px;height:26px;margin-left:4px;border:1px solid var(--border);border-radius:6px;background:var(--card,#fff);color:inherit;font-weight:700;cursor:pointer}
+.asm-rb-btn.on{background:var(--info);border-color:var(--info);color:#fff}
+.asm-rb-none{font-size:10px;color:var(--di);margin-left:6px}
+.asm-rb-sum{font-size:12px;margin-top:4px}
+.asm-orig{margin-top:12px;font-size:12px}.asm-orig summary{cursor:pointer;font-weight:700}

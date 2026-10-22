@@ -194,18 +194,19 @@ router.get('/results', auth, adminOnly, async (req,res) => {
       EXTRACT(EPOCH FROM (NOW()-a.started_at))::float AS total_elapsed, u.name AS user_name
       FROM assessment_attempts a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.started_at DESC`);
     const candidates = await q(`SELECT id, name FROM users WHERE roles ? 'assessment' ORDER BY name`);
+    const original = await abschriftOriginal();
     const out = [];
     for (const r of rows) {
       const att = r.version === A.VERSION && !r.archived_at ? await expireIfNeeded(r) : r;
       const overrides = parseJson(att.overrides, {});
-      const results = A.applyOverrides(parseJson(att.results, []), overrides);
+      const results = A.applyRatings(A.applyOverrides(parseJson(att.results, []), overrides), parseJson(att.ratings, {}), { original });
       out.push({
         id: att.id, userId: att.user_id, userName: r.user_name || '?', ...stateOf(att),
         outdated: att.version !== A.VERSION, results, summary: A.summarize(results),
         events: parseJson(att.events, []), archivedAt: att.archived_at, device: parseJson(att.device, {}),
       });
     }
-    ok(res, { attempts: out, candidates: candidates.map(c => ({ id: c.id, name: c.name })) });
+    ok(res, { attempts: out, candidates: candidates.map(c => ({ id: c.id, name: c.name })), abschriftOriginal: original });
   } catch(e) { console.error('[assessment/results]', e.message); bad(res,'Serverfehler',500); }
 });
 
@@ -242,6 +243,46 @@ router.put('/attempts/:id/override', auth, adminOnly, async (req,res) => {
     await logAct(req.uid, req.user.name, 'assessment_override', { attemptId: att.id, userName: att.user_name, section, qid, correct });
     ok(res);
   } catch(e) { console.error('[assessment/override]', e.message); bad(res,'Serverfehler',500); }
+});
+
+// Bewertungsraster: value 0–3 setzt ein Kriterium, null entfernt die Bewertung.
+router.put('/attempts/:id/rating', auth, adminOnly, async (req,res) => {
+  try {
+    const { section, qid, criterion, value } = req.body || {};
+    const q = typeof section === 'string' && typeof qid === 'string' && A.rubricOf(section, qid);
+    if (!q || !q.rubric.some(c => c.key === criterion)) return bad(res,'Ungültige Angaben');
+    if (value !== null && !(Number.isInteger(value) && value >= 0 && value <= A.RATING_MAX)) return bad(res,'Ungültige Punkte');
+    const att = await q1('SELECT a.id, a.results, a.ratings, u.name AS user_name FROM assessment_attempts a LEFT JOIN users u ON u.id=a.user_id WHERE a.id=$1', [req.params.id]);
+    if (!att) return bad(res,'Nicht gefunden',404);
+    const r = parseJson(att.results, []).find(x => x.key === section);
+    if (!r || !(r.blocks || []).some(b => (b.details || []).some(d => d.id === qid))) return bad(res,'Dieser Text wurde noch nicht abgegeben',409);
+    const ratings = parseJson(att.ratings, {});
+    const key = A.overrideKey(section, qid);
+    const scores = { ...(ratings[key]?.scores || {}) };
+    if (value === null) delete scores[criterion]; else scores[criterion] = value;
+    if (Object.keys(scores).length) ratings[key] = { scores, by: req.user.name, at: new Date().toISOString() };
+    else delete ratings[key];
+    await pool.query('UPDATE assessment_attempts SET ratings=$1 WHERE id=$2', [JSON.stringify(ratings), att.id]);
+    await logAct(req.uid, req.user.name, 'assessment_rating', { attemptId: att.id, userName: att.user_name, section, qid, criterion, value });
+    ok(res);
+  } catch(e) { console.error('[assessment/rating]', e.message); bad(res,'Serverfehler',500); }
+});
+
+// Originaltext der Abschrift (liegt den Bewerbern auf Papier vor). Dient nur
+// dem automatischen Vergleich in den Details.
+async function abschriftOriginal() {
+  const r = await q1(`SELECT value FROM assessment_config WHERE key='abschrift_original'`);
+  return r ? r.value : '';
+}
+router.put('/config/abschrift', auth, adminOnly, async (req,res) => {
+  try {
+    const text = req.body?.text;
+    if (typeof text !== 'string' || text.length > 20000) return bad(res,'Ungültiger Text');
+    await pool.query(`INSERT INTO assessment_config (key,value,updated_at) VALUES ('abschrift_original',$1,NOW())
+      ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()`, [text.trim()]);
+    await logAct(req.uid, req.user.name, 'assessment_config', { key: 'abschrift_original' });
+    ok(res);
+  } catch(e) { console.error('[assessment/config]', e.message); bad(res,'Serverfehler',500); }
 });
 
 // Löschen: abgeschlossene, abgebrochene und archivierte Durchgänge werden
