@@ -1033,6 +1033,8 @@ async function initDB() {
     `ALTER TABLE assessment_attempts ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ`,
     `ALTER TABLE assessment_attempts DROP CONSTRAINT IF EXISTS assessment_attempts_user_id_key`,
     `CREATE UNIQUE INDEX IF NOT EXISTS assessment_attempts_active_user ON assessment_attempts(user_id) WHERE archived_at IS NULL`,
+    // Nachbewertung durch die Administration: { "<Abschnitt>/<Frage>": { correct, by, at } }.
+    `ALTER TABLE assessment_attempts ADD COLUMN IF NOT EXISTS overrides TEXT NOT NULL DEFAULT '{}'`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }

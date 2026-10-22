@@ -7,8 +7,8 @@ const idx = key => SECTIONS.findIndex(s => s.key === key);
 const qs = key => A.questionsOf(SECTIONS[idx(key)]);
 
 describe('Fragenkatalog', () => {
-  it('dauert insgesamt 76 Minuten', () => {
-    expect(A.TOTAL_MINUTES).toBe(76);
+  it('dauert insgesamt 82 Minuten', () => {
+    expect(A.TOTAL_MINUTES).toBe(82);
   });
   it('hat die vorgegebene Reihenfolge mit der Pause an Position 5', () => {
     expect(SECTIONS.map(s => s.key)).toEqual(['rechtschreibung', 'geografie', 'it', 'motivation', 'pause', 'englisch', 'logik', 'merken', 'rechnen', 'persoenlichkeit', 'abschrift']);
@@ -19,7 +19,7 @@ describe('Fragenkatalog', () => {
     const count = key => qs(key).length;
     expect(count('geografie')).toBe(35);
     expect(count('it')).toBe(25);
-    expect(count('englisch')).toBe(25);
+    expect(count('englisch')).toBe(26);
     expect(count('logik')).toBe(20);
     expect(count('merken')).toBe(5);
     expect(count('rechnen')).toBe(40);
@@ -44,6 +44,13 @@ describe('Fragenkatalog', () => {
     const words = A.tokenize(q.passage).map(A.coreWord);
     for (const w of Object.keys(q.errors)) expect(words.filter(x => x === w).length, w).toBe(1);
     expect(Object.keys(q.errors).length).toBe(10);
+  });
+  it('englisches Protokoll: 10 Fehlerwörter, jedes genau einmal', () => {
+    const q = qs('englisch').find(x => x.type === 'markwords');
+    const words = A.tokenize(q.passage).map(A.coreWord);
+    for (const w of Object.keys(q.errors)) expect(words.filter(x => x === w).length, w).toBe(1);
+    expect(Object.keys(q.errors).length).toBe(10);
+    expect(A.overview().find(s => s.key === 'englisch').maxPoints).toBe(45);
   });
   it('Persönlichkeit: je Skala 6 Aussagen, beide Pole vertreten, 4 Kontrollfragen', () => {
     const s = SECTIONS[idx('persoenlichkeit')];
@@ -97,18 +104,18 @@ describe('publicSection — keine Lösungen an den Client', () => {
 
 describe('Zeitlimit (vergangene Sekunden aus der Datenbank)', () => {
   it('verbleibende Zeit sinkt ab Start', () => {
-    expect(A.remainingSeconds(0, 0)).toBe(5 * 60);
-    expect(A.remainingSeconds(0, 60)).toBe(4 * 60);
+    expect(A.remainingSeconds(0, 0)).toBe(8 * 60);
+    expect(A.remainingSeconds(0, 60)).toBe(7 * 60);
     expect(A.remainingSeconds(0, null)).toBeNull();
   });
   it('gilt erst nach der Kulanzzeit als abgelaufen', () => {
-    expect(A.isExpired(0, 5 * 60 + A.GRACE_SECONDS - 1)).toBe(false);
-    expect(A.isExpired(0, 5 * 60 + A.GRACE_SECONDS + 1)).toBe(true);
+    expect(A.isExpired(0, 8 * 60 + A.GRACE_SECONDS - 1)).toBe(false);
+    expect(A.isExpired(0, 8 * 60 + A.GRACE_SECONDS + 1)).toBe(true);
   });
 });
 
 describe('parseNumber — deutsche Eingaben', () => {
-  it.each([['59,5', 59.5], ['1.210', 1210], ['1210 €', 1210], ['25 %', 25], ['33', 33], ['59.5', 59.5], ['abc', null], ['', null]])('%s → %s', (inp, out) => {
+  it.each([['59,5', 59.5], ['1.210', 1210], ['1210 €', 1210], ['25 %', 25], ['33', 33], ['59.5', 59.5], ['abc', null], ['', null], ['30 Liter', 30], ['ca. 8 min', 8], ['22,5 %', 22.5], ['12 Std 30 min', null]])('%s → %s', (inp, out) => {
     expect(A.parseNumber(inp)).toBe(out);
   });
 });
@@ -190,5 +197,25 @@ describe('scoreSection', () => {
   it('summarize zählt nur bewertete Abschnitte', () => {
     const res = [A.scoreSection(idx('geografie'), { g1: 0 }), A.scoreSection(idx('persoenlichkeit'), { p1: 5 })];
     expect(A.summarize(res)).toEqual({ points: 1, max: 35, percent: 3 });
+  });
+});
+
+describe('Nachbewertung', () => {
+  it('setzt falsche Antworten auf richtig und rechnet Punkte neu', () => {
+    const i = idx('geografie');
+    const r = [A.scoreSection(i, { gk4: 'Halein' })];
+    const before = r[0].points;
+    const out = A.applyOverrides(r, { 'geografie/gk4': { correct: true, by: 'Admin', at: 'x' } });
+    const d = out[0].blocks[1].details.find(x => x.id === 'gk4');
+    expect(d.correct).toBe(true);
+    expect(d.override).toEqual({ by: 'Admin', at: 'x', original: false });
+    expect(out[0].points).toBe(before + 1);
+    expect(A.summarize(out).points).toBe(before + 1);
+    expect(r[0].points).toBe(before);
+  });
+  it('ignoriert Texte, Protokollaufgabe und unbekannte Fragen', () => {
+    const r = [A.scoreSection(idx('abschrift'), {})];
+    expect(A.applyOverrides(r, { 'abschrift/ab1': { correct: true } })[0].points).toBe(0);
+    expect(A.applyOverrides(r, {})).toBe(r);
   });
 });
