@@ -6,7 +6,7 @@
 // Administratoren sehen zusätzlich die Ergebnisse aller Mitarbeiter.
 // Nutzt die globalen Helfer aus app.js (api, esc, toast, fdt, S).
 const ASM_TITLE='Leitstellen Assessment 2026';
-const ASM={info:null,section:null,answers:{},block:0,deadline:0,timer:null,draftTimer:null,submitting:false,warned:{},results:null,openResult:null,memoUntil:{},prevText:{}};
+const ASM={info:null,section:null,answers:{},block:0,deadline:0,timer:null,draftTimer:null,submitting:false,warned:{},results:null,openResult:null,memoUntil:{},prevText:{},videoDone:{}};
 function asmStopTimers(){if(ASM.timer){clearInterval(ASM.timer);ASM.timer=null;}if(ASM.draftTimer){clearTimeout(ASM.draftTimer);ASM.draftTimer=null;}}
 const asmFmt=s=>{s=Math.max(0,Math.ceil(s));return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');};
 const asmWords=t=>(String(t||'').trim().match(/\S+/g)||[]).length;
@@ -176,7 +176,7 @@ async function asmBeginSection(byClick){
   try{
     const r=await api('POST','/assessment/section/begin');
     ASM.section=r.section;ASM.answers=r.draft?.answers||{};ASM.block=r.draft?.block||0;
-    ASM.warned={};ASM.submitting=false;ASM.memoUntil={};ASM.prevText={};
+    ASM.warned={};ASM.submitting=false;ASM.memoUntil={};ASM.prevText={};ASM.videoDone={};
     ASM.deadline=Date.now()+(r.state.remainingSeconds||0)*1000;
     asmSetTotal(r.state);
     ASM.sectionStart=ASM.deadline-r.section.minutes*60*1000;
@@ -197,6 +197,20 @@ function asmMemorizing(bi){
   if(ASM.memoUntil[bi]===undefined)ASM.memoUntil[bi]=Date.now()+b.memorize.seconds*1000;
   return Date.now()<ASM.memoUntil[bi];
 }
+// Video-Blöcke: zuerst nur das Video, mit „Weiter“ kommen die Fragen (ohne Zurück).
+function asmVideoKey(bi){return (ASM.info?.attempt?.id||'')+'/'+ASM.section.key+'/'+bi;}
+function asmWatching(bi){
+  const b=ASM.section.blocks[bi];
+  if(!b?.video)return false;
+  if(ASM.videoDone[bi])return false;
+  try{if(sessionStorage.getItem('asmVideo:'+asmVideoKey(bi))){ASM.videoDone[bi]=true;return false;}}catch(e){}
+  return true;
+}
+function asmVideoDone(bi){
+  ASM.videoDone[bi]=true;
+  try{sessionStorage.setItem('asmVideo:'+asmVideoKey(bi),'1');}catch(e){}
+  asmRenderSection();window.scrollTo(0,0);const m=document.getElementById('main');if(m)m.scrollTop=0;
+}
 function asmRenderSection(){
   const sec=ASM.section,total=ASM.info.sections.length;
   const head=`<div class="asm-bar" id="asmBar"><div class="asm-bar-row">
@@ -214,7 +228,11 @@ function asmRenderSection(){
     let num=0;
     sec.blocks.forEach((b,bi)=>{if(!sec.freeOrder&&bi<ASM.block)num+=b.questions.length;});
     body=asmCurrentBlocks().map(([b,bi])=>{
-      let h=`<div class="asm-block"><div class="asm-block-title">${esc(b.title)}</div>${b.instruction?`<div class="asm-block-ins">${esc(b.instruction)}</div>`:''}${b.video?`<div class="asm-video"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(b.video)}?rel=0&modestbranding=1" title="${esc(b.title)}" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>`:''}`;
+      let h=`<div class="asm-block"><div class="asm-block-title">${esc(b.title)}</div>${b.instruction?`<div class="asm-block-ins">${esc(b.instruction)}</div>`:''}${asmWatching(bi)?`<div class="asm-video"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(b.video)}?rel=0&modestbranding=1" title="${esc(b.title)}" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>`:''}`;
+      if(asmWatching(bi)){
+        num+=b.questions.length;
+        return h+`<div class="asm-next"><button class="btn-p" onclick="asmVideoDone(${bi})">Weiter zu den Fragen ▶</button><div class="asm-video-note">Danach kannst du das Video nicht mehr ansehen.</div></div></div>`;
+      }
       if(asmMemorizing(bi)){
         h+=`<div class="dash-card asm-memo"><div style="font-weight:700;margin-bottom:8px">🧠 ${esc(b.memorize.text)}</div>
           <ul>${b.memorize.facts.map(f=>`<li>${esc(f)}</li>`).join('')}</ul>
@@ -227,7 +245,7 @@ function asmRenderSection(){
     }).join('');
     const last=sec.freeOrder||ASM.block>=sec.blocks.length-1;
     const onlyFinalWriting=asmQuestions(sec).every(q=>q.type==='writing'&&q.final);
-    if(!asmCurrentBlocks().some(([,bi])=>asmMemorizing(bi))&&!onlyFinalWriting)
+    if(!asmCurrentBlocks().some(([,bi])=>asmMemorizing(bi)||asmWatching(bi))&&!onlyFinalWriting)
       body+=`<div class="asm-next">${last?`<button class="btn-p" onclick="asmSubmit(false)">✔ Abschnitt abgeben</button>`:`<button class="btn-p" onclick="asmNextBlock()">Fertig, weiter ▶</button>`}</div>`;
   }
   // Scrollposition behalten (je nach Layout scrollt <main> oder das Fenster).
