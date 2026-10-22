@@ -7,8 +7,8 @@ const idx = key => SECTIONS.findIndex(s => s.key === key);
 const qs = key => A.questionsOf(SECTIONS[idx(key)]);
 
 describe('Fragenkatalog', () => {
-  it('dauert insgesamt 79 Minuten', () => {
-    expect(A.TOTAL_MINUTES).toBe(79);
+  it('dauert insgesamt 82 Minuten', () => {
+    expect(A.TOTAL_MINUTES).toBe(82);
   });
   it('hat die vorgegebene Reihenfolge mit der Pause an Position 5', () => {
     expect(SECTIONS.map(s => s.key)).toEqual(['rechtschreibung', 'geografie', 'it', 'motivation', 'pause', 'englisch', 'logik', 'merken', 'rechnen', 'persoenlichkeit', 'abschrift']);
@@ -19,7 +19,7 @@ describe('Fragenkatalog', () => {
     const count = key => qs(key).length;
     expect(count('geografie')).toBe(35);
     expect(count('it')).toBe(25);
-    expect(count('englisch')).toBe(25);
+    expect(count('englisch')).toBe(26);
     expect(count('logik')).toBe(20);
     expect(count('merken')).toBe(5);
     expect(count('rechnen')).toBe(40);
@@ -44,6 +44,13 @@ describe('Fragenkatalog', () => {
     const words = A.tokenize(q.passage).map(A.coreWord);
     for (const w of Object.keys(q.errors)) expect(words.filter(x => x === w).length, w).toBe(1);
     expect(Object.keys(q.errors).length).toBe(10);
+  });
+  it('englisches Protokoll: 10 Fehlerwörter, jedes genau einmal', () => {
+    const q = qs('englisch').find(x => x.type === 'markwords');
+    const words = A.tokenize(q.passage).map(A.coreWord);
+    for (const w of Object.keys(q.errors)) expect(words.filter(x => x === w).length, w).toBe(1);
+    expect(Object.keys(q.errors).length).toBe(10);
+    expect(A.overview().find(s => s.key === 'englisch').maxPoints).toBe(45);
   });
   it('Persönlichkeit: je Skala 6 Aussagen, beide Pole vertreten, 4 Kontrollfragen', () => {
     const s = SECTIONS[idx('persoenlichkeit')];
