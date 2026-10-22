@@ -750,7 +750,10 @@ details.dash-card > summary { list-style: none; cursor: pointer; display: flex; 
 .asm-det-sec{margin:6px 0 16px;font-size:12px}
 .asm-det-head{font-size:13px;margin-bottom:4px}
 .asm-det-block{font-weight:700;margin:8px 0 2px;color:var(--mu)}
-.asm-det{width:100%;border-collapse:collapse;margin-top:4px}
+.asm-det{width:100%;border-collapse:collapse;margin-top:4px;table-layout:fixed}
+/* feste Spalten, damit die Bewertungsknöpfe in allen Blöcken bündig rechts stehen */
+.asm-det .c-mark{width:24px}.asm-det .c-q{width:36%}.asm-det .c-a{width:22%}.asm-det .c-btn{width:140px}
+.asm-det td{overflow-wrap:anywhere}
 .asm-det td,.asm-det th{border-bottom:1px solid var(--border);padding:3px 6px;font-size:11px;text-align:left;vertical-align:top}
 .asm-dims{display:flex;flex-direction:column;gap:6px;margin:6px 0;max-width:560px}
 .asm-dim{display:grid;grid-template-columns:100px 1fr 100px 30px 1fr;align-items:center;gap:8px;font-size:11px}
@@ -811,3 +814,7 @@ body.asm-run .asm-bar{box-shadow:var(--sh)}
 .asm-video-note{font-size:12px;color:var(--mu);margin-top:6px}
 .asm-video iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 .asm-txt.asm-open{width:100%}
+
+.asm-det-time{font-size:12px;color:var(--mu);margin:2px 0 8px}
+.asm-det-time.exp{color:var(--danger)}
+.asm-det-btime{font-weight:500;color:var(--mu);font-size:11px;margin-left:8px}

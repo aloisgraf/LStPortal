@@ -18,15 +18,18 @@ const parseJson = (t, fb) => { try { return t ? JSON.parse(t) : fb; } catch { re
 const SELECT_ATT = `SELECT *, EXTRACT(EPOCH FROM (NOW()-section_started_at))::float AS elapsed,
   EXTRACT(EPOCH FROM (NOW()-started_at))::float AS total_elapsed FROM assessment_attempts`;
 const getAttempt = uid => q1(`${SELECT_ATT} WHERE user_id=$1 AND archived_at IS NULL`, [uid]);
-// draft = { answers, block } — block = Index des aktuellen Blocks („Fertig, weiter“).
-const draftOf = att => { const d = parseJson(att.draft, {}); return { answers: d.answers || {}, block: Number.isInteger(d.block) ? d.block : 0 }; };
+// draft = { answers, block, blockAt } — block = Index des aktuellen Blocks
+// („Fertig, weiter“), blockAt = Sekunden seit Abschnittsbeginn, zu denen ein
+// Block begonnen wurde (für die Zeitauswertung je Block).
+const draftOf = att => { const d = parseJson(att.draft, {}); return { answers: d.answers || {}, block: Number.isInteger(d.block) ? d.block : 0, blockAt: d.blockAt && typeof d.blockAt === 'object' ? d.blockAt : {} }; };
+const timingOf = att => ({ used: att.elapsed, blockAt: draftOf(att).blockAt });
 
 // Wertet einen Abschnitt aus und springt zum nächsten. expectedSection
 // verhindert doppeltes Weiterschalten bei gleichzeitigen Abgaben.
 async function finishSection(att, answers, late) {
   const idx = att.current_section;
   const results = parseJson(att.results, []);
-  results.push(A.scoreSection(idx, answers, { late }));
+  results.push(A.scoreSection(idx, answers, { late, ...timingOf(att) }));
   const last = idx + 1 >= A.SECTIONS.length;
   const r = await pool.query(
     `UPDATE assessment_attempts SET results=$1, draft='{}', section_started_at=NULL,
@@ -128,8 +131,10 @@ router.put('/section/draft', auth, assessmentAccess, async (req,res) => {
     const nBlocks = A.SECTIONS[att.current_section].blocks.length;
     const reqBlock = Number(req.body?.block);
     const block = Number.isInteger(reqBlock) ? Math.min(Math.max(prev.block, reqBlock), Math.max(0, nBlocks - 1)) : prev.block;
+    const blockAt = { ...prev.blockAt };
+    if (block > prev.block) blockAt[block] = Math.round(att.elapsed);
     await pool.query('UPDATE assessment_attempts SET draft=$1 WHERE id=$2 AND current_section=$3 AND status=\'running\'',
-      [JSON.stringify({ answers, block }), att.id, att.current_section]);
+      [JSON.stringify({ answers, block, blockAt }), att.id, att.current_section]);
     ok(res, { block });
   } catch(e) { console.error('[assessment/draft]', e.message); bad(res,'Serverfehler',500); }
 });
@@ -263,7 +268,7 @@ router.post('/users/:uid/abort', auth, adminOnly, async (req,res) => {
     const att = await getAttempt(u.id);
     if (!att || att.status !== 'running') return bad(res,'Kein laufender Durchgang',409);
     const results = parseJson(att.results, []);
-    if (att.section_started_at && att.version === A.VERSION) results.push(A.scoreSection(att.current_section, draftOf(att).answers, { late: false }));
+    if (att.section_started_at && att.version === A.VERSION) results.push(A.scoreSection(att.current_section, draftOf(att).answers, { late: false, aborted: true, ...timingOf(att) }));
     const ev = JSON.stringify([{ type: 'aborted', section: att.current_section, at: new Date().toISOString(), by: req.user.name }]);
     const r = await pool.query(`UPDATE assessment_attempts SET status='aborted', results=$1, draft='{}', section_started_at=NULL,
         finished_at=NOW(), events=(events::jsonb || $2::jsonb)::text WHERE id=$3 AND status='running'`,

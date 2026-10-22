@@ -622,7 +622,7 @@ function asmPdf(attId){
   if(!w){toast('⚠️ Bitte Pop-ups für diese Seite erlauben.','err');return;}
   w.document.write(`<!doctype html><html lang="de" data-theme="light"><head><meta charset="utf-8"><title>${esc(ASM_TITLE)} – ${esc(a.userName)}</title>
     <link rel="stylesheet" href="${location.origin}/app.css">
-    <style>body{background:#fff;color:#111;padding:24px;font-family:system-ui,sans-serif}.asm-ovr-btn,.asm-wd-replay{display:none!important}
+    <style>body{background:#fff;color:#111;padding:24px;font-family:system-ui,sans-serif}.asm-ovr-btn,.asm-wd-replay{display:none!important}.asm-det .c-btn{width:0}
       .asm-pdf-sum{border-collapse:collapse;margin:8px 0 18px}.asm-pdf-sum td,.asm-pdf-sum th{border:1px solid #ccc;padding:4px 10px;font-size:12px;text-align:left}
       .asm-det-sec{break-inside:auto}.asm-wd{break-inside:avoid}@page{margin:14mm}</style></head><body>
     <h2 style="margin:0">${esc(ASM_TITLE)}</h2>
@@ -646,14 +646,14 @@ function asmDetailHtml(a){
   // mit einem früheren Fragenkatalog lassen sich vollständig ansehen.
   const note=a.outdated?'<div class="asm-det-note">ℹ️ Durchgang mit einem früheren Fragenkatalog – angezeigt werden die Fragen, wie sie damals gestellt wurden.</div>':'';
   return note+(a.results||[]).filter(r=>r.kind!=='pause').map(r=>{
-    const head=`<div class="asm-det-head"><b>${esc(r.title)}</b>${r.scored?` – ${r.points}/${r.max} Punkte (${r.percent} %)`:''}${r.late?' · durch Zeitablauf beendet':''}</div>`;
+    const head=`<div class="asm-det-head"><b>${esc(r.title)}</b>${r.scored?` – ${r.points}/${r.max} Punkte (${r.percent} %)`:''}${r.late?' · durch Zeitablauf beendet':''}</div>${asmTimeHtml(r)}`;
     const dims=r.dims?asmDimsHtml(r.dims):'';
     const blocks=(r.blocks||[]).map(b=>{
       const det=b.details||[];const scoredRows=det.filter(d=>d.type!=='writing'&&d.type!=='markwords');
-      let h=(r.blocks.length>1?`<div class="asm-det-block">${esc(b.title)}${b.max?` – ${b.points}/${b.max}`:''}</div>`:'');
+      let h=(r.blocks.length>1?`<div class="asm-det-block">${esc(b.title)}${b.max?` – ${b.points}/${b.max}`:''}${typeof b.used==='number'?`<span class="asm-det-btime">⏱ ${asmMmss(b.used)} Min.</span>`:''}</div>`:'');
       det.filter(d=>d.type==='markwords').forEach(d=>h+=asmMarkwordsDetail(d));
       det.filter(d=>d.type==='writing').forEach(d=>h+=asmWritingDetail(d));
-      if(scoredRows.length)h+=`<table class="asm-det"><tbody>${scoredRows.map(d=>d.type==='likert'
+      if(scoredRows.length)h+=`<table class="asm-det"><colgroup><col class="c-mark"><col class="c-q"><col class="c-a"><col class="c-sol"><col class="c-btn"></colgroup><tbody>${scoredRows.map(d=>d.type==='likert'
         ?`<tr><td></td><td>${esc(d.text)}</td><td>${d.given===null?asmNone:`<b>${d.given}</b>`}</td><td></td></tr>`
         :`<tr${d.override?' class="asm-ovr"':''}><td>${asmMark(d.correct)}</td><td>${esc(d.text)}</td><td>${d.given===null?asmNone:esc(d.given)}</td><td style="color:var(--mu)">${d.correct&&!d.override?'':'richtig: '+esc(d.expected)}${d.override?`<div class="asm-ovr-note">✎ nachbewertet als ${d.correct?'richtig':'falsch'} von ${esc(d.override.by)}, ${fdt(d.override.at)}</div>`:''}</td>
           <td class="asm-ovr-btn">${d.override?`<button class="btn-s" onclick="asmOverride('${a.id}','${r.key}','${d.id}',null)">↺ zurücksetzen</button>`:d.correct?`<button class="btn-s" onclick="asmOverride('${a.id}','${r.key}','${d.id}',false)">als falsch werten</button>`:`<button class="btn-s asm-ovr-ok" onclick="asmOverride('${a.id}','${r.key}','${d.id}',true)">✓ als richtig werten</button>`}</td></tr>`).join('')}</tbody></table>`;
@@ -661,6 +661,14 @@ function asmDetailHtml(a){
     }).join('');
     return `<div class="asm-det-sec">${head}${dims}${blocks}</div>`;
   }).join('')+asmEventsHtml(a.events)||'<i>Noch keine Abschnitte abgegeben.</i>';
+}
+const asmMmss=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+// Zeitauswertung je Abschnitt: abgelaufen oder wie viel Restzeit übrig war.
+function asmTimeHtml(r){
+  const t=r.time;if(!t)return '';
+  const used=`${asmMmss(t.used)} von ${asmMmss(t.limit)} Min. genutzt`;
+  const txt=r.aborted?`⛔ abgebrochen nach ${used}`:t.expired?`⏰ Zeit abgelaufen (${asmMmss(t.limit)} Min. voll genutzt)`:`✔ vorzeitig abgegeben, <b>${asmMmss(t.remaining)} Min. Restzeit</b> übrig (${used})`;
+  return `<div class="asm-det-time ${t.expired&&!r.aborted?'exp':''}">${txt}</div>`;
 }
 function asmDimsHtml(dims){
   return `<div class="asm-dims">${dims.map(d=>d.control

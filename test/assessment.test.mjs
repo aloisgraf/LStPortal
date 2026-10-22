@@ -241,3 +241,21 @@ describe('Nachbewertung', () => {
     expect(A.applyOverrides(r, {})).toBe(r);
   });
 });
+
+describe('Zeitauswertung je Abschnitt', () => {
+  it('ohne Zeitangabe keine time', () => {
+    expect(A.scoreSection(idx('englisch'), {}).time).toBeUndefined();
+  });
+  it('Restzeit bei vorzeitiger Abgabe und Zeit je Block', () => {
+    const i = idx('englisch'), limit = SECTIONS[i].minutes * 60;
+    const r = A.scoreSection(i, {}, { used: 600, blockAt: { 1: 200, 2: 450 } });
+    expect(r.time).toEqual({ limit, used: 600, remaining: limit - 600, expired: false });
+    expect(r.blocks.map(b => b.used)).toEqual([200, 250, 150]);
+  });
+  it('abgelaufen bei Zeitablauf, auch mit Kulanz über dem Limit', () => {
+    const i = idx('englisch'), limit = SECTIONS[i].minutes * 60;
+    const r = A.scoreSection(i, {}, { used: limit + 15, late: true, blockAt: {} });
+    expect(r.time).toEqual({ limit, used: limit, remaining: 0, expired: true });
+    expect(r.blocks[1].used).toBeNull();
+  });
+});
