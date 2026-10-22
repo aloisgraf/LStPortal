@@ -495,7 +495,7 @@ function asmResultsHtml(){
       <td>${a.summary.percent!==null?`<b>${a.summary.percent} %</b><div style="font-size:10px;color:var(--mu)">${a.summary.points}/${a.summary.max}</div>`:'–'}</td>
       <td style="font-size:11px">${ctrl?.level?asmLevelBadge(ctrl.level):'–'}</td>
       <td style="font-size:11px">${asmEventsCell(a.events)}</td>
-      <td style="white-space:nowrap"><button class="btn-s" style="font-size:11px" onclick="ASM.openResult=${open?'null':`'${a.id}'`};asmRenderOverview();${open?'':`document.getElementById('asmDetail')?.scrollIntoView({behavior:'smooth'})`}">${open?'Schließen':'Details'}</button></td></tr>
+      <td style="white-space:nowrap"><button class="btn-s" style="font-size:11px" onclick="ASM.openResult=${open?'null':`'${a.id}'`};asmRenderOverview();${open?'':`document.getElementById('asmDetail')?.scrollIntoView({behavior:'smooth'})`}">${open?'Schließen':'Details'}</button>${a.status!=='running'||a.archivedAt?` <button class="btn-s asm-abort" style="font-size:11px" title="Durchgang endgültig löschen" onclick="asmDeleteAttempt('${a.id}')">🗑 Löschen</button>`:''}</td></tr>
 `;
   }).join('');
   return `<div class="dash-card" style="border-top-color:var(--info)">
@@ -679,6 +679,11 @@ function asmAdminLive(){
       const el=document.getElementById('asmCand');if(el)el.outerHTML=asmCandidatesHtml();
     }catch(e){}
   },1000);
+}
+async function asmDeleteAttempt(id){
+  const a=(ASM.results?.attempts||[]).find(x=>x.id===id);
+  if(!await asmConfirm(`Durchgang von ${a?.userName||'?'} (begonnen ${a?fdt(a.startedAt):''}) endgültig löschen? Alle Antworten und Ergebnisse dieses Durchgangs sind danach weg. Das kann nicht rückgängig gemacht werden.`))return;
+  try{await api('DELETE','/assessment/attempts/'+id);if(ASM.openResult===id)ASM.openResult=null;toast('🗑 Gelöscht');renderAssessment();}catch(e){toast('⚠️ '+e.message,'err');}
 }
 async function asmResetUser(uid,name){
   if(!confirm(`Assessment von ${name} zurücksetzen? ${name} kann das Assessment dann neu machen. Der bisherige Durchgang bleibt für die Administration archiviert.`))return;

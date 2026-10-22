@@ -215,6 +215,19 @@ router.put('/attempts/:id/override', auth, adminOnly, async (req,res) => {
   } catch(e) { console.error('[assessment/override]', e.message); bad(res,'Serverfehler',500); }
 });
 
+// Löschen: abgeschlossene, abgebrochene und archivierte Durchgänge werden
+// endgültig entfernt. Ein laufender Durchgang muss vorher abgebrochen werden.
+router.delete('/attempts/:id', auth, adminOnly, async (req,res) => {
+  try {
+    const att = await q1('SELECT a.id, a.status, a.archived_at, u.name AS user_name FROM assessment_attempts a LEFT JOIN users u ON u.id=a.user_id WHERE a.id=$1', [req.params.id]);
+    if (!att) return bad(res,'Nicht gefunden',404);
+    if (att.status === 'running' && !att.archived_at) return bad(res,'Laufende Durchgänge zuerst abbrechen',409);
+    await pool.query('DELETE FROM assessment_attempts WHERE id=$1', [att.id]);
+    await logAct(req.uid, req.user.name, 'assessment_delete', { attemptId: att.id, userName: att.user_name });
+    ok(res);
+  } catch(e) { console.error('[assessment/delete]', e.message); bad(res,'Serverfehler',500); }
+});
+
 // Abbrechen: ein laufender Durchgang wird sofort beendet (Status „aborted“).
 // Ein begonnener Abschnitt wird mit dem Zwischenstand gewertet. Der
 // Mitarbeiter sieht danach nur noch den Hinweis; mit „Zurücksetzen“ kann er
