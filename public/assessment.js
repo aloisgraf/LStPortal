@@ -585,13 +585,21 @@ function asmCharsHtml(chars){
   chars.forEach(c=>{if(c.s!==cur){flush();cur=c.s;}buf+=c.c;});
   flush();return h;
 }
+// Anschläge pro Minute: alle getippten Zeichen (auch später gelöschte) je
+// Minute Schreibzeit. Wird aus dem Protokoll gerechnet, gilt also auch für
+// ältere Durchgänge.
+function asmKpm(log,seconds){
+  if(!seconds)return 0;
+  const typed=(log||[]).reduce((n,e)=>n+String(e[3]||'').length,0);
+  return Math.round(typed/seconds*60);
+}
 function asmWritingDetail(d){
   const s=d.stats||{},log=d.log||[];
   const id='asmRp_'+d.id+'_'+Math.random().toString(36).slice(2,7);
   ASM._logs=ASM._logs||{};ASM._logs[id]=log;
   return `<div class="asm-wd">
     <div class="asm-wd-q">${esc(d.text)}</div>
-    <div class="asm-wd-stats"><span>${s.words||0} Wörter</span><span>${s.chars||0} Zeichen</span><span>${s.corrections||0} Korrekturen</span><span>${s.deletedChars||0} gelöschte Zeichen</span><span>Schreibzeit ${asmFmt(s.seconds||0)}</span><span>${d.done?'🔒 abgeschlossen':'⏱ nicht abgeschlossen (Zeitablauf)'}</span></div>
+    <div class="asm-wd-stats"><span>${s.words||0} Wörter</span><span>${s.chars||0} Zeichen</span><span>${s.corrections||0} Korrekturen</span><span>${s.deletedChars||0} gelöschte Zeichen</span><span>Schreibzeit ${asmFmt(s.seconds||0)}</span><span><b>${asmKpm(log,s.seconds)}</b> Anschläge/Min.</span><span>${s.seconds?Math.round((s.chars||0)/s.seconds*60):0} Zeichen/Min. netto</span><span>${d.done?'🔒 abgeschlossen':'⏱ nicht abgeschlossen (Zeitablauf)'}</span></div>
     <div class="asm-wd-label">Endtext</div><div class="asm-wd-text">${d.given?esc(d.given):asmNone}</div>
     <div class="asm-wd-label">Korrekturen <span style="font-weight:400">(<del>gelöscht</del>, <ins>nachträglich eingefügt</ins>)</span></div><div class="asm-wd-text">${log.length?asmCharsHtml(asmReplay(log)):asmNone}</div>
     ${log.length?`<div class="asm-wd-label">Wiedergabe des Schreibprozesses</div>
