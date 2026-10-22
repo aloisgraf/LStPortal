@@ -806,3 +806,4 @@ body.asm-run .asm-bar{box-shadow:var(--sh)}
 .asm-ovr-btn{text-align:right;white-space:nowrap}.asm-ovr-btn .btn-s{font-size:10px;padding:2px 8px}
 .asm-ovr-ok{color:var(--ok);border-color:var(--ok)}
 .asm-ovr td{background:rgba(59,130,246,.06)}.asm-ovr-note{font-size:10px;color:var(--info);margin-top:2px}
+.asm-admin-start{margin-top:16px;padding-top:12px;border-top:1px dashed var(--border);display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12px}

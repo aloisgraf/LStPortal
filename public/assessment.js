@@ -102,12 +102,15 @@ function asmRenderOverview(){
         <li>Handy und weitere Hilfsmittel bleiben weg, es sei denn, die Prüfungsleitung erlaubt etwas anderes.</li>
       </ul>
       <button class="btn-p" onclick="asmStart()">▶ Assessment starten – viel Erfolg!</button>
+      ${isAdmin?`<div class="asm-admin-start"><b>Nur Admin – Testdurchgang ab Abschnitt:</b>
+        <select id="asmFrom" class="flt" style="width:auto;min-width:260px">${sections.map((s,i)=>`<option value="${i}">${i+1}. ${esc(s.title)}</option>`).join('')}</select>
+        <button class="btn-s" onclick="asmStart(+document.getElementById('asmFrom').value)">▶ Ab hier starten</button></div>`:''}
     </div>`;
   }else if(att.status==='running'){
     const s=sections[att.currentSection];
     const pause=s.kind==='pause';
     body=`<div class="dash-card asm-intro">
-      ${att.currentSection>0?`<div class="asm-done-note">✓ Abschnitt ${att.currentSection} ist abgegeben.</div>`:''}
+      ${att.currentSection>0&&att.submitted?`<div class="asm-done-note">✓ Abschnitt ${att.currentSection} ist abgegeben.</div>`:''}
       <div style="font-size:11px;color:var(--mu);font-weight:600">Als Nächstes: Abschnitt ${att.currentSection+1} von ${sections.length}</div>
       <div style="font-size:17px;font-weight:800;margin:2px 0 6px">${pause?'☕ ':''}${esc(s.title)}</div>
       <div style="font-size:13px;color:var(--mu);margin-bottom:10px">${esc(s.description)}</div>
@@ -123,16 +126,22 @@ function asmRenderOverview(){
     body=`<div class="dash-card asm-intro" style="border-top-color:var(--ok)">
       <div style="font-size:18px;font-weight:800;margin-bottom:6px">✅ Assessment abgeschlossen</div>
       <div style="font-size:13px;color:var(--mu)">Vielen Dank! Alle Abschnitte wurden abgegeben (${fdt(att.finishedAt)}). Die Auswertung erfolgt durch die Administration.</div>
+      ${isAdmin?`<button class="btn-s" style="margin-top:12px" onclick="asmNewTest()">↺ Neuer Testdurchgang (nur Admin)</button>`:''}
     </div>`;
   }
   document.getElementById('main').innerHTML=`<div class="ph"><div class="pt">📝 ${ASM_TITLE}</div></div>${body}${isAdmin?asmCandidatesHtml()+asmResultsHtml():''}`;
   if(isAdmin)asmAdminLive();
   if(att&&att.status==='running'){asmSetTotal(att);if(ASM.timer)clearInterval(ASM.timer);ASM.timer=setInterval(()=>{if(S.view!=='assessment'){asmStopTimers();return;}asmTickTotal();},500);}
 }
-async function asmStart(){
-  if(!await asmConfirm('Assessment jetzt starten? Die Seite wechselt dabei in den Vollbildmodus.'))return;
+async function asmStart(from){
+  const at=from>0?` ab Abschnitt ${from+1}`:'';
+  if(!await asmConfirm(ASM.info.isAdmin?`Testdurchgang${at} jetzt starten?`:'Assessment jetzt starten? Die Seite wechselt dabei in den Vollbildmodus.'))return;
   asmEnterFs();
-  try{await api('POST','/assessment/start');await renderAssessment();}catch(e){toast('⚠️ '+e.message,'err');}
+  try{await api('POST','/assessment/start',from>0?{startSection:from}:{});await renderAssessment();}catch(e){toast('⚠️ '+e.message,'err');}
+}
+// Admin: eigenen abgeschlossenen Testdurchgang archivieren und neu beginnen.
+async function asmNewTest(){
+  try{await api('POST','/assessment/users/'+S.currentUser+'/reset');renderAssessment();}catch(e){toast('⚠️ '+e.message,'err');}
 }
 async function asmBeginSection(byClick){
   if(byClick)asmEnterFs();
