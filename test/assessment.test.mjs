@@ -7,8 +7,8 @@ const idx = key => SECTIONS.findIndex(s => s.key === key);
 const qs = key => A.questionsOf(SECTIONS[idx(key)]);
 
 describe('Fragenkatalog', () => {
-  it('dauert insgesamt 81 Minuten', () => {
-    expect(A.TOTAL_MINUTES).toBe(81);
+  it('dauert insgesamt 88 Minuten', () => {
+    expect(A.TOTAL_MINUTES).toBe(88);
   });
   it('hat die vorgegebene Reihenfolge mit der Pause an Position 5', () => {
     expect(SECTIONS.map(s => s.key)).toEqual(['rechtschreibung', 'geografie', 'it', 'motivation', 'pause', 'englisch', 'logik', 'merken', 'rechnen', 'persoenlichkeit', 'abschrift']);
@@ -19,7 +19,7 @@ describe('Fragenkatalog', () => {
     const count = key => qs(key).length;
     expect(count('geografie')).toBe(35);
     expect(count('it')).toBe(25);
-    expect(count('englisch')).toBe(26);
+    expect(count('englisch')).toBe(36);
     expect(count('logik')).toBe(20);
     expect(count('merken')).toBe(5);
     expect(count('rechnen')).toBe(40);
@@ -50,7 +50,7 @@ describe('Fragenkatalog', () => {
     const words = A.tokenize(q.passage).map(A.coreWord);
     for (const w of Object.keys(q.errors)) expect(words.filter(x => x === w).length, w).toBe(1);
     expect(Object.keys(q.errors).length).toBe(10);
-    expect(A.overview().find(s => s.key === 'englisch').maxPoints).toBe(45);
+    expect(A.overview().find(s => s.key === 'englisch').maxPoints).toBe(55);
   });
   it('Persönlichkeit: je Skala 6 Aussagen, beide Pole vertreten, 4 Kontrollfragen', () => {
     const s = SECTIONS[idx('persoenlichkeit')];
@@ -193,6 +193,28 @@ describe('scoreSection', () => {
   it('Kürzel-Abschlussfragen: Freitext tolerant bei Schreibweise', () => {
     const r = A.scoreSection(idx('geografie'), { gk1: 'salzburg umgebung', gk2: 'Sankt Johann im Pongau', gk3: 'Tamsweg ', gk4: 'Halein', gk5: 'zell am see' });
     expect(r.blocks[1].details.map(d => d.correct)).toEqual([true, true, true, false, true]);
+  });
+  it('Notruf-Video: offene Antworten über Stichwörter', () => {
+    const i = idx('englisch');
+    const ok = (id, t) => A.scoreSection(i, { [id]: t }).blocks[2].details.find(d => d.id === id).correct;
+    expect(ok('nr1', '515 780 5613')).toBe(true);
+    expect(ok('nr1', '515-780-561')).toBe(false);
+    expect(ok('nr2', '8505 Harbaugh Blvd')).toBe(true);
+    expect(ok('nr2', 'Harbaugh Boulevard')).toBe(false);
+    expect(ok('nr3', 'Male, around 60 years')).toBe(true);
+    expect(ok('nr3', 'female, 60')).toBe(false);
+    expect(ok('nr4', 'middle of the chest')).toBe(true);
+    expect(ok('nr5', 'two per second')).toBe(true);
+    expect(ok('nr5', '120 per minute')).toBe(true);
+    expect(ok('nr5', '100 per minute')).toBe(false);
+    expect(ok('nr6', 'an AED')).toBe(true);
+    expect(ok('nr7', "No, she didn't")).toBe(true);
+    expect(ok('nr7', 'Yes')).toBe(false);
+    expect(ok('nr8', 'she is alone')).toBe(true);
+    expect(ok('nr9', 'Harbach Center, a library')).toBe(true);
+    expect(ok('nr9', 'a library')).toBe(false);
+    expect(ok('nr10', 'no shock')).toBe(true);
+    expect(A.scoreSection(i, {}).blocks[2].details[0].expected).toBe('515-780-5613');
   });
   it('summarize zählt nur bewertete Abschnitte', () => {
     const res = [A.scoreSection(idx('geografie'), { g1: 0 }), A.scoreSection(idx('persoenlichkeit'), { p1: 5 })];
