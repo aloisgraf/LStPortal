@@ -513,9 +513,7 @@ router.get('/plans/:id/matrix', auth, async (req,res) => {
   try {
     const plan = await q1('SELECT * FROM dp_plans WHERE id=$1',[req.params.id]);
     if (!plan) return bad(res,'Nicht gefunden',404);
-    const dpRoles = req.p.roles||[];
-    const canManageDpRoute = req.p.manageUsers||dpRoles.some(r=>['leitung','dienstplanung'].includes(r));
-    if(!canManageDpRoute){
+    if(!req.p.canManageDp){
       if(plan.status!=='published') return bad(res,'Keine Berechtigung',403);
       const hasAssignment = await q1('SELECT id FROM dp_assignments WHERE plan_id=$1 AND employee_id=$2',[req.params.id,req.uid]);
       if(!hasAssignment) return bad(res,'Keine Berechtigung',403);
@@ -725,7 +723,7 @@ router.get('/plans/:id/matrix', auth, async (req,res) => {
 // ── PLAN RESET ────────────────────────────────────────────────────────────────
 
 router.post('/plans/:id/reset', auth, async (req,res) => {
-  const canEdit = req.p.manageUsers || (req.p.roles||[]).some(r=>['admin','dienstplanung','leitung'].includes(r));
+  const canEdit = req.p.canManageDp;
   if (!canEdit) return bad(res,'Keine Berechtigung',403);
   try {
     // Delete shift assignments (no absence) and combined shift+absence
@@ -743,7 +741,7 @@ router.get('/plans/:id/versions', auth, async (req,res) => {
 });
 
 router.post('/plans/:id/versions', auth, async (req,res) => {
-  const canEdit = req.p.manageUsers || (req.p.roles||[]).some(r=>['admin','dienstplanung','leitung'].includes(r));
+  const canEdit = req.p.canManageDp;
   if (!canEdit) return bad(res,'Keine Berechtigung',403);
   const {versionName} = req.body;
   if (!versionName?.trim()) return bad(res,'Name erforderlich',400);
@@ -756,7 +754,7 @@ router.post('/plans/:id/versions', auth, async (req,res) => {
 });
 
 router.post('/plans/:id/versions/:vId/restore', auth, async (req,res) => {
-  const canEdit = req.p.manageUsers || (req.p.roles||[]).some(r=>['admin','dienstplanung','leitung'].includes(r));
+  const canEdit = req.p.canManageDp;
   if (!canEdit) return bad(res,'Keine Berechtigung',403);
   try {
     const ver = await q1('SELECT assignments FROM dp_plan_versions WHERE id=$1 AND plan_id=$2',[req.params.vId,req.params.id]);
@@ -781,7 +779,7 @@ router.delete('/plans/:id/versions/:vId', auth, async (req,res) => {
 // ── ASSIGNMENTS ───────────────────────────────────────────────────────────────
 
 router.post('/plans/:id/assign', auth, async (req,res) => {
-  const canEdit = req.p.manageUsers || (req.p.roles||[]).some(r=>['admin','dienstplanung','leitung'].includes(r));
+  const canEdit = req.p.canManageDp;
   if (!canEdit) return bad(res,'Keine Berechtigung',403);
   try {
     const plan = await q1('SELECT * FROM dp_plans WHERE id=$1',[req.params.id]);
@@ -934,7 +932,7 @@ router.post('/plans/:id/assign', auth, async (req,res) => {
 });
 
 router.delete('/plans/:id/assign/:aid', auth, async (req,res) => {
-  const canEdit = req.p.manageUsers || (req.p.roles||[]).some(r=>['admin','dienstplanung','leitung'].includes(r));
+  const canEdit = req.p.canManageDp;
   if (!canEdit) return bad(res,'Keine Berechtigung',403);
   try {
     await q('DELETE FROM dp_assignments WHERE id=$1 AND plan_id=$2',[req.params.aid,req.params.id]);

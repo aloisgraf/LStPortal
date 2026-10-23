@@ -3,10 +3,9 @@ const router = require('express').Router();
 const { q, q1, newId, pool } = require('../db');
 const { auth, ok, bad } = require('../middleware');
 
-// Spintvergabe: fest auf admin/leitung/technik beschränkt (sehen UND
-// bearbeiten) — bewusst kein über Einstellungen/Rollen-Rechte konfigurierbares
-// Recht wie bei manageSop, sondern hart wie z.B. canManageDp.
-const canManageSpint = req => (req.p?.roles||[]).some(r=>['admin','leitung','technik'].includes(r));
+// Spindvergabe: Modul "spind" in lib/permissions.js (Standard admin/leitung/
+// technik), sehen UND bearbeiten.
+const canManageSpint = req => !!req.p?.canManageSpint;
 const requireManage = (req,res) => { if(!canManageSpint(req)){ bad(res,'Keine Berechtigung',403); return false; } return true; };
 
 router.post('/lockers', auth, async (req,res) => {

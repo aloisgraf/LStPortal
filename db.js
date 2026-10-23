@@ -2,6 +2,7 @@
 const { Pool } = require('pg');
 const crypto   = require('crypto');
 const { isAssessmentOnly, canSeeAssessment, canManageAssessment } = require('./lib/roles');
+const { derivePermissions, deriveTicketPermissions } = require('./lib/permissions');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -45,116 +46,29 @@ function invalidateDeptCache() { _deptCache = null; }
 // — dort liegt sie, damit sie ohne DB-Verbindung testbar ist (Vitest).
 const { isUserActive } = require('./lib/dp-rules');
 
-// Jeder Menü-Reiter (public/index.html, Sidebar-Elemente id="ni-<key>") — für
-// die "Reiter-Sichtbarkeit" in Einstellungen → Rechte. Reine Anzeige-Steuerung
-// im Menü, ersetzt keine serverseitige Route-Absicherung (die bleibt separat
-// bestehen, z.B. canManageDp für die Dienstplanungs-Reiter).
-const NAV_TABS = [
-  {key:'home', label:'Übersicht'},
-  {key:'docs', label:'Dokumente'},
-  {key:'wiki', label:'Wiki'},
-  {key:'meetings', label:'Besprechungen'},
-  {key:'todos', label:'Todos'},
-  {key:'contacts', label:'Kontakte'},
-  {key:'sop', label:'Notfall-Checklisten'},
-  {key:'spint', label:'Spindvergabe'},
-  {key:'schedule', label:'Dienstplan (Kalender)'},
-  {key:'allw', label:'Zulagendienste'},
-  {key:'homeoffice', label:'Homeoffice'},
-  {key:'vacation', label:'Urlaubsübersicht'},
-  {key:'diensttausch', label:'Diensttausch'},
-  {key:'abrechnung', label:'Abrechnung'},
-  {key:'dienstplaene', label:'Dienstpläne'},
-  {key:'zahnarzt', label:'Dienstplan Zahnärzte'},
-  {key:'platz', label:'Platzübersicht'},
-  {key:'links', label:'Links'},
-  {key:'tickets', label:'Tickets: Offene'},
-  {key:'tickets_closed', label:'Tickets: Abgeschlossene'},
-  {key:'tickets_cancelled', label:'Tickets: Stornierte'},
-  {key:'tickets_deleted', label:'Tickets: Gelöschte'},
-  {key:'checklists', label:'Checklisten'},
-  {key:'dp', label:'Dienstplanung: Planerstellung'},
-  {key:'dp-config', label:'Dienstplanung: Konfiguration'},
-  {key:'dp-christmas', label:'Dienstplanung: Weihnachtsdienst'},
-  {key:'dp-mine', label:'Dienstplanung: Mein Dienstplan'},
-  {key:'messages', label:'Nachrichten: Eingang'},
-  {key:'messages_sent', label:'Nachrichten: Gesendet'},
-  {key:'chat', label:'Chat'},
-  {key:'news', label:'News'},
-  {key:'statistik', label:'Statistik'},
-  {key:'assessment', label:'Assessment'},
-];
-
-// Wendet dieselbe "Grant gewinnt über Deny"-Merge-Logik wie getP()/overrideMap
-// an, aber auf role_permissions-Zeilen mit dem Schlüsselpräfix "tab:<key>".
-// Default (kein Override vorhanden) = sichtbar, damit ein neu hinzugefügter
-// Reiter nicht versehentlich für alle verschwindet.
-function getTabVisibility(roles, overrides) {
-  const ovMap = {};
-  (overrides||[]).forEach(o => {
-    if (!roles.includes(o.role) || !o.permission.startsWith('tab:')) return;
-    const key = o.permission.slice(4);
-    if (o.granted && ovMap[key] !== false) ovMap[key] = true;
-    else if (!o.granted && ovMap[key] === undefined) ovMap[key] = false;
-  });
-  const result = {};
-  NAV_TABS.forEach(t => { result[t.key] = ovMap[t.key] !== undefined ? ovMap[t.key] : true; });
-  return result;
-}
-
+// Rechte und Reiter-Sichtbarkeit kommen aus lib/permissions.js (Module mit
+// Stufen). getP liefert zusätzlich die bisherigen Rechte-Namen (manageUsers,
+// canApproveEvents, …), damit die Prüfungen in den Routen weiter gelten.
+// Rolle "Assessment" (lib/roles.js): bewusst NICHT über role_permissions
+// übersteuerbar, damit die serverseitige Sperre nicht aufgehoben werden kann.
 async function getP(uid, userObj=null, overrides=[]) {
   const u = userObj || await getUser(uid);
   const roles = parseRoles(u?.roles);
-  const has = (...r) => r.some(x => roles.includes(x));
-  const full = has('admin','leitung','dienstplanung');
-  // Build overrideMap: for each permission, if any role grants explicitly, use that
-  const overrideMap = {};
-  (overrides||[]).forEach(o => {
-    if(roles.includes(o.role)) {
-      if(o.granted && overrideMap[o.permission] !== false) overrideMap[o.permission] = true;
-      else if(!o.granted && overrideMap[o.permission] === undefined) overrideMap[o.permission] = false;
-    }
-  });
-  const perm = (key, defaultVal) => overrideMap[key] !== undefined ? overrideMap[key] : defaultVal;
   return {
-    manageUsers: perm('manageUsers', has('admin')),
-    editAllPersonal: perm('editAllPersonal', full),
-    addForOthers: perm('addForOthers', has('admin','leitung','dienstplanung','ausbildung','qm')),
-    addGeneral: perm('addGeneral', has('admin','leitung','dienstplanung','technik','ausbildung','qm')),
-    manageGeneral: perm('manageGeneral', has('admin','leitung','dienstplanung','technik','ausbildung','qm')),
-    seeAllAllw: perm('seeAllAllw', full),
-    editAllw: perm('editAllw', full),
-    canApproveEvents: perm('canApproveEvents', has('admin','dienstplanung','leitung')),
-    canSendMessages: perm('canSendMessages', !has('standard')),
-    seeAllAbrechnung: perm('seeAllAbrechnung', has('admin','dienstplanung')),
-    // Notfall-Checklisten anlegen/bearbeiten/freigeben — standardmäßig "technischer
-    // Leiter" (Rolle technik) + admin/leitung, wie in der Anforderung beschrieben.
-    // Ausführen dürfen weiterhin alle angemeldeten Nutzer (kein eigenes Recht nötig).
-    manageSop: perm('manageSop', has('admin','technik','leitung')),
-    // Rolle "Assessment" (lib/roles.js): bewusst NICHT über role_permissions
-    // übersteuerbar, damit die serverseitige Sperre nicht versehentlich
-    // aufgehoben werden kann.
+    ...derivePermissions(roles, overrides),
     assessmentOnly: isAssessmentOnly(roles),
     seeAssessment: canSeeAssessment(roles),
     manageAssessment: canManageAssessment(roles),
-    tabs: getTabVisibility(roles, overrides),
     roles,
   };
 }
 
-async function getTP(uid, userObj=null) {
+// p = Ergebnis von getP für denselben Nutzer
+async function getTP(uid, userObj=null, p=null) {
   const u = userObj || await getUser(uid);
   const roles = parseRoles(u?.roles);
-  const has = (...r) => r.some(x => roles.includes(x));
-  const deptIds = await getDepartmentIds();
-  return {
-    seeAll: has('admin','leitung'), editAll: has('admin','leitung'),
-    myDepts: deptIds.filter(d => roles.includes(d)),
-    canSetPublic: !has('standard'), canAssign: !has('standard'),
-    canSeeSubcat: has('admin','leitung','schichtleiter','qm'),
-    canEditSubcat: has('admin','leitung','schichtleiter','qm'),
-    roles,
-  };
+  const perms = p || derivePermissions(roles, []);
+  return deriveTicketPermissions(roles, perms, await getDepartmentIds());
 }
 
 // Sichtbarkeit: Ersteller, zugewiesener Bearbeiter und explizit hinzugefügte
@@ -264,5 +178,5 @@ function canEditAcl(item, uid, roles, p, categoriesById) {
 
 module.exports = { pool, q, q1, newId, parseRoles, parseTags, getUser, getUserByUsername, DEPTS, logAct,
   getP, getTP, canSeeTk, canEditTk, nextTicketNumber, auditNote, createNotification,
-  parseMentions, isUserActive, NAV_TABS, getTabVisibility, getDepartmentIds, invalidateDeptCache,
+  parseMentions, isUserActive, getDepartmentIds, invalidateDeptCache,
   parseRoleList, canSeeAcl, canEditAcl };

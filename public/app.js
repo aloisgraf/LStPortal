@@ -123,22 +123,6 @@ const STATUSES=[{id:'open',label:'Offen'},{id:'in_progress',label:'In Bearbeitun
 // "closed" abzufragen, damit "cancelled" nirgends vergessen wird.
 const TK_INACTIVE_STATUSES=['closed','cancelled'];
 const isTkClosed=tk=>TK_INACTIVE_STATUSES.includes(tk.status);
-const RM=[
-  ['Benutzer verwalten',         {admin:1,leitung:0,dienstplanung:0,schichtleiter:0,technik:0,ausbildung:0,qm:0,standard:0}],
-  ['Dienstplan: alle sehen',     {admin:1,leitung:1,dienstplanung:1,schichtleiter:1,technik:0,ausbildung:0,qm:0,standard:0}],
-  ['Dienstplan: nur eigene',     {admin:0,leitung:0,dienstplanung:0,schichtleiter:0,technik:1,ausbildung:1,qm:1,standard:1}],
-  ['Eintr\u00e4ge genehmigen',  {admin:1,leitung:0,dienstplanung:1,schichtleiter:0,technik:0,ausbildung:0,qm:0,standard:0}],
-  ['Allg. Eintr\u00e4ge erstellen',{admin:1,leitung:1,dienstplanung:1,schichtleiter:1,technik:1,ausbildung:1,qm:1,standard:0}],
-  ['Tickets: Fachbereich sehen', {admin:1,leitung:1,dienstplanung:2,schichtleiter:0,technik:2,ausbildung:2,qm:2,standard:0}],
-  ['Tickets: alle sehen',        {admin:1,leitung:1,dienstplanung:0,schichtleiter:0,technik:0,ausbildung:0,qm:0,standard:0}],
-  ['Tickets: Beschwerden sehen', {admin:1,leitung:1,dienstplanung:0,schichtleiter:1,technik:0,ausbildung:0,qm:1,standard:0}],
-  ['Tickets: nur eigene',        {admin:0,leitung:0,dienstplanung:0,schichtleiter:0,technik:0,ausbildung:0,qm:0,standard:1}],
-  ['Status setzen',              {admin:1,leitung:1,dienstplanung:1,schichtleiter:1,technik:1,ausbildung:1,qm:1,standard:0}],
-  ['Nachrichten senden',         {admin:1,leitung:1,dienstplanung:1,schichtleiter:1,technik:1,ausbildung:1,qm:1,standard:0}],
-  ['Alle Zulagen',               {admin:1,leitung:1,dienstplanung:1,schichtleiter:0,technik:0,ausbildung:0,qm:0,standard:0}],
-  ['Abrechnung alle sehen',      {admin:1,leitung:0,dienstplanung:1,schichtleiter:0,technik:0,ausbildung:0,qm:0,standard:0}],
-  ['Aktivit\u00e4tslog sehen',  {admin:1,leitung:0,dienstplanung:0,schichtleiter:0,technik:0,ausbildung:0,qm:0,standard:0}],
-];
 let S={
   year:new Date().getFullYear(),month:new Date().getMonth(),
   currentUser:null,view:'home',filterUser:null,
@@ -235,14 +219,9 @@ async function fetchData(){
     S.lockerCategories=data.lockerCategories||[];
     S.chatThreads=data.chatThreads||[];S.chatMessages=data.chatMessages||[];
     S.currentUser=data.currentUser;S.p=data.permissions||{};
-    const u=getU(S.currentUser);const roles=u?.roles||['standard'];
-    const has=(...r)=>r.some(x=>roles.includes(x));
-    S.tp={seeAll:has('admin','leitung'),editAll:has('admin','leitung'),
-      myDepts:DEPTS.filter(d=>roles.includes(d)),
-      canSetPublic:!has('standard'),canAssign:!has('standard'),
-      canSeeSubcat:has('admin','leitung','schichtleiter','qm'),
-      canEditSubcat:has('admin','leitung','schichtleiter','qm'),
-      roles};
+    // Ticket-Rechte kommen fertig vom Server (lib/permissions.js, Modul "tickets")
+    S.tp=data.ticketPermissions||{seeAll:false,editAll:false,myDepts:[],canSetPublic:false,canAssign:false,canSeeSubcat:false,canEditSubcat:false,roles:S.p.roles||[]};
+    S.permModel=data.permModel||null;
     S.imp=data.impersonation||{realIsAdmin:false,viewingAs:null,testUsers:[]};
     updateBadges();
     renderViewAsUi();
@@ -387,9 +366,9 @@ function loginOK(){
     if(docLinkId&&(S.docs||[]).some(d=>d.id===docLinkId)){S._docHighlight=docLinkId;setView('docs');}
     else setView('home');
   });startAutoRefresh();startChatSync();
-  // archivNav for all users
+  // News-Archiv folgt dem Reiter News
   const archivNav=document.getElementById('ni-news_archiv');
-  if(archivNav)archivNav.style.display='block';
+  if(archivNav)archivNav.style.display=(S.p?.tabs||{}).news===false?'none':'block';
   toast('\uD83D\uDC4B Willkommen, '+(u?lastNameFirst(u.name):'')+'!');
 }
 async function logout(){
@@ -472,12 +451,11 @@ function restoreNavSectionState() {
     }
   }
 }
-// Alle Sidebar-Reiter (id="ni-<key>") — muss mit db.js NAV_TABS übereinstimmen.
+// Alle Sidebar-Reiter (id="ni-<key>") — muss zu lib/permissions.js (MODULES[].tabs) passen.
 const NAV_TAB_IDS=['assessment','home','sop','docs','wiki','meetings','todos','contacts','schedule','allw','homeoffice','vacation','diensttausch','abrechnung','dienstplaene','zahnarzt','platz','links','tickets','tickets_closed','tickets_cancelled','tickets_deleted','checklists','dp','dp-config','dp-christmas','dp-mine','messages','messages_sent','news','statistik','spint','chat'];
-// Zusätzlich zur (abschaltbaren) Reiter-Sichtbarkeit weiterhin hart verdrahtete
-// Mindestanforderungen für die Dienstplanungs-/Statistik-Reiter — ein Reiter
-// ist nur sichtbar, wenn BEIDES zutrifft.
-const NAV_BASELINE={assessment:()=>!!S.p?.seeAssessment, statistik:()=>!!S.p?.manageUsers, dp:()=>!!S.p?.canManageDp, 'dp-config':()=>!!S.p?.canManageDp, 'dp-christmas':()=>!!S.p?.canManageDp, spint:()=>!!S.p?.canManageSpint};
+// Sichtbarkeit kommt aus den Stufen (S.p.tabs). Zusätzliche Mindest-
+// anforderungen (z. B. Assessment) — ein Reiter ist nur sichtbar, wenn BEIDES zutrifft.
+const NAV_BASELINE={assessment:()=>!!S.p?.seeAssessment, statistik:()=>!!S.p?.seeStatistik, dp:()=>!!S.p?.canManageDp, 'dp-config':()=>!!S.p?.canManageDp, 'dp-christmas':()=>!!S.p?.canManageDp, spint:()=>!!S.p?.canManageSpint};
 function applyNavVisibility(){
   const tabs=S.p?.tabs||{};
   NAV_TAB_IDS.forEach(id=>{
@@ -1330,7 +1308,7 @@ function renderCalendar(){renderSchedule();}
 // SECTION: Diensttausch
 // ══════════════════════════════════════════
 function renderDiensttausch() {
-  const canDecide = S.p.canApproveEvents;
+  const canDecide = S.p.manageDiensttausch;
   const list = S.diensttausch;
   function dtCard(dt) {
     const isNew = !dt.isSeen && dt.isRelevant;
@@ -1843,7 +1821,7 @@ function closePdf() {
 function renderDienstplaene(){
   const active=S.dienstplaene.filter(d=>!d.isArchived).sort((a,b)=>a.year!==b.year?b.year-a.year:b.month-a.month);
   const archived=S.dienstplaene.filter(d=>d.isArchived).sort((a,b)=>a.year!==b.year?b.year-a.year:b.month-a.month);
-  const canUp=S.p.addGeneral;
+  const canUp=S.p.uploadDienstplaene;
   document.getElementById('main').innerHTML=`
     <div class="ph"><div class="pt">&#128196; Dienstpl\u00e4ne</div>${canUp?`<button class="btn-p" onclick="openDpUpload()">&#128228; PDF hochladen</button>`:''}</div>
     <div class="tw" style="margin-bottom:14px">
@@ -2978,78 +2956,51 @@ function backToAdmin(tab='users'){['ufOv','cfOv','tfOv','deptOv'].forEach(closeM
 function renderUsrList(){document.getElementById('usrList').innerHTML=S.users.map(u=>`<div class="ai"${u.isActive===false?' style="opacity:.45;font-style:italic"':''}>${avHtml(u.initials,u.color,34,13,u.isOnline)}<div class="aii"><div class="ain">${lastNameFirst(u.name)} ${u.isActive===false?'\uD83D\uDEAB inaktiv \u00B7 ':''}${roleBadges(u.id)}${u.isOnline?'<span style="font-size:10px;color:var(--ok)">\u25cf online</span>':''}</div><div class="ais">${u.mustChangePW?'\u26A0\uFE0F PW ausstehend':'\u2713 Aktiv'}${u.hireDate?' \u00B7 seit '+u.hireDate.split('-').reverse().join('.'):''}${u.terminationDate?' \u00B7 bis '+u.terminationDate.split('-').reverse().join('.'):''}</div></div><div class="aia"><button class="btn-e" onclick="openUF('${u.id}')">\u270e</button>${S.users.length>1&&u.id!==S.currentUser?`<button class="btn-d" onclick="delUser('${u.id}')">\u2715</button>`:''}</div></div>`).join('');}
 function renderCatList(){document.getElementById('catList').innerHTML=S.categories.map(c=>`<div class="ai"><div style="width:14px;height:14px;border-radius:3px;background:${c.color};flex-shrink:0"></div><div class="aii"><div class="ain">${c.emoji} ${c.label}</div></div><div class="aia"><button class="btn-e" onclick="openCF('${c.id}')">\u270e</button>${S.categories.length>1?`<button class="btn-d" onclick="delCat('${c.id}')">\u2715</button>`:''}</div></div>`).join('');}
 function renderTagList(){document.getElementById('tagList').innerHTML=S.tags.map(t=>`<div class="ai"><div style="width:14px;height:14px;border-radius:3px;background:${t.color};flex-shrink:0"></div><div class="aii"><div class="ain"><span class="tag-chip" style="background:${t.color}1a;color:${t.color}">${t.label}</span></div></div><div class="aia"><button class="btn-e" onclick="openTF('${t.id}')">\u270e</button>${S.tags.length>1?`<button class="btn-d" onclick="delTag('${t.id}')">\u2715</button>`:''}</div></div>`).join('');}
-const RIGHTS_ROLES_LIST=['admin','leitung','dienstplanung','schichtleiter','technik','qm','standard'];
-// Muss mit db.js NAV_TABS (key+label) \u00fcbereinstimmen \u2014 bewusst dupliziert
-// (Frontend hat keinen Zugriff auf db.js), Reihenfolge/Gruppierung entspricht
-// der Sidebar.
-const RIGHTS_NAV_TABS=[
-  {key:'home',label:'\u00dcbersicht'},{key:'sop',label:'Notfall-Checklisten'},{key:'docs',label:'Dokumente'},{key:'wiki',label:'Wiki'},{key:'meetings',label:'Besprechungen'},{key:'todos',label:'Todos'},{key:'contacts',label:'Kontakte'},
-  {key:'schedule',label:'Dienstplan (Kalender)'},{key:'allw',label:'Zulagendienste'},{key:'homeoffice',label:'Homeoffice'},{key:'vacation',label:'Urlaubs\u00fcbersicht'},
-  {key:'diensttausch',label:'Diensttausch'},{key:'abrechnung',label:'Abrechnung'},{key:'dienstplaene',label:'Dienstpl\u00e4ne'},
-  {key:'zahnarzt',label:'Dienstplan Zahn\u00e4rzte'},{key:'platz',label:'Platz\u00fcbersicht'},{key:'links',label:'Links'},
-  {key:'tickets',label:'Tickets: Offene'},{key:'tickets_closed',label:'Tickets: Abgeschlossene'},{key:'tickets_cancelled',label:'Tickets: Stornierte'},{key:'tickets_deleted',label:'Tickets: Gel\u00f6schte'},{key:'checklists',label:'Checklisten'},
-  {key:'dp',label:'Dienstplanung: Planerstellung'},{key:'dp-config',label:'Dienstplanung: Konfiguration'},{key:'dp-christmas',label:'Dienstplanung: Weihnachtsdienst'},{key:'dp-mine',label:'Dienstplanung: Mein Dienstplan'},
-  {key:'messages',label:'Nachrichten: Eingang'},{key:'messages_sent',label:'Nachrichten: Gesendet'},{key:'news',label:'News'},{key:'statistik',label:'Statistik'},
-  {key:'spint',label:'Spindvergabe'},{key:'chat',label:'Chat'},
-];
+// Rechte-Matrix: Module mit Stufen (lib/permissions.js). Das Modell kommt
+// vom Server (S.permModel), damit es nur an einer Stelle definiert ist.
 function renderRightsMatrix(){
   const el=document.getElementById('rightsMatrix');if(!el)return;
-  const ROLES_LIST=RIGHTS_ROLES_LIST;
-  const PERMS=[
-    {key:'manageUsers',label:'Benutzerverwaltung'},
-    {key:'canApproveEvents',label:'Kalender/Urlaub: alle Eintr\u00e4ge sehen',hint:'Sonst nur eigene + f\u00fcr einen erstellte Eintr\u00e4ge; andere User werden im Dienstplan/in der Urlaubs\u00fcbersicht anonymisiert angezeigt (Name/Grund verborgen).'},
-    {key:'editAllPersonal',label:'Alle Eintr\u00e4ge bearbeiten'},
-    {key:'addForOthers',label:'F\u00fcr andere eintragen'},
-    {key:'addGeneral',label:'Allg. Eintr\u00e4ge'},
-    {key:'seeAllAllw',label:'Zulagendienste: alle sehen',hint:'Sonst nur die eigenen Zulagendienste.'},
-    {key:'editAllw',label:'Zulagen bearbeiten'},
-    {key:'seeAllAbrechnung',label:'Abrechnung: alle sehen',hint:'Sonst nur die eigene Abrechnung.'},
-    {key:'canSendMessages',label:'Nachrichten senden'},
-    {key:'manageSop',label:'Notfall-Checklisten verwalten',hint:'Vorlagen anlegen/bearbeiten/freigeben. Ausführen können weiterhin alle Nutzer, unabhängig von diesem Recht.'},
-  ];
-  const defaults={
-    admin:{manageUsers:1,canApproveEvents:1,editAllPersonal:1,addForOthers:1,addGeneral:1,seeAllAllw:1,editAllw:1,seeAllAbrechnung:1,canSendMessages:1,manageSop:1},
-    leitung:{canApproveEvents:1,editAllPersonal:1,addForOthers:1,addGeneral:1,seeAllAllw:1,editAllw:1,canSendMessages:1,manageSop:1},
-    dienstplanung:{canApproveEvents:1,editAllPersonal:1,addForOthers:1,addGeneral:1,seeAllAllw:1,editAllw:1,seeAllAbrechnung:1,canSendMessages:1},
-    schichtleiter:{addForOthers:1,canSendMessages:1},
-    technik:{addGeneral:1,canSendMessages:1,manageSop:1},
-    qm:{addForOthers:1,addGeneral:1,canSendMessages:1},
-    standard:{},
-  };
-  const ovMap={};
-  (S.rolePermissions||[]).forEach(o=>{if(!ovMap[o.role])ovMap[o.role]={};ovMap[o.role][o.permission]=o.granted;});
-  const permTable=(rows,keyOf,defaultOf)=>`<table style="width:100%;border-collapse:collapse;font-size:12px">
-      <thead><tr>
-        <th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--border);min-width:200px">Recht</th>
-        ${ROLES_LIST.map(r=>`<th style="padding:6px 8px;border-bottom:2px solid var(--border);text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.5px">${r}</th>`).join('')}
-      </tr></thead>
-      <tbody>
-        ${rows.map((p2,pi)=>`<tr style="background:${pi%2===0?'var(--sf2)':'transparent'}">
-          <td style="padding:6px 8px;font-size:12px;color:var(--tx)" title="${p2.hint?esc(p2.hint):''}">${p2.label}${p2.hint?' \u2139\ufe0f':''}</td>
-          ${ROLES_LIST.map(r=>{
-            const permKey=keyOf(p2);
-            const defVal=defaultOf(r,p2);
-            const override=ovMap[r]?.[permKey];
-            const effective=override!==undefined?override:defVal;
-            const isOverridden=override!==undefined;
-            return`<td style="text-align:center;padding:6px 8px">
-              <label style="cursor:pointer;display:flex;align-items:center;justify-content:center;gap:2px" title="${isOverridden?'\u00dcberschrieben':'Standard'}">
-                <input type="checkbox" ${effective?'checked':''} onchange="setRightOverride('${r}','${permKey}',this.checked)" style="cursor:pointer">
-                ${isOverridden?`<span style="font-size:9px;color:${override?'var(--ok)':'var(--danger)'}">${override?'\u2191':'\u2193'}</span>`:''}
-              </label>
-            </td>`;
-          }).join('')}
-        </tr>`).join('')}
-      </tbody>
-    </table>`;
+  const M=S.permModel;
+  if(!M){el.innerHTML='<div class="empty">Kein Zugriff</div>';return;}
+  const roleLabel=r=>{const d=ROLES.find(x=>x.id===r);if(d)return d.label;const dp=(S.departments||[]).find(x=>x.id===r);return dp?dp.label:r;};
+  const ov={};
+  (S.rolePermissions||[]).forEach(o=>{(ov[o.role]=ov[o.role]||{})[o.permission]=o;});
+  const th=`<th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--border);min-width:220px;position:sticky;left:0;background:var(--sf)">Modul</th>`+
+    M.roles.map(r=>`<th style="padding:6px 4px;border-bottom:2px solid var(--border);text-align:center;font-size:11px;white-space:nowrap">${esc(roleLabel(r))}</th>`).join('');
+  const cellStyle='text-align:center;padding:4px';
+  const mark=(isOv,up)=>isOv?`<span title="vom Standard abweichend" style="font-size:10px;color:${up?'var(--ok)':'var(--danger)'}">${up?'↑':'↓'}</span>`:'';
+  const modRows=M.modules.map((m,i)=>`<tr style="background:${i%2===0?'var(--sf2)':'transparent'}">
+      <td style="padding:6px 8px;font-size:12px;position:sticky;left:0;background:inherit" title="${esc(m.hint||'')}">${esc(m.label)}${m.hint?' ℹ️':''}</td>
+      ${M.roles.map(r=>{
+        const idx=id=>m.levels.findIndex(l=>l.id===id);
+        if(r==='admin')return`<td style="${cellStyle};font-size:11px;color:var(--mu)">${esc(m.levels[m.levels.length-1].label)}</td>`;
+        const o=ov[r]?.['mod:'+m.key];
+        const def=m.defaults[r];
+        const cur=o&&idx(o.level)>=0?o.level:def;
+        const isOv=!!o&&cur!==def;
+        return`<td style="${cellStyle}"><div style="display:flex;align-items:center;gap:2px;justify-content:center">
+          <select class="flt" style="font-size:11px;padding:2px 4px;min-width:0;width:auto${cur==='aus'?';color:var(--mu)':''}" onchange="setRightLevel('${r}','${m.key}',this.value)">
+            ${m.levels.map(l=>`<option value="${l.id}"${l.id===cur?' selected':''}>${esc(l.label)}${l.id===def?' · Std.':''}</option>`).join('')}
+          </select>${mark(isOv,idx(cur)>idx(def))}</div></td>`;
+      }).join('')}
+    </tr>`).join('');
+  const flagRows=M.flags.map((f,i)=>`<tr style="background:${i%2===0?'var(--sf2)':'transparent'}">
+      <td style="padding:6px 8px;font-size:12px;position:sticky;left:0;background:inherit">${esc(f.label)}</td>
+      ${M.roles.map(r=>{
+        if(r==='admin')return`<td style="${cellStyle}"><input type="checkbox" checked disabled></td>`;
+        const o=ov[r]?.['flag:'+f.key];
+        const def=!!f.defaults[r];
+        const cur=o?!!o.granted:def;
+        return`<td style="${cellStyle}"><label style="display:flex;align-items:center;justify-content:center;gap:2px;cursor:pointer">
+          <input type="checkbox" ${cur?'checked':''} onchange="setRightFlag('${r}','${f.key}',this.checked)">${mark(!!o&&cur!==def,cur)}</label></td>`;
+      }).join('')}
+    </tr>`).join('');
   el.innerHTML=`<div style="overflow-x:auto">
-    <div style="font-weight:700;font-size:13px;margin-bottom:8px">Rechte</div>
-    ${permTable(PERMS, p2=>p2.key, (r,p2)=>!!(defaults[r]||{})[p2.key])}
-    <div style="font-size:11px;color:var(--mu);margin:10px 0 20px">\u2191/\u2193 = manuell \u00fcberschrieben \u00b7 \u00c4nderungen werden sofort gespeichert</div>
-    <div style="font-weight:700;font-size:13px;margin-bottom:4px">Reiter-Sichtbarkeit im Men\u00fc</div>
-    <div style="font-size:11px;color:var(--mu);margin-bottom:8px">Blendet den jeweiligen Reiter in der Seitenleiste f\u00fcr die Rolle aus \u2014 ersetzt keine serverseitige Zugriffssperre (z.B. Dienstplanung bleibt zus\u00e4tzlich auf berechtigte Rollen beschr\u00e4nkt).</div>
-    ${permTable(RIGHTS_NAV_TABS, t=>'tab:'+t.key, ()=>true)}
-    <div style="font-size:11px;color:var(--mu);margin-top:10px">\u2191/\u2193 = manuell \u00fcberschrieben \u00b7 \u00c4nderungen werden sofort gespeichert</div>
+    <div style="font-size:12px;color:var(--mu);margin-bottom:10px">Jede Rolle hat pro Modul eine Stufe; höhere Stufen schließen die niedrigeren ein. Wer mehrere Rollen hat, bekommt pro Modul die höchste Stufe. „kein Zugriff“ blendet den Reiter aus und sperrt den Bereich auch am Server. Der Administrator hat immer alles. Die Rolle Assessment ist nicht einstellbar (Bewerber sehen nur das Assessment, Assessment plus weitere Rolle = Prüfer).</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>${th}</tr></thead><tbody>${modRows}</tbody></table>
+    <div style="font-weight:700;font-size:13px;margin:18px 0 8px">Einzelrechte</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>${th.replace('>Modul<','>Recht<')}</tr></thead><tbody>${flagRows}</tbody></table>
+    <div style="font-size:11px;color:var(--mu);margin-top:10px">↑/↓ = vom Standard abweichend · „Std.“ = Standardwert · Änderungen werden sofort gespeichert</div>
   </div>`;
 }
 function renderDeptsAdmin(){
@@ -3087,9 +3038,19 @@ async function deleteDept(id){
   if(!confirm('Fachbereich l\u00f6schen?'))return;
   try{await api('DELETE','/departments/'+id);await fetchData();renderDeptsAdmin();toast('\u2705 Gel\u00f6scht');}catch(e){toast('\u26a0\ufe0f '+e.message,'err');}
 }
-async function setRightOverride(role,permission,granted){
+// Stufe/Schalter speichern; der Standardwert wird als "keine Abweichung" gespeichert (Zeile gelöscht)
+async function setRightLevel(role,mod,level){
+  const m=(S.permModel?.modules||[]).find(x=>x.key===mod);
+  await saveRight(role,'mod:'+mod,m&&m.defaults[role]===level?null:{level});
+}
+async function setRightFlag(role,flag,granted){
+  const f=(S.permModel?.flags||[]).find(x=>x.key===flag);
+  await saveRight(role,'flag:'+flag,f&&!!f.defaults[role]===granted?null:{granted});
+}
+async function saveRight(role,permission,value){
   try{
-    await api('POST','/role-permissions',{role,permission,granted});
+    if(value===null)await api('DELETE','/role-permissions/'+encodeURIComponent(role)+'/'+encodeURIComponent(permission));
+    else await api('POST','/role-permissions',{role,permission,...value});
     await fetchData();renderRightsMatrix();
     toast('\u2705 Recht aktualisiert');
   }catch(e){toast('\u26a0\ufe0f '+e.message,'err');}
@@ -3841,7 +3802,7 @@ function getAustrianHolidays(year) {
 function renderHomeoffice() {
   var year=S.year, month=S.month!==null?S.month:new Date().getMonth();
   var firstDay=new Date(year,month,1), lastDay=new Date(year,month+1,0);
-  var canManage=S.p.canApproveEvents||S.p.manageUsers;
+  var canManage=!!S.p.manageHomeoffice;
   var moNames=['Jänner','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
   var dayNames=['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
   var moName=moNames[month];
@@ -4112,7 +4073,7 @@ async function loadNews(){
 }
 function renderNews(){
   var isArchiv=S.view==='news_archiv';
-  var canEdit=S.p.manageUsers||(getU(S.currentUser)?.roles||[]).includes('leitung');
+  var canEdit=!!S.p.manageNews;
   var today=new Date().toISOString().slice(0,10);
   var news=S.news||[];
   var display=isArchiv?news.filter(function(n){return n.isExpired;}):news.filter(function(n){return !n.isExpired;});
@@ -4312,8 +4273,8 @@ function _renderZahnarzt() {
   const today   = new Date().toISOString().slice(0, 10);
   const hols    = new Set([...getAustrianHolidays(new Date().getFullYear()),
                            ...getAustrianHolidays(new Date().getFullYear()+1)]);
-  const canEdit = !!(S.p.roles||[]).some(r=>['admin','technik','leitung','dienstplanung'].includes(r));
-  const canDel  = !!(S.p.roles||[]).some(r=>['admin','technik'].includes(r));
+  const canEdit = !!S.p.zahnarztEdit;
+  const canDel  = !!S.p.zahnarztDelete;
 
   // Group by date
   const byDate = {};
@@ -4406,7 +4367,7 @@ function zahnarztWeekNext() {
 // ── Edit modal (ID-based, no JSON-in-onclick) ─────────────────────
 function _zdOpen(id) {
   const e = id ? _zdGet(id) : null;
-  const canDel = id && !!(S.p.roles||[]).some(r=>['admin','technik'].includes(r));
+  const canDel = id && !!S.p.zahnarztDelete;
   const ov = document.createElement('div');
   ov.className='ov'; ov.id='zahnarztFormOv';
   ov.innerHTML=`<div class="modal sm">
@@ -4676,7 +4637,7 @@ const ELP_NORD_EXT = [
 function renderPlatz(){
   const mySess=S.stationSessions.find(s=>s.userId===S.currentUser);
   const isAlreadyIn=!!mySess;
-  const canManageOutage=(S.p?.roles||[]).some(r=>['admin','leitung','technik'].includes(r));
+  const canManageOutage=!!S.p?.managePlatz;
   function card(st){
     if(st.empty) return `<div class="elp-station" style="background:transparent;border-color:transparent;box-shadow:none"></div>`;
     const outage=S.stationOutages.find(o=>o.stationName===st.name);
@@ -4970,7 +4931,7 @@ async function deleteLink(id){
 
 // ── KONTAKTE ──────────────────────────────────────────────────────────────
 function renderContacts(){
-  const canAdd=!!S.p.addGeneral;
+  const canAdd=!!S.p.createContacts;
   const isAdmin=!!S.p?.manageUsers;
   const cats=S.contactCategories||[];
   const filt=S._contactCatFilter||'all';
@@ -5686,8 +5647,8 @@ function renderSopRunList(){
 }
 
 // ── SPINTVERGABE ─────────────────────────────────────────────────────────────
-// Fest auf admin/leitung/technik beschränkt (S.p.canManageSpint, siehe
-// NAV_BASELINE) — kein separates Recht in der Rechte-Matrix wie bei manageSop.
+// Modul "spind" in der Rechte-Matrix (S.p.canManageSpint, Standard
+// admin/leitung/technik).
 function lockerCatLabel(catId){const c=(S.lockerCategories||[]).find(x=>x.id===catId);return c?(c.emoji?c.emoji+' ':'')+c.label:'';}
 function renderSpint(){
   if(!S.p.canManageSpint){ document.getElementById('main').innerHTML='<div class="empty">⚠️ Kein Zugriff</div>'; return; }
@@ -6037,7 +5998,7 @@ function fmtDate(d){if(!d)return'';var p=String(d).slice(0,10);return p.slice(8)
 // HTML/JS einschleusen, ganz ohne separate Sanitizer-Bibliothek.
 // ═══════════════════════════════════════════════════════════════════════════
 
-function wikiCanManage(article) { return article ? !!article._canManage : !!S.p.addGeneral; }
+function wikiCanManage(article) { return article ? !!article._canManage : !!S.p.createWiki; }
 
 function renderWiki() {
   // Wichtig: S._wikiEditing zuerst prüfen — beim Anlegen eines NEUEN Artikels

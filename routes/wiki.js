@@ -6,7 +6,7 @@ const { validateMime } = require('../fileutil');
 
 // Wiki ist für alle eingeloggten Nutzer lesbar (interne Wissensdatenbank);
 // Anlegen/Ändern/Löschen wie bei Kontakten/Links/Besprechungen über
-// addGeneral geregelt.
+// createWiki geregelt (Modul in lib/permissions.js).
 
 // ── KATEGORIEN ────────────────────────────────────────────────────────────
 
@@ -26,7 +26,7 @@ router.get('/wiki-categories', auth, async (req, res) => {
 });
 
 router.post('/wiki-categories', auth, async (req, res) => {
-  if (!req.p.addGeneral) return bad(res, 'Keine Berechtigung', 403);
+  if (!req.p.createWiki) return bad(res, 'Keine Berechtigung', 403);
   try {
     const { name, icon, color, sortOrder, parentId, visibleRoles, editableRoles, visibleUsers, editableUsers } = req.body;
     if (!name?.trim()) return bad(res, 'Name erforderlich', 400);
@@ -104,7 +104,7 @@ router.get('/wiki-articles', auth, async (req, res) => {
 });
 
 router.post('/wiki-articles', auth, async (req, res) => {
-  if (!req.p.addGeneral) return bad(res, 'Keine Berechtigung', 403);
+  if (!req.p.createWiki) return bad(res, 'Keine Berechtigung', 403);
   try {
     const { title, categoryId, tags, body, visibleRoles, editableRoles, visibleUsers, editableUsers } = req.body;
     if (!title?.trim()) return bad(res, 'Titel erforderlich', 400);
@@ -214,7 +214,7 @@ router.post('/wiki-articles/:id/restore/:vid', auth, async (req, res) => {
 // ── BILDER (für den Markdown-Editor) ───────────────────────────────────────
 
 router.post('/wiki-images', auth, async (req, res) => {
-  if (!req.p.addGeneral) return bad(res, 'Keine Berechtigung', 403);
+  if (!req.p.createWiki) return bad(res, 'Keine Berechtigung', 403);
   try {
     const { name, mimeType, data } = req.body;
     if (!name?.trim() || !data) return bad(res, 'Datei erforderlich', 400);

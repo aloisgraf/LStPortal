@@ -1045,6 +1045,23 @@ async function initDB() {
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }
 
+  // Rechte-Modell "Module mit Stufen" (lib/permissions.js): Spalte level und
+  // einmalige Übernahme der alten Einzelrechte/Reiter-Schalter in Stufen.
+  await pool.query('ALTER TABLE role_permissions ADD COLUMN IF NOT EXISTS level TEXT').catch(()=>{});
+  try {
+    const done = await q1(`SELECT 1 FROM role_permissions WHERE role='_system' AND permission='model:stufen'`);
+    if (!done) {
+      const { migrateLegacyOverrides } = require('./lib/permissions');
+      const { rows, droppedTabs } = migrateLegacyOverrides(await q('SELECT * FROM role_permissions'));
+      for (const r of rows)
+        await pool.query(`INSERT INTO role_permissions (role,permission,granted,level) VALUES ($1,$2,$3,$4)
+          ON CONFLICT (role,permission) DO UPDATE SET granted=$3, level=$4`, [r.role, r.permission, r.granted, r.level]);
+      await pool.query(`INSERT INTO role_permissions (role,permission,granted) VALUES ('_system','model:stufen',true) ON CONFLICT DO NOTHING`);
+      console.log(`✓ Rechte auf Stufen umgestellt: ${rows.length} Übersteuerung(en) übernommen` +
+        (droppedTabs ? `, ${droppedTabs} einzeln ausgeblendete(r) Reiter nicht übernommen` : ''));
+    }
+  } catch(e) { console.error('[rechte-migration]', e.message); }
+
   // ── Einmalige Rückwirkende Absicherung der Ordner-/Datei-Berechtigungen ──
   // Vor dieser Umstellung bedeutete ein leeres visible_roles/visible_users
   // "für alle sichtbar" (Standardverhalten). Die neue Logik (canSeeAcl/

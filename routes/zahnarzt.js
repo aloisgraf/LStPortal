@@ -12,9 +12,8 @@ function excelDateToISO(serial) {
 
 function canEdit(req) { return true; } // all authenticated users can edit entries
 
-const isTechnik = req =>
-  (Array.isArray(req.p.roles) ? req.p.roles : []).some(r =>
-    ['admin','technik','leitung','dienstplanung'].includes(r));
+// Stufen aus der Rechte-Matrix (lib/permissions.js, Modul "zahnarzt")
+const isTechnik = req => !!req.p.zahnarztEdit;
 
 // ── GET all entries ───────────────────────────────────────────────
 router.get('/dienste', auth, async (req,res) => {
@@ -72,7 +71,7 @@ router.put('/dienste/:id', auth, async (req,res) => {
 // ── DELETE entry ──────────────────────────────────────────────────
 router.delete('/dienste/:id', auth, async (req,res) => {
   try {
-    if (!isTechnik(req)) return bad(res,'Keine Berechtigung',403);
+    if (!req.p.zahnarztDelete) return bad(res,'Keine Berechtigung',403);
     await pool.query('DELETE FROM zahnarzt_dienste WHERE id=$1',[req.params.id]);
     ok(res);
   } catch(e) { bad(res, e.message, 500); }
