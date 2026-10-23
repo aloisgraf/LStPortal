@@ -9,7 +9,7 @@
 // sieht nur die Administration.
 const router = require('express').Router();
 const { q, q1, newId, pool, logAct } = require('../db');
-const { auth, assessmentAccess, adminOnly, ok, bad } = require('../middleware');
+const { auth, assessmentAccess, assessmentManage, adminOnly, ok, bad } = require('../middleware');
 const A = require('../lib/assessment');
 
 const parseJson = (t, fb) => { try { return t ? JSON.parse(t) : fb; } catch { return fb; } };
@@ -79,7 +79,7 @@ async function dropOutdated(att) {
 router.get('/', auth, assessmentAccess, async (req,res) => {
   try {
     const att = await expireIfNeeded(await dropOutdated(await getAttempt(req.uid)));
-    ok(res, { sections: A.overview(), totalMinutes: A.TOTAL_MINUTES, attempt: stateOf(att), isAdmin: !!req.p.manageUsers });
+    ok(res, { sections: A.overview(), totalMinutes: A.TOTAL_MINUTES, attempt: stateOf(att), isAdmin: !!req.p.manageAssessment, canDelete: !!req.p.manageUsers });
   } catch(e) { console.error('[assessment]', e.message); bad(res,'Serverfehler',500); }
 });
 
@@ -90,7 +90,7 @@ router.post('/start', auth, assessmentAccess, async (req,res) => {
     // übersprungenen Minuten werden vom Startzeitpunkt abgezogen, damit die
     // Gesamtzeit-Anzeige stimmt.
     let from = 0;
-    if (req.p.manageUsers && req.body?.startSection !== undefined) {
+    if (req.p.manageAssessment && req.body?.startSection !== undefined) {
       from = Number(req.body.startSection);
       if (!Number.isInteger(from) || from < 0 || from >= A.SECTIONS.length) return bad(res,'Ungültiger Abschnitt');
     }
@@ -176,7 +176,7 @@ router.post('/section/submit', auth, assessmentAccess, async (req,res) => {
     if (!att || att.status !== 'running' || !att.section_started_at) return bad(res,'Kein laufender Abschnitt',409);
     if (Number(req.body?.section) !== att.current_section) return bad(res,'Abschnitt ist bereits abgeschlossen',409);
     const sec = A.SECTIONS[att.current_section];
-    if (sec.kind === 'pause' && !req.p.manageUsers && A.remainingSeconds(att.current_section, att.elapsed) > 2) return bad(res,'Die Pause läuft noch',409);
+    if (sec.kind === 'pause' && !req.p.manageAssessment && A.remainingSeconds(att.current_section, att.elapsed) > 2) return bad(res,'Die Pause läuft noch',409);
     const late = A.isExpired(att.current_section, att.elapsed);
     const stored = draftOf(att).answers;
     const answers = late ? stored : A.mergeAnswers(stored, A.sanitizeAnswers(att.current_section, req.body?.answers));
@@ -188,12 +188,12 @@ router.post('/section/submit', auth, assessmentAccess, async (req,res) => {
 });
 
 // ── ADMINISTRATION ───────────────────────────────────────────────────────────
-router.get('/results', auth, adminOnly, async (req,res) => {
+router.get('/results', auth, assessmentManage, async (req,res) => {
   try {
     const rows = await q(`SELECT a.*, EXTRACT(EPOCH FROM (NOW()-a.section_started_at))::float AS elapsed,
       EXTRACT(EPOCH FROM (NOW()-a.started_at))::float AS total_elapsed, u.name AS user_name
       FROM assessment_attempts a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.started_at DESC`);
-    const candidates = await q(`SELECT id, name FROM users WHERE roles ? 'assessment' ORDER BY name`);
+    const candidates = await q(`SELECT id, name FROM users WHERE roles ? 'assessment' AND jsonb_array_length(roles)=1 ORDER BY name`);
     const original = await abschriftOriginal();
     const out = [];
     for (const r of rows) {
@@ -213,7 +213,7 @@ router.get('/results', auth, adminOnly, async (req,res) => {
 // Zurücksetzen: der aktive Durchgang wird archiviert, der Mitarbeiter kann
 // neu beginnen und sieht den alten nicht mehr. Die Administration sieht ihn
 // weiterhin in den Ergebnissen.
-router.post('/users/:uid/reset', auth, adminOnly, async (req,res) => {
+router.post('/users/:uid/reset', auth, assessmentManage, async (req,res) => {
   try {
     const u = await q1('SELECT id, name FROM users WHERE id=$1', [req.params.uid]);
     if (!u) return bad(res,'Nicht gefunden',404);
@@ -226,7 +226,7 @@ router.post('/users/:uid/reset', auth, adminOnly, async (req,res) => {
 
 // Nachbewertung einer einzelnen Antwort. correct=true/false setzt die Wertung,
 // correct=null nimmt die Korrektur zurück.
-router.put('/attempts/:id/override', auth, adminOnly, async (req,res) => {
+router.put('/attempts/:id/override', auth, assessmentManage, async (req,res) => {
   try {
     const { section, qid, correct } = req.body || {};
     if (typeof section !== 'string' || typeof qid !== 'string' || ![true, false, null].includes(correct)) return bad(res,'Ungültige Angaben');
@@ -246,7 +246,7 @@ router.put('/attempts/:id/override', auth, adminOnly, async (req,res) => {
 });
 
 // Bewertungsraster: value 0–3 setzt ein Kriterium, null entfernt die Bewertung.
-router.put('/attempts/:id/rating', auth, adminOnly, async (req,res) => {
+router.put('/attempts/:id/rating', auth, assessmentManage, async (req,res) => {
   try {
     const { section, qid, criterion, value } = req.body || {};
     const q = typeof section === 'string' && typeof qid === 'string' && A.rubricOf(section, qid);
@@ -274,7 +274,7 @@ async function abschriftOriginal() {
   const r = await q1(`SELECT value FROM assessment_config WHERE key='abschrift_original'`);
   return r ? r.value : '';
 }
-router.put('/config/abschrift', auth, adminOnly, async (req,res) => {
+router.put('/config/abschrift', auth, assessmentManage, async (req,res) => {
   try {
     const text = req.body?.text;
     if (typeof text !== 'string' || text.length > 20000) return bad(res,'Ungültiger Text');
@@ -302,7 +302,7 @@ router.delete('/attempts/:id', auth, adminOnly, async (req,res) => {
 // Ein begonnener Abschnitt wird mit dem Zwischenstand gewertet. Der
 // Mitarbeiter sieht danach nur noch den Hinweis; mit „Zurücksetzen“ kann er
 // neu beginnen.
-router.post('/users/:uid/abort', auth, adminOnly, async (req,res) => {
+router.post('/users/:uid/abort', auth, assessmentManage, async (req,res) => {
   try {
     const u = await q1('SELECT id, name FROM users WHERE id=$1', [req.params.uid]);
     if (!u) return bad(res,'Nicht gefunden',404);

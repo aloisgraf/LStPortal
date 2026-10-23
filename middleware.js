@@ -63,8 +63,10 @@ async function auth(req, res, next) {
 }
 
 const assessmentAccess = (req,res,next) => req.p?.seeAssessment ? next() : res.status(403).json({success:false,error:'Keine Berechtigung'});
+// Prüfer (Assessment + weitere Rolle) und Administration, siehe lib/roles.js.
+const assessmentManage = (req,res,next) => req.p?.manageAssessment ? next() : res.status(403).json({success:false,error:'Keine Berechtigung'});
 const adminOnly = (req,res,next) => req.p?.manageUsers ? next() : res.status(403).json({success:false,error:'Keine Berechtigung'});
 const ok  = (res, data) => res.json({ success:true, data: data??null });
 const bad = (res, msg, code=400) => res.status(code).json({ success:false, error:msg });
 
-module.exports = { auth, adminOnly, assessmentAccess, ok, bad, invalidateRolePermsCache };
+module.exports = { auth, adminOnly, assessmentAccess, assessmentManage, ok, bad, invalidateRolePermsCache };

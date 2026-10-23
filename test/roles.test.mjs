@@ -1,23 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-const { validateRoles, isAssessmentOnly, canSeeAssessment, assessmentOnlyAllowed } = require('../lib/roles');
+const { validateRoles, isAssessmentOnly, canSeeAssessment, canManageAssessment, assessmentOnlyAllowed } = require('../lib/roles');
 
-describe('validateRoles — Assessment ist exklusiv', () => {
-  it('Assessment allein ist gültig', () => {
+describe('validateRoles', () => {
+  it('Assessment ist mit jeder Rolle kombinierbar', () => {
     expect(validateRoles(['assessment'])).toBeNull();
-  });
-  it('Assessment mit Admin ist gültig', () => {
-    expect(validateRoles(['admin', 'assessment'])).toBeNull();
-  });
-  it('Assessment mit jeder anderen Rolle wird abgelehnt', () => {
-    for (const other of ['standard', 'leitung', 'dienstplanung', 'schichtleiter', 'technik', 'qm', 'ausbildung', 'neuerfachbereich'])
-      expect(validateRoles(['assessment', other])).toMatch(/Assessment/);
-    expect(validateRoles(['admin', 'assessment', 'qm'])).toMatch(/Assessment/);
-  });
-  it('bestehende Kombinationen und Fachbereichs-Rollen bleiben gültig', () => {
-    expect(validateRoles(['admin', 'leitung'])).toBeNull();
-    expect(validateRoles(['standard', 'neuerfachbereich'])).toBeNull();
+    for (const other of ['admin', 'standard', 'leitung', 'ausbildung', 'qm', 'neuerfachbereich'])
+      expect(validateRoles(['assessment', other])).toBeNull();
   });
   it('leere Rollenliste wird abgelehnt', () => {
     expect(validateRoles([])).toBeTruthy();
@@ -25,14 +15,23 @@ describe('validateRoles — Assessment ist exklusiv', () => {
   });
 });
 
-describe('isAssessmentOnly / canSeeAssessment', () => {
-  it('nur Assessment ohne Admin ist eingeschränkt', () => {
+describe('Bewerber, Prüfer und Administration', () => {
+  it('nur die Rolle Assessment = Bewerber, eingeschränkt', () => {
     expect(isAssessmentOnly(['assessment'])).toBe(true);
+    expect(isAssessmentOnly(['assessment', 'ausbildung'])).toBe(false);
     expect(isAssessmentOnly(['admin', 'assessment'])).toBe(false);
     expect(isAssessmentOnly(['standard'])).toBe(false);
   });
+  it('Assessment mit weiterer Rolle = Prüfer', () => {
+    expect(canManageAssessment(['assessment', 'ausbildung'])).toBe(true);
+    expect(canManageAssessment(['leitung', 'assessment'])).toBe(true);
+    expect(canManageAssessment(['admin'])).toBe(true);
+    expect(canManageAssessment(['assessment'])).toBe(false);
+    expect(canManageAssessment(['ausbildung'])).toBe(false);
+  });
   it('Assessment-Bereich sehen Assessment-Nutzer und Admins', () => {
     expect(canSeeAssessment(['assessment'])).toBe(true);
+    expect(canSeeAssessment(['assessment', 'leitung'])).toBe(true);
     expect(canSeeAssessment(['admin'])).toBe(true);
     expect(canSeeAssessment(['leitung'])).toBe(false);
   });

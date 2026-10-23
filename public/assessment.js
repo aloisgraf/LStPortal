@@ -572,7 +572,7 @@ function asmResultsHtml(){
       <td>${a.summary.percent!==null?`<b>${a.summary.percent} %</b><div style="font-size:10px;color:var(--mu)">${a.summary.points}/${a.summary.max}</div>`:'–'}</td>
       <td style="font-size:11px">${ctrl?.level?asmLevelBadge(ctrl.level):'–'}</td>
       <td style="font-size:11px">${asmEventsCell(a.events)}</td>
-      <td style="white-space:nowrap"><button class="btn-s" style="font-size:11px" onclick="ASM.openResult=${open?'null':`'${a.id}'`};asmRenderOverview();${open?'':`document.getElementById('asmDetail')?.scrollIntoView({behavior:'smooth'})`}">${open?'Schließen':'Details'}</button>${a.status!=='running'||a.archivedAt?` <button class="btn-s asm-abort" style="font-size:11px" title="Durchgang endgültig löschen" onclick="asmDeleteAttempt('${a.id}')">🗑 Löschen</button>`:''}</td></tr>
+      <td style="white-space:nowrap"><button class="btn-s" style="font-size:11px" onclick="ASM.openResult=${open?'null':`'${a.id}'`};asmRenderOverview();${open?'':`document.getElementById('asmDetail')?.scrollIntoView({behavior:'smooth'})`}">${open?'Schließen':'Details'}</button>${ASM.info.canDelete&&(a.status!=='running'||a.archivedAt)?` <button class="btn-s asm-abort" style="font-size:11px" title="Durchgang endgültig löschen" onclick="asmDeleteAttempt('${a.id}')">🗑 Löschen</button>`:''}</td></tr>
 `;
   }).join('');
   return `<div class="dash-card" style="border-top-color:var(--info)">
