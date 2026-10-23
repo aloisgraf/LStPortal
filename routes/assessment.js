@@ -18,15 +18,18 @@ const parseJson = (t, fb) => { try { return t ? JSON.parse(t) : fb; } catch { re
 const SELECT_ATT = `SELECT *, EXTRACT(EPOCH FROM (NOW()-section_started_at))::float AS elapsed,
   EXTRACT(EPOCH FROM (NOW()-started_at))::float AS total_elapsed FROM assessment_attempts`;
 const getAttempt = uid => q1(`${SELECT_ATT} WHERE user_id=$1 AND archived_at IS NULL`, [uid]);
-// draft = { answers, block } — block = Index des aktuellen Blocks („Fertig, weiter“).
-const draftOf = att => { const d = parseJson(att.draft, {}); return { answers: d.answers || {}, block: Number.isInteger(d.block) ? d.block : 0 }; };
+// draft = { answers, block, blockAt } — block = Index des aktuellen Blocks
+// („Fertig, weiter“), blockAt = Sekunden seit Abschnittsbeginn, zu denen ein
+// Block begonnen wurde (für die Zeitauswertung je Block).
+const draftOf = att => { const d = parseJson(att.draft, {}); return { answers: d.answers || {}, block: Number.isInteger(d.block) ? d.block : 0, blockAt: d.blockAt && typeof d.blockAt === 'object' ? d.blockAt : {} }; };
+const timingOf = att => ({ used: att.elapsed, blockAt: draftOf(att).blockAt });
 
 // Wertet einen Abschnitt aus und springt zum nächsten. expectedSection
 // verhindert doppeltes Weiterschalten bei gleichzeitigen Abgaben.
 async function finishSection(att, answers, late) {
   const idx = att.current_section;
   const results = parseJson(att.results, []);
-  results.push(A.scoreSection(idx, answers, { late }));
+  results.push(A.scoreSection(idx, answers, { late, ...timingOf(att) }));
   const last = idx + 1 >= A.SECTIONS.length;
   const r = await pool.query(
     `UPDATE assessment_attempts SET results=$1, draft='{}', section_started_at=NULL,
@@ -128,8 +131,10 @@ router.put('/section/draft', auth, assessmentAccess, async (req,res) => {
     const nBlocks = A.SECTIONS[att.current_section].blocks.length;
     const reqBlock = Number(req.body?.block);
     const block = Number.isInteger(reqBlock) ? Math.min(Math.max(prev.block, reqBlock), Math.max(0, nBlocks - 1)) : prev.block;
+    const blockAt = { ...prev.blockAt };
+    if (block > prev.block) blockAt[block] = Math.round(att.elapsed);
     await pool.query('UPDATE assessment_attempts SET draft=$1 WHERE id=$2 AND current_section=$3 AND status=\'running\'',
-      [JSON.stringify({ answers, block }), att.id, att.current_section]);
+      [JSON.stringify({ answers, block, blockAt }), att.id, att.current_section]);
     ok(res, { block });
   } catch(e) { console.error('[assessment/draft]', e.message); bad(res,'Serverfehler',500); }
 });
@@ -189,18 +194,19 @@ router.get('/results', auth, adminOnly, async (req,res) => {
       EXTRACT(EPOCH FROM (NOW()-a.started_at))::float AS total_elapsed, u.name AS user_name
       FROM assessment_attempts a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.started_at DESC`);
     const candidates = await q(`SELECT id, name FROM users WHERE roles ? 'assessment' ORDER BY name`);
+    const original = await abschriftOriginal();
     const out = [];
     for (const r of rows) {
       const att = r.version === A.VERSION && !r.archived_at ? await expireIfNeeded(r) : r;
       const overrides = parseJson(att.overrides, {});
-      const results = A.applyOverrides(parseJson(att.results, []), overrides);
+      const results = A.applyRatings(A.applyOverrides(parseJson(att.results, []), overrides), parseJson(att.ratings, {}), { original });
       out.push({
         id: att.id, userId: att.user_id, userName: r.user_name || '?', ...stateOf(att),
         outdated: att.version !== A.VERSION, results, summary: A.summarize(results),
         events: parseJson(att.events, []), archivedAt: att.archived_at, device: parseJson(att.device, {}),
       });
     }
-    ok(res, { attempts: out, candidates: candidates.map(c => ({ id: c.id, name: c.name })) });
+    ok(res, { attempts: out, candidates: candidates.map(c => ({ id: c.id, name: c.name })), abschriftOriginal: original });
   } catch(e) { console.error('[assessment/results]', e.message); bad(res,'Serverfehler',500); }
 });
 
@@ -239,6 +245,46 @@ router.put('/attempts/:id/override', auth, adminOnly, async (req,res) => {
   } catch(e) { console.error('[assessment/override]', e.message); bad(res,'Serverfehler',500); }
 });
 
+// Bewertungsraster: value 0–3 setzt ein Kriterium, null entfernt die Bewertung.
+router.put('/attempts/:id/rating', auth, adminOnly, async (req,res) => {
+  try {
+    const { section, qid, criterion, value } = req.body || {};
+    const q = typeof section === 'string' && typeof qid === 'string' && A.rubricOf(section, qid);
+    if (!q || !q.rubric.some(c => c.key === criterion)) return bad(res,'Ungültige Angaben');
+    if (value !== null && !(Number.isInteger(value) && value >= 0 && value <= A.RATING_MAX)) return bad(res,'Ungültige Punkte');
+    const att = await q1('SELECT a.id, a.results, a.ratings, u.name AS user_name FROM assessment_attempts a LEFT JOIN users u ON u.id=a.user_id WHERE a.id=$1', [req.params.id]);
+    if (!att) return bad(res,'Nicht gefunden',404);
+    const r = parseJson(att.results, []).find(x => x.key === section);
+    if (!r || !(r.blocks || []).some(b => (b.details || []).some(d => d.id === qid))) return bad(res,'Dieser Text wurde noch nicht abgegeben',409);
+    const ratings = parseJson(att.ratings, {});
+    const key = A.overrideKey(section, qid);
+    const scores = { ...(ratings[key]?.scores || {}) };
+    if (value === null) delete scores[criterion]; else scores[criterion] = value;
+    if (Object.keys(scores).length) ratings[key] = { scores, by: req.user.name, at: new Date().toISOString() };
+    else delete ratings[key];
+    await pool.query('UPDATE assessment_attempts SET ratings=$1 WHERE id=$2', [JSON.stringify(ratings), att.id]);
+    await logAct(req.uid, req.user.name, 'assessment_rating', { attemptId: att.id, userName: att.user_name, section, qid, criterion, value });
+    ok(res);
+  } catch(e) { console.error('[assessment/rating]', e.message); bad(res,'Serverfehler',500); }
+});
+
+// Originaltext der Abschrift (liegt den Bewerbern auf Papier vor). Dient nur
+// dem automatischen Vergleich in den Details.
+async function abschriftOriginal() {
+  const r = await q1(`SELECT value FROM assessment_config WHERE key='abschrift_original'`);
+  return r ? r.value : '';
+}
+router.put('/config/abschrift', auth, adminOnly, async (req,res) => {
+  try {
+    const text = req.body?.text;
+    if (typeof text !== 'string' || text.length > 20000) return bad(res,'Ungültiger Text');
+    await pool.query(`INSERT INTO assessment_config (key,value,updated_at) VALUES ('abschrift_original',$1,NOW())
+      ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()`, [text.trim()]);
+    await logAct(req.uid, req.user.name, 'assessment_config', { key: 'abschrift_original' });
+    ok(res);
+  } catch(e) { console.error('[assessment/config]', e.message); bad(res,'Serverfehler',500); }
+});
+
 // Löschen: abgeschlossene, abgebrochene und archivierte Durchgänge werden
 // endgültig entfernt. Ein laufender Durchgang muss vorher abgebrochen werden.
 router.delete('/attempts/:id', auth, adminOnly, async (req,res) => {
@@ -263,7 +309,7 @@ router.post('/users/:uid/abort', auth, adminOnly, async (req,res) => {
     const att = await getAttempt(u.id);
     if (!att || att.status !== 'running') return bad(res,'Kein laufender Durchgang',409);
     const results = parseJson(att.results, []);
-    if (att.section_started_at && att.version === A.VERSION) results.push(A.scoreSection(att.current_section, draftOf(att).answers, { late: false }));
+    if (att.section_started_at && att.version === A.VERSION) results.push(A.scoreSection(att.current_section, draftOf(att).answers, { late: false, aborted: true, ...timingOf(att) }));
     const ev = JSON.stringify([{ type: 'aborted', section: att.current_section, at: new Date().toISOString(), by: req.user.name }]);
     const r = await pool.query(`UPDATE assessment_attempts SET status='aborted', results=$1, draft='{}', section_started_at=NULL,
         finished_at=NOW(), events=(events::jsonb || $2::jsonb)::text WHERE id=$3 AND status='running'`,

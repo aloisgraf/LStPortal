@@ -1037,6 +1037,10 @@ async function initDB() {
     `ALTER TABLE assessment_attempts ADD COLUMN IF NOT EXISTS overrides TEXT NOT NULL DEFAULT '{}'`,
     // Letzter Gerätestatus des Teilnehmers (Akku) für die Live-Ansicht.
     `ALTER TABLE assessment_attempts ADD COLUMN IF NOT EXISTS device TEXT NOT NULL DEFAULT '{}'`,
+    // Bewertungsraster der Texte: { "<Abschnitt>/<Frage>": { scores: { Kriterium: 0–3 }, by, at } }.
+    `ALTER TABLE assessment_attempts ADD COLUMN IF NOT EXISTS ratings TEXT NOT NULL DEFAULT '{}'`,
+    // Einstellungen des Assessments (z. B. Originaltext der Abschrift).
+    `CREATE TABLE IF NOT EXISTS assessment_config (key TEXT PRIMARY KEY, value TEXT NOT NULL DEFAULT '', updated_at TIMESTAMPTZ DEFAULT NOW())`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }
