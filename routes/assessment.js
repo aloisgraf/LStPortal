@@ -245,13 +245,13 @@ router.put('/attempts/:id/override', auth, assessmentManage, async (req,res) => 
   } catch(e) { console.error('[assessment/override]', e.message); bad(res,'Serverfehler',500); }
 });
 
-// Bewertungsraster: value 0–3 setzt ein Kriterium, null entfernt die Bewertung.
+// Bewertungsraster: value 1–5 setzt ein Kriterium, null entfernt die Bewertung.
 router.put('/attempts/:id/rating', auth, assessmentManage, async (req,res) => {
   try {
     const { section, qid, criterion, value } = req.body || {};
     const q = typeof section === 'string' && typeof qid === 'string' && A.rubricOf(section, qid);
     if (!q || !q.rubric.some(c => c.key === criterion)) return bad(res,'Ungültige Angaben');
-    if (value !== null && !(Number.isInteger(value) && value >= 0 && value <= A.RATING_MAX)) return bad(res,'Ungültige Punkte');
+    if (value !== null && !(Number.isInteger(value) && value >= A.RATING_MIN && value <= A.RATING_MAX)) return bad(res,'Ungültige Punkte');
     const att = await q1('SELECT a.id, a.results, a.ratings, u.name AS user_name FROM assessment_attempts a LEFT JOIN users u ON u.id=a.user_id WHERE a.id=$1', [req.params.id]);
     if (!att) return bad(res,'Nicht gefunden',404);
     const r = parseJson(att.results, []).find(x => x.key === section);
