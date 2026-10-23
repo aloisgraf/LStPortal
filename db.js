@@ -1,7 +1,7 @@
 'use strict';
 const { Pool } = require('pg');
 const crypto   = require('crypto');
-const { isAssessmentOnly, canSeeAssessment } = require('./lib/roles');
+const { isAssessmentOnly, canSeeAssessment, canManageAssessment } = require('./lib/roles');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -136,6 +136,7 @@ async function getP(uid, userObj=null, overrides=[]) {
     // aufgehoben werden kann.
     assessmentOnly: isAssessmentOnly(roles),
     seeAssessment: canSeeAssessment(roles),
+    manageAssessment: canManageAssessment(roles),
     tabs: getTabVisibility(roles, overrides),
     roles,
   };

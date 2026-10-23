@@ -229,7 +229,7 @@ router.get('/', auth, async (req,res) => {
         tabs:p.tabs,
         roles: p.roles,
         canManageDp, manageSop:p.manageSop, canManageSpint,
-        assessmentOnly:p.assessmentOnly, seeAssessment:p.seeAssessment,
+        assessmentOnly:p.assessmentOnly, seeAssessment:p.seeAssessment, manageAssessment:p.manageAssessment,
       },
       users: usersRaw.map(u=>({
         id:u.id, name:u.name, initials:u.initials, roles:parseRoles(u.roles),

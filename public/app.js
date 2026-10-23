@@ -3237,7 +3237,6 @@ async function saveUser(){
   if(!/^[a-z0-9._-]{3,40}$/.test(username)){errEl.textContent='\u26A0\uFE0F Benutzername: min. 3 Zeichen, nur Buchstaben/Zahlen/._-!';return;}
   const roles=Array.from(document.querySelectorAll('#ufRoles input:checked')).map(cb=>cb.value);
   if(!roles.length){errEl.textContent='\u26A0\uFE0F Mindestens eine Rolle!';return;}
-  if(roles.includes('assessment')&&roles.some(r=>r!=='assessment'&&!ASSESSMENT_COMBINABLE.includes(r))){errEl.textContent='\u26A0\uFE0F Assessment kann nur mit Administrator kombiniert werden!';return;}
   const id=document.getElementById('ufId').value;loading(true);
   const dpRelevant=document.getElementById('ufDpRelevant')?document.getElementById('ufDpRelevant').checked:false;
   const isTestUser=document.getElementById('ufIsTestUser')?document.getElementById('ufIsTestUser').checked:false;
@@ -3247,15 +3246,10 @@ async function saveUser(){
     await fetchData();backToAdmin('users');toast('\u2705 Benutzer gespeichert!');
   }catch(e){errEl.textContent='\u26A0\uFE0F '+e.message;}finally{loading(false);}
 }
-// Rolle "Assessment" ist exklusiv (lib/roles.js): daneben ist nur Administrator
-// erlaubt — beim Anhaken werden die unverträglichen Rollen automatisch abgewählt.
-const ASSESSMENT_COMBINABLE=['admin'];
-function ufRoleChange(cb){
-  if(!cb.checked)return;
-  const boxes=Array.from(document.querySelectorAll('#ufRoles input'));
-  if(cb.value==='assessment')boxes.forEach(b=>{if(b.value!=='assessment'&&!ASSESSMENT_COMBINABLE.includes(b.value))b.checked=false;});
-  else if(!ASSESSMENT_COMBINABLE.includes(cb.value))boxes.forEach(b=>{if(b.value==='assessment')b.checked=false;});
-}
+// Rolle "Assessment" (lib/roles.js): allein = Bewerber (sieht nur das
+// Assessment), zusammen mit einer weiteren Rolle = Prüfer (Assessment wie die
+// Administration, ohne Löschen). Alle Kombinationen sind erlaubt.
+function ufRoleChange(cb){}
 async function delUser(id){if(!confirm('Benutzer l\u00f6schen?'))return;loading(true);try{await api('DELETE','/users/'+id);await fetchData();backToAdmin('users');}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}finally{loading(false);}}
 function openCF(id){const c=id?getCat(id):null;document.getElementById('cfT').textContent=c?'Kategorie bearbeiten':'Kategorie anlegen';document.getElementById('cfId').value=c?.id||'';document.getElementById('cfLb').value=c?.label||'';document.getElementById('cfEm').value=c?.emoji||'\uD83D\uDCCC';document.getElementById('cfErr').textContent='';S.cfColor=c?.color||pal()[2];buildCP('cfCR',S.cfColor,'pickC');closeModal('admOv');openModal('cfOv');}
 async function saveCategory(){const label=document.getElementById('cfLb').value.trim();const errEl=document.getElementById('cfErr');errEl.textContent='';if(!label){errEl.textContent='\u26A0\uFE0F Bezeichnung erforderlich!';return;}const id=document.getElementById('cfId').value;loading(true);try{if(id)await api('PUT','/categories/'+id,{label,emoji:document.getElementById('cfEm').value.trim()||'\uD83D\uDCCC',color:S.cfColor});else await api('POST','/categories',{label,emoji:document.getElementById('cfEm').value.trim()||'\uD83D\uDCCC',color:S.cfColor});await fetchData();backToAdmin('cats');toast('\u2705 Gespeichert!');}catch(e){errEl.textContent='\u26A0\uFE0F '+e.message;}finally{loading(false);}}
