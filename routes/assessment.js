@@ -193,7 +193,7 @@ router.get('/results', auth, assessmentManage, async (req,res) => {
     const rows = await q(`SELECT a.*, EXTRACT(EPOCH FROM (NOW()-a.section_started_at))::float AS elapsed,
       EXTRACT(EPOCH FROM (NOW()-a.started_at))::float AS total_elapsed, u.name AS user_name
       FROM assessment_attempts a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.started_at DESC`);
-    const candidates = await q(`SELECT id, name FROM users WHERE roles ? 'assessment' AND jsonb_array_length(roles)=1 ORDER BY name`);
+    const candidates = await q(`SELECT id, name FROM users WHERE roles ? 'assessment' AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements_text(roles) r WHERE r NOT IN ('assessment','standard')) ORDER BY name`);
     const original = await abschriftOriginal();
     const out = [];
     for (const r of rows) {

@@ -18,6 +18,7 @@ describe('validateRoles', () => {
 describe('Bewerber, Prüfer und Administration', () => {
   it('nur die Rolle Assessment = Bewerber, eingeschränkt', () => {
     expect(isAssessmentOnly(['assessment'])).toBe(true);
+    expect(isAssessmentOnly(['assessment', 'standard'])).toBe(true);
     expect(isAssessmentOnly(['assessment', 'ausbildung'])).toBe(false);
     expect(isAssessmentOnly(['admin', 'assessment'])).toBe(false);
     expect(isAssessmentOnly(['standard'])).toBe(false);
@@ -27,6 +28,8 @@ describe('Bewerber, Prüfer und Administration', () => {
     expect(canManageAssessment(['leitung', 'assessment'])).toBe(true);
     expect(canManageAssessment(['admin'])).toBe(true);
     expect(canManageAssessment(['assessment'])).toBe(false);
+    expect(canManageAssessment(['assessment', 'standard'])).toBe(false);
+    expect(canManageAssessment(['assessment', 'standard', 'leitung'])).toBe(true);
     expect(canManageAssessment(['ausbildung'])).toBe(false);
   });
   it('Assessment-Bereich sehen Assessment-Nutzer und Admins', () => {
