@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const { q, q1, newId, pool, parseRoles, logAct, nextTicketNumber, getUser, createNotification } = require('../db');
 const { auth, adminOnly, ok, bad, invalidateRolePermsCache } = require('../middleware');
 const { validateRoles } = require('../lib/roles');
+const { validateOverride } = require('../lib/permissions');
 
 
 router.put('/allowances', auth, async (req,res) => {
@@ -127,7 +128,7 @@ router.delete('/messages/:id', auth, async (req,res) => {
   try {
     const msg=await q1('SELECT * FROM messages WHERE id=$1',[req.params.id]);
     if (!msg) return bad(res,'Nicht gefunden',404);
-    if (!req.p.roles.includes('admin')&&msg.sender_id!==req.uid) return bad(res,'Keine Berechtigung',403);
+    if (!req.p.manageUsers&&msg.sender_id!==req.uid) return bad(res,'Keine Berechtigung',403);
     await pool.query('DELETE FROM message_reads WHERE message_id=$1',[req.params.id]);
     await pool.query('DELETE FROM messages WHERE id=$1',[req.params.id]);
     ok(res);
@@ -265,7 +266,7 @@ router.post('/impersonate/stop', auth, async (req,res) => {
 // ── DIENSTPLAENE ──────────────────────────────────────────────────────────────
 router.post('/dienstplaene', auth, async (req,res) => {
   try {
-    if (!req.p.addGeneral) return bad(res,'Keine Berechtigung',403);
+    if (!req.p.uploadDienstplaene) return bad(res,'Keine Berechtigung',403);
     const {month,year,label,filename,fileData} = req.body;
     if (!month||!year||!label?.trim()||!fileData) return bad(res,'Alle Felder erforderlich');
     const existing = await q('SELECT id,version FROM dienstplaene WHERE month=$1 AND year=$2 AND is_archived=false',[month,year]);
@@ -294,7 +295,7 @@ router.get('/dienstplaene/:id/file', auth, async (req,res) => {
 });
 router.delete('/dienstplaene/:id', auth, async (req,res) => {
   try {
-    if (!req.p.addGeneral) return bad(res,'Keine Berechtigung',403);
+    if (!req.p.uploadDienstplaene) return bad(res,'Keine Berechtigung',403);
     await pool.query('DELETE FROM dienstplaene WHERE id=$1',[req.params.id]);
     ok(res);
   } catch(e) { bad(res,'Serverfehler',500); }
@@ -316,7 +317,7 @@ router.put('/checklists/:id', auth, async (req,res) => {
   try {
     const tmpl = await q1('SELECT * FROM checklist_templates WHERE id=$1',[req.params.id]);
     if (!tmpl) return bad(res,'Nicht gefunden',404);
-    if (!req.p.roles.includes('admin')&&tmpl.created_by!==req.uid) return bad(res,'Keine Berechtigung',403);
+    if (!req.p.manageChecklists&&tmpl.created_by!==req.uid) return bad(res,'Keine Berechtigung',403);
     const {name,department,items=[]} = req.body;
     await pool.query('UPDATE checklist_templates SET name=$1,department=$2 WHERE id=$3',[name.trim(),department,req.params.id]);
     await pool.query('DELETE FROM checklist_template_items WHERE template_id=$1',[req.params.id]);
@@ -330,7 +331,7 @@ router.delete('/checklists/:id', auth, async (req,res) => {
   try {
     const tmpl = await q1('SELECT * FROM checklist_templates WHERE id=$1',[req.params.id]);
     if (!tmpl) return bad(res,'Nicht gefunden',404);
-    if (!req.p.roles.includes('admin')&&tmpl.created_by!==req.uid) return bad(res,'Keine Berechtigung',403);
+    if (!req.p.manageChecklists&&tmpl.created_by!==req.uid) return bad(res,'Keine Berechtigung',403);
     await pool.query('DELETE FROM checklist_template_items WHERE template_id=$1',[req.params.id]);
     await pool.query('DELETE FROM checklist_templates WHERE id=$1',[req.params.id]);
     ok(res);
@@ -357,7 +358,7 @@ router.post('/diensttausch', auth, async (req,res) => {
 
 router.put('/diensttausch/:id/decide', auth, async (req,res) => {
   try {
-    if (!req.p.canApproveEvents) return bad(res,'Keine Berechtigung',403);
+    if (!req.p.manageDiensttausch) return bad(res,'Keine Berechtigung',403);
     const { decision, rejectReason } = req.body;
     if (!['approved','rejected'].includes(decision)) return bad(res,'Ungültige Entscheidung');
     await pool.query(
@@ -484,7 +485,7 @@ router.get('/homeoffice/slots', auth, async (req,res) => {
 
 router.put('/homeoffice/config', auth, async (req,res) => {
   try {
-    if(!req.p.canApproveEvents&&!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+    if(!req.p.manageHomeoffice) return bad(res,'Keine Berechtigung',403);
     const {date,maxSlots} = req.body;
     if(!date||maxSlots==null) return bad(res,'date und maxSlots erforderlich');
     const slots = parseInt(maxSlots);
@@ -573,7 +574,7 @@ router.delete('/homeoffice/dienste/:id', auth, adminOnly, async (req,res) => {
 // ── NEWS ──
 router.get('/news', auth, async (req,res) => {
   try {
-    const canManage = req.p.manageUsers || req.p.roles?.includes('leitung');
+    const canManage = req.p.manageNews;
     const today = new Date().toISOString().slice(0,10);
     const all = await q('SELECT * FROM news ORDER BY created_at DESC');
     const pins = await q('SELECT news_id FROM news_pins WHERE user_id=$1',[req.uid]);
@@ -597,7 +598,7 @@ router.get('/news', auth, async (req,res) => {
 
 router.post('/news', auth, async (req,res) => {
   try {
-    const isEditor = req.p.manageUsers || req.p.roles?.includes('leitung');
+    const isEditor = req.p.manageNews;
     if(!isEditor) return bad(res,'Keine Berechtigung',403);
     const {title,body,fromDate,toDate,isImportant} = req.body;
     if(!title?.trim()) return bad(res,'Titel erforderlich');
@@ -613,7 +614,7 @@ router.post('/news', auth, async (req,res) => {
 
 router.put('/news/:id', auth, async (req,res) => {
   try {
-    const isEditor = req.p.manageUsers || req.p.roles?.includes('leitung');
+    const isEditor = req.p.manageNews;
     if(!isEditor) return bad(res,'Keine Berechtigung',403);
     const {title,body,fromDate,toDate,isImportant} = req.body;
     await pool.query(
@@ -626,7 +627,7 @@ router.put('/news/:id', auth, async (req,res) => {
 
 router.delete('/news/:id', auth, async (req,res) => {
   try {
-    const isEditor = req.p.manageUsers || req.p.roles?.includes('leitung');
+    const isEditor = req.p.manageNews;
     if(!isEditor) return bad(res,'Keine Berechtigung',403);
     await pool.query('DELETE FROM news_pins WHERE news_id=$1',[req.params.id]);
     await pool.query('DELETE FROM news WHERE id=$1',[req.params.id]);
@@ -789,7 +790,7 @@ router.get('/ical/:userId', async (req,res) => {
 // STATISTIK
 router.get('/statistik', auth, async (req,res) => {
   try {
-    if (!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+    if (!req.p.seeStatistik) return bad(res,'Keine Berechtigung',403);
     const [ticketsRaw, logins] = await Promise.all([
       q('SELECT id,created_by,assignee_id,status,department,updated_at FROM tickets WHERE is_deleted IS NOT TRUE'),
       q(`SELECT user_id, COUNT(*) as cnt FROM activity_log WHERE action='login' GROUP BY user_id`),
@@ -887,8 +888,7 @@ router.delete('/portal-links/:id', auth, async (req,res) => {
 // ── STATION OUTAGES ──
 router.post('/station-outages', auth, async (req,res) => {
   try {
-    const roles=req.p.roles||[];
-    if(!roles.some(r=>['admin','leitung','technik'].includes(r))) return bad(res,'Keine Berechtigung',403);
+    if(!req.p.managePlatz) return bad(res,'Keine Berechtigung',403);
     const {stationName,reason,endAt} = req.body;
     if (!stationName) return bad(res,'Station erforderlich');
     await pool.query('INSERT INTO station_outages (id,station_name,reason,start_at,end_at,created_by) VALUES ($1,$2,$3,NOW(),$4,$5)',
@@ -898,8 +898,7 @@ router.post('/station-outages', auth, async (req,res) => {
 });
 router.delete('/station-outages/:id', auth, async (req,res) => {
   try {
-    const roles=req.p.roles||[];
-    if(!roles.some(r=>['admin','leitung','technik'].includes(r))) return bad(res,'Keine Berechtigung',403);
+    if(!req.p.managePlatz) return bad(res,'Keine Berechtigung',403);
     await pool.query('DELETE FROM station_outages WHERE id=$1',[req.params.id]);
     ok(res);
   } catch(e) { bad(res,'Serverfehler',500); }
@@ -915,13 +914,17 @@ router.get('/role-permissions', auth, async (req,res) => {
 router.post('/role-permissions', auth, async (req,res) => {
   try {
     if(!req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
-    const {role,permission,granted} = req.body;
-    if(!role||!permission) return bad(res,'role und permission erforderlich');
+    // Modul: {role, permission:'mod:<modul>', level} · Schalter: {role, permission:'flag:<key>', granted}
+    const {role,permission,granted,level} = req.body||{};
+    const isMod = String(permission||'').startsWith('mod:');
+    const err = validateOverride(role, permission, isMod ? level : granted);
+    if(err) return bad(res,err);
     await pool.query(
-      'INSERT INTO role_permissions (role,permission,granted) VALUES ($1,$2,$3) ON CONFLICT (role,permission) DO UPDATE SET granted=$3',
-      [role,permission,granted!==false]
+      'INSERT INTO role_permissions (role,permission,granted,level) VALUES ($1,$2,$3,$4) ON CONFLICT (role,permission) DO UPDATE SET granted=$3, level=$4',
+      [role, permission, isMod ? true : granted, isMod ? level : null]
     );
     invalidateRolePermsCache();
+    await logAct(req.uid, req.user.name, 'role_permission', {role, permission, value: isMod ? level : granted});
     ok(res);
   } catch(e) { bad(res,'Serverfehler',500); }
 });

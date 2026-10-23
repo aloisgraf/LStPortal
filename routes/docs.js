@@ -126,7 +126,7 @@ router.get('/docs', auth, async (req, res) => {
 // muss das Anlegen selbst mindestens genauso vertrauenswürdig sein wie das
 // spätere Einschränken.
 router.post('/docs', auth, async (req, res) => {
-  if (!req.p.addGeneral) return bad(res, 'Keine Berechtigung', 403);
+  if (!req.p.createDocs) return bad(res, 'Keine Berechtigung', 403);
   const { title, description, categoryId, name: originalName, mimeType, data, visibleRoles, editableRoles, visibleUsers, editableUsers } = req.body;
   if (!title) return bad(res, 'Titel erforderlich', 400);
   if (!originalName || !data) return bad(res, 'Datei fehlt', 400);

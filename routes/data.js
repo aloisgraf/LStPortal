@@ -2,6 +2,7 @@
 const router = require('express').Router();
 const { q, q1, parseRoles, parseTags, canSeeTk, canEditTk, canSeeMsg, pool, isUserActive, canSeeAcl, canEditAcl } = require('../db');
 const { auth, ok, bad } = require('../middleware');
+const { clientModel } = require('../lib/permissions');
 
 // DATA
 router.get('/', auth, async (req,res) => {
@@ -23,8 +24,7 @@ router.get('/', auth, async (req,res) => {
           mustChangePW:u.must_change_pw, username:u.username, isOnline:true }],
       });
     }
-    const canManageDp = roles.some(r=>['admin','leitung','dienstplanung'].includes(r));
-    const canManageSpint = roles.some(r=>['admin','leitung','technik'].includes(r));
+    const { canManageDp, canManageSpint } = p;
     const [usersRaw,cats,tagsRaw,evRaw,evConfirmsRaw,tkRaw,notesRaw,allwRaw,clTmpls,clItems,
            tkClRaw,tkClItemsRaw,msgsRaw,readsRaw,notifsRaw,einspRaw,hoRaw,dpRaw,tkViewsRaw,dtRaw,dtReadsRaw,hoSlotsRaw,hoConfigRaw,hoBoxesRaw,hoDiensteRaw,vacCfgRaw,tkSubcatsRaw,noteTmplsRaw,stShiftsRaw,stSessionsRaw,tkFilesRaw,docCatsRaw,docsRaw,linksRaw,stOutagesRaw,rolePermsRaw,meetingsRaw,instancesRaw,itemsRaw,partRaw,dpShiftTypesRaw,dpAbsenceTypesRaw,dpPlansRaw,dpQualificationsRaw,dpShiftPrefsRaw,dpProtocolRaw,todosRaw,todoItemsRaw,todoAssigneesRaw,myDpPlanIdsRaw,todoNotificationsRaw,contactsRaw,sopTemplatesRaw,sopItemsRaw,sopRunsRaw,sopRunItemsRaw,lockersRaw,sopBranchOptionsRaw,departmentsRaw,lockerCategoriesRaw,chatThreadsRaw,chatMessagesRaw,chatReadsRaw,protocolsRaw,todoNotesRaw,instFilesRaw,docLinksRaw,contactLinksRaw,appointmentsRaw,wikiCatsRaw,wikiArticlesRaw,contactCatsRaw] = await Promise.all([
       q('SELECT id,name,initials,roles,color,must_change_pw,last_seen,category,email,username,hire_date,termination_date,dp_relevant,is_test_user FROM users ORDER BY name'),
@@ -226,11 +226,19 @@ router.get('/', auth, async (req,res) => {
         seeAllAbrechnung:p.seeAllAbrechnung,
         myDepts:tp.myDepts, seeAllTickets:tp.seeAll,
         canSetPublic:tp.canSetPublic, canAssign:tp.canAssign,
-        tabs:p.tabs,
+        tabs:p.tabs, levels:p.levels, flags:p.flags,
         roles: p.roles,
         canManageDp, manageSop:p.manageSop, canManageSpint,
+        manageHomeoffice:p.manageHomeoffice, manageDiensttausch:p.manageDiensttausch,
+        uploadDienstplaene:p.uploadDienstplaene, zahnarztEdit:p.zahnarztEdit, zahnarztDelete:p.zahnarztDelete,
+        managePlatz:p.managePlatz, manageChecklists:p.manageChecklists, manageNews:p.manageNews,
+        createDocs:p.createDocs, createWiki:p.createWiki, createContacts:p.createContacts,
+        seeStatistik:p.seeStatistik,
         assessmentOnly:p.assessmentOnly, seeAssessment:p.seeAssessment, manageAssessment:p.manageAssessment,
       },
+      ticketPermissions: tp,
+      // Modell für die Rechte-Matrix (Einstellungen → Rechte), nur für die Administration
+      permModel: p.manageUsers ? clientModel((departmentsRaw||[]).map(d=>d.id)) : null,
       users: usersRaw.map(u=>({
         id:u.id, name:u.name, initials:u.initials, roles:parseRoles(u.roles),
         color:u.color, mustChangePW:u.must_change_pw,
@@ -251,12 +259,12 @@ router.get('/', auth, async (req,res) => {
         const createdByMe = ev.created_by === uid;
         // Sichtbarkeit: Dienstplanung/Admin/Leitung sehen alles
         // Andere: eigene + die für sie erstellt wurden + allgemeine
-        const canSeeAll = roles.includes('admin') || roles.includes('leitung') || p.canApproveEvents;
+        const canSeeAll = p.canApproveEvents;
         const isForMe = ev.user_id === uid;
         // Anonymisieren wenn: kein Vollzugriff, nicht allgemein, nicht eigener Eintrag, nicht für mich erstellt
         const anonymize = !canSeeAll && !ev.is_general && !isForMe && !createdByMe;
         // Löschen darf: Admin, Ersteller (wenn ausstehend)
-        const canDelete = roles.includes('admin') || (createdByMe && (!ev.approval_status || ev.approval_status === 'pending'));
+        const canDelete = p.manageUsers || (createdByMe && (!ev.approval_status || ev.approval_status === 'pending'));
         const confirmed = ev.is_general || createdByMe || confirmedEventIds.has(ev.id);
         return {
           id:ev.id, isGeneral:ev.is_general, dateFrom:ev.date_from, dateTo:ev.date_to,
@@ -297,7 +305,7 @@ router.get('/', auth, async (req,res) => {
         if(m.sender_id===uid) return true;        // eigene gesendete
         if(!m.target_type||m.target_type==='all') return true;  // an alle
         if(m.target_type==='user') return m.target_value===uid; // direkt an mich
-        const isPriv=roles.includes('admin')||roles.includes('leitung');
+        const isPriv=p.seeAllMessages;
         return isPriv||roles.includes(m.target_value); // an Fachbereich
       }).map(m=>({
         id:m.id, title:m.title, body:m.body,
@@ -330,7 +338,7 @@ router.get('/', auth, async (req,res) => {
       })),
       diensttausch: dtRaw.filter(dt => {
         // Dienstplanung/Admin sieht alles
-        if (p.canApproveEvents) return true;
+        if (p.manageDiensttausch) return true;
         // Alle anderen: nur eigene + Erwähnungen
         if (dt.created_by === uid) return true;
         if (myNameForDt && dt.text.toLowerCase().includes('@'+myNameForDt)) return true;
@@ -341,7 +349,7 @@ router.get('/', auth, async (req,res) => {
         rejectReason:dt.reject_reason, isSeen:dtSeenSet.has(dt.id),
         isRelevant: dt.created_by===uid ||
           (myNameForDt && dt.text.toLowerCase().includes('@'+myNameForDt)) ||
-          (p.canApproveEvents && dt.status==='pending'),
+          (p.manageDiensttausch && dt.status==='pending'),
       })),
       ticketSubcategories: (tkSubcatsRaw||[]).map(s=>({id:s.id,department:s.department,label:s.label,sortOrder:s.sort_order})),
       noteTemplates: (noteTmplsRaw||[]).map(t=>({id:t.id,label:t.label,body:t.body})),
@@ -361,7 +369,7 @@ router.get('/', auth, async (req,res) => {
         _canManage:canEditAcl(d, uid, roles, p, docCatsById)})),
       portalLinks: (linksRaw||[]).map(l=>({id:l.id,label:l.label,url:l.url,icon:l.icon,description:l.description,sortOrder:l.sort_order})),
       stationOutages: (stOutagesRaw||[]).map(o=>({id:o.id,stationName:o.station_name,reason:o.reason,startAt:o.start_at,endAt:o.end_at,createdBy:o.created_by})),
-      rolePermissions: (rolePermsRaw||[]).map(r=>({role:r.role,permission:r.permission,granted:r.granted})),
+      rolePermissions: (rolePermsRaw||[]).map(r=>({role:r.role,permission:r.permission,granted:r.granted,level:r.level||null})),
       meetings: (meetingsRaw||[]).filter(m=>p.manageUsers||m.created_by===uid||assignedMeetingIds.has(m.id)).map(m=>{
         const canMng=p.manageUsers||m.created_by===uid;
         return {id:m.id,title:m.title,type:m.type,rhythm:m.rhythm,rhythmDay:m.rhythm_day,rhythmTime:m.rhythm_time||'',description:m.description||'',link:m.link||null,createdBy:m.created_by,createdAt:m.created_at,_canManage:canMng,

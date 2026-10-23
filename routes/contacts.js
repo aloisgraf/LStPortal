@@ -6,7 +6,7 @@ const { auth, ok, bad } = require('../middleware');
 // Kontakte sind standardmäßig nur für Ersteller + Admin sichtbar; Ordner
 // (Kategorien) und/oder einzelne Kontakte können gezielt für Rollen und/oder
 // Nutzer freigegeben werden (siehe canSeeAcl/canEditAcl in db.js) — Anlegen
-// wie bei Dokumenten/Wiki über addGeneral geregelt.
+// wie bei Dokumenten/Wiki über createContacts geregelt (Modul in lib/permissions.js).
 
 // ── KATEGORIEN ────────────────────────────────────────────────────────────
 
@@ -25,7 +25,7 @@ router.get('/contact-categories', auth, async (req, res) => {
 });
 
 router.post('/contact-categories', auth, async (req, res) => {
-  if (!req.p.addGeneral) return bad(res, 'Keine Berechtigung', 403);
+  if (!req.p.createContacts) return bad(res, 'Keine Berechtigung', 403);
   try {
     const { name, icon, color, sortOrder, parentId, visibleRoles, editableRoles, visibleUsers, editableUsers } = req.body;
     if (!name?.trim()) return bad(res, 'Name erforderlich', 400);
@@ -101,7 +101,7 @@ router.get('/contacts', auth, async (req,res) => {
 
 router.post('/contacts', auth, async (req,res) => {
   try {
-    if (!req.p.addGeneral) return bad(res,'Keine Berechtigung',403);
+    if (!req.p.createContacts) return bad(res,'Keine Berechtigung',403);
     const {title,name,email,phone1,phone2,company,responsibleFor,availability,categoryId,visibleRoles,editableRoles,visibleUsers,editableUsers} = req.body;
     if (!name?.trim()) return bad(res,'Name erforderlich');
     const id = newId();
