@@ -1041,9 +1041,13 @@ async function initDB() {
     `ALTER TABLE assessment_attempts ADD COLUMN IF NOT EXISTS ratings TEXT NOT NULL DEFAULT '{}'`,
     // Einstellungen des Assessments (z. B. Originaltext der Abschrift).
     `CREATE TABLE IF NOT EXISTS assessment_config (key TEXT PRIMARY KEY, value TEXT NOT NULL DEFAULT '', updated_at TIMESTAMPTZ DEFAULT NOW())`,
+    // Versionierter Fragenkatalog (lib/assessment-catalog.js), sections = JSON.
+    `CREATE TABLE IF NOT EXISTS assessment_catalogs (version INTEGER PRIMARY KEY, sections TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW(), created_by TEXT, note TEXT)`,
   ];
   for (const m of migs2) { try { await pool.query(m); } catch(e) {} }
   for (const m of migs) { try { await pool.query(m); } catch(e) {} }
+  try { await require('./lib/assessment-catalog').loadCatalogs(pool); }
+  catch(e) { console.error('[assessment-catalog]', e.message); }
 
   // Rechte-Modell "Module mit Stufen" (lib/permissions.js): Spalte level und
   // einmalige Übernahme der alten Einzelrechte/Reiter-Schalter in Stufen.

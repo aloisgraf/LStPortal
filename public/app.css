@@ -848,3 +848,24 @@ body.asm-run .asm-bar{box-shadow:var(--sh)}
 .asm-wd-status{font-size:12px;font-weight:700;color:var(--ok)}.asm-wd-status.exp{color:var(--danger)}
 .asm-play-time{font-size:11px;color:var(--mu);white-space:nowrap;font-variant-numeric:tabular-nums}
 .asm-play-btn{min-width:100px}
+.asm-ed-top{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px;font-size:13px}
+.asm-ed-note{font-size:12px;color:var(--mu);margin-bottom:12px}
+.asm-ed-sec{border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px;padding:8px 12px;background:var(--card,#fff)}
+.asm-ed-sec>summary{cursor:pointer;font-weight:800;font-size:14px;padding:4px 0}
+.asm-ed-min{font-weight:400;color:var(--mu);font-size:12px;margin-left:6px}
+.asm-ed-block{border-left:3px solid var(--info);padding:6px 0 6px 12px;margin:12px 0}
+.asm-ed-bh{font-weight:700;color:var(--mu);font-size:12px;margin-bottom:4px}
+.asm-ed-f{display:block;flex:1;margin:4px 0;font-size:11px;color:var(--mu)}
+.asm-ed-f>span{display:block;margin-bottom:2px}
+.asm-ed-f input,.asm-ed-f textarea,.asm-ed-f select{width:100%;font:inherit;font-size:13px;color:var(--tx,inherit);padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg)}
+.asm-ed-f textarea{resize:vertical}
+.asm-ed-row{display:flex;gap:10px;flex-wrap:wrap}
+.asm-ed-q{border:1px solid var(--border);border-radius:8px;padding:6px 10px;margin:8px 0}
+.asm-ed-qh{display:flex;align-items:center;gap:8px;font-size:12px}
+.asm-ed-type{background:var(--bg);border-radius:10px;padding:1px 8px;font-size:11px}
+.asm-ed-id{color:var(--di);font-size:10px}
+.asm-ed-del{margin-left:auto;font-size:11px;padding:2px 8px}
+.asm-ed-add{font-size:12px;color:var(--mu);margin-top:6px}.asm-ed-add .btn-s{font-size:11px;padding:2px 8px}
+.asm-ed-bar{position:sticky;bottom:0;display:flex;gap:10px;align-items:center;background:var(--card,#fff);border-top:1px solid var(--border);padding:10px 0;margin-top:10px}
+.asm-ed-bar input{flex:1}
+.asm-ed-state{font-size:12px;color:var(--warn);white-space:nowrap}
