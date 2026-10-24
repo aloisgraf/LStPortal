@@ -1,7 +1,7 @@
 'use strict';
 const router = require('express').Router();
 const bcrypt = require('bcryptjs');
-const { q, q1, newId, pool, parseRoles, logAct, nextTicketNumber, getUser, createNotification } = require('../db');
+const { q, q1, newId, pool, parseRoles, logAct, nextTicketNumber, getUser, createNotification, getP, aclAccessInfo } = require('../db');
 const { auth, adminOnly, ok, bad, invalidateRolePermsCache } = require('../middleware');
 const { validateRoles } = require('../lib/roles');
 const { validateOverride } = require('../lib/permissions');
@@ -902,6 +902,33 @@ router.delete('/station-outages/:id', auth, async (req,res) => {
     await pool.query('DELETE FROM station_outages WHERE id=$1',[req.params.id]);
     ok(res);
   } catch(e) { bad(res,'Serverfehler',500); }
+});
+
+// ── ORDNER-BERECHTIGUNGEN EINES NUTZERS ──
+// Übersicht für das eigene Profil bzw. für die Administration (Benutzer
+// bearbeiten): welche Ordner von Dokumenten, Wiki und Kontakten der Nutzer
+// lesen/schreiben darf und warum (Rolle, persönlich, geerbt, selbst angelegt).
+router.get('/folder-access/:uid', auth, async (req,res) => {
+  try {
+    if (req.params.uid !== req.uid && !req.p.manageUsers) return bad(res,'Keine Berechtigung',403);
+    const u = await getUser(req.params.uid);
+    if (!u) return bad(res,'Nicht gefunden',404);
+    const tp = await getP(u.id, u, await q('SELECT * FROM role_permissions').catch(()=>[]));
+    if (tp.manageUsers) return ok(res, { isAdmin:true, groups:[] });
+    const roles = parseRoles(u.roles);
+    const groups = [];
+    for (const [key,label,table] of [['docs','Dokumente','doc_categories'],['wiki','Wiki','wiki_categories'],['contacts','Kontakte','contact_categories']]) {
+      const cats = await q(`SELECT * FROM ${table} ORDER BY sort_order, name`).catch(()=>[]);
+      const byId = {}; cats.forEach(c => byId[c.id] = c);
+      const pathOf = c => { const parts=[]; const seen=new Set(); let x=c; while (x && !seen.has(x.id)) { seen.add(x.id); parts.unshift(x.name); x = byId[x.parent_id]; } return parts.join(' / '); };
+      const items = cats.map(c => ({ c, info: aclAccessInfo(c, u.id, roles, tp, byId) }))
+        .filter(x => x.info)
+        .map(x => ({ id:x.c.id, icon:x.c.icon||'', path:pathOf(x.c), ...x.info }))
+        .sort((a,b) => a.path.localeCompare(b.path,'de'));
+      groups.push({ key, label, items });
+    }
+    ok(res, { isAdmin:false, groups });
+  } catch(e) { console.error('[folder-access]', e.message); bad(res,'Serverfehler',500); }
 });
 
 // ── ROLE PERMISSIONS ──

@@ -48,40 +48,78 @@ const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','A
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
 const ROLES=[{id:'admin',label:'Administrator',icon:'\uD83D\uDD11'},{id:'leitung',label:'Leitung',icon:'\u2B50'},{id:'dienstplanung',label:'Dienstplanung',icon:'\uD83D\uDCCB'},{id:'schichtleiter',label:'Schichtleiter',icon:'\uD83D\uDD06'},{id:'technik',label:'Technik',icon:'\uD83D\uDD27'},{id:'ausbildung',label:'Ausbildung',icon:'\uD83C\uDF93'},{id:'qm',label:'QM',icon:'\u2705'},{id:'standard',label:'Standard',icon:'\uD83D\uDC64'},{id:'assessment',label:'Assessment',icon:'\uD83D\uDCDD'}];
-// Gemeinsamer Sichtbarkeits-/Bearbeitungs-Editor f\u00FCr Dokumente, Wiki-Artikel,
-// Kontakte UND deren Ordner (Kategorien) \u2014 Rollen und/oder einzelne Nutzer
-// zuweisbar. Ohne EIGENE Zuweisung erbt ein Datensatz von seinem Ordner
-// (parent_id-Kette); ist nirgends etwas zugewiesen, sehen/bearbeiten nur
-// Ersteller + Admin (deny-by-default, keine Rolle sieht automatisch alles),
-// siehe canSeeAcl/canEditAcl in db.js.
+// Gemeinsamer Berechtigungs-Editor für Dokumente, Wiki-Artikel, Kontakte UND
+// deren Ordner (Kategorien): Rolle oder einzelnen Benutzer aus einem Dropdown
+// wählen und Lesen oder Schreiben geben (Schreiben schließt Lesen ein).
+// Gespeichert wird wie bisher als visible_*/editable_* (Schreiben = in beiden).
+// Ohne EIGENE Berechtigung erbt ein Datensatz von seinem Ordner (parent_id-
+// Kette); ist nirgends etwas vergeben, sehen/bearbeiten nur Ersteller + Admin
+// (deny-by-default), siehe canSeeAcl/canEditAcl in db.js.
+function aclRoleChoices(){
+  const fixed=ROLES.filter(r=>r.id!=='admin'&&r.id!=='assessment').map(r=>({id:r.id,label:r.icon+' '+r.label}));
+  const extra=(S.departments||[]).filter(d=>!ROLES.some(r=>r.id===d.id)).map(d=>({id:d.id,label:(d.emoji?d.emoji+' ':'')+d.label}));
+  return [...fixed,...extra];
+}
+function aclLabel(kind,id){
+  if(kind==='role'){const r=aclRoleChoices().find(x=>x.id===id);return r?r.label:id;}
+  const u=getU(id);return '👤 '+(u?lastNameFirst(u.name):'(gelöschter Benutzer)');
+}
+function aclRowHtml(prefix,kind,id,mode){
+  return `<div class="acl-row" data-kind="${kind}" data-id="${esc(id)}" style="display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid var(--border)">
+    <span style="flex:1;font-size:13px">${esc(aclLabel(kind,id))}</span>
+    <select class="acl-mode" style="width:auto;font-size:12px"><option value="read"${mode==='read'?' selected':''}>Lesen</option><option value="write"${mode==='write'?' selected':''}>Schreiben</option></select>
+    <button type="button" class="btn-d" style="font-size:11px;padding:2px 6px" title="Entfernen" onclick="this.closest('.acl-row').remove();aclRefresh('${prefix}')">&#10005;</button>
+  </div>`;
+}
+function aclTaken(prefix){
+  return new Set(Array.from(document.querySelectorAll('#'+prefix+'AclRows .acl-row')).map(r=>r.dataset.kind+':'+r.dataset.id));
+}
+function aclOptions(kind,taken){
+  if(kind==='role')return `<option value="">Rolle wählen …</option>`+aclRoleChoices().filter(r=>!taken.has('role:'+r.id)).map(r=>`<option value="${esc(r.id)}">${esc(r.label)}</option>`).join('');
+  const users=(S.users||[]).filter(u=>u.isActive!==false&&!taken.has('user:'+u.id)&&!(u.roles||[]).includes('admin')).slice().sort((a,b)=>lastNameFirst(a.name).localeCompare(lastNameFirst(b.name),'de'));
+  return `<option value="">Benutzer wählen …</option>`+users.map(u=>`<option value="${u.id}">${esc(lastNameFirst(u.name))}</option>`).join('');
+}
+function aclRefresh(prefix){
+  const taken=aclTaken(prefix);
+  ['role','user'].forEach(k=>{const el=document.getElementById(prefix+'AclWho-'+k);if(el)el.innerHTML=aclOptions(k,taken);});
+  const empty=document.getElementById(prefix+'AclEmpty');
+  if(empty)empty.style.display=taken.size?'none':'';
+}
+function aclAdd(prefix,kind){
+  const id=document.getElementById(prefix+'AclWho-'+kind).value;
+  if(!id){toast(kind==='role'?'⚠️ Bitte zuerst eine Rolle wählen':'⚠️ Bitte zuerst einen Benutzer wählen');return;}
+  const mode=document.getElementById(prefix+'AclMode-'+kind).value;
+  document.getElementById(prefix+'AclRows').insertAdjacentHTML('beforeend',aclRowHtml(prefix,kind,id,mode));
+  aclRefresh(prefix);
+}
 function aclEditorHtml(idPrefix, acl) {
-  const vis = acl?.visibleRoles||[], visU = acl?.visibleUsers||[];
-  const ed = acl?.editableRoles||[], edU = acl?.editableUsers||[];
-  const roleRow = (name, selected) => ROLES.map(r=>`<label class="rck"><input type="checkbox" name="${name}" value="${r.id}" ${selected.includes(r.id)?'checked':''}><span>${r.icon} ${r.label}</span></label>`).join('');
-  const userRow = (name, selected) => (S.users||[]).slice().sort((a,b)=>a.name.localeCompare(b.name,'de')).map(u=>`<label class="rck"><input type="checkbox" name="${name}" value="${u.id}" ${selected.includes(u.id)?'checked':''}><span>${esc(lastNameFirst(u.name))}</span></label>`).join('');
+  const rows=[], taken=new Set();
+  const add=(kind,vis,ed)=>{
+    [...new Set([...(vis||[]),...(ed||[])])].forEach(id=>{taken.add(kind+':'+id);rows.push(aclRowHtml(idPrefix,kind,id,(ed||[]).includes(id)?'write':'read'));});
+  };
+  add('role',acl?.visibleRoles,acl?.editableRoles);
+  add('user',acl?.visibleUsers,acl?.editableUsers);
+  const addLine=kind=>`<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+      <select id="${idPrefix}AclWho-${kind}" style="flex:1;min-width:160px">${aclOptions(kind,taken)}</select>
+      <select id="${idPrefix}AclMode-${kind}" style="width:auto"><option value="read">Lesen</option><option value="write">Schreiben</option></select>
+      <button type="button" class="btn-s" onclick="aclAdd('${idPrefix}','${kind}')">&#65291; ${kind==='role'?'Rolle':'Benutzer'}</button>
+    </div>`;
   return `<div class="fg full">
-    <label>Sichtbar f\u00FCr Rollen (leer = vom Ordner geerbt, sonst nur Ersteller + Admin)</label>
-    <div id="${idPrefix}VisRoles" style="display:flex;flex-wrap:wrap;gap:8px">${roleRow('visRoles',vis)}</div>
-    <details style="margin-top:6px"><summary style="font-size:12px;color:var(--mu);cursor:pointer">+ einzelne Nutzer</summary>
-      <div id="${idPrefix}VisUsers" style="display:flex;flex-wrap:wrap;gap:8px;max-height:160px;overflow-y:auto;margin-top:6px">${userRow('visUsers',visU)}</div>
-    </details>
-  </div>
-  <div class="fg full">
-    <label>Bearbeitbar von Rollen (leer = vom Ordner geerbt, sonst nur Ersteller + Admin)</label>
-    <div id="${idPrefix}EditRoles" style="display:flex;flex-wrap:wrap;gap:8px">${roleRow('editRoles',ed)}</div>
-    <details style="margin-top:6px"><summary style="font-size:12px;color:var(--mu);cursor:pointer">+ einzelne Nutzer</summary>
-      <div id="${idPrefix}EditUsers" style="display:flex;flex-wrap:wrap;gap:8px;max-height:160px;overflow-y:auto;margin-top:6px">${userRow('editUsers',edU)}</div>
-    </details>
+    <label>Berechtigungen</label>
+    <div id="${idPrefix}AclRows">${rows.join('')}</div>
+    <div id="${idPrefix}AclEmpty" style="font-size:12px;color:var(--mu);padding:4px 0${rows.length?';display:none':''}">Keine eigenen Berechtigungen: es gelten die des Ordners, sonst sehen es nur Ersteller und Admin.</div>
+    ${addLine('role')}${addLine('user')}
+    <div style="font-size:11px;color:var(--mu);margin-top:6px">Lesen = sehen · Schreiben = sehen und bearbeiten · Administratoren haben immer Zugriff</div>
   </div>`;
 }
 function aclReadRoles(idPrefix) {
-  const vals = sel => Array.from(document.querySelectorAll(sel)).map(cb=>cb.value);
-  return {
-    visibleRoles: vals('#'+idPrefix+'VisRoles input:checked'),
-    visibleUsers: vals('#'+idPrefix+'VisUsers input:checked'),
-    editableRoles: vals('#'+idPrefix+'EditRoles input:checked'),
-    editableUsers: vals('#'+idPrefix+'EditUsers input:checked'),
-  };
+  const out={visibleRoles:[],visibleUsers:[],editableRoles:[],editableUsers:[]};
+  document.querySelectorAll('#'+idPrefix+'AclRows .acl-row').forEach(r=>{
+    const kind=r.dataset.kind==='user'?'Users':'Roles', id=r.dataset.id;
+    out['visible'+kind].push(id);
+    if(r.querySelector('.acl-mode').value==='write')out['editable'+kind].push(id);
+  });
+  return out;
 }
 // Gemeinsame Ordner-/Kategorie-Verwaltung f\u00FCr Dokumente, Wiki und Kontakte \u2014
 // Berechtigungen (\uD83D\uDD12-Button je Ordner) laufen f\u00FCr alle drei Module \u00FCber
@@ -403,7 +441,29 @@ function openPwModal(){
         ${l.note?`<span style="color:var(--mu);font-size:11px">${esc(l.note)}</span>`:''}
       </div>`).join('');
   }
+  renderFolderAccess('myFolderAccess',S.currentUser);
   openModal('pwModal');
+}
+// Übersicht "Ordner-Berechtigungen" (Dokumente, Wiki, Kontakte) eines Nutzers —
+// im eigenen Profil und in der Administration beim Benutzer.
+async function renderFolderAccess(elId,uid){
+  const el=document.getElementById(elId);if(!el||!uid)return;
+  el.innerHTML='<div style="font-size:12px;color:var(--mu)">Lädt …</div>';
+  try{
+    const d=await api('GET','/folder-access/'+encodeURIComponent(uid));
+    if(d.isAdmin){el.innerHTML='<div style="font-size:12px;color:var(--mu)">Administrator: Zugriff auf alle Ordner.</div>';return;}
+    const badge=a=>a==='schreiben'?'<span class="bdg" style="font-size:10px;background:rgba(16,185,129,.15);color:var(--ok)">Schreiben</span>':'<span class="bdg" style="font-size:10px">Lesen</span>';
+    const via=i=>{
+      const base=i.via==='admin'?'Administrator':i.via==='creator'?'selbst angelegt':i.via==='user'?'persönlich':
+        'Rolle '+(i.roles||[]).map(r=>ROLES.find(x=>x.id===r)?.label||(S.departments||[]).find(x=>x.id===r)?.label||r).join(', ');
+      return base+(i.from?` (geerbt von „${i.from}“)`:'');
+    };
+    const html=d.groups.map(g=>`<div style="margin-bottom:8px"><div style="font-size:12px;font-weight:700;margin-bottom:2px">${esc(g.label)}</div>${
+      g.items.length?g.items.map(i=>`<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12px;border-top:1px solid var(--border)">
+        <span style="flex:1">${esc(i.icon)} ${esc(i.path)}</span>${badge(i.access)}<span style="color:var(--mu);font-size:11px;min-width:110px;text-align:right">${esc(via(i))}</span></div>`).join('')
+      :'<div style="font-size:12px;color:var(--mu)">Keine Ordner</div>'}</div>`).join('');
+    el.innerHTML=html;
+  }catch(e){el.innerHTML=`<div style="font-size:12px;color:var(--danger)">${esc(e.message)}</div>`;}
 }
 function pickMyColor(col,cid){S.myColor=col;document.querySelectorAll('#'+cid+' .cp').forEach(el=>el.classList.toggle('on',el.style.backgroundColor===h2r(col)));}
 async function saveMyColor(){
@@ -2994,7 +3054,7 @@ function renderRightsMatrix(){
         const isOv=!!o&&cur!==def;
         return`<td style="${cellStyle}"><div style="display:flex;align-items:center;gap:2px;justify-content:center">
           <select class="flt" style="font-size:11px;padding:2px 4px;min-width:0;width:auto${cur==='aus'?';color:var(--mu)':''}" onchange="setRightLevel('${r}','${m.key}',this.value)">
-            ${m.levels.map(l=>`<option value="${l.id}"${l.id===cur?' selected':''}>${esc(l.label)}${l.id===def?' · Std.':''}</option>`).join('')}
+            ${m.levels.map(l=>`<option value="${l.id}"${l.id===cur?' selected':''}>${esc(l.label)}</option>`).join('')}
           </select>${mark(isOv,idx(cur)>idx(def))}</div></td>`;
       }).join('')}
     </tr>`).join('');
@@ -3014,7 +3074,7 @@ function renderRightsMatrix(){
     <table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>${th}</tr></thead><tbody>${modRows}</tbody></table>
     <div style="font-weight:700;font-size:13px;margin:18px 0 8px">Einzelrechte</div>
     <table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>${th.replace('>Modul<','>Recht<')}</tr></thead><tbody>${flagRows}</tbody></table>
-    <div style="font-size:11px;color:var(--mu);margin-top:10px">↑/↓ = vom Standard abweichend · „Std.“ = Standardwert · Änderungen werden sofort gespeichert</div>
+    <div style="font-size:11px;color:var(--mu);margin-top:10px">↑/↓ = vom Standard abweichend · Änderungen werden sofort gespeichert</div>
   </div>`;
 }
 function renderDeptsAdmin(){
@@ -3152,6 +3212,8 @@ function openUF(id){
   // Mitarbeiter sichtbar (bei Neuanlage gibt es noch keinen).
   const histWrap=document.getElementById('ufRoleHistWrap');
   histWrap.style.display=u?'':'none';
+  const faWrap=document.getElementById('ufFolderAccessWrap');
+  if(faWrap){faWrap.style.display=u?'':'none';if(u)renderFolderAccess('ufFolderAccess',u.id);}
   document.getElementById('ufRoleHistBody').style.display='none';
   document.getElementById('ufRoleHistBody').innerHTML='';
   // Dienstplan-Einstellungen: eingebettet statt eigener Admin-Bereich, damit
