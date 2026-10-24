@@ -86,6 +86,12 @@ Browser → Render (Node.js App) → Supabase (PostgreSQL)
 
 Einfach Code ins GitHub-Repo pushen → Render deployed automatisch neu.
 
+### Versionsnummer & Aktualisierungsdatum
+
+Bei jedem Push/Merge auf den Live-Branch (`claude/review-project-status-KYW7a`, den Render deployed) zählt die GitHub Action **„Version hochzählen“** die Version in `public/version.json` automatisch hoch (z. B. 3.0.0 → 3.0.1), setzt das Aktualisierungsdatum und trägt den PR-Titel ins Changelog ein. Das Portal zeigt Version und Datum unten in der Sidebar; ein Klick öffnet das Changelog.
+
+- `[minor]` im PR-Titel → 3.1.0, `[major]` → 4.0.0
+
 ---
 
 ## Projektstruktur
