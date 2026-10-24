@@ -11,7 +11,7 @@ function showHelpSection(id){
   if(c)c.scrollTop=0;
 }
 
-const APP_VERSION='3.0.0';
+let APP_VERSION='3.0.0',APP_DATE='';
 // PWA: ermöglicht "Zum Home-Bildschirm hinzufügen" auf iOS/Android — siehe
 // public/sw.js für die Cache-Strategie (App-Daten selbst werden nie gecacht).
 if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js').catch(()=>{});});}
@@ -384,7 +384,7 @@ function loginOK(){
   startClock();
   document.getElementById('LS').classList.remove('open');
   document.getElementById('hdr').style.display='flex';document.getElementById('APP').style.display='grid';
-  const vb=document.getElementById('versionBadge');if(vb)vb.textContent='v'+APP_VERSION;
+  renderVersion();loadVersion();
   const u=getU(S.currentUser);
   document.getElementById('pillNm').textContent=u?lastNameFirst(u.name):'?';
   const pa=document.getElementById('pillAv');pa.textContent=u?.initials||'?';pa.style.background=(u?.color||'#888')+'22';pa.style.color=u?.color||'#888';
@@ -3651,6 +3651,27 @@ function stopBrainAnimation(){
   const canvas=document.getElementById('brainCanvas');
   const ctx=canvas?.getContext('2d');
   if(ctx)ctx.clearRect(0,0,canvas.width,canvas.height);
+}
+// App-Version + Aktualisierungsdatum aus public/version.json (wird bei jedem Push auf den Live-Branch automatisch hochgezählt)
+function fmtVerDate(iso){const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(iso||'');return m?`${m[3]}.${m[2]}.${m[1]}`:'';}
+function renderVersion(){
+  const vb=document.getElementById('versionBadge');
+  if(vb){vb.textContent='v'+APP_VERSION+(APP_DATE?' \u00b7 '+fmtVerDate(APP_DATE):'');vb.title=APP_DATE?'Aktualisiert am '+fmtVerDate(APP_DATE):'';}
+}
+async function loadVersion(){
+  try{
+    const r=await fetch('/version.json',{cache:'no-store'});if(!r.ok)return;
+    const v=await r.json();if(!v?.version)return;
+    APP_VERSION=v.version;APP_DATE=v.date||'';renderVersion();
+    const el=document.getElementById('autoChangelog'),list=Array.isArray(v.changelog)?v.changelog:[];
+    if(!el||!list.length)return;
+    const cur=document.getElementById('clStaticCur');
+    if(cur){const b=cur.previousElementSibling;if(b){b.style.background='var(--sf3)';b.style.color='var(--mu)';}cur.remove();}
+    el.innerHTML=list.map((e,i)=>`<div style="padding:12px;background:${i?'var(--sf2)':'rgba(59,109,212,0.06)'};border:1px solid ${i?'var(--border)':'rgba(59,109,212,.20)'};border-radius:8px">
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:${i?'var(--sf3)':'var(--acc)'};color:${i?'var(--mu)':'var(--act)'};padding:2px 8px;border-radius:4px">v${escHtml(e.version)}</span> <span style="font-size:11px;color:var(--mu)">${i?'':'Aktuell \u00b7 '}${escHtml(fmtVerDate(e.date))}</span></div>
+        <ul style="font-size:12px;line-height:1.8;padding-left:18px">${(e.changes||[]).map(c=>`<li>${escHtml(c)}</li>`).join('')}</ul>
+      </div>`).join('');
+  }catch(e){}
 }
 function openModal(id){document.getElementById(id)?.classList.add('open');}
 function closeModal(id){document.getElementById(id)?.classList.remove('open');}
