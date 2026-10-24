@@ -156,7 +156,7 @@ function asmRenderOverview(){
       ${isAdmin?`<button class="btn-s" style="margin-top:12px" onclick="asmNewTest()">↺ Neuer Testdurchgang (nur Admin)</button>`:''}
     </div>`;
   }
-  document.getElementById('main').innerHTML=`<div class="ph"><div class="pt">📝 ${ASM_TITLE}</div></div>${body}${isAdmin?asmCandidatesHtml()+asmResultsHtml():''}`;
+  document.getElementById('main').innerHTML=`<div class="ph"><div class="pt">📝 ${ASM_TITLE}</div>${ASM.info.canEdit?`<button class="btn-s" style="margin-left:auto" onclick="asmEditCatalog()">✏️ Fragenkatalog bearbeiten (Version ${ASM.info.catalogVersion})</button>`:''}</div>${body}${isAdmin?asmCandidatesHtml()+asmResultsHtml():''}`;
   if(isAdmin)asmAdminLive();
   if(att&&att.status==='running'){asmSendDevice();asmSetTotal(att);if(ASM.timer)clearInterval(ASM.timer);ASM.timer=setInterval(()=>{if(S.view!=='assessment'){asmStopTimers();return;}asmTickTotal();},500);}
 }
@@ -842,4 +842,121 @@ async function asmDeleteAttempt(id){
 async function asmResetUser(uid,name){
   if(!confirm(`Assessment von ${name} zurücksetzen? ${name} kann das Assessment dann neu machen. Der bisherige Durchgang bleibt für die Administration archiviert.`))return;
   try{await api('POST','/assessment/users/'+uid+'/reset');toast('✅ Zurückgesetzt');renderAssessment();}catch(e){toast('⚠️ '+e.message,'err');}
+}
+
+// ── Fragenkatalog bearbeiten (nur Administration) ──
+// Alle Abschnitte mit Fragen und Lösungen in Eingabefeldern. Speichern legt
+// auf dem Server eine neue Version an, wenn sich etwas geändert hat; laufende
+// Durchgänge bleiben bei ihrer Version.
+const ASM_ED_TYPES={choice:'Auswahl',number:'Zahl',text:'Text',markwords:'Fehler markieren',writing:'Freitext',likert:'Skala 1–5'};
+async function asmEditCatalog(version){
+  try{
+    const r=await api('GET','/assessment/catalog'+(version!==undefined?'?version='+version:''));
+    ASM.ed={sections:r.sections,version:r.version,latest:r.latest,versions:r.versions,dirty:false};
+    asmEdRender();window.scrollTo(0,0);
+  }catch(e){toast('⚠️ '+e.message,'err');}
+}
+// Wert an einem Pfad wie "3.blocks.0.questions.2.text" setzen.
+function asmEdSet(path,val){
+  const keys=path.split('.');let o=ASM.ed.sections;
+  for(let i=0;i<keys.length-1;i++)o=o[keys[i]];
+  const k=keys[keys.length-1];
+  if(val===undefined)delete o[k];else o[k]=val;
+  ASM.ed.dirty=true;
+  const st=document.getElementById('asmEdState');if(st)st.textContent='● ungespeicherte Änderungen';
+}
+function asmEdGet(path){return path.split('.').reduce((o,k)=>o?.[k],ASM.ed.sections);}
+const asmEdLines=v=>String(v||'').split('\n').map(x=>x.trim()).filter(Boolean);
+// Stichwörter offener Fragen: eine Zeile je Kombination, Gruppen mit „+“,
+// gleichwertige Wörter mit „|“ getrennt.
+const asmKwToText=kw=>(kw||[]).map(c=>c.map(g=>g.join(' | ')).join(' + ')).join('\n');
+const asmKwFromText=t=>asmEdLines(t).map(l=>l.split('+').map(g=>g.split('|').map(w=>w.trim()).filter(Boolean)).filter(g=>g.length)).filter(c=>c.length);
+const asmErrToText=e=>Object.entries(e||{}).map(([w,r])=>`${w} = ${r}`).join('\n');
+const asmErrFromText=t=>Object.fromEntries(asmEdLines(t).map(l=>l.split('=')).filter(p=>p.length>=2).map(p=>[p[0].trim(),p.slice(1).join('=').trim()]));
+function asmEdField(label,path,val,{area=false,rows=2,type='text',conv='str',width=''}={}){
+  const h=`asmEdSet('${path}',${conv==='lines'?'asmEdLines(this.value)':conv==='int'?'(this.value===\'\'?undefined:parseInt(this.value,10))':conv==='kw'?'asmKwFromText(this.value)':conv==='err'?'asmErrFromText(this.value)':'this.value'})`;
+  return `<label class="asm-ed-f"${width?` style="max-width:${width}"`:''}><span>${label}</span>${area?`<textarea rows="${rows}" oninput="${esc(h)}">${esc(val??'')}</textarea>`:`<input type="${type}" value="${esc(val??'')}" oninput="${esc(h)}">`}</label>`;
+}
+function asmEdQuestion(q,p,num){
+  let f=asmEdField('Frage',p+'.text',q.text,{area:true,rows:2});
+  if(q.hint!==undefined)f+=asmEdField('Hinweis',p+'.hint',q.hint);
+  if(q.pre!==undefined)f+=asmEdField('Vorgabe (fester Text über der Frage)',p+'.pre',q.pre,{area:true,rows:3});
+  if(q.type==='choice'){
+    f+=asmEdField('Antwortmöglichkeiten (eine pro Zeile)',p+'.options',(q.options||[]).join('\n'),{area:true,rows:Math.max(2,(q.options||[]).length),conv:'lines'});
+    f+=`<label class="asm-ed-f" style="max-width:420px"><span>Richtige Antwort</span><select onchange="asmEdSet('${p}.answer',+this.value)" onfocus="asmEdRefreshSel(this,'${p}')">${(q.options||[]).map((o,i)=>`<option value="${i}"${q.answer===i?' selected':''}>${esc(o)}</option>`).join('')}</select></label>`;
+  }else if(q.type==='number'){
+    f+=`<div class="asm-ed-row">${asmEdField('Lösung',p+'.answer',q.answer,{width:'160px'})}${asmEdField('Toleranz (optional)',p+'.tol',q.tol,{width:'160px'})}${asmEdField('Einheit (optional)',p+'.unit',q.unit,{width:'160px'})}</div>`;
+  }else if(q.type==='text'){
+    f+=asmEdField(q.open?'Musterlösung':'Richtige Antworten (eine pro Zeile)',p+'.accept',(q.accept||[]).join('\n'),{area:true,rows:Math.max(1,(q.accept||[]).length),conv:'lines'});
+    if(q.open){
+      f+=asmEdField('Stichwörter für die automatische Wertung (eine Zeile je Kombination, „+“ = und, „|“ = oder)',p+'.keywords',asmKwToText(q.keywords),{area:true,rows:2,conv:'kw'});
+      f+=asmEdField('Ziffernfolge (optional, z. B. Telefonnummer)',p+'.digits',q.digits,{width:'260px'});
+    }
+  }else if(q.type==='markwords'){
+    f+=asmEdField('Text mit Fehlern',p+'.passage',q.passage,{area:true,rows:8});
+    f+=asmEdField('Fehler (eine Zeile je Fehler: falsch = richtig)',p+'.errors',asmErrToText(q.errors),{area:true,rows:5,conv:'err'});
+  }else if(q.type==='writing'&&q.targetWords!==undefined){
+    f+=asmEdField('Zielwortzahl',p+'.targetWords',q.targetWords,{type:'number',conv:'int',width:'160px'});
+  }
+  return `<div class="asm-ed-q" id="asmEdQ_${p.replace(/\./g,'_')}"><div class="asm-ed-qh"><b>${num}.</b> <span class="asm-ed-type">${ASM_ED_TYPES[q.type]||q.type}</span> <span class="asm-ed-id">${esc(q.id)}</span><button class="btn-s asm-ed-del" title="Frage löschen" onclick="asmEdDelQ('${p}')">🗑</button></div>${f}</div>`;
+}
+// Auswahlliste der richtigen Antwort an geänderte Antwortmöglichkeiten anpassen.
+function asmEdRefreshSel(sel,p){
+  const q=asmEdGet(p);
+  sel.innerHTML=(q.options||[]).map((o,i)=>`<option value="${i}"${q.answer===i?' selected':''}>${esc(o)}</option>`).join('');
+}
+function asmEdDelQ(p){
+  if(!confirm('Diese Frage löschen?'))return;
+  const keys=p.split('.'),i=+keys.pop();asmEdGet(keys.join('.')).splice(i,1);ASM.ed.dirty=true;asmEdRender();
+}
+function asmEdAddQ(p,type){
+  const list=asmEdGet(p);
+  const all=new Set(ASM.ed.sections.flatMap(s=>s.blocks.flatMap(b=>b.questions.map(q=>q.id))));
+  let n=1,id;do{id='n'+Date.now().toString(36)+n++;}while(all.has(id));
+  const q={id,type,text:''};
+  if(type==='choice'){q.options=['',''];q.answer=0;}
+  if(type==='number')q.answer='';
+  if(type==='text')q.accept=[];
+  list.push(q);ASM.ed.dirty=true;asmEdRender();
+  setTimeout(()=>document.getElementById('asmEdQ_'+(p+'.'+(list.length-1)).replace(/\./g,'_'))?.scrollIntoView({block:'center'}),50);
+}
+function asmEdToggle(si,open){ASM.edOpen=ASM.edOpen||new Set();open?ASM.edOpen.add(si):ASM.edOpen.delete(si);}
+function asmEdRender(){
+  const e=ASM.ed,ro=e.version!==e.latest;let num=0;
+  const secs=e.sections.map((s,si)=>{
+    const sp=String(si);
+    const op=ASM.edOpen?.has(si)?' open':'',tg=`ontoggle="asmEdToggle(${si},this.open)"`;
+    if(s.kind==='pause')return `<details class="asm-ed-sec"${op} ${tg}><summary>${si+1}. ${esc(s.title)} <span class="asm-ed-min">${s.minutes} Min.</span></summary>
+      <div class="asm-ed-row">${asmEdField('Titel',sp+'.title',s.title)}${asmEdField('Minuten',sp+'.minutes',s.minutes,{type:'number',conv:'int',width:'120px'})}</div>${asmEdField('Beschreibung',sp+'.description',s.description,{area:true})}</details>`;
+    const blocks=s.blocks.map((b,bi)=>{
+      const bp=`${sp}.blocks.${bi}`;
+      let h=`<div class="asm-ed-block"><div class="asm-ed-bh">Block ${bi+1}</div>${asmEdField('Überschrift',bp+'.title',b.title)}${asmEdField('Anweisung',bp+'.instruction',b.instruction,{area:true})}`;
+      if(b.video!==undefined)h+=asmEdField('YouTube-Video (ID)',bp+'.video',b.video,{width:'260px'});
+      if(b.memorize)h+=`<div class="asm-ed-row">${asmEdField('Merkzeit (Sek.)',bp+'.memorize.seconds',b.memorize.seconds,{type:'number',conv:'int',width:'140px'})}${asmEdField('Merktext',bp+'.memorize.text',b.memorize.text)}</div>${asmEdField('Zu merkende Angaben (eine pro Zeile)',bp+'.memorize.facts',(b.memorize.facts||[]).join('\n'),{area:true,rows:4,conv:'lines'})}`;
+      h+=b.questions.map((q,qi)=>asmEdQuestion(q,`${bp}.questions.${qi}`,++num)).join('');
+      h+=`<div class="asm-ed-add">+ Frage: ${['choice','number','text'].map(t=>`<button class="btn-s" onclick="asmEdAddQ('${bp}.questions','${t}')">${ASM_ED_TYPES[t]}</button>`).join(' ')}</div></div>`;
+      return h;
+    }).join('');
+    const nq=s.blocks.reduce((n,b)=>n+b.questions.length,0);
+    return `<details class="asm-ed-sec"${op} ${tg}><summary>${si+1}. ${esc(s.title)} <span class="asm-ed-min">${s.minutes} Min. · ${nq} ${nq===1?'Frage':'Fragen'}</span></summary>
+      <div class="asm-ed-row">${asmEdField('Titel',sp+'.title',s.title)}${asmEdField('Kurzname (Ergebnistabelle)',sp+'.short',s.short,{width:'220px'})}${asmEdField('Minuten',sp+'.minutes',s.minutes,{type:'number',conv:'int',width:'120px'})}</div>
+      ${asmEdField('Beschreibung',sp+'.description',s.description,{area:true})}${blocks}</details>`;
+  }).join('');
+  const vers=(e.versions||[]).map(v=>`<option value="${v.version}"${v.version===e.version?' selected':''}>Version ${v.version}${v.version===e.latest?' (aktuell)':''} · ${fdt(v.createdAt)} · ${esc(v.createdBy||'')}${v.note?' · '+esc(v.note):''}</option>`).join('');
+  document.getElementById('main').innerHTML=`<div class="ph"><div class="pt">✏️ Fragenkatalog bearbeiten</div></div>
+    <div class="dash-card asm-ed">
+      <div class="asm-ed-top"><label>Version <select class="flt" style="width:auto" onchange="if(!ASM.ed.dirty||confirm('Ungespeicherte Änderungen verwerfen?'))asmEditCatalog(+this.value);else this.value=ASM.ed.version">${vers}</select></label>
+        <button class="btn-s" onclick="if(!ASM.ed.dirty||confirm('Ungespeicherte Änderungen verwerfen?')){ASM.ed=null;renderAssessment();}">← Zurück zum Assessment</button></div>
+      <div class="asm-ed-note">${ro?`ℹ️ Du siehst die ältere Version ${e.version}. Speichern legt sie mit deinen Änderungen als neue aktuelle Version an.`:'Beim Speichern entsteht eine neue Version, wenn sich etwas geändert hat. Laufende Durchgänge bleiben bei ihrer Version, neue Durchgänge starten mit der neuen. Bereits abgegebene Ergebnisse ändern sich nicht.'}</div>
+      ${secs}
+      <div class="asm-ed-bar"><input id="asmEdNote" class="flt" style="width:auto;min-width:180px" placeholder="Kurze Notiz zur Änderung (optional)" maxlength="300"><span id="asmEdState" class="asm-ed-state">${e.dirty?'● ungespeicherte Änderungen':''}</span><button class="btn-p" onclick="asmEdSave()">💾 Speichern</button></div>
+    </div>`;
+}
+async function asmEdSave(){
+  try{
+    const r=await api('PUT','/assessment/catalog',{sections:ASM.ed.sections,note:document.getElementById('asmEdNote')?.value||''});
+    if(!r.changed){toast('Keine Änderungen – keine neue Version angelegt');return;}
+    toast('✓ Gespeichert als Version '+r.version);
+    await asmEditCatalog();
+  }catch(e){toast('⚠️ '+e.message,'err');}
 }
