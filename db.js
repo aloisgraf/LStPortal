@@ -152,7 +152,7 @@ function resolveAcl(item, field, categoriesById) {
     const cat = categoriesById[catId];
     if (!cat) break;
     const found = _aclOwn(cat, field);
-    if (found) return found;
+    if (found) return { ...found, from: cat };
     catId = cat.parent_id;
   }
   return { roles: [], users: [] };
@@ -176,7 +176,26 @@ function canEditAcl(item, uid, roles, p, categoriesById) {
   return (roles||[]).some(r => src.roles.includes(r));
 }
 
+// Für die Übersicht "Meine Ordner-Berechtigungen": ob und warum ein Nutzer
+// einen Ordner/Eintrag lesen oder schreiben darf (gleiche Regeln wie
+// canSeeAcl/canEditAcl). null = kein Zugriff.
+function aclAccessInfo(item, uid, roles, p, categoriesById) {
+  if (p?.manageUsers) return { access:'schreiben', via:'admin' };
+  if ((item.created_by ?? item.uploaded_by) === uid) return { access:'schreiben', via:'creator' };
+  const how = field => {
+    const src = resolveAcl(item, field, categoriesById);
+    const from = src.from ? src.from.name : null;
+    if (src.users.includes(uid)) return { via:'user', from };
+    const r = (roles||[]).filter(x => src.roles.includes(x));
+    return r.length ? { via:'role', roles:r, from } : null;
+  };
+  const w = how('editable');
+  if (w) return { access:'schreiben', ...w };
+  const r = how('visible');
+  return r ? { access:'lesen', ...r } : null;
+}
+
 module.exports = { pool, q, q1, newId, parseRoles, parseTags, getUser, getUserByUsername, DEPTS, logAct,
   getP, getTP, canSeeTk, canEditTk, nextTicketNumber, auditNote, createNotification,
   parseMentions, isUserActive, getDepartmentIds, invalidateDeptCache,
-  parseRoleList, canSeeAcl, canEditAcl };
+  parseRoleList, canSeeAcl, canEditAcl, aclAccessInfo };
