@@ -10947,15 +10947,18 @@ function _onGameState(state, isInitialLoad) {
   }
   (state.newAchievements||[]).forEach(a=>toast('🏆 Erfolg freigeschaltet: '+a.icon+' '+a.name,'ok',5000));
   if (state.leveledUp) toast('⭐ Level '+state.leveledUp+' erreicht!','ok',4000);
-  if (S.view==='game') renderGame();
-  startGameTicker();
+  // Ticker nur auf der Spielseite — eine verspätete Antwort (Klick/Sync)
+  // nach dem Verlassen der Ansicht darf ihn nicht wieder anwerfen.
+  if (S.view==='game') { renderGame(); startGameTicker(); }
 }
 function startGameTicker() {
   if (_gameTickerInterval) return;
   let syncCounter=0;
   _gameTickerInterval = setInterval(()=>{
     if (!S.game) return;
-    S._gameLocalCoins += S.game.derived.incomePerSecond*0.2;
+    // Netto wie am Server: Gegenstände + Mitarbeiter − Gehälter/Unterhalt
+    // (1 Spielstunde = 1 reale Minute), Kontostand nie negativ.
+    S._gameLocalCoins = Math.max(0, S._gameLocalCoins + S.game.financials.netPerGameHour/60*0.2);
     if (S.view==='game') _updateGameCoinDisplay();
     syncCounter++;
     if (syncCounter>=100) { syncCounter=0; loadGame(); } // alle ~20s mit Server abgleichen
@@ -11065,7 +11068,7 @@ function gameOfficeSceneHtml(items) {
   const g = [];
   // Wand + Boden
   g.push(`<rect x="0" y="0" width="800" height="230" fill="var(--sf2)"/>`);
-  g.push(`<rect x="0" y="230" width="800" height="90" fill="var(--bg2)"/>`);
+  g.push(`<rect x="0" y="230" width="800" height="90" fill="var(--sf3)"/>`);
   g.push(`<rect x="0" y="228" width="800" height="3" fill="var(--border)"/>`);
   // Großraumbüro: zusätzliche Schreibtisch-Silhouetten im Hintergrund
   if (has('openspace')) {
@@ -11090,7 +11093,7 @@ function gameOfficeSceneHtml(items) {
   </g>`);
   g.push(gamePlantSvg(130,190,1));
   // Zimmerpflanze (Shop) — zweite, größere Pflanze
-  if (has('plant')) g.push(gamePlantSvg(610,175,1.3));
+  if (has('plant')) g.push(gamePlantSvg(745,240,1.2));
   // Schreibtischlampe
   if (has('lamp')) g.push(`<g><rect x="372" y="118" width="4" height="34" fill="#44546b"/><path d="M356 118 L390 118 L380 100 L366 100 Z" fill="#f4b740"/></g>`);
   // Kaffeemaschine
@@ -11098,7 +11101,7 @@ function gameOfficeSceneHtml(items) {
   // Zweiter Monitor
   if (has('monitor2')) g.push(`<g><rect x="220" y="104" width="62" height="46" rx="4" fill="#2b3444"/><rect x="226" y="110" width="50" height="34" rx="2" fill="#5b8bd6"/><rect x="246" y="150" width="10" height="7" fill="#2b3444"/></g>`);
   // Aktenschrank
-  if (has('cabinet')) g.push(`<g><rect x="560" y="120" width="60" height="100" rx="3" fill="#8a97a8"/><rect x="568" y="135" width="44" height="6" fill="#6b7784"/><rect x="568" y="165" width="44" height="6" fill="#6b7784"/><rect x="568" y="195" width="44" height="6" fill="#6b7784"/></g>`);
+  if (has('cabinet')) g.push(`<g><rect x="598" y="120" width="60" height="100" rx="3" fill="#8a97a8"/><rect x="606" y="135" width="44" height="6" fill="#6b7784"/><rect x="606" y="165" width="44" height="6" fill="#6b7784"/><rect x="606" y="195" width="44" height="6" fill="#6b7784"/></g>`);
   // Zweiter Arbeitsplatz
   if (has('desk2')) g.push(`<g>
     <rect x="30" y="160" width="150" height="9" rx="3" fill="#a8763e"/>
@@ -11109,7 +11112,7 @@ function gameOfficeSceneHtml(items) {
     <rect x="15" y="182" width="28" height="36" rx="6" fill="var(--acc)" opacity=".7"/>
   </g>`);
   // Meetingbereich
-  if (has('meeting')) g.push(`<g><ellipse cx="700" cy="195" rx="46" ry="16" fill="#c9bfae"/><circle cx="656" cy="188" r="10" fill="var(--acc)" opacity=".7"/><circle cx="744" cy="188" r="10" fill="var(--acc)" opacity=".7"/><circle cx="700" cy="168" r="10" fill="var(--acc)" opacity=".7"/></g>`);
+  if (has('meeting')) g.push(`<g><ellipse cx="722" cy="195" rx="46" ry="16" fill="#c9bfae"/><circle cx="678" cy="188" r="10" fill="var(--acc)" opacity=".7"/><circle cx="766" cy="188" r="10" fill="var(--acc)" opacity=".7"/><circle cx="722" cy="168" r="10" fill="var(--acc)" opacity=".7"/></g>`);
   // Kleine Büroküche
   if (has('kitchen')) g.push(`<g><rect x="520" y="200" width="70" height="20" rx="3" fill="#cfd6dd"/><rect x="530" y="185" width="22" height="18" rx="2" fill="#8a97a8"/><circle cx="572" cy="195" r="5" fill="#44546b"/></g>`);
   // Executive Office — Akzentrahmen signalisiert "High-End"
