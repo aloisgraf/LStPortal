@@ -10914,41 +10914,58 @@ function onChatMessagesChanged(prevMsgs){
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DESK EMPIRE — kleines Idle-Spiel (Menüpunkt "Spiele" in der Kopfzeile).
-// Der Server (routes/game.js) ist die alleinige Quelle der Wahrheit für
-// Kontostand/Preise/Einnahmen — der Client schickt nur Aktionen (Klick/Kauf)
-// und zeigt zwischen den Server-Antworten lediglich eine kosmetische,
-// lokal hochgerechnete Zahl an (S._gameLocalCoins), niemals maßgeblich.
+// Der Server (routes/game.js, lib/game-logic.js) ist die alleinige Quelle der
+// Wahrheit für Kontostand/Preise/Einnahmen — der Client schickt nur Absichten
+// (Klicks gebündelt, Käufe) und rechnet zwischen den Antworten lediglich eine
+// kosmetische Anzeige des Kontostands hoch (S._gameLocalCoins).
+// Das Büro ist ein isometrisches Raster: jeder Gegenstand, Arbeitsplatz,
+// Raum und jedes Angebot belegt eine Stellfläche, jeder Mitarbeiter sitzt
+// sichtbar an seinem Arbeitsplatz.
 // ═══════════════════════════════════════════════════════════════════════════
-let _gameTickerInterval = null;
+let _gameTickerInterval = null, _gameClickQueue = 0, _gameClickTimer = null;
 function fmtCoins(n) {
   n = Math.max(0, n||0);
   if (n >= 1e9) return (n/1e9).toFixed(2).replace('.',',')+' Mrd.';
   if (n >= 1e6) return (n/1e6).toFixed(2).replace('.',',')+' Mio.';
   return Math.floor(n).toLocaleString('de-DE');
 }
-function fmtRate(n) {
-  n = Math.max(0, n||0);
-  if (n >= 1e6) return fmtCoins(n);
-  if (n < 10) return n.toFixed(1).replace('.',',');
-  return Math.floor(n).toLocaleString('de-DE');
+function fmtSigned(n) { return (n<0?'−':'+')+fmtCoins(Math.abs(n)); }
+function fmtMinutes(min) {
+  if (!isFinite(min)) return '–';
+  if (min < 1) return '< 1 Min.';
+  if (min < 90) return Math.round(min)+' Min.';
+  if (min < 48*60) return (min/60).toFixed(1).replace('.',',')+' Std.';
+  return Math.round(min/1440)+' Tage';
 }
+const _gameStageName = id => (S.gameCatalog?.stages||[]).find(s=>s.id===id)?.name||'';
 async function loadGame() {
   try {
+    if (!S.gameCatalog) S.gameCatalog = await api('GET','/game/catalog');
     const state = await api('GET','/game/state');
-    _onGameState(state, true);
+    _onGameState(state);
   } catch(e) { toast('⚠️ Spiel konnte nicht geladen werden: '+e.message,'err'); }
 }
-function _onGameState(state, isInitialLoad) {
-  S.game = state;
-  S._gameLocalCoins = state.coins;
-  if (isInitialLoad && state.offlineEarnings > 0) {
-    const mins = Math.max(1, Math.round(state.offlineSeconds/60));
-    toast('👋 Willkommen zurück! +'+fmtCoins(state.offlineEarnings)+' Office Coins verdient ('+mins+' Min. offline)','ok',6000);
+function _onGameState(state) {
+  const prev = S.game;
+  const ev = state.events||{};
+  if (ev.reset) toast('🏗️ Desk Empire wurde komplett überarbeitet — dein Büro startet neu im Keller.','ok',7000);
+  if (ev.offlineEarnings > 0) {
+    const mins = Math.max(1, Math.round(ev.offlineSeconds/60));
+    toast('👋 Willkommen zurück! +'+fmtCoins(ev.offlineEarnings)+' Office Coins in '+fmtMinutes(mins)+' Abwesenheit','ok',6000);
   }
-  (state.newAchievements||[]).forEach(a=>toast('🏆 Erfolg freigeschaltet: '+a.icon+' '+a.name,'ok',5000));
-  if (state.leveledUp) toast('⭐ Level '+state.leveledUp+' erreicht!','ok',4000);
-  // Ticker nur auf der Spielseite — eine verspätete Antwort (Klick/Sync)
-  // nach dem Verlassen der Ansicht darf ihn nicht wieder anwerfen.
+  if (ev.order?.done) toast('📋 Auftrag „'+ev.order.name+'“ erledigt: +'+fmtCoins(ev.order.reward)+' 🪙','ok',5000);
+  if (ev.order?.failed) toast('⌛ Auftrag „'+ev.order.name+'“ nicht rechtzeitig geschafft','err',5000);
+  (ev.newAchievements||[]).forEach(a=>toast('🏆 Erfolg: '+a.icon+' '+a.name,'ok',5000));
+  if (ev.leveledUp) toast('⭐ Level '+ev.leveledUp+' erreicht!','ok',4000);
+  // Neu hinzugekommene Objekte/Mitarbeiter für die Einblend-Animation merken
+  if (prev && prev.stage === state.stage) {
+    S._gameAnim = { fromIndex: state.layout.length > prev.layout.length ? prev.layout.length : state.layout.length,
+      emps: new Set(state.employees.filter(e=>!prev.employees.some(p=>p.id===e.id)).map(e=>e.id)) };
+  } else S._gameAnim = null;
+  if (S._gameSel != null && S._gameSel >= state.layout.length) S._gameSel = null;
+  S.game = state;
+  S._gameClockOffset = state.now - Date.now();
+  S._gameLocalCoins = state.coins + _gameClickQueue*state.clickValue;
   if (S.view==='game') { renderGame(); startGameTicker(); }
 }
 function startGameTicker() {
@@ -10956,20 +10973,30 @@ function startGameTicker() {
   let syncCounter=0;
   _gameTickerInterval = setInterval(()=>{
     if (!S.game) return;
-    // Netto wie am Server: Gegenstände + Mitarbeiter − Gehälter/Unterhalt
-    // (1 Spielstunde = 1 reale Minute), Kontostand nie negativ.
-    S._gameLocalCoins = Math.max(0, S._gameLocalCoins + S.game.financials.netPerGameHour/60*0.2);
-    if (S.view==='game') _updateGameCoinDisplay();
+    // Netto wie am Server (Einnahmen − Gehälter − Unterhalt), nie negativ
+    S._gameLocalCoins = Math.max(0, S._gameLocalCoins + S.game.financials.netPerMinute/60*0.2);
+    if (S.view==='game') _updateGameLive();
     syncCounter++;
-    if (syncCounter>=100) { syncCounter=0; loadGame(); } // alle ~20s mit Server abgleichen
+    if (syncCounter>=100 && !_gameClickQueue) { syncCounter=0; loadGame(); } // alle ~20s mit Server abgleichen
   }, 200);
 }
 function stopGameTicker() {
   if (_gameTickerInterval) { clearInterval(_gameTickerInterval); _gameTickerInterval=null; }
 }
-function _updateGameCoinDisplay() {
+// Kontostand, Kaufknöpfe und Auftrags-Restzeit ohne komplettes Neuzeichnen aktualisieren
+function _updateGameLive() {
   const el = document.getElementById('gameCoinsDisplay');
-  if (el) el.textContent = fmtCoins(S._gameLocalCoins)+' 🪙';
+  if (el) el.textContent = fmtCoins(S._gameLocalCoins);
+  document.querySelectorAll('#main [data-cost]').forEach(b=>{
+    const can = b.dataset.ok==='1' && S._gameLocalCoins >= +b.dataset.cost;
+    b.disabled = !can;
+    b.closest('.ge-card')?.classList.toggle('ge-afford', can);
+  });
+  const ot = document.getElementById('gameOrderTime');
+  if (ot && S.game?.order) {
+    const o = S.game.order, t = (o.active ? o.expiresAt : o.offeredUntil) - (Date.now()+(S._gameClockOffset||0));
+    ot.textContent = Math.max(0, Math.floor(t/60000))+':'+String(Math.max(0, Math.floor(t/1000)%60)).padStart(2,'0');
+  }
 }
 function _spawnClickFx(e, text) {
   const btn = e.currentTarget||e.target;
@@ -10977,330 +11004,412 @@ function _spawnClickFx(e, text) {
   const fx = document.createElement('div');
   fx.className = 'game-click-fx';
   fx.textContent = text;
-  fx.style.left = (rect.left + rect.width/2 + (Math.random()*30-15)) + 'px';
+  fx.style.left = (rect.left + rect.width/2 + (Math.random()*40-20)) + 'px';
   fx.style.top = rect.top + 'px';
   document.body.appendChild(fx);
   fx.addEventListener('animationend', ()=>fx.remove());
   setTimeout(()=>fx.remove(), 1200); // Sicherheitsnetz, falls animationend nicht feuert
 }
-async function gameClick(e) {
+// Klicks werden gesammelt und höchstens einmal pro Sekunde geschickt; der
+// Server rechnet maximal 10 Klicks pro Sekunde an.
+function gameClick(e) {
   if (!S.game) return;
-  S._gameLocalCoins += S.game.derived.clickValue;
-  _updateGameCoinDisplay();
-  _spawnClickFx(e, '+'+fmtCoins(S.game.derived.clickValue));
-  try {
-    const state = await api('POST','/game/click');
-    _onGameState(state, false);
-  } catch(err) { toast('⚠️ '+err.message,'err'); }
+  _gameClickQueue++;
+  S._gameLocalCoins += S.game.clickValue;
+  _updateGameLive();
+  _spawnClickFx(e, '+'+fmtCoins(S.game.clickValue));
+  if (!_gameClickTimer) _gameClickTimer = setTimeout(_flushGameClicks, 900);
 }
-async function gameBuyItem(itemId) {
+async function _flushGameClicks() {
+  _gameClickTimer = null;
+  const count = _gameClickQueue;
+  if (!count) return;
+  _gameClickQueue = 0;
+  try { _onGameState(await api('POST','/game/click',{count})); }
+  catch(err) { toast('⚠️ '+err.message,'err'); }
+}
+async function gameAct(path, body, okMsg) {
+  if (_gameClickQueue) await _flushGameClicks();
   try {
-    const state = await api('POST','/game/buy-item',{itemId});
-    _onGameState(state, false);
+    const state = await api('POST','/game/'+path, body||{});
+    _onGameState(state);
+    if (okMsg) toast(okMsg,'ok');
   } catch(e) { toast('⚠️ '+e.message,'err'); }
 }
-async function gameBuyUpgrade(upgradeId) {
-  try {
-    const state = await api('POST','/game/buy-upgrade',{upgradeId});
-    _onGameState(state, false);
-    toast('✅ Upgrade freigeschaltet');
-  } catch(e) { toast('⚠️ '+e.message,'err'); }
+const gameBuyObject = id => gameAct('buy-object',{id});
+const gameBuyPolicy = id => gameAct('buy-policy',{id},'✅ Eingeführt');
+const gameBuyUpgrade = id => gameAct('buy-upgrade',{id},'✅ Upgrade freigeschaltet');
+const gameHire = classId => gameAct('hire',{classId},'✅ Eingestellt');
+const gameMove = () => gameAct('move',{},'🚚 Umzug geschafft!');
+const gameStartTeambuilding = () => gameAct('teambuilding',{},'🎉 Teambuilding gestartet');
+const gameOrder = accept => gameAct(accept?'order/accept':'order/decline',{});
+function gameFire(employeeId) {
+  if (!confirm('Mitarbeiter wirklich entlassen?')) return;
+  gameAct('fire',{employeeId},'Entlassen');
 }
+function gameSellSelected() {
+  const i = S._gameSel; if (i==null) return;
+  const o = _gameObj(S.game.layout[i]);
+  if (!confirm((o?.name||'Gegenstand')+' für den halben Preis verkaufen?')) return;
+  S._gameSel = null;
+  gameAct('sell-object',{index:i},'Verkauft');
+}
+function gameSelectSlot(i) { S._gameSel = (S._gameSel===i ? null : i); renderGame(); }
+const _gameObj = id => (S.gameCatalog?.objects||[]).find(o=>o.id===id);
+
 function renderGame() {
-  if (!S.game) {
-    document.getElementById('main').innerHTML = `<div style="padding:60px;text-align:center;color:var(--mu)">⏳ Lade Spielstand…</div>`;
+  const main = document.getElementById('main');
+  if (!S.game || !S.gameCatalog) {
+    main.innerHTML = `<div style="padding:60px;text-align:center;color:var(--mu)">⏳ Lade Spielstand…</div>`;
     loadGame();
     return;
   }
-  const g = S.game;
-  const tab = S._gameTab||'main';
+  const g = S.game, cat = S.gameCatalog;
+  const panel = S._gamePanel||'einrichtung';
+  const scroll = document.querySelector('.ge-panel-body')?.scrollTop||0;
+  const net = g.financials.netPerMinute;
   const xpPct = Math.min(100, Math.round((g.xp/g.xpToNext)*100));
-  const tabBtn=(id,label)=>`<button class="game-tab${tab===id?' active':''}" onclick="S._gameTab='${id}';renderGame()">${label}</button>`;
-  document.getElementById('main').innerHTML = `
-    <div class="game-wrap">
-      <div class="game-hdr">
-        <div class="game-title">🎮 Desk Empire</div>
-        <div class="game-stats">
-          <div class="game-stat"><span class="game-stat-label">Level</span><span class="game-stat-val">${g.level}</span></div>
-          <div class="game-stat"><span class="game-stat-label">Kontostand</span><span class="game-stat-val" id="gameCoinsDisplay">${fmtCoins(S._gameLocalCoins)} 🪙</span></div>
-          <div class="game-stat"><span class="game-stat-label">Pro Sekunde</span><span class="game-stat-val">${fmtRate(g.derived.incomePerSecond)} 🪙/s</span></div>
+  const mood = g.employees.length ? Math.round((g.workforce.avgHealth+g.workforce.avgSatisfaction)/2)+' %' : '–';
+  const tab = (id,label) => `<button class="ge-tab${panel===id?' active':''}" onclick="S._gamePanel='${id}';renderGame()">${label}</button>`;
+  main.innerHTML = `
+  <div class="ge">
+    <div class="ge-top">
+      <div class="ge-brand">
+        <div class="ge-title">Desk Empire</div>
+        <div class="ge-sub">Etappe ${g.stage} von ${cat.stages.length} · ${esc(_gameStageName(g.stage))}</div>
+      </div>
+      <div class="ge-kpis">
+        <div class="ge-kpi"><span>Kontostand</span><b><span id="gameCoinsDisplay">${fmtCoins(S._gameLocalCoins)}</span> 🪙</b></div>
+        <div class="ge-kpi"><span>Gewinn pro Minute</span><b class="${net>=0?'ge-pos':'ge-neg'}">${fmtSigned(net)}</b></div>
+        <div class="ge-kpi"><span>Team</span><b>${g.employees.length} / ${g.capacity}</b></div>
+        <div class="ge-kpi"><span>⌀ Stimmung</span><b>${mood}</b></div>
+        <div class="ge-kpi ge-kpi-lvl"><span>Level ${g.level}</span>
+          <div class="ge-xp" title="${fmtCoins(g.xp)} / ${fmtCoins(g.xpToNext)} XP (1 XP je verdientem Office Coin)"><div style="width:${xpPct}%"></div></div>
         </div>
       </div>
-      <div class="game-xp-row">
-        <div class="game-xp-bar"><div class="game-xp-fill" style="width:${xpPct}%"></div></div>
-        <div class="game-xp-label">${Math.floor(g.xp)} / ${g.xpToNext} XP bis Level ${g.level+1}</div>
-      </div>
-      <div class="game-tabs">
-        ${tabBtn('main','🏢 Büro')}
-        ${tabBtn('employees','🧑‍💼 Mitarbeiter ('+g.workforce.activeCount+'/'+g.maxEmployees+')')}
-        ${tabBtn('office','🪑 Arbeitsplätze')}
-        ${tabBtn('perks','💚 Angebote')}
-        ${tabBtn('shop','🛒 Shop')}
-        ${tabBtn('achievements','🏆 Erfolge ('+g.achievements.length+'/'+g.catalog.achievements.length+')')}
-        ${tabBtn('stats','📊 Finanzen')}
-      </div>
-      <div class="game-body">
-        ${tab==='main'?renderGameMain(g):tab==='employees'?renderGameEmployees(g):tab==='office'?renderGameOffice(g):tab==='perks'?renderGamePerks(g):tab==='shop'?renderGameShop(g):tab==='achievements'?renderGameAchievements(g):renderGameStats(g)}
-      </div>
-    </div>`;
-}
-function renderGameMain(g) {
-  const net = g.financials.netPerGameHour;
-  return `
-    <div class="game-office-card">${gameOfficeSceneHtml(g.ownedItems)}</div>
-    <div class="game-overview-strip">
-      <div class="game-stat"><span class="game-stat-label">Mitarbeiter</span><span class="game-stat-val">${g.workforce.activeCount} / ${g.maxEmployees}</span></div>
-      <div class="game-stat"><span class="game-stat-label">⌀ Gesundheit</span><span class="game-stat-val">${Math.round(g.workforce.avgHealth)}%</span></div>
-      <div class="game-stat"><span class="game-stat-label">⌀ Zufriedenheit</span><span class="game-stat-val">${Math.round(g.workforce.avgSatisfaction)}%</span></div>
-      <div class="game-stat"><span class="game-stat-label">Gewinn/Spielstunde</span><span class="game-stat-val" style="color:${net>=0?'var(--ok)':'var(--danger)'}">${net>=0?'+':''}${fmtCoins(net)} 🪙</span></div>
     </div>
-    <div class="game-click-area">
-      <button class="game-click-btn" onclick="gameClick(event)">💪 Arbeiten <span>+${fmtCoins(g.derived.clickValue)}</span></button>
-      <div style="font-size:12px;color:var(--mu);margin-top:8px">Jeder Klick bringt dir ${fmtCoins(g.derived.clickValue)} Office Coins. 1 Spielstunde = 1 reale Minute.</div>
-    </div>`;
-}
-// Modular aufgebaute Büro-Illustration — jedes Möbelstück ist eine eigene
-// SVG-Gruppe, die nur erscheint, wenn der zugehörige Shop-Gegenstand
-// mindestens einmal gekauft wurde. Bewusst flaches, ruhiges 2D-Design statt
-// zufälliger Emojis, damit der Fortschritt optisch nachvollziehbar bleibt.
-function gameOfficeSceneHtml(items) {
-  const has = id => (items[id]||0) > 0;
-  const g = [];
-  // Wand + Boden
-  g.push(`<rect x="0" y="0" width="800" height="230" fill="var(--sf2)"/>`);
-  g.push(`<rect x="0" y="230" width="800" height="90" fill="var(--sf3)"/>`);
-  g.push(`<rect x="0" y="228" width="800" height="3" fill="var(--border)"/>`);
-  // Großraumbüro: zusätzliche Schreibtisch-Silhouetten im Hintergrund
-  if (has('openspace')) {
-    for (let i=0;i<4;i++) {
-      const x=40+i*180;
-      g.push(`<rect x="${x}" y="205" width="70" height="8" rx="2" fill="var(--border)" opacity=".6"/>`);
-    }
-  }
-  // Basis: Schreibtisch, Stuhl, Computer, kleine Pflanze (immer vorhanden)
-  g.push(`<g>
-    <rect x="260" y="150" width="190" height="10" rx="3" fill="#a8763e"/>
-    <rect x="270" y="160" width="8" height="55" fill="#8a5f30"/>
-    <rect x="432" y="160" width="8" height="55" fill="#8a5f30"/>
-    <rect x="300" y="100" width="70" height="52" rx="4" fill="#2b3444"/>
-    <rect x="306" y="106" width="58" height="38" rx="2" fill="#5b8bd6"/>
-    <rect x="325" y="152" width="20" height="8" fill="#2b3444"/>
-    <rect x="310" y="160" width="50" height="6" rx="2" fill="#1f2630"/>
-    <rect x="395" y="130" width="22" height="22" rx="3" fill="#dfe3e8"/>
-    <circle cx="406" cy="155" r="14" fill="#6b7784"/>
-    <rect x="200" y="175" width="34" height="42" rx="6" fill="var(--acc)" opacity=".85"/>
-    <rect x="200" y="167" width="34" height="14" rx="6" fill="var(--acc)"/>
-  </g>`);
-  g.push(gamePlantSvg(130,190,1));
-  // Zimmerpflanze (Shop) — zweite, größere Pflanze
-  if (has('plant')) g.push(gamePlantSvg(745,240,1.2));
-  // Schreibtischlampe
-  if (has('lamp')) g.push(`<g><rect x="372" y="118" width="4" height="34" fill="#44546b"/><path d="M356 118 L390 118 L380 100 L366 100 Z" fill="#f4b740"/></g>`);
-  // Kaffeemaschine
-  if (has('coffee')) g.push(`<g><rect x="470" y="188" width="46" height="14" rx="3" fill="#5b4636"/><rect x="478" y="150" width="30" height="40" rx="4" fill="#caa26b"/><rect x="486" y="156" width="14" height="10" rx="2" fill="#5b4636"/></g>`);
-  // Zweiter Monitor
-  if (has('monitor2')) g.push(`<g><rect x="220" y="104" width="62" height="46" rx="4" fill="#2b3444"/><rect x="226" y="110" width="50" height="34" rx="2" fill="#5b8bd6"/><rect x="246" y="150" width="10" height="7" fill="#2b3444"/></g>`);
-  // Aktenschrank
-  if (has('cabinet')) g.push(`<g><rect x="598" y="120" width="60" height="100" rx="3" fill="#8a97a8"/><rect x="606" y="135" width="44" height="6" fill="#6b7784"/><rect x="606" y="165" width="44" height="6" fill="#6b7784"/><rect x="606" y="195" width="44" height="6" fill="#6b7784"/></g>`);
-  // Zweiter Arbeitsplatz
-  if (has('desk2')) g.push(`<g>
-    <rect x="30" y="160" width="150" height="9" rx="3" fill="#a8763e"/>
-    <rect x="38" y="169" width="7" height="48" fill="#8a5f30"/>
-    <rect x="165" y="169" width="7" height="48" fill="#8a5f30"/>
-    <rect x="60" y="120" width="55" height="40" rx="4" fill="#2b3444"/>
-    <rect x="65" y="125" width="45" height="30" rx="2" fill="#5b8bd6"/>
-    <rect x="15" y="182" width="28" height="36" rx="6" fill="var(--acc)" opacity=".7"/>
-  </g>`);
-  // Meetingbereich
-  if (has('meeting')) g.push(`<g><ellipse cx="722" cy="195" rx="46" ry="16" fill="#c9bfae"/><circle cx="678" cy="188" r="10" fill="var(--acc)" opacity=".7"/><circle cx="766" cy="188" r="10" fill="var(--acc)" opacity=".7"/><circle cx="722" cy="168" r="10" fill="var(--acc)" opacity=".7"/></g>`);
-  // Kleine Büroküche
-  if (has('kitchen')) g.push(`<g><rect x="520" y="200" width="70" height="20" rx="3" fill="#cfd6dd"/><rect x="530" y="185" width="22" height="18" rx="2" fill="#8a97a8"/><circle cx="572" cy="195" r="5" fill="#44546b"/></g>`);
-  // Executive Office — Akzentrahmen signalisiert "High-End"
-  if (has('executive')) {
-    g.push(`<rect x="0" y="0" width="800" height="320" fill="none" stroke="#e6c570" stroke-width="4" rx="10"/>`);
-    g.push(`<g><rect x="690" y="90" width="90" height="60" rx="4" fill="#3b2f23"/><rect x="700" y="98" width="70" height="10" fill="#e6c570" opacity=".6"/><rect x="700" y="112" width="70" height="10" fill="#e6c570" opacity=".6"/><rect x="700" y="126" width="70" height="10" fill="#e6c570" opacity=".6"/></g>`);
-  }
-  return `<svg viewBox="0 0 800 320" preserveAspectRatio="xMidYMax meet" style="width:100%;height:auto;display:block">${g.join('')}</svg>`;
-}
-function gamePlantSvg(x,y,scale) {
-  return `<g transform="translate(${x},${y}) scale(${scale})">
-    <rect x="-14" y="30" width="28" height="26" rx="4" fill="#b4592f"/>
-    <path d="M0 32 C-18 24 -22 2 -10 -8 C-6 -16 6 -16 10 -8 C22 2 18 24 0 32 Z" fill="#4b9f5f"/>
-  </g>`;
-}
-function renderGameShop(g) {
-  const priceOf = id => g.prices.find(p=>p.id===id)?.price ?? 0;
-  const itemCard = it => {
-    const owned = g.ownedItems[it.id]||0;
-    const price = priceOf(it.id);
-    const afford = g.coins >= price;
-    return `<div class="game-shop-card${afford?'':' locked'}">
-      <div class="game-shop-icon">${it.icon}</div>
-      <div class="game-shop-info">
-        <div class="game-shop-name">${esc(it.name)}</div>
-        <div class="game-shop-meta">+${fmtRate(it.rate)} 🪙/s &middot; ${owned} im Besitz</div>
-      </div>
-      <button class="game-shop-buy" ${afford?'':'disabled'} onclick="gameBuyItem('${it.id}')">${fmtCoins(price)} 🪙</button>
-    </div>`;
-  };
-  const upgCard = u => {
-    const owned = g.ownedUpgrades.includes(u.id);
-    const lockedByReq = u.requires && !g.ownedUpgrades.includes(u.requires);
-    const afford = g.coins >= u.cost;
-    return `<div class="game-shop-card${(owned||!afford||lockedByReq)?' locked':''}">
-      <div class="game-shop-icon">⭐</div>
-      <div class="game-shop-info">
-        <div class="game-shop-name">${esc(u.name)}</div>
-        <div class="game-shop-meta">${esc(u.desc)}${lockedByReq?' · Voraussetzung fehlt':''}</div>
-      </div>
-      ${owned?`<span class="game-shop-owned">✓ Freigeschaltet</span>`:`<button class="game-shop-buy" ${(afford&&!lockedByReq)?'':'disabled'} onclick="gameBuyUpgrade('${u.id}')">${fmtCoins(u.cost)} 🪙</button>`}
-    </div>`;
-  };
-  return `
-    <div class="game-shop-section-title">Deko &amp; Technik (automatische Einnahmen)</div>
-    <div class="game-shop-list">${g.catalog.items.map(itemCard).join('')}</div>
-    <div class="game-shop-section-title" style="margin-top:18px">Upgrades</div>
-    <div class="game-shop-list">${g.catalog.upgrades.map(upgCard).join('')}</div>`;
-}
-function renderGameEmployees(g) {
-  const classCard = c => {
-    const afford = g.coins >= c.hireCost;
-    const full = g.workforce.activeCount >= g.maxEmployees;
-    return `<div class="game-shop-card${(afford&&!full)?'':' locked'}">
-      <div class="game-shop-icon">🧑‍💼</div>
-      <div class="game-shop-info">
-        <div class="game-shop-name">${esc(c.name)}</div>
-        <div class="game-shop-meta">${fmtCoins(c.wage)} 🪙/Spielstunde Gehalt &middot; Produktivität ${c.productivity}</div>
-      </div>
-      <button class="game-shop-buy" ${(afford&&!full)?'':'disabled'} onclick="gameHire('${c.id}')" title="${full?'Kein freier Arbeitsplatz':''}">${fmtCoins(c.hireCost)} 🪙</button>
-    </div>`;
-  };
-  const empRow = e => {
-    const cls = g.catalog.employeeClasses.find(c=>c.id===e.classId);
-    const active = e.status==='active';
-    return `<div class="game-emp-row${active?'':' terminated'}">
-      <div class="game-emp-name">${esc(e.name)} <span class="game-emp-pos">${esc(cls?.name||e.classId)}</span>${active?'':' <span class="game-emp-pos">· gekündigt</span>'}</div>
-      ${active?`
-      <div class="game-emp-bars">
-        <div class="game-emp-bar-lbl">❤️ ${Math.round(e.health)}%</div><div class="game-bar"><div class="game-bar-fill health" style="width:${e.health}%"></div></div>
-        <div class="game-emp-bar-lbl">😊 ${Math.round(e.satisfaction)}%</div><div class="game-bar"><div class="game-bar-fill sat" style="width:${e.satisfaction}%"></div></div>
-      </div>
-      <button class="btn-d" style="font-size:11px;padding:4px 9px" onclick="gameFire('${e.id}')">Kündigen</button>`:''}
-    </div>`;
-  };
-  const activeEmployees = g.employees.filter(e=>e.status==='active');
-  return `
-    <div class="game-shop-section-title">Arbeitsplätze: ${activeEmployees.length} / ${g.maxEmployees} belegt</div>
-    <div class="game-emp-list" style="margin-bottom:18px">
-      ${activeEmployees.length?activeEmployees.map(empRow).join(''):'<div style="color:var(--mu);font-size:13px;padding:8px 0">Noch keine Mitarbeiter eingestellt.</div>'}
-      ${g.employees.filter(e=>e.status!=='active').map(empRow).join('')}
-    </div>
-    <div class="game-shop-section-title">Einstellen</div>
-    <div class="game-shop-list">${g.catalog.employeeClasses.map(classCard).join('')}</div>`;
-}
-function renderGameOffice(g) {
-  const wsCard = w => {
-    const owned = g.workstations[w.id]||0;
-    const afford = g.coins >= w.cost;
-    return `<div class="game-shop-card${afford?'':' locked'}">
-      <div class="game-shop-icon">${w.icon}</div>
-      <div class="game-shop-info">
-        <div class="game-shop-name">${esc(w.name)}</div>
-        <div class="game-shop-meta">${fmtCoins(w.upkeep)} 🪙/Spielstunde laufende Kosten &middot; ${owned} im Besitz</div>
-      </div>
-      <button class="game-shop-buy" ${afford?'':'disabled'} onclick="gameBuyWorkstation('${w.id}')">${fmtCoins(w.cost)} 🪙</button>
-    </div>`;
-  };
-  return `
-    <div class="game-shop-section-title">Arbeitsplätze &amp; Büroausstattung — aktuelle Kapazität: ${g.maxEmployees} Mitarbeiter</div>
-    <div class="game-shop-list">${g.catalog.workstations.map(wsCard).join('')}</div>`;
-}
-function renderGamePerks(g) {
-  const perkCard = p => {
-    const owned = g.perks[p.id]||0;
-    const maxed = owned >= p.maxCount;
-    const afford = g.coins >= p.cost;
-    return `<div class="game-shop-card${(afford&&!maxed)?'':' locked'}">
-      <div class="game-shop-icon">${p.icon}</div>
-      <div class="game-shop-info">
-        <div class="game-shop-name">${esc(p.name)}</div>
-        <div class="game-shop-meta">${fmtCoins(p.upkeep)} 🪙/Spielstunde &middot; ${owned}/${p.maxCount} aktiv</div>
-      </div>
-      ${maxed?`<span class="game-shop-owned">✓ Maximal</span>`:`<button class="game-shop-buy" ${afford?'':'disabled'} onclick="gameBuyPerk('${p.id}')">${fmtCoins(p.cost)} 🪙</button>`}
-    </div>`;
-  };
-  const tbActive = g.teambuildingActive;
-  const tbRemaining = tbActive ? Math.max(0, Math.round((new Date(g.teambuildingUntil).getTime()-Date.now())/60000)) : 0;
-  return `
-    <div class="game-shop-section-title">Mitarbeiterangebote (laufende Kosten pro Spielstunde)</div>
-    <div class="game-shop-list">${g.catalog.perks.map(perkCard).join('')}</div>
-    <div class="game-shop-section-title" style="margin-top:18px">Veranstaltung</div>
-    <div class="game-shop-list">
-      <div class="game-shop-card${(tbActive||g.coins<g.catalog.teambuildingCost)?' locked':''}">
-        <div class="game-shop-icon">🎉</div>
-        <div class="game-shop-info">
-          <div class="game-shop-name">Teambuilding</div>
-          <div class="game-shop-meta">${tbActive?'Aktiv — noch ~'+tbRemaining+' Min.':'Zufriedenheit & Teamleistung zeitlich begrenzt erhöht (6 Spielstunden)'}</div>
+    ${_gameOrderHtml(g)}
+    <div class="ge-main">
+      <div class="ge-scene-col">
+        <div class="ge-scene">${gameOfficeSceneHtml(g)}</div>
+        ${_gameSelectionHtml(g)}
+        <div class="ge-actions">
+          <button class="ge-work" onclick="gameClick(event)">💪 Arbeiten <span>+${fmtCoins(g.clickValue)}</span></button>
+          ${_gameMoveHtml(g)}
         </div>
-        ${tbActive?`<span class="game-shop-owned">✓ Aktiv</span>`:`<button class="game-shop-buy" ${g.coins>=g.catalog.teambuildingCost?'':'disabled'} onclick="gameStartTeambuilding()">${fmtCoins(g.catalog.teambuildingCost)} 🪙</button>`}
       </div>
+      <div class="ge-panel">
+        <div class="ge-tabs">
+          ${tab('einrichtung','🪑 Einrichtung')}${tab('team','🧑‍💼 Team')}${tab('upgrades','⭐ Upgrades')}${tab('finanzen','📊 Finanzen')}${tab('erfolge','🏆 '+g.achievements.length+'/'+cat.achievements.length)}
+        </div>
+        <div class="ge-panel-body">
+          ${panel==='team'?_gameTeamHtml(g):panel==='upgrades'?_gameUpgradesHtml(g):panel==='finanzen'?_gameFinanceHtml(g):panel==='erfolge'?_gameAchievementsHtml(g):_gameShopHtml(g)}
+        </div>
+      </div>
+    </div>
+  </div>`;
+  const pb = document.querySelector('.ge-panel-body'); if (pb) pb.scrollTop = scroll;
+  S._gameAnim = null;
+  _updateGameLive();
+}
+function _gameOrderHtml(g) {
+  const o = g.order;
+  if (!o) return '';
+  if (!o.active) return `<div class="ge-order">
+      <div class="ge-order-ic">📋</div>
+      <div class="ge-order-txt"><b>Neuer Auftrag: ${esc(o.name)}</b><span>${esc(o.desc)} · Belohnung ${fmtCoins(o.reward)} 🪙 · Angebot noch <span id="gameOrderTime"></span></span></div>
+      <button class="btn-p" onclick="gameOrder(true)">Annehmen</button>
+      <button class="btn-s" onclick="gameOrder(false)">Ablehnen</button>
+    </div>`;
+  const pct = Math.min(100, Math.round(o.progress/o.target*100));
+  return `<div class="ge-order active">
+      <div class="ge-order-ic">⏱️</div>
+      <div class="ge-order-txt"><b>${esc(o.name)}</b><span>${esc(o.desc)} · Belohnung ${fmtCoins(o.reward)} 🪙</span>
+        <div class="ge-order-bar"><div style="width:${pct}%"></div></div></div>
+      <div class="ge-order-time"><span id="gameOrderTime"></span><small>${o.type==='earn'?fmtCoins(o.progress)+' / '+fmtCoins(o.target):o.progress+' / '+o.target}</small></div>
     </div>`;
 }
-function renderGameAchievements(g) {
-  const have = new Set(g.achievements);
-  return `<div class="game-ach-list">${g.catalog.achievements.map(a=>`
-    <div class="game-ach-card${have.has(a.id)?' unlocked':''}">
-      <div class="game-ach-icon">${have.has(a.id)?a.icon:'🔒'}</div>
-      <div class="game-ach-name">${esc(a.name)}</div>
-    </div>`).join('')}</div>`;
+function _gameMoveHtml(g) {
+  const n = g.nextStage;
+  if (!n) return `<div class="ge-move done">🏙️ Höchste Etappe erreicht</div>`;
+  const lvlOk = g.level >= n.minLevel;
+  return `<div class="ge-card ge-move">
+      <div class="ge-card-ic">🚚</div>
+      <div class="ge-card-info"><b>Umzug: ${esc(n.name)}</b>
+        <span>${n.cols*n.rows} Stellflächen statt ${g.slots} · schaltet neue Einrichtung frei · ${lvlOk?'Level erreicht':'ab Level '+n.minLevel+' (du: '+g.level+')'}</span></div>
+      <button class="ge-buy" data-cost="${n.cost}" data-ok="${lvlOk?1:0}" onclick="gameMove()">${fmtCoins(n.cost)} 🪙</button>
+    </div>`;
 }
-function renderGameStats(g) {
-  const row=(label,val,color)=>`<div class="game-stats-row"><span>${label}</span><span${color?' style="color:'+color+'"':''}>${val}</span></div>`;
-  const totalItems = Object.values(g.ownedItems).reduce((a,b)=>a+b,0);
+function _gameSelectionHtml(g) {
+  const i = S._gameSel;
+  const free = g.slots - g.layout.length;
+  if (i==null) return `<div class="ge-hint">${g.layout.length} von ${g.slots} Stellflächen belegt${free?'':' — Büro voll: Stück im Bild anklicken, um es zu verkaufen, oder umziehen'}</div>`;
+  const o = _gameObj(g.layout[i]);
+  return `<div class="ge-hint sel"><b>${o?.icon||''} ${esc(o?.name||'')}</b> ${_gameEffectText(o, g)}
+    <button class="btn-d" style="font-size:11px;padding:4px 10px;margin-left:auto" onclick="gameSellSelected()">Verkaufen</button>
+    <button class="btn-s" style="font-size:11px;padding:4px 10px" onclick="gameSelectSlot(${i})">Schließen</button></div>`;
+}
+function _gameEffectText(o, g) {
+  if (!o) return '';
+  const p = [];
+  if (o.income) p.push('+'+fmtCoins(o.income)+' 🪙/Min.');
+  if (o.capacity) p.push('Platz für '+o.capacity+' Mitarbeiter');
+  if (o.healthFlat) p.push('Gesundheit +'+o.healthFlat);
+  if (o.satisfactionFlat) p.push('Zufriedenheit +'+o.satisfactionFlat);
+  if (o.recovery) p.push('Erholung für '+o.recovery+' Mitarbeiter');
+  if (o.teamMult) p.push('Teamleistung +'+Math.round(o.teamMult*100)+' %');
+  if (o.productivityMult) p.push('Leistung '+Math.round((o.productivityMult-1)*100)+' %');
+  if (o.upkeep) p.push('Kosten '+fmtCoins(o.upkeep)+' 🪙/Min.');
+  return p.join(' · ');
+}
+function _gameShopHtml(g) {
+  const cat = S.gameCatalog;
+  const full = g.layout.length >= g.slots;
+  const card = o => {
+    const owned = g.objects[o.id]||0, price = g.prices[o.id];
+    const locked = o.stage > g.stage, maxed = o.max && owned >= o.max;
+    const payback = o.income ? ' · bezahlt sich in '+fmtMinutes(price/o.income) : '';
+    let btn;
+    if (locked) btn = `<span class="ge-lock">ab ${esc(_gameStageName(o.stage))}</span>`;
+    else if (maxed) btn = `<span class="ge-owned">✓ Maximum</span>`;
+    else btn = `<button class="ge-buy" data-cost="${price}" data-ok="${full?0:1}" title="${full?'Kein freier Platz':''}" onclick="gameBuyObject('${o.id}')">${fmtCoins(price)} 🪙</button>`;
+    return `<div class="ge-card${locked?' locked':''}">
+      <div class="ge-card-ic">${o.icon}</div>
+      <div class="ge-card-info"><b>${esc(o.name)}${owned?` <em>×${owned}</em>`:''}</b><span>${_gameEffectText(o,g)}${locked?'':payback}</span></div>
+      ${btn}</div>`;
+  };
+  const sec = (title, catId, note) => {
+    const list = cat.objects.filter(o=>o.cat===catId);
+    return `<div class="ge-sec">${title}${note?`<small>${note}</small>`:''}</div>${list.map(card).join('')}`;
+  };
+  return `${full?`<div class="ge-warn">Alle ${g.slots} Stellflächen belegt. Verkaufe etwas (im Bild anklicken) oder ziehe um.</div>`:''}
+    ${sec('Deko &amp; Technik','deko','bringt Geld ohne Personal')}
+    ${sec('Arbeitsplätze','platz','ohne Arbeitsplatz kein Mitarbeiter')}
+    ${sec('Räume','raum','fürs Team')}
+    ${sec('Angebote','angebot','für Gesundheit und Zufriedenheit')}`;
+}
+function _gameMoodClass(e) { const m=(e.health+e.satisfaction)/2; return m>=65?'good':m>=45?'mid':'bad'; }
+function _gameTeamHtml(g) {
+  const cat = S.gameCatalog;
+  const nowMs = Date.now()+(S._gameClockOffset||0);
+  const freeDesks = g.capacity - g.employees.length;
+  const row = e => {
+    const cls = cat.employeeClasses.find(c=>c.id===e.classId);
+    const net = e.income - e.wage;
+    return `<div class="ge-emp">
+      <div class="ge-emp-dot ${_gameMoodClass(e)}"></div>
+      <div class="ge-emp-name"><b>${esc(e.name)}</b><span>${esc(cls?.name||e.classId)} · <span class="${net>=0?'ge-pos':'ge-neg'}">${fmtSigned(net)} 🪙/Min.</span></span></div>
+      <div class="ge-emp-bars">
+        <span title="Gesundheit">❤️</span><div class="ge-bar"><div class="h" style="width:${e.health}%"></div></div>
+        <span title="Zufriedenheit">😊</span><div class="ge-bar"><div class="s" style="width:${e.satisfaction}%"></div></div>
+      </div>
+      <button class="ge-x" title="Entlassen" onclick="gameFire('${e.id}')">✕</button>
+    </div>`;
+  };
+  const hire = c => {
+    const locked = c.stage > g.stage;
+    const est = g.hireEstimates[c.id]||0;
+    return `<div class="ge-card${locked?' locked':''}">
+      <div class="ge-card-ic">🧑‍💼</div>
+      <div class="ge-card-info"><b>${esc(c.name)}</b><span>Gehalt ${fmtCoins(c.wage)} 🪙/Min. · bringt jetzt ca. ${fmtCoins(est)} (<span class="${est>=c.wage?'ge-pos':'ge-neg'}">${fmtSigned(est-c.wage)}</span>)${c.teamMult?' · Teamleistung +'+Math.round(c.teamMult*100)+' %':''}</span></div>
+      ${locked?`<span class="ge-lock">ab ${esc(_gameStageName(c.stage))}</span>`:`<button class="ge-buy" data-cost="${c.hireCost}" data-ok="${freeDesks>0?1:0}" title="${freeDesks>0?'':'Kein freier Arbeitsplatz'}" onclick="gameHire('${c.id}')">${fmtCoins(c.hireCost)} 🪙</button>`}
+    </div>`;
+  };
+  const pol = p => {
+    const locked = p.stage > g.stage, have = !!g.policies[p.id];
+    return `<div class="ge-card${locked?' locked':''}">
+      <div class="ge-card-ic">${p.icon}</div>
+      <div class="ge-card-info"><b>${esc(p.name)}</b><span>${_gameEffectText(p,g)}</span></div>
+      ${locked?`<span class="ge-lock">ab ${esc(_gameStageName(p.stage))}</span>`:have?`<span class="ge-owned">✓ Eingeführt</span>`:`<button class="ge-buy" data-cost="${p.cost}" data-ok="1" onclick="gameBuyPolicy('${p.id}')">${fmtCoins(p.cost)} 🪙</button>`}
+    </div>`;
+  };
+  const tbActive = g.teambuildingUntil > nowMs;
+  const w = g.workforce;
+  return `
+    <div class="ge-team-sum">
+      <div><span>Gesundheit</span><b>${g.employees.length?Math.round(w.avgHealth)+' %':'–'}</b><small>Ziel ${Math.round(g.wellbeingTargets.health)} %</small></div>
+      <div><span>Zufriedenheit</span><b>${g.employees.length?Math.round(w.avgSatisfaction)+' %':'–'}</b><small>Ziel ${Math.round(g.wellbeingTargets.satisfaction)} %</small></div>
+      <div><span>Erholung</span><b>${w.recovery}</b><small>Mitarbeiter ohne Überlastung</small></div>
+      <div><span>Teamleistung</span><b>+${Math.round(w.teamBonus*100)} %</b><small>Meetings, Leitung</small></div>
+    </div>
+    <div class="ge-sec">Mitarbeiter <small>${g.employees.length} von ${g.capacity} Arbeitsplätzen besetzt</small></div>
+    ${g.employees.length?g.employees.map(row).join(''):`<div class="ge-empty">Noch niemand eingestellt. Kaufe einen Schreibtisch unter „Einrichtung“ und stelle dann jemanden ein.</div>`}
+    <div class="ge-sec">Einstellen ${freeDesks>0?`<small>${freeDesks} Arbeitsplatz frei</small>`:'<small>kein Arbeitsplatz frei</small>'}</div>
+    ${S.gameCatalog.employeeClasses.map(hire).join('')}
+    <div class="ge-sec">Regelungen <small>ohne Stellfläche</small></div>
+    ${S.gameCatalog.policies.map(pol).join('')}
+    <div class="ge-sec">Veranstaltung</div>
+    <div class="ge-card">
+      <div class="ge-card-ic">🎉</div>
+      <div class="ge-card-info"><b>Teambuilding</b><span>${tbActive?'Läuft noch '+Math.ceil((g.teambuildingUntil-nowMs)/60000)+' Min.':'10 Min. lang Zufriedenheit +15 und Teamleistung +10 %'}</span></div>
+      ${tbActive?`<span class="ge-owned">✓ Läuft</span>`:`<button class="ge-buy" data-cost="${g.teambuildingCost}" data-ok="${g.employees.length?1:0}" onclick="gameStartTeambuilding()">${fmtCoins(g.teambuildingCost)} 🪙</button>`}
+    </div>`;
+}
+function _gameUpgradesHtml(g) {
+  const cat = S.gameCatalog;
+  const card = u => {
+    const owned = g.upgrades.includes(u.id), locked = u.stage > g.stage;
+    const needs = u.requires && !g.upgrades.includes(u.requires) ? cat.upgrades.find(x=>x.id===u.requires) : null;
+    let btn;
+    if (owned) btn = `<span class="ge-owned">✓</span>`;
+    else if (locked) btn = `<span class="ge-lock">ab ${esc(_gameStageName(u.stage))}</span>`;
+    else btn = `<button class="ge-buy" data-cost="${u.cost}" data-ok="${needs?0:1}" onclick="gameBuyUpgrade('${u.id}')">${fmtCoins(u.cost)} 🪙</button>`;
+    return `<div class="ge-card${locked?' locked':''}${owned?' owned':''}">
+      <div class="ge-card-ic">⭐</div>
+      <div class="ge-card-info"><b>${esc(u.name)}</b><span>${esc(u.desc)}${needs?' · braucht „'+esc(needs.name)+'“':''}</span></div>${btn}</div>`;
+  };
+  const open = cat.upgrades.filter(u=>!g.upgrades.includes(u.id)), done = cat.upgrades.filter(u=>g.upgrades.includes(u.id));
+  return `<div class="ge-sec">Verfügbar</div>${open.map(card).join('')||'<div class="ge-empty">Alles freigeschaltet.</div>'}
+    ${done.length?`<div class="ge-sec">Freigeschaltet</div>${done.map(card).join('')}`:''}`;
+}
+function _gameFinanceHtml(g) {
   const f = g.financials;
-  const net = f.netPerGameHour;
-  return `
-    <div class="game-shop-section-title">Finanzen (pro Spielstunde = pro realer Minute)</div>
-    <div class="game-stats-card" style="margin-bottom:18px">
-      ${row('Automatische Einnahmen (Büro-Gegenstände)', '+'+fmtCoins(f.itemIncomePerGameHour)+' 🪙')}
-      ${row('Einnahmen durch Mitarbeiterleistung', '+'+fmtCoins(f.employeeIncomePerGameHour)+' 🪙')}
-      ${row('Gehälter', '−'+fmtCoins(f.wageCostPerGameHour)+' 🪙')}
-      ${row('Kosten Arbeitsplätze/Ausstattung', '−'+fmtCoins(f.workstationUpkeepPerGameHour)+' 🪙')}
-      ${row('Kosten Mitarbeiterangebote', '−'+fmtCoins(f.perkUpkeepPerGameHour)+' 🪙')}
-      ${row('Gewinn / Verlust', (net>=0?'+':'−')+fmtCoins(Math.abs(net))+' 🪙', net>=0?'var(--ok)':'var(--danger)')}
+  const row = (l,v,cls)=>`<div class="ge-frow"><span>${l}</span><b${cls?` class="${cls}"`:''}>${v}</b></div>`;
+  return `<div class="ge-sec">Pro Minute</div>
+    <div class="ge-fcard">
+      ${row('Deko &amp; Technik', '+'+fmtCoins(f.decoIncome))}
+      ${row('Leistung der Mitarbeiter', '+'+fmtCoins(f.staffIncome))}
+      ${row('Gehälter', '−'+fmtCoins(f.wages))}
+      ${row('Unterhalt Einrichtung', '−'+fmtCoins(f.upkeep))}
+      ${row('Regelungen', '−'+fmtCoins(f.policyUpkeep))}
+      ${row('Gewinn', fmtSigned(f.netPerMinute)+' 🪙', f.netPerMinute>=0?'ge-pos':'ge-neg')}
     </div>
-    <div class="game-shop-section-title">Allgemein</div>
-    <div class="game-stats-card">
-      ${row('Level', g.level)}
-      ${row('Aktueller Kontostand', fmtCoins(g.coins)+' 🪙')}
+    <div class="ge-sec">Allgemein</div>
+    <div class="ge-fcard">
+      ${row('Ertrag pro Klick', fmtCoins(g.clickValue)+' 🪙')}
+      ${row('Offline-Ertrag', 'bis '+Math.round(g.offline.maxMs/3600e3)+' Std. zu '+Math.round(g.offline.mult*100)+' %')}
       ${row('Insgesamt verdient', fmtCoins(g.totalEarned)+' 🪙')}
-      ${row('Ertrag pro Klick', fmtCoins(g.derived.clickValue)+' 🪙')}
-      ${row('Gegenstände gekauft', totalItems)}
-      ${row('Upgrades freigeschaltet', g.ownedUpgrades.length+' / '+g.catalog.upgrades.length)}
-      ${row('Mitarbeiter aktiv', g.workforce.activeCount+' / '+g.maxEmployees)}
-      ${row('⌀ Gesundheit Belegschaft', Math.round(g.workforce.avgHealth)+'%')}
-      ${row('⌀ Zufriedenheit Belegschaft', Math.round(g.workforce.avgSatisfaction)+'%')}
-      ${row('Erfolge', g.achievements.length+' / '+g.catalog.achievements.length)}
+      ${row('Klicks', fmtCoins(g.stats.clicks||0))}
+      ${row('Aufträge erledigt', g.stats.ordersDone||0)}
+      ${row('Eingestellt (gesamt)', g.stats.hired||0)}
     </div>`;
 }
-async function gameHire(classId) {
-  try { const state = await api('POST','/game/hire',{classId}); _onGameState(state,false); toast('✅ Eingestellt'); }
-  catch(e) { toast('⚠️ '+e.message,'err'); }
+function _gameAchievementsHtml(g) {
+  const have = new Set(g.achievements);
+  return `<div class="ge-ach">${S.gameCatalog.achievements.map(a=>`
+    <div class="ge-ach-card${have.has(a.id)?' on':''}"><div>${have.has(a.id)?a.icon:'🔒'}</div><span>${esc(a.name)}</span></div>`).join('')}</div>`;
 }
-async function gameFire(employeeId) {
-  if (!confirm('Mitarbeiter wirklich kündigen?')) return;
-  try { const state = await api('POST','/game/fire',{employeeId}); _onGameState(state,false); toast('Gekündigt'); }
-  catch(e) { toast('⚠️ '+e.message,'err'); }
+
+// ── ISOMETRISCHES BÜRO ─────────────────────────────────────────────────────
+// Raster cols×rows; Stellfläche i liegt bei (i % cols, floor(i / cols)), die
+// erste Reihe direkt an der hinteren Wand. P(u,v,z) projiziert Rasterkoordinaten
+// (u nach rechts vorne, v nach links vorne, z nach oben) auf die Zeichenfläche.
+const _GT = 34; // halbe Kachelbreite in px (Kachel 68×34)
+function _gP(u,v,z) { return [((u-v)*_GT).toFixed(1), ((u+v)*_GT/2 - (z||0)).toFixed(1)]; }
+function _gPoly(pts, fill, extra) { return `<polygon points="${pts.map(p=>p.join(',')).join(' ')}" fill="${fill}"${extra||''}/>`; }
+function _gShade(hex, f) {
+  const n = parseInt(hex.slice(1),16); let r=n>>16, g=(n>>8)&255, b=n&255;
+  const k = c => Math.max(0, Math.min(255, Math.round(f<0 ? c*(1+f) : c+(255-c)*f)));
+  return '#'+[k(r),k(g),k(b)].map(x=>x.toString(16).padStart(2,'0')).join('');
 }
-async function gameBuyWorkstation(workstationId) {
-  try { const state = await api('POST','/game/buy-workstation',{workstationId}); _onGameState(state,false); }
-  catch(e) { toast('⚠️ '+e.message,'err'); }
+// Quader auf Kachel (c,r): u0..u1/v0..v1 in Kachelanteilen, z0/h in px
+function _gBox(c, r, u0, v0, u1, v1, z0, h, color, opts) {
+  const o = opts||{}, zt = z0+h, U0=c+u0, U1=c+u1, V0=r+v0, V1=r+v1;
+  const op = o.opacity!=null ? ` opacity="${o.opacity}"` : '';
+  return `<g${op}>`
+    + _gPoly([_gP(U0,V1,z0),_gP(U1,V1,z0),_gP(U1,V1,zt),_gP(U0,V1,zt)], _gShade(color,-0.18))
+    + _gPoly([_gP(U1,V0,z0),_gP(U1,V1,z0),_gP(U1,V1,zt),_gP(U1,V0,zt)], _gShade(color,-0.34))
+    + _gPoly([_gP(U0,V0,zt),_gP(U1,V0,zt),_gP(U1,V1,zt),_gP(U0,V1,zt)], _gShade(color,0.12))
+    + `</g>`;
 }
-async function gameBuyPerk(perkId) {
-  try { const state = await api('POST','/game/buy-perk',{perkId}); _onGameState(state,false); }
-  catch(e) { toast('⚠️ '+e.message,'err'); }
+// Fläche auf der vorderen linken Seite (v = v1) eines Quaders, z.B. Bildschirm
+function _gFaceV(c, r, u0, u1, v, z0, z1, fill, extra) {
+  return _gPoly([_gP(c+u0,r+v,z0),_gP(c+u1,r+v,z0),_gP(c+u1,r+v,z1),_gP(c+u0,r+v,z1)], fill, extra);
 }
-async function gameStartTeambuilding() {
-  try { const state = await api('POST','/game/teambuilding'); _onGameState(state,false); toast('🎉 Teambuilding gestartet'); }
-  catch(e) { toast('⚠️ '+e.message,'err'); }
+function _gCircle(c, r, u, v, z, rad, fill, extra) { const [x,y]=_gP(c+u,r+v,z); return `<circle cx="${x}" cy="${y}" r="${rad}" fill="${fill}"${extra||''}/>`; }
+function _gEllipse(c, r, u, v, z, rx, ry, fill) { const [x,y]=_gP(c+u,r+v,z); return `<ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" fill="${fill}"/>`; }
+const _G_WOOD='#b07a45', _G_DARK='#2b3444', _G_SCREEN='#5b8bd6', _G_METAL='#8a97a8';
+function _gDesk(c, r, top, x0, x1) {
+  return _gBox(c,r,x0+0.02,0.72,x0+0.07,0.77,0,20,'#5b4a3a')+_gBox(c,r,x1-0.07,0.72,x1-0.02,0.77,0,20,'#5b4a3a')
+    +_gBox(c,r,x1-0.07,0.2,x1-0.02,0.25,0,20,'#5b4a3a')+_gBox(c,r,x0,0.18,x1,0.8,20,4,top);
+}
+function _gMonitor(c, r, u) {
+  return _gBox(c,r,u+0.08,0.33,u+0.12,0.37,24,8,_G_DARK)+_gBox(c,r,u,0.3,u+0.22,0.35,30,17,_G_DARK)+_gFaceV(c,r,u+0.02,u+0.2,0.35,32,45,_G_SCREEN);
+}
+function _gPerson(c, r, u, emp, anim) {
+  const mood = emp ? _gameMoodClass(emp) : 'mid';
+  const col = {good:'#22c55e',mid:'#f59e0b',bad:'#ef4444'}[mood];
+  const shirt = ['#3b6dd4','#7c3aed','#0ea5e9','#14b8a6','#ec4899','#f97316'][(emp?.name||'').length%6];
+  const [hx,hy] = _gP(c+u,r+0.9,44);
+  return `<g class="${anim?'ge-pop':''}"><title>${esc(emp?.name||'')} · ❤️ ${Math.round(emp?.health||0)} % · 😊 ${Math.round(emp?.satisfaction||0)} %</title>`
+    + _gBox(c,r,u-0.1,0.86,u+0.1,0.98,0,14,'#374151')
+    + _gBox(c,r,u-0.08,0.84,u+0.08,0.94,14,20,shirt)
+    + `<circle cx="${hx}" cy="${hy}" r="7" fill="#f1c27d"/>`
+    + `<circle cx="${hx}" cy="${(+hy-14).toFixed(1)}" r="4" fill="${col}" stroke="var(--sf)" stroke-width="1.5"/></g>`;
+}
+function _gPlantSprite(c, r) {
+  return _gBox(c,r,0.36,0.36,0.64,0.64,0,16,'#b4592f')
+    +_gCircle(c,r,0.5,0.5,34,14,'#3f8f53')+_gCircle(c,r,0.4,0.55,40,9,'#4fae66')+_gCircle(c,r,0.6,0.45,44,9,'#5cc074')+_gCircle(c,r,0.5,0.5,50,7,'#6fd087');
+}
+const _G_SPRITES = {
+  desk: (c,r,ctx) => _gDesk(c,r,_G_WOOD,0.12,0.88)+_gMonitor(c,r,0.38)+ctx.people(0.5),
+  desk_ergo: (c,r,ctx) => _gDesk(c,r,'#dfe6ee',0.1,0.9)+_gMonitor(c,r,0.22)+_gMonitor(c,r,0.5)+_gBox(c,r,0.78,0.3,0.86,0.38,24,8,'#3f8f53')+ctx.people(0.5),
+  desk_dbl: (c,r,ctx) => _gDesk(c,r,_G_WOOD,0.03,0.97)+_gMonitor(c,r,0.1)+_gMonitor(c,r,0.62)+ctx.people(0.24)+ctx.people(0.76,1),
+  plant: (c,r) => _gPlantSprite(c,r),
+  lamp: (c,r) => _gBox(c,r,0.4,0.4,0.6,0.6,0,3,'#44546b')+_gBox(c,r,0.48,0.48,0.52,0.52,3,50,'#44546b')
+    +_gCircle(c,r,0.5,0.5,56,20,'#ffd56b',' opacity=".25"')+_gBox(c,r,0.36,0.36,0.64,0.64,52,12,'#f4b740'),
+  coffee: (c,r) => _gBox(c,r,0.15,0.3,0.85,0.72,0,24,_G_METAL)+_gBox(c,r,0.3,0.36,0.62,0.6,24,22,'#5b4636')
+    +_gFaceV(c,r,0.36,0.56,0.6,30,40,'#2b2018')+_gBox(c,r,0.66,0.5,0.76,0.6,24,6,'#f3f4f6'),
+  monitor2: (c,r) => _gDesk(c,r,'#9a6b3c',0.15,0.85)+_gMonitor(c,r,0.22)+_gMonitor(c,r,0.5)+_gBox(c,r,0.3,0.5,0.7,0.62,24,2,'#1f2630'),
+  cabinet: (c,r) => _gBox(c,r,0.2,0.3,0.8,0.7,0,54,_G_METAL)
+    +[12,26,40].map(z=>_gFaceV(c,r,0.28,0.72,0.7,z,z+3,'#5b6676')).join(''),
+  printer: (c,r) => _gBox(c,r,0.18,0.25,0.82,0.75,0,28,'#dfe3e8')+_gBox(c,r,0.25,0.3,0.75,0.6,28,5,'#44546b')
+    +_gBox(c,r,0.3,0.58,0.7,0.8,18,2,'#ffffff')+_gCircle(c,r,0.78,0.6,24,2.5,'#22c55e'),
+  aquarium: (c,r) => _gBox(c,r,0.12,0.3,0.88,0.72,0,18,'#3b2f23')+_gBox(c,r,0.14,0.32,0.86,0.7,18,28,'#4fb3e6',{opacity:0.6})
+    +_gCircle(c,r,0.4,0.6,32,3.5,'#f97316')+_gCircle(c,r,0.7,0.5,38,3,'#facc15')+_gBox(c,r,0.55,0.4,0.62,0.47,18,10,'#3f8f53'),
+  server: (c,r) => _gBox(c,r,0.25,0.28,0.75,0.72,0,66,'#1f2630')
+    +[10,22,34,46,58].map(z=>_gCircle(c,r,0.35,0.72,z,1.8,'#22c55e')+_gCircle(c,r,0.45,0.72,z,1.8,z%24?'#38bdf8':'#22c55e')).join(''),
+  art: (c,r) => _gBox(c,r,0.34,0.34,0.66,0.66,0,28,'#e5e7eb')
+    +(()=>{const [x,y]=_gP(c+0.5,r+0.5,28);return `<polygon points="${x},${+y-36} ${+x+12},${+y-16} ${x},${+y-2} ${+x-12},${+y-16}" fill="#e6c570"/><polygon points="${x},${+y-36} ${+x+12},${+y-16} ${x},${+y-2}" fill="#c9a54a"/>`;})(),
+  conftech: (c,r) => _gBox(c,r,0.46,0.46,0.54,0.54,0,24,'#44546b')+_gBox(c,r,0.08,0.42,0.92,0.5,24,40,'#111827')
+    +_gFaceV(c,r,0.12,0.88,0.5,28,60,'#3b82f6')+_gFaceV(c,r,0.2,0.5,0.5,40,52,'#93c5fd'),
+  lounge: (c,r) => _gBox(c,r,0.08,0.3,0.92,0.82,0,12,'#7c5cbf')+_gBox(c,r,0.08,0.3,0.92,0.42,12,18,'#6a4cae')
+    +_gBox(c,r,0.08,0.42,0.18,0.82,12,10,'#6a4cae')+_gBox(c,r,0.82,0.42,0.92,0.82,12,10,'#6a4cae')+_gBox(c,r,0.4,0.5,0.6,0.7,12,6,'#f4b740'),
+  meeting: (c,r) => _gBox(c,r,0.46,0.46,0.54,0.54,0,18,'#5b4a3a')+_gEllipse(c,r,0.5,0.5,20,26,13,'#c9bfae')
+    +_gBox(c,r,0.1,0.42,0.22,0.58,0,14,'#3b6dd4')+_gBox(c,r,0.42,0.1,0.58,0.22,0,14,'#3b6dd4')
+    +_gBox(c,r,0.78,0.42,0.9,0.58,0,14,'#3b6dd4')+_gBox(c,r,0.42,0.78,0.58,0.9,0,14,'#3b6dd4'),
+  rest: (c,r) => _gBox(c,r,0.1,0.2,0.9,0.8,0,12,'#6aa5c9')+_gBox(c,r,0.15,0.25,0.4,0.75,12,5,"#f3f4f6")+_gBox(c,r,0.5,0.3,0.85,0.75,12,3,"#9ec5e0"),
+  kitchen: (c,r) => _gBox(c,r,0.1,0.15,0.36,0.42,0,58,'#e5e7eb')+_gBox(c,r,0.1,0.45,0.92,0.78,0,28,'#cfd6dd')
+    +_gBox(c,r,0.55,0.5,0.75,0.68,28,3,'#94a3b8')+_gBox(c,r,0.2,0.5,0.4,0.66,28,10,'#ef4444'),
+  gym: (c,r) => _gBox(c,r,0.12,0.38,0.88,0.66,0,6,'#374151')+_gBox(c,r,0.78,0.4,0.84,0.46,6,34,'#6b7280')+_gBox(c,r,0.78,0.58,0.84,0.64,6,34,'#6b7280')
+    +_gBox(c,r,0.76,0.4,0.86,0.64,40,4,'#111827')+_gBox(c,r,0.2,0.12,0.5,0.22,0,8,'#ef4444'),
+  water: (c,r) => _gBox(c,r,0.36,0.36,0.64,0.64,0,30,'#e5e7eb')+_gBox(c,r,0.4,0.4,0.6,0.6,30,22,'#7cc4f5',{opacity:0.85})+_gCircle(c,r,0.5,0.64,22,2.5,'#3b82f6'),
+  fruit: (c,r) => _gBox(c,r,0.28,0.28,0.72,0.72,0,20,_G_WOOD)+_gEllipse(c,r,0.5,0.5,22,14,6,'#d6b98c')
+    +_gCircle(c,r,0.45,0.5,28,4.5,'#ef4444')+_gCircle(c,r,0.55,0.45,29,4.5,'#facc15')+_gCircle(c,r,0.52,0.56,29,4.5,'#22c55e'),
+  vending: (c,r) => _gBox(c,r,0.24,0.3,0.76,0.7,0,60,'#c0392b')+_gFaceV(c,r,0.3,0.58,0.7,22,54,'#fde68a')+_gFaceV(c,r,0.62,0.7,0.7,30,44,'#1f2630'),
+};
+function gameOfficeSceneHtml(g) {
+  const st = S.gameCatalog.stages.find(s=>s.id===g.stage)||{cols:4,rows:3};
+  const cols = st.cols, rows = st.rows, WALL = 96;
+  const parts = [];
+  // Wände: hinten rechts (v=0) und hinten links (u=0), mit Fenstern je Etappe
+  parts.push(_gPoly([_gP(0,0,0),_gP(cols,0,0),_gP(cols,0,WALL),_gP(0,0,WALL)],'var(--sf)',' stroke="var(--border)"'));
+  parts.push(_gPoly([_gP(0,0,0),_gP(0,rows,0),_gP(0,rows,WALL),_gP(0,0,WALL)],'var(--sf3)',' stroke="var(--border)"'));
+  const win = g.stage===1 ? {z0:62,z1:84,every:2} : g.stage===2 ? {z0:36,z1:80,every:2} : {z0:20,z1:88,every:1};
+  for (let i=0;i<cols;i+=win.every) parts.push(_gPoly([_gP(i+0.2,0,win.z0),_gP(i+0.8,0,win.z0),_gP(i+0.8,0,win.z1),_gP(i+0.2,0,win.z1)],'var(--acc)',' opacity=".22"'));
+  for (let i=0;i<rows;i+=win.every) parts.push(_gPoly([_gP(0,i+0.2,win.z0),_gP(0,i+0.8,win.z0),_gP(0,i+0.8,win.z1),_gP(0,i+0.2,win.z1)],'var(--acc)',' opacity=".16"'));
+  if (g.stage===4) parts.push(_gPoly([_gP(0,0,WALL),_gP(cols,0,WALL),_gP(cols,0,WALL-6),_gP(0,0,WALL-6)],'#e6c570'));
+  // Boden
+  for (let r=0;r<rows;r++) for (let c=0;c<cols;c++) {
+    const i = r*cols+c, sel = S._gameSel===i;
+    parts.push(_gPoly([_gP(c,r,0),_gP(c+1,r,0),_gP(c+1,r+1,0),_gP(c,r+1,0)], (c+r)%2?'var(--sf2)':'var(--sf3)',
+      ` stroke="${sel?'var(--acc)':'var(--border)'}" stroke-width="${sel?2.5:1}"`+(i<g.layout.length?` class="ge-tile" onclick="gameSelectSlot(${i})"`:'')));
+  }
+  // Mitarbeiter in Reihenfolge den Arbeitsplätzen zuordnen
+  let empIdx = 0;
+  const anim = S._gameAnim;
+  const objs = g.layout.map((id,i)=>({ id, i, c:i%cols, r:Math.floor(i/cols) }))
+    .sort((a,b)=>(a.c+a.r)-(b.c+b.r) || a.r-b.r);
+  const seats = {};
+  g.layout.forEach((id,i)=>{ const o=_gameObj(id); for (let k=0;k<(o?.capacity||0);k++) (seats[i]=seats[i]||[]).push(g.employees[empIdx++]||null); });
+  for (const it of objs) {
+    const o = _gameObj(it.id), draw = _G_SPRITES[it.id];
+    if (!draw) continue;
+    let seat = 0;
+    const ctx = { people: (u) => { const e = (seats[it.i]||[])[seat++]; return e ? _gPerson(it.c,it.r,u,e,anim?.emps?.has(e.id)) : ''; } };
+    const isNew = anim && it.i >= anim.fromIndex;
+    parts.push(`<g class="ge-obj${isNew?' ge-pop':''}${S._gameSel===it.i?' sel':''}" onclick="gameSelectSlot(${it.i})"><title>${esc(o?.name||'')}</title>${draw(it.c,it.r,ctx)}</g>`);
+  }
+  const minX = -rows*_GT-8, maxX = cols*_GT+8, minY = -WALL-12, maxY = (cols+rows)*_GT/2+8;
+  return `<svg viewBox="${minX} ${minY} ${maxX-minX} ${maxY-minY}" preserveAspectRatio="xMidYMid meet" class="ge-svg">${parts.join('')}</svg>`;
 }

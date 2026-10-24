@@ -1009,6 +1009,11 @@ async function initDB() {
     `ALTER TABLE game_saves ADD COLUMN IF NOT EXISTS workstations TEXT NOT NULL DEFAULT '{}'`,
     `ALTER TABLE game_saves ADD COLUMN IF NOT EXISTS perks TEXT NOT NULL DEFAULT '{}'`,
     `ALTER TABLE game_saves ADD COLUMN IF NOT EXISTS teambuilding_until TIMESTAMPTZ`,
+    // Desk Empire Version 2: der komplette Spielstand liegt als JSON in
+    // `state` (Aufbau siehe lib/game-logic.js newState). Die Einzelspalten
+    // oben stammen aus Version 1 und werden nicht mehr gelesen; ein Stand
+    // ohne `state` startet beim nächsten Aufruf neu.
+    `ALTER TABLE game_saves ADD COLUMN IF NOT EXISTS state TEXT`,
     // Assessment (routes/assessment.js) — ein Durchgang pro Mitarbeiter;
     // Zurücksetzen durch die Administration löscht die Zeile. draft = zuletzt
     // zwischengespeicherte Antworten des laufenden Abschnitts, results =
