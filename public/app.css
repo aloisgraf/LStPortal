@@ -255,6 +255,7 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
 @media(min-width:769px){body.adm-view.adm-wide .app{grid-template-columns:1fr}body.adm-view.adm-wide #sidebar{display:none}}
 #adminBtn.on{background:var(--sf3);color:var(--acc)}
 .al{display:flex;flex-direction:column;gap:7px;margin-bottom:12px}
+.usr-gone{margin-top:6px;border-top:1px solid var(--border);padding-top:10px}.usr-gone>summary{cursor:pointer;font-size:12px;font-weight:700;color:var(--mu);padding:4px 2px}
 .ai{display:flex;align-items:center;gap:9px;padding:9px 12px;background:var(--sf2);border:1px solid var(--border);border-radius:7px}
 .aii{flex:1;min-width:0}.ain{font-size:13px;font-weight:600;display:flex;align-items:center;gap:4px;flex-wrap:wrap}.ais{font-size:11px;color:var(--mu);margin-top:2px}.aia{display:flex;gap:5px;flex-shrink:0;align-items:center}
 .cr{display:flex;gap:5px;flex-wrap:wrap}.cp{width:24px;height:24px;border-radius:4px;cursor:pointer;border:2px solid transparent;transition:.15s}.cp.on{border-color:var(--tx);transform:scale(1.2)}
