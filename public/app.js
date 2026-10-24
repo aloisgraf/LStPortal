@@ -85,9 +85,9 @@ function aclRefresh(prefix){
   const empty=document.getElementById(prefix+'AclEmpty');
   if(empty)empty.style.display=taken.size?'none':'';
 }
-function aclAdd(prefix,kind){
+function aclAdd(prefix,kind,quiet){
   const id=document.getElementById(prefix+'AclWho-'+kind).value;
-  if(!id){toast(kind==='role'?'⚠️ Bitte zuerst eine Rolle wählen':'⚠️ Bitte zuerst einen Benutzer wählen');return;}
+  if(!id){if(!quiet)toast(kind==='role'?'⚠️ Bitte zuerst eine Rolle wählen':'⚠️ Bitte zuerst einen Benutzer wählen');return;}
   const mode=document.getElementById(prefix+'AclMode-'+kind).value;
   document.getElementById(prefix+'AclRows').insertAdjacentHTML('beforeend',aclRowHtml(prefix,kind,id,mode));
   aclRefresh(prefix);
@@ -100,19 +100,21 @@ function aclEditorHtml(idPrefix, acl) {
   add('role',acl?.visibleRoles,acl?.editableRoles);
   add('user',acl?.visibleUsers,acl?.editableUsers);
   const addLine=kind=>`<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
-      <select id="${idPrefix}AclWho-${kind}" style="flex:1;min-width:160px">${aclOptions(kind,taken)}</select>
       <select id="${idPrefix}AclMode-${kind}" style="width:auto"><option value="read">Lesen</option><option value="write">Schreiben</option></select>
-      <button type="button" class="btn-s" onclick="aclAdd('${idPrefix}','${kind}')">&#65291; ${kind==='role'?'Rolle':'Benutzer'}</button>
+      <select id="${idPrefix}AclWho-${kind}" style="flex:1;min-width:160px" onchange="aclAdd('${idPrefix}','${kind}',true)">${aclOptions(kind,taken)}</select>
     </div>`;
   return `<div class="fg full">
     <label>Berechtigungen</label>
+    <div style="font-size:11px;color:var(--mu)">Vergeben:</div>
     <div id="${idPrefix}AclRows">${rows.join('')}</div>
     <div id="${idPrefix}AclEmpty" style="font-size:12px;color:var(--mu);padding:4px 0${rows.length?';display:none':''}">Keine eigenen Berechtigungen: es gelten die des Ordners, sonst sehen es nur Ersteller und Admin.</div>
     ${addLine('role')}${addLine('user')}
-    <div style="font-size:11px;color:var(--mu);margin-top:6px">Lesen = sehen · Schreiben = sehen und bearbeiten · Administratoren haben immer Zugriff</div>
+    <div style="font-size:11px;color:var(--mu);margin-top:6px">Recht wählen, dann Rolle oder Benutzer auswählen: der Eintrag erscheint sofort oben in der Liste. Lesen = sehen · Schreiben = sehen und bearbeiten · Administratoren haben immer Zugriff</div>
   </div>`;
 }
 function aclReadRoles(idPrefix) {
+  // Noch ausgewählte, aber nicht übernommene Einträge mitnehmen
+  ['role','user'].forEach(k=>{const el=document.getElementById(idPrefix+'AclWho-'+k);if(el&&el.value)aclAdd(idPrefix,k,true);});
   const out={visibleRoles:[],visibleUsers:[],editableRoles:[],editableUsers:[]};
   document.querySelectorAll('#'+idPrefix+'AclRows .acl-row').forEach(r=>{
     const kind=r.dataset.kind==='user'?'Users':'Roles', id=r.dataset.id;
