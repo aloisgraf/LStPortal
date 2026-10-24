@@ -1368,8 +1368,9 @@ function showHelpSection(id){
   <div class="modal lg">
     <div class="mh"><h2>&#128203; Changelog</h2><button class="mc" onclick="closeModal('changelogOv')">&#10005;</button></div>
     <div class="mb2" style="gap:10px">
+      <div id="autoChangelog" style="display:contents"></div>
       <div style="padding:12px;background:rgba(59,109,212,0.06));border:1px solid rgba(59,109,212,.20);border-radius:8px">
-        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.2.4</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v2.2.4</span> <span id="clStaticCur" style="font-size:11px;color:var(--mu)">Aktuell</span></div>
         <ul style="font-size:12px;line-height:1.8;padding-left:18px">
           <li>News: Wichtig/Angepinnt-Badges in &Uuml;bersicht (auch kombiniert)</li>
           <li>&Uuml;bersicht: Letzter Refresh-Zeitstempel im Header</li>
@@ -1465,7 +1466,7 @@ function showHelpSection(id){
 </div>
 
 <script>
-const APP_VERSION='2.2.4';
+let APP_VERSION='2.2.4',APP_DATE='';
 const MONTHS=['J\u00e4nner','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const PALETTE=['#3b6dd4','#10b981','#7c3aed','#e87bb0','#f59e0b','#ef4444','#0ea5e9','#84cc16','#f97316','#6366f1','#64748b','#14b8a6'];
 const PAL_DARK=['#e8c547','#5bc4a0','#7b8be8','#e87bb0','#c47b5b','#e85b5b','#5bc4e8','#a0e85b','#e8a05b','#5b8be8','#8888a8','#a05be8'];
@@ -1612,7 +1613,7 @@ function loginOK(){
   startClock();
   document.getElementById('LS').classList.remove('open');
   document.getElementById('hdr').style.display='flex';document.getElementById('APP').style.display='grid';
-  const vb=document.getElementById('versionBadge');if(vb)vb.textContent='v'+APP_VERSION;
+  renderVersion();loadVersion();
   const u=getU(S.currentUser);
   document.getElementById('pillNm').textContent=u?.name||'?';
   const pa=document.getElementById('pillAv');pa.textContent=u?.initials||'?';pa.style.background=(u?.color||'#888')+'22';pa.style.color=u?.color||'#888';
@@ -2922,6 +2923,27 @@ async function saveTag(){const label=document.getElementById('tfLb').value.trim(
 async function delTag(id){if(!confirm('Tag l\u00f6schen?'))return;loading(true);try{await api('DELETE','/tags/'+id);await fetchData();backToAdmin('tags');}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}finally{loading(false);}}
 // UTILS
 function toggleTheme(){const dark=document.documentElement.getAttribute('data-theme')==='dark';document.documentElement.setAttribute('data-theme',dark?'light':'dark');document.getElementById('thBtn').textContent=dark?'\uD83C\uDF19':'\u2600\uFE0F';localStorage.setItem('lst_theme',dark?'light':'dark');}
+// App-Version + Aktualisierungsdatum aus public/version.json (wird bei jedem Push auf main automatisch hochgezählt)
+function fmtVerDate(iso){const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(iso||'');return m?`${m[3]}.${m[2]}.${m[1]}`:'';}
+function renderVersion(){
+  const vb=document.getElementById('versionBadge');
+  if(vb){vb.textContent='v'+APP_VERSION+(APP_DATE?' \u00b7 '+fmtVerDate(APP_DATE):'');vb.title=APP_DATE?'Aktualisiert am '+fmtVerDate(APP_DATE):'';}
+}
+async function loadVersion(){
+  try{
+    const r=await fetch('/version.json',{cache:'no-store'});if(!r.ok)return;
+    const v=await r.json();if(!v?.version)return;
+    APP_VERSION=v.version;APP_DATE=v.date||'';renderVersion();
+    const el=document.getElementById('autoChangelog'),list=Array.isArray(v.changelog)?v.changelog:[];
+    if(!el||!list.length)return;
+    const cur=document.getElementById('clStaticCur');
+    if(cur){const b=cur.previousElementSibling;if(b){b.style.background='var(--sf3)';b.style.color='var(--mu)';}cur.remove();}
+    el.innerHTML=list.map((e,i)=>`<div style="padding:12px;background:${i?'var(--sf2)':'rgba(59,109,212,0.06)'};border:1px solid ${i?'var(--border)':'rgba(59,109,212,.20)'};border-radius:8px">
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:${i?'var(--sf3)':'var(--acc)'};color:${i?'var(--mu)':'var(--act)'};padding:2px 8px;border-radius:4px">v${escHtml(e.version)}</span> <span style="font-size:11px;color:var(--mu)">${i?'':'Aktuell \u00b7 '}${escHtml(fmtVerDate(e.date))}</span></div>
+        <ul style="font-size:12px;line-height:1.8;padding-left:18px">${(e.changes||[]).map(c=>`<li>${escHtml(c)}</li>`).join('')}</ul>
+      </div>`).join('');
+  }catch(e){}
+}
 function openModal(id){document.getElementById(id)?.classList.add('open');}
 function closeModal(id){document.getElementById(id)?.classList.remove('open');}
 function eyeToggle(inputId,btn){const inp=document.getElementById(inputId);const show=inp.type==='password';inp.type=show?'text':'password';btn.textContent=show?'\uD83D\uDE48':'\uD83D\uDC41';}
