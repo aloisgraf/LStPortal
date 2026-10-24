@@ -1,5 +1,13 @@
 {
-  "version": "2.2.4",
-  "date": "2026-10-21T20:03:53+02:00",
-  "changelog": []
+  "version": "2.2.5",
+  "date": "2026-10-24T16:32:33+02:00",
+  "changelog": [
+    {
+      "version": "2.2.5",
+      "date": "2026-10-24T16:32:33+02:00",
+      "changes": [
+        "Automatische App-Version mit Aktualisierungsdatum (#22)"
+      ]
+    }
+  ]
 }
