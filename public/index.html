@@ -221,7 +221,7 @@
         <button class="tb" id="atb-shifts" onclick="swTab('shifts')">&#128336; Schichten</button>
         <button class="tb" id="atb-links" onclick="swTab('links')">&#128279; Links</button>
       </div>
-      <div class="tp on" id="atp-users"><div class="al" id="usrList"></div><button class="btn-p" style="width:100%;justify-content:center" onclick="openUF(null)">&#65291; Benutzer</button></div>
+      <div class="tp on" id="atp-users"><div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button class="btn-p" onclick="openUF(null)">&#65291; Neuer Benutzer</button></div><div class="al" id="usrList"></div></div>
       <div class="tp" id="atp-cats"><div class="al" id="catList"></div><button class="btn-p" style="width:100%;justify-content:center" onclick="openCF(null)">&#65291; Kategorie</button></div>
       <div class="tp" id="atp-tags"><div class="al" id="tagList"></div><button class="btn-p" style="width:100%;justify-content:center" onclick="openTF(null)">&#65291; Tag</button></div>
       <div class="tp" id="atp-stats"><div id="statsPanel"></div></div>
@@ -1443,8 +1443,9 @@
   <div class="modal lg">
     <div class="mh"><h2>&#128203; Changelog</h2><button class="mc" onclick="closeModal('changelogOv')">&#10005;</button></div>
     <div class="mb2" style="gap:10px">
+      <div id="autoChangelog" style="display:contents"></div>
       <div style="padding:12px;background:rgba(59,109,212,0.06));border:1px solid rgba(59,109,212,.20);border-radius:8px">
-        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v3.0.0</span> <span style="font-size:11px;color:var(--mu)">Aktuell</span></div>
+        <div style="margin-bottom:8px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:var(--acc);color:var(--act);padding:2px 8px;border-radius:4px">v3.0.0</span> <span id="clStaticCur" style="font-size:11px;color:var(--mu)">Aktuell</span></div>
         <ul style="font-size:12px;line-height:1.8;padding-left:18px">
           <li><b>Neu: Chat</b> — echte 1:1-Unterhaltungen (getrennt von den bisherigen Rundschreiben-Nachrichten), mehrere andockbare Fenster gleichzeitig, minimier-/maximierbar, Emoji-Auswahl, Ungelesen-Hinweis</li>
           <li><b>Neu: Notfall-Checklisten (SOP)</b> — Vorlagen mit Freigabe-Workflow, Verzweigungen (Wenn/Dann-Pfade mit Zusammenführung), Testdurchlauf im Entwurf, Foto-/Kontakt-/Texteingabe-Schritte, Statistiken und Ausdruck</li>

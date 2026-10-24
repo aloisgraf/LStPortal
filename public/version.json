@@ -1,0 +1,13 @@
+{
+  "version": "3.0.1",
+  "date": "2026-10-24T17:03:33+02:00",
+  "changelog": [
+    {
+      "version": "3.0.1",
+      "date": "2026-10-24T17:03:33+02:00",
+      "changes": [
+        "Versionsnummer mit Datum automatisch hochzählen (Live-Stand)"
+      ]
+    }
+  ]
+}
