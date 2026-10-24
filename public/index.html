@@ -204,6 +204,101 @@
     <div class="sbver" onclick="openModal('changelogOv')" title="Changelog">LSt Portal <span id="versionBadge"></span> &#9432;</div>
   </aside>
   <main id="main"></main>
+  <!-- ADMINISTRATION: eigene Seite (S.view==='admin'), Men&#252; links neben dem Hauptmen&#252; -->
+  <section class="adm-page" id="admPage" style="display:none">
+      <div class="adm-layout">
+      <div class="atabs">
+        <div class="atabs-h"><span>&#9881;&#65039; Administration</span><button class="adm-wide-btn" id="admWideBtn" onclick="toggleAdmWide()" title="Hauptmen&#252; ausblenden (mehr Platz)">&#171;</button></div>
+        <button class="tb on" id="atb-users" onclick="swTab('users')">&#128100; Benutzer</button>
+        <button class="tb" id="atb-cats" onclick="swTab('cats')">&#127912; Kategorien</button>
+        <button class="tb" id="atb-tags" onclick="swTab('tags')">&#127991;&#65039; Tags</button>
+        <button class="tb" id="atb-stats" onclick="swTab('stats')">&#128202; Statistiken</button>
+        <button class="tb" id="atb-rights" onclick="swTab('rights')">&#128272; Rechte</button>
+        <button class="tb" id="atb-depts" onclick="swTab('depts')">&#127970; Fachbereiche</button>
+        <button class="tb" id="atb-subcats" onclick="swTab('subcats')">&#127991; Unterkategorien</button>
+        <button class="tb" id="atb-notetpls" onclick="swTab('notetpls')">&#128172; Notizvorlagen</button>
+        <button class="tb" id="atb-log" onclick="swTab('log');loadLog(true)">&#128221; Aktivitätslog</button>
+        <button class="tb" id="atb-shifts" onclick="swTab('shifts')">&#128336; Schichten</button>
+        <button class="tb" id="atb-links" onclick="swTab('links')">&#128279; Links</button>
+      </div>
+      <div class="tp on" id="atp-users"><div class="al" id="usrList"></div><button class="btn-p" style="width:100%;justify-content:center" onclick="openUF(null)">&#65291; Benutzer</button></div>
+      <div class="tp" id="atp-cats"><div class="al" id="catList"></div><button class="btn-p" style="width:100%;justify-content:center" onclick="openCF(null)">&#65291; Kategorie</button></div>
+      <div class="tp" id="atp-tags"><div class="al" id="tagList"></div><button class="btn-p" style="width:100%;justify-content:center" onclick="openTF(null)">&#65291; Tag</button></div>
+      <div class="tp" id="atp-stats"><div id="statsPanel"></div></div>
+      <div class="tp" id="atp-rights"><div id="rightsMatrix" style="overflow-x:auto"></div></div>
+      <div class="tp" id="atp-depts"><div id="deptsList"></div></div>
+      <div class="tp" id="atp-subcats">
+        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:flex-end">
+          <div class="fg" style="margin:0;flex:1;min-width:140px"><label style="font-size:11px">Fachbereich</label><select id="scFDept" style="font-size:12px;padding:5px 8px">
+            <option value="qm">&#9989; QM</option>
+            <option value="technik">&#128295; Technik</option>
+            <option value="leitung">&#11088; Leitung</option>
+            <option value="dienstplanung">&#128203; Dienstplanung</option>
+            <option value="ausbildung">&#127891; Ausbildung</option>
+          </select></div>
+          <div class="fg" style="margin:0;flex:2;min-width:180px"><label style="font-size:11px">Bezeichnung</label><input type="text" id="scFLabel" placeholder="z.B. Beschwerdemanagement" style="font-size:12px;padding:5px 8px"></div>
+          <div class="fg" style="margin:0"><label style="font-size:11px;display:flex;align-items:center;gap:5px;cursor:pointer;padding:6px 0"><input type="checkbox" id="scFComplaint"> Ist Beschwerde</label></div>
+          <button class="btn-p" style="font-size:12px;white-space:nowrap" onclick="addSubcat()">&#65291; Hinzuf&#252;gen</button>
+        </div>
+        <div id="subcatList"></div>
+      </div>
+      <div class="tp" id="atp-notetpls">
+        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:flex-end">
+          <div class="fg" style="margin:0;flex:1;min-width:120px"><label style="font-size:11px">Bezeichnung (Button-Label)</label><input type="text" id="ntFLabel" placeholder="z.B. In Bearbeitung" style="font-size:12px;padding:5px 8px"></div>
+          <div class="fg" style="margin:0;flex:3;min-width:200px"><label style="font-size:11px">Text der Vorlage</label><input type="text" id="ntFBody" placeholder="Wird bearbeitet, Rückmeldung folgt." style="font-size:12px;padding:5px 8px"></div>
+          <button class="btn-p" style="font-size:12px;white-space:nowrap" onclick="addNoteTpl()">&#65291; Hinzuf&#252;gen</button>
+        </div>
+        <div id="noteTplList"></div>
+      </div>
+      <div class="tp" id="atp-ho">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div>
+            <div style="font-size:12px;font-weight:700;margin-bottom:8px">&#128230; Homeoffice-Boxen</div>
+            <div id="hoBoxList"></div>
+            <div style="display:flex;gap:6px;margin-top:8px">
+              <input type="text" id="hoNewBox" placeholder="Neue Box..." style="flex:1;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--r);background:var(--sf)">
+              <button class="btn-p" style="font-size:11px" onclick="hoAddBox()">&#43;</button>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:12px;font-weight:700;margin-bottom:8px">&#128336; Dienste</div>
+            <div id="hoDienstList"></div>
+            <div style="display:flex;gap:6px;margin-top:8px">
+              <input type="text" id="hoNewDienst" placeholder="Neuer Dienst..." style="flex:1;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--r);background:var(--sf)">
+              <button class="btn-p" style="font-size:11px" onclick="hoAddDienst()">&#43;</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tp" id="atp-log">
+        <div style="font-size:12px;color:var(--mu);margin-bottom:8px">Alle Benutzeraktionen chronologisch. Nur für Administratoren sichtbar.</div>
+        <div id="logContent" style="font-size:12px;max-height:calc(100vh - var(--hdr) - 150px);overflow-y:auto;border:1px solid var(--border);border-radius:var(--r)">
+          <div style="padding:20px;text-align:center;color:var(--di)">Lade…</div>
+        </div>
+        <button class="btn-s" id="logMoreBtn" onclick="loadLog(false)" style="width:100%;margin-top:8px;display:none">Mehr laden …</button>
+      </div>
+      <div class="tp" id="atp-shifts">
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:flex-end">
+          <div class="fg" style="margin:0;flex:2;min-width:140px"><label style="font-size:11px">Bezeichnung</label><input type="text" id="shiftFLabel" placeholder="z.B. Frühschicht" style="font-size:12px;padding:5px 8px"></div>
+          <div class="fg" style="margin:0;min-width:80px"><label style="font-size:11px">Von</label><input type="time" id="shiftFStart" style="font-size:12px;padding:5px 8px"></div>
+          <div class="fg" style="margin:0;min-width:80px"><label style="font-size:11px">Bis</label><input type="time" id="shiftFEnd" style="font-size:12px;padding:5px 8px"></div>
+          <div class="fg" style="margin:0;min-width:100px"><label style="font-size:11px;display:flex;align-items:center;gap:5px"><input type="checkbox" id="shiftFBreak" checked> Hat Pause</label></div>
+          <button class="btn-p" style="font-size:12px;white-space:nowrap" onclick="addShift()">&#43; Hinzuf&#252;gen</button>
+        </div>
+        <div id="shiftList"></div>
+      </div>
+      <div class="tp" id="atp-links">
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:flex-end">
+          <div class="fg" style="margin:0;flex:1;min-width:50px"><label style="font-size:11px">Icon</label><input type="text" id="linkFIcon" placeholder="&#128279;" style="font-size:12px;padding:5px 8px;width:50px"></div>
+          <div class="fg" style="margin:0;flex:3;min-width:160px"><label style="font-size:11px">Bezeichnung</label><input type="text" id="linkFLabel" placeholder="z.B. Admin Portal" style="font-size:12px;padding:5px 8px"></div>
+          <div class="fg" style="margin:0;flex:4;min-width:200px"><label style="font-size:11px">URL</label><input type="text" id="linkFUrl" placeholder="https://..." style="font-size:12px;padding:5px 8px"></div>
+          <div class="fg" style="margin:0;flex:3;min-width:160px"><label style="font-size:11px">Beschreibung</label><input type="text" id="linkFDesc" placeholder="Optional..." style="font-size:12px;padding:5px 8px"></div>
+          <button class="btn-p" style="font-size:12px;white-space:nowrap" onclick="addLink()">&#43; Hinzuf&#252;gen</button>
+        </div>
+        <div id="linkList"></div>
+      </div>
+      </div><!-- /adm-layout -->
+  </section>
 </div>
 
 <!-- EINSTELLUNGEN MODAL -->
@@ -591,104 +686,6 @@
 </div>
 
 <!-- ADMIN MODAL -->
-<div class="ov" id="admOv">
-  <div class="modal wide">
-    <div class="mh"><h2>&#9881;&#65039; Administration</h2><button class="mc" onclick="closeModal('admOv')">&#10005;</button></div>
-    <div class="mb2" style="padding:0;overflow:hidden">
-      <div class="adm-layout">
-      <div class="atabs">
-        <button class="tb on" id="atb-users" onclick="swTab('users')">&#128100; Benutzer</button>
-        <button class="tb" id="atb-cats" onclick="swTab('cats')">&#127912; Kategorien</button>
-        <button class="tb" id="atb-tags" onclick="swTab('tags')">&#127991;&#65039; Tags</button>
-        <button class="tb" id="atb-stats" onclick="swTab('stats')">&#128202; Statistiken</button>
-        <button class="tb" id="atb-rights" onclick="swTab('rights')">&#128272; Rechte</button>
-        <button class="tb" id="atb-depts" onclick="swTab('depts')">&#127970; Fachbereiche</button>
-        <button class="tb" id="atb-subcats" onclick="swTab('subcats')">&#127991; Unterkategorien</button>
-        <button class="tb" id="atb-notetpls" onclick="swTab('notetpls')">&#128172; Notizvorlagen</button>
-        <button class="tb" id="atb-log" onclick="swTab('log');loadLog(true)">&#128221; Aktivitätslog</button>
-        <button class="tb" id="atb-shifts" onclick="swTab('shifts')">&#128336; Schichten</button>
-        <button class="tb" id="atb-links" onclick="swTab('links')">&#128279; Links</button>
-      </div>
-      <div class="tp on" id="atp-users"><div class="al" id="usrList"></div><button class="btn-p" style="width:100%;justify-content:center" onclick="openUF(null)">&#65291; Benutzer</button></div>
-      <div class="tp" id="atp-cats"><div class="al" id="catList"></div><button class="btn-p" style="width:100%;justify-content:center" onclick="openCF(null)">&#65291; Kategorie</button></div>
-      <div class="tp" id="atp-tags"><div class="al" id="tagList"></div><button class="btn-p" style="width:100%;justify-content:center" onclick="openTF(null)">&#65291; Tag</button></div>
-      <div class="tp" id="atp-stats"><div id="statsPanel"></div></div>
-      <div class="tp" id="atp-rights"><div id="rightsMatrix" style="overflow-x:auto"></div></div>
-      <div class="tp" id="atp-depts"><div id="deptsList"></div></div>
-      <div class="tp" id="atp-subcats">
-        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:flex-end">
-          <div class="fg" style="margin:0;flex:1;min-width:140px"><label style="font-size:11px">Fachbereich</label><select id="scFDept" style="font-size:12px;padding:5px 8px">
-            <option value="qm">&#9989; QM</option>
-            <option value="technik">&#128295; Technik</option>
-            <option value="leitung">&#11088; Leitung</option>
-            <option value="dienstplanung">&#128203; Dienstplanung</option>
-            <option value="ausbildung">&#127891; Ausbildung</option>
-          </select></div>
-          <div class="fg" style="margin:0;flex:2;min-width:180px"><label style="font-size:11px">Bezeichnung</label><input type="text" id="scFLabel" placeholder="z.B. Beschwerdemanagement" style="font-size:12px;padding:5px 8px"></div>
-          <div class="fg" style="margin:0"><label style="font-size:11px;display:flex;align-items:center;gap:5px;cursor:pointer;padding:6px 0"><input type="checkbox" id="scFComplaint"> Ist Beschwerde</label></div>
-          <button class="btn-p" style="font-size:12px;white-space:nowrap" onclick="addSubcat()">&#65291; Hinzuf&#252;gen</button>
-        </div>
-        <div id="subcatList"></div>
-      </div>
-      <div class="tp" id="atp-notetpls">
-        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:flex-end">
-          <div class="fg" style="margin:0;flex:1;min-width:120px"><label style="font-size:11px">Bezeichnung (Button-Label)</label><input type="text" id="ntFLabel" placeholder="z.B. In Bearbeitung" style="font-size:12px;padding:5px 8px"></div>
-          <div class="fg" style="margin:0;flex:3;min-width:200px"><label style="font-size:11px">Text der Vorlage</label><input type="text" id="ntFBody" placeholder="Wird bearbeitet, Rückmeldung folgt." style="font-size:12px;padding:5px 8px"></div>
-          <button class="btn-p" style="font-size:12px;white-space:nowrap" onclick="addNoteTpl()">&#65291; Hinzuf&#252;gen</button>
-        </div>
-        <div id="noteTplList"></div>
-      </div>
-      <div class="tp" id="atp-ho">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-          <div>
-            <div style="font-size:12px;font-weight:700;margin-bottom:8px">&#128230; Homeoffice-Boxen</div>
-            <div id="hoBoxList"></div>
-            <div style="display:flex;gap:6px;margin-top:8px">
-              <input type="text" id="hoNewBox" placeholder="Neue Box..." style="flex:1;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--r);background:var(--sf)">
-              <button class="btn-p" style="font-size:11px" onclick="hoAddBox()">&#43;</button>
-            </div>
-          </div>
-          <div>
-            <div style="font-size:12px;font-weight:700;margin-bottom:8px">&#128336; Dienste</div>
-            <div id="hoDienstList"></div>
-            <div style="display:flex;gap:6px;margin-top:8px">
-              <input type="text" id="hoNewDienst" placeholder="Neuer Dienst..." style="flex:1;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--r);background:var(--sf)">
-              <button class="btn-p" style="font-size:11px" onclick="hoAddDienst()">&#43;</button>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="tp" id="atp-log">
-        <div style="font-size:12px;color:var(--mu);margin-bottom:8px">Alle Benutzeraktionen chronologisch. Nur für Administratoren sichtbar.</div>
-        <div id="logContent" style="font-size:12px;max-height:400px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--r)">
-          <div style="padding:20px;text-align:center;color:var(--di)">Lade…</div>
-        </div>
-        <button class="btn-s" id="logMoreBtn" onclick="loadLog(false)" style="width:100%;margin-top:8px;display:none">Mehr laden …</button>
-      </div>
-      <div class="tp" id="atp-shifts">
-        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:flex-end">
-          <div class="fg" style="margin:0;flex:2;min-width:140px"><label style="font-size:11px">Bezeichnung</label><input type="text" id="shiftFLabel" placeholder="z.B. Frühschicht" style="font-size:12px;padding:5px 8px"></div>
-          <div class="fg" style="margin:0;min-width:80px"><label style="font-size:11px">Von</label><input type="time" id="shiftFStart" style="font-size:12px;padding:5px 8px"></div>
-          <div class="fg" style="margin:0;min-width:80px"><label style="font-size:11px">Bis</label><input type="time" id="shiftFEnd" style="font-size:12px;padding:5px 8px"></div>
-          <div class="fg" style="margin:0;min-width:100px"><label style="font-size:11px;display:flex;align-items:center;gap:5px"><input type="checkbox" id="shiftFBreak" checked> Hat Pause</label></div>
-          <button class="btn-p" style="font-size:12px;white-space:nowrap" onclick="addShift()">&#43; Hinzuf&#252;gen</button>
-        </div>
-        <div id="shiftList"></div>
-      </div>
-      <div class="tp" id="atp-links">
-        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:flex-end">
-          <div class="fg" style="margin:0;flex:1;min-width:50px"><label style="font-size:11px">Icon</label><input type="text" id="linkFIcon" placeholder="&#128279;" style="font-size:12px;padding:5px 8px;width:50px"></div>
-          <div class="fg" style="margin:0;flex:3;min-width:160px"><label style="font-size:11px">Bezeichnung</label><input type="text" id="linkFLabel" placeholder="z.B. Admin Portal" style="font-size:12px;padding:5px 8px"></div>
-          <div class="fg" style="margin:0;flex:4;min-width:200px"><label style="font-size:11px">URL</label><input type="text" id="linkFUrl" placeholder="https://..." style="font-size:12px;padding:5px 8px"></div>
-          <div class="fg" style="margin:0;flex:3;min-width:160px"><label style="font-size:11px">Beschreibung</label><input type="text" id="linkFDesc" placeholder="Optional..." style="font-size:12px;padding:5px 8px"></div>
-          <button class="btn-p" style="font-size:12px;white-space:nowrap" onclick="addLink()">&#43; Hinzuf&#252;gen</button>
-        </div>
-        <div id="linkList"></div>
-      </div>
-      </div><!-- /adm-layout -->
-    </div>
-  </div>
-</div>
 <div class="ov" id="ufOv"><div class="modal lg"><div class="mh"><h2 id="ufT">Benutzer</h2><button class="mc" onclick="backToAdmin('users')">&#10005;</button></div><div class="mb2"><input type="hidden" id="ufId"><div class="fr"><div class="fg"><label>Name *</label><input type="text" id="ufNm"></div><div class="fg"><label>K&#252;rzel *</label><input type="text" id="ufIn" maxlength="3"></div></div><div class="fg full"><label>Benutzername * (f&#252;r Login)</label><input type="text" id="ufUsername" autocomplete="username" placeholder="z.B. vorname.nachname"></div><div class="fg full"><label>Rollen</label><div class="role-chks" id="ufRoles"></div><small style="color:var(--mu);font-size:11px">&#128221; Assessment kann nur zusammen mit Administrator vergeben werden.</small></div><div class="fg full" id="ufRoleHistWrap" style="display:none"><button type="button" class="btn-s" style="font-size:11px" onclick="toggleUfRoleHistory()">&#128337; Rechte-Verlauf</button><div id="ufRoleHistBody" style="display:none;margin-top:6px;font-size:11px;color:var(--mu);max-height:160px;overflow-y:auto"></div></div><div class="fg full" id="ufFolderAccessWrap" style="display:none"><details><summary style="cursor:pointer;font-weight:600;font-size:13px">&#128194; Ordner-Berechtigungen</summary><div id="ufFolderAccess" style="margin-top:6px;max-height:260px;overflow-y:auto"></div></details></div><div class="fg full"><label>Kategorie (z.B. Schichtleiter, Disponent Nord)</label><input type="text" id="uffCategory" placeholder="optional"></div><div class="fg full"><label>E-Mail (f&#252;r Ticket-Benachrichtigungen)</label><input type="email" id="ufEmail" placeholder="optional, z.B. name@gmx.at"></div><div class="fr"><div class="fg"><label>Eintrittsdatum *</label><input type="date" id="ufHireDate"></div><div class="fg"><label>Austrittsdatum</label><input type="date" id="ufTermDate"></div></div><div class="fg full"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:600"><input type="checkbox" id="ufDpRelevant" onchange="onUfDpRelevantChange()"> &#128197; F&#252;r Dienstplanung relevant</label><small style="color:var(--mu);font-size:11px">Blendet Sollstunden, Nachtdienst-Einstellungen usw. f&#252;r diesen Mitarbeiter unten ein.</small></div><div class="fg full" id="ufDpSection" style="display:none;border:1px solid var(--border);border-radius:8px;padding:10px 12px;background:var(--sf2)"><div style="font-weight:600;font-size:12px;margin-bottom:6px">&#128197; Dienstplan-Einstellungen</div><div id="ufDpParamsBody"><div style="font-size:12px;color:var(--mu)">Erst nach dem Speichern des Mitarbeiters verf&#252;gbar.</div></div></div><div class="fg" id="ufPWRR" style="display:none"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="ufPWRst"> PW zur&#252;cksetzen auf <b>Passwort1</b></label></div><div class="fg full"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:600"><input type="checkbox" id="ufIsTestUser"> &#128065; Testuser</label><small style="color:var(--mu);font-size:11px">Kann von Admins &#252;ber "Ansicht als" ausgew&#228;hlt werden, um das Portal aus Sicht dieses Kontos zu pr&#252;fen.</small></div><div class="fg"><label>Farbe</label><div class="cr" id="ufCR"></div></div><div id="ufErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div></div><div class="mf"><button class="btn-s" onclick="backToAdmin('users')">Abbrechen</button><button class="btn-p" onclick="saveUser()">&#128190; Speichern</button></div></div></div>
 <div class="ov" id="cfOv"><div class="modal sm"><div class="mh"><h2 id="cfT">Kategorie</h2><button class="mc" onclick="backToAdmin('cats')">&#10005;</button></div><div class="mb2"><input type="hidden" id="cfId"><div class="fr"><div class="fg"><label>Bezeichnung *</label><input type="text" id="cfLb"></div><div class="fg"><label>Emoji</label><div style="display:flex;gap:6px"><input type="text" id="cfEm" maxlength="4" style="flex:1"><button type="button" class="btn-s emoji-pick-btn" onclick="openEmojiPicker('cfEm',this)">😀</button></div></div></div><div class="fg"><label>Farbe</label><div class="cr" id="cfCR"></div></div><div id="cfErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div></div><div class="mf"><button class="btn-s" onclick="backToAdmin('cats')">Abbrechen</button><button class="btn-p" onclick="saveCategory()">&#128190; Speichern</button></div></div></div>
 <div class="ov" id="tfOv"><div class="modal sm"><div class="mh"><h2 id="tfT">Tag</h2><button class="mc" onclick="backToAdmin('tags')">&#10005;</button></div><div class="mb2"><input type="hidden" id="tfId"><div class="fg"><label>Bezeichnung *</label><input type="text" id="tfLb"></div><div class="fg"><label>Farbe</label><div class="cr" id="tfCR"></div></div><div id="tfErr" style="color:var(--danger);font-size:12px;font-weight:600;min-height:16px"></div></div><div class="mf"><button class="btn-s" onclick="backToAdmin('tags')">Abbrechen</button><button class="btn-p" onclick="saveTag()">&#128190; Speichern</button></div></div></div>

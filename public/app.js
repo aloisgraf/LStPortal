@@ -532,8 +532,16 @@ function setView(v){
   // dauerhaft aktiv, obwohl die Spielseite längst nicht mehr sichtbar ist.
   if(S.view==='game'&&v!=='game')stopGameTicker();
   if(S.p?.assessmentOnly)v='assessment';
+  if(v==='admin'&&!S.p?.manageUsers)v='home';
   S.view=v;
   NAV_TAB_IDS.forEach(x=>{const el=document.getElementById('ni-'+x);if(el)el.classList.toggle('active',x===v);});
+  // Administration ist eine eigene Seite neben #main (nicht über innerHTML
+  // gerendert), damit alle Admin-Reiter ihre festen Element-IDs behalten.
+  const isAdm=v==='admin';
+  document.getElementById('admPage').style.display=isAdm?'':'none';
+  document.getElementById('main').style.display=isAdm?'none':'';
+  document.getElementById('adminBtn')?.classList.toggle('on',isAdm);
+  document.body.classList.toggle('adm-view',isAdm);applyAdmWide();
   applyNavVisibility();
   document.getElementById('sidebar').classList.remove('open');document.getElementById('sbOv').classList.remove('open');
   renderSBF();renderMain();
@@ -3010,8 +3018,14 @@ async function loadLog(reset){
 }
 function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
-function openAdminModal(){renderUsrList();renderCatList();renderTagList();renderRightsMatrix();openModal('admOv');}
+// Administration ist eine eigene Seite (S.view==='admin'), kein Modal mehr —
+// der Name bleibt, weil er von vielen Stellen aufgerufen wird.
+function openAdminModal(){if(!S.p?.manageUsers)return;if(S.view!=='admin')setView('admin');renderUsrList();renderCatList();renderTagList();renderRightsMatrix();}
 function swTab(t){['users','cats','tags','stats','rights','depts','subcats','notetpls','log','ho','shifts','links'].forEach(x=>{document.getElementById('atb-'+x)?.classList.toggle('on',x===t);document.getElementById('atp-'+x)?.classList.toggle('on',x===t);});if(t==='ho')renderHoAdmin();if(t==='subcats')renderSubcatAdmin();if(t==='notetpls')renderNoteTplAdmin();if(t==='stats')renderStatsPanel();if(t==='shifts')renderShiftsAdmin();if(t==='links')renderLinksAdmin();if(t==='rights')renderRightsMatrix();if(t==='depts')renderDeptsAdmin();}
+// Breitmodus: blendet auf der Admin-Seite das Hauptmenü aus (z. B. für die
+// breite Rechte-Matrix). Pro Browser gemerkt.
+function applyAdmWide(){let w=false;try{w=localStorage.getItem('lst_adm_wide')==='1';}catch(e){}document.body.classList.toggle('adm-wide',w);const b=document.getElementById('admWideBtn');if(b){b.innerHTML=w?'&#187;':'&#171;';b.title=w?'Hauptmen\u00fc einblenden':'Hauptmen\u00fc ausblenden (mehr Platz)';}}
+function toggleAdmWide(){try{localStorage.setItem('lst_adm_wide',document.body.classList.contains('adm-wide')?'0':'1');}catch(e){}applyAdmWide();}
 function backToAdmin(tab='users'){['ufOv','cfOv','tfOv','deptOv'].forEach(closeModal);openAdminModal();swTab(tab);}
 function renderUsrList(){document.getElementById('usrList').innerHTML=S.users.map(u=>`<div class="ai"${u.isActive===false?' style="opacity:.45;font-style:italic"':''}>${avHtml(u.initials,u.color,34,13,u.isOnline)}<div class="aii"><div class="ain">${lastNameFirst(u.name)} ${u.isActive===false?'\uD83D\uDEAB inaktiv \u00B7 ':''}${roleBadges(u.id)}${u.isOnline?'<span style="font-size:10px;color:var(--ok)">\u25cf online</span>':''}</div><div class="ais">${u.mustChangePW?'\u26A0\uFE0F PW ausstehend':'\u2713 Aktiv'}${u.hireDate?' \u00B7 seit '+u.hireDate.split('-').reverse().join('.'):''}${u.terminationDate?' \u00B7 bis '+u.terminationDate.split('-').reverse().join('.'):''}</div></div><div class="aia"><button class="btn-e" onclick="openUF('${u.id}')">\u270e</button>${S.users.length>1&&u.id!==S.currentUser?`<button class="btn-d" onclick="delUser('${u.id}')">\u2715</button>`:''}</div></div>`).join('');}
 function renderCatList(){document.getElementById('catList').innerHTML=S.categories.map(c=>`<div class="ai"><div style="width:14px;height:14px;border-radius:3px;background:${c.color};flex-shrink:0"></div><div class="aii"><div class="ain">${c.emoji} ${c.label}</div></div><div class="aia"><button class="btn-e" onclick="openCF('${c.id}')">\u270e</button>${S.categories.length>1?`<button class="btn-d" onclick="delCat('${c.id}')">\u2715</button>`:''}</div></div>`).join('');}
@@ -3081,7 +3095,7 @@ function openDeptForm(id){
   document.getElementById('deptLabel').value=d?.label||'';
   document.getElementById('dpEmoji').value=d?.emoji||'';
   document.getElementById('dpColor').value=d?.color||'#64748b';
-  closeModal('admOv');openModal('deptOv');
+  openModal('deptOv');
 }
 async function saveDept(){
   const id=document.getElementById('dpId').value;
@@ -3210,7 +3224,7 @@ function openUF(id){
   dpSection.style.display=u?.dpRelevant?'':'none';
   if(u?.dpRelevant)renderUfDpParamsSection(u.id);
   else document.getElementById('ufDpParamsBody').innerHTML=id?'':'<div style="font-size:12px;color:var(--mu)">Erst nach dem Speichern des Mitarbeiters verfügbar.</div>';
-  buildCP('ufCR',S.ufColor,'pickU');closeModal('admOv');openModal('ufOv');
+  buildCP('ufCR',S.ufColor,'pickU');openModal('ufOv');
 }
 // Blendet den eingebetteten Dienstplan-Abschnitt ein/aus. Bei einem noch
 // nicht gespeicherten (neuen) Mitarbeiter gibt es noch keine ID, an die
@@ -3274,10 +3288,10 @@ async function saveUser(){
 // Administration, ohne Löschen). Alle Kombinationen sind erlaubt.
 function ufRoleChange(cb){}
 async function delUser(id){if(!confirm('Benutzer l\u00f6schen?'))return;loading(true);try{await api('DELETE','/users/'+id);await fetchData();backToAdmin('users');}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}finally{loading(false);}}
-function openCF(id){const c=id?getCat(id):null;document.getElementById('cfT').textContent=c?'Kategorie bearbeiten':'Kategorie anlegen';document.getElementById('cfId').value=c?.id||'';document.getElementById('cfLb').value=c?.label||'';document.getElementById('cfEm').value=c?.emoji||'\uD83D\uDCCC';document.getElementById('cfErr').textContent='';S.cfColor=c?.color||pal()[2];buildCP('cfCR',S.cfColor,'pickC');closeModal('admOv');openModal('cfOv');}
+function openCF(id){const c=id?getCat(id):null;document.getElementById('cfT').textContent=c?'Kategorie bearbeiten':'Kategorie anlegen';document.getElementById('cfId').value=c?.id||'';document.getElementById('cfLb').value=c?.label||'';document.getElementById('cfEm').value=c?.emoji||'\uD83D\uDCCC';document.getElementById('cfErr').textContent='';S.cfColor=c?.color||pal()[2];buildCP('cfCR',S.cfColor,'pickC');openModal('cfOv');}
 async function saveCategory(){const label=document.getElementById('cfLb').value.trim();const errEl=document.getElementById('cfErr');errEl.textContent='';if(!label){errEl.textContent='\u26A0\uFE0F Bezeichnung erforderlich!';return;}const id=document.getElementById('cfId').value;loading(true);try{if(id)await api('PUT','/categories/'+id,{label,emoji:document.getElementById('cfEm').value.trim()||'\uD83D\uDCCC',color:S.cfColor});else await api('POST','/categories',{label,emoji:document.getElementById('cfEm').value.trim()||'\uD83D\uDCCC',color:S.cfColor});await fetchData();backToAdmin('cats');toast('\u2705 Gespeichert!');}catch(e){errEl.textContent='\u26A0\uFE0F '+e.message;}finally{loading(false);}}
 async function delCat(id){if(!confirm('Kategorie l\u00f6schen?'))return;loading(true);try{await api('DELETE','/categories/'+id);await fetchData();backToAdmin('cats');}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}finally{loading(false);}}
-function openTF(id){const t=id?getTag(id):null;document.getElementById('tfT').textContent=t?'Tag bearbeiten':'Tag anlegen';document.getElementById('tfId').value=t?.id||'';document.getElementById('tfLb').value=t?.label||'';document.getElementById('tfErr').textContent='';S.tfColor=t?.color||pal()[0];buildCP('tfCR',S.tfColor,'pickT');closeModal('admOv');openModal('tfOv');}
+function openTF(id){const t=id?getTag(id):null;document.getElementById('tfT').textContent=t?'Tag bearbeiten':'Tag anlegen';document.getElementById('tfId').value=t?.id||'';document.getElementById('tfLb').value=t?.label||'';document.getElementById('tfErr').textContent='';S.tfColor=t?.color||pal()[0];buildCP('tfCR',S.tfColor,'pickT');openModal('tfOv');}
 async function saveTag(){const label=document.getElementById('tfLb').value.trim();const errEl=document.getElementById('tfErr');errEl.textContent='';if(!label){errEl.textContent='\u26A0\uFE0F Bezeichnung erforderlich!';return;}const id=document.getElementById('tfId').value;loading(true);try{if(id)await api('PUT','/tags/'+id,{label,color:S.tfColor});else await api('POST','/tags',{label,color:S.tfColor});await fetchData();backToAdmin('tags');toast('\u2705 Gespeichert!');}catch(e){errEl.textContent='\u26A0\uFE0F '+e.message;}finally{loading(false);}}
 async function delTag(id){if(!confirm('Tag l\u00f6schen?'))return;loading(true);try{await api('DELETE','/tags/'+id);await fetchData();backToAdmin('tags');}catch(e){toast('\u26A0\uFE0F '+e.message,'err');}finally{loading(false);}}
 // \u2500\u2500 "ANSICHT ALS" (Testuser-Impersonation) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -3629,7 +3643,7 @@ function openModal(id){document.getElementById(id)?.classList.add('open');}
 function closeModal(id){document.getElementById(id)?.classList.remove('open');}
 function eyeToggle(inputId,btn){const inp=document.getElementById(inputId);const show=inp.type==='password';inp.type=show?'text':'password';btn.textContent=show?'\uD83D\uDE48':'\uD83D\uDC41';}
 function toast(msg,type='',dur=3200){const t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),dur);}
-const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','admOv','ufOv','cfOv','tfOr','clFormOv','attachClOv','changelogOv','dpOv','rejectEinspOv','helpOv','msgFormOv','msgDetOv','gSearchOv','stLoginOv','docFormOv','docVerOv','docHistOv','docCatOv','dpReportModal','deptOv','spintCatOv','spintCatFormOv','protoFormOv','viewAsOv','contactOv','wikiCatFormOv','contactCatFormOv','catAclOv'];
+const ALL_MODALS=['evtOv','pwModal','allwOv','tkFormOv','tkDetOv','ufOv','cfOv','tfOr','clFormOv','attachClOv','changelogOv','dpOv','rejectEinspOv','helpOv','msgFormOv','msgDetOv','gSearchOv','stLoginOv','docFormOv','docVerOv','docHistOv','docCatOv','dpReportModal','deptOv','spintCatOv','spintCatFormOv','protoFormOv','viewAsOv','contactOv','wikiCatFormOv','contactCatFormOv','catAclOv'];
 document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();openGSearch();return;}
   if(e.key==='Escape'){ALL_MODALS.forEach(closeModal);closeGSearch();if(document.getElementById('brainScreensaverOv')?.style.display==='block')closeBrainScreensaver();}
@@ -4963,7 +4977,7 @@ const QUICK_LINKS = [
 function renderLinks(){
   const allLinks=S.links.length?S.links:QUICK_LINKS;
   document.getElementById('main').innerHTML=`
-    <div class="ph"><div class="pt">&#128279; Links</div>${S.p?.manageUsers?`<button class="btn-s" onclick="openModal('admOv');swTab('links')">⚙️ Links verwalten</button>`:''}</div>
+    <div class="ph"><div class="pt">&#128279; Links</div>${S.p?.manageUsers?`<button class="btn-s" onclick="openAdminModal();swTab('links')">⚙️ Links verwalten</button>`:''}</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;padding:0 20px 20px">
     ${allLinks.map(lk=>`<div style="background:var(--sf);border:1px solid var(--border);border-radius:12px;padding:16px 18px;cursor:pointer;transition:.15s" onclick="window.open('${lk.url}','_blank','noopener')" onmouseover="this.style.borderColor='var(--acc)'" onmouseout="this.style.borderColor='var(--border)'">
       <div style="font-size:28px;margin-bottom:8px">${lk.icon||'🔗'}</div>
