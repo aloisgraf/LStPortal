@@ -636,73 +636,103 @@ details.dash-card > summary { list-style: none; cursor: pointer; display: flex; 
 .todo-ci-textarea::placeholder{color:var(--di)}
 .todo-ci.done-item .todo-ci-textarea{text-decoration:none;color:var(--di)}
 
-/* ── DESK EMPIRE (Spiele) ──────────────────────────────────────────────── */
-.game-wrap{max-width:900px;margin:0 auto;padding:20px}
-.game-hdr{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px;margin-bottom:14px}
-.game-title{font-size:19px;font-weight:700}
-.game-stats{display:flex;gap:22px;flex-wrap:wrap}
-.game-stat{display:flex;flex-direction:column;gap:2px;min-width:90px}
-.game-stat-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--mu)}
-.game-stat-val{font-size:16px;font-weight:700;color:var(--tx)}
-.game-xp-row{margin-bottom:16px}
-.game-xp-bar{height:8px;border-radius:5px;background:var(--sf2);overflow:hidden;margin-bottom:4px}
-.game-xp-fill{height:100%;background:var(--acc);border-radius:5px;transition:width .4s ease}
-.game-xp-label{font-size:11px;color:var(--mu)}
-.game-tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:16px;flex-wrap:wrap}
-.game-tab{padding:8px 14px;font-size:13px;font-weight:600;background:none;border:none;border-bottom:2px solid transparent;color:var(--mu);cursor:pointer;font-family:inherit;transition:.15s}
-.game-tab:hover{color:var(--tx)}
-.game-tab.active{color:var(--acc);border-bottom-color:var(--acc)}
-.game-body{min-height:200px}
-.game-office-card{background:var(--sf);border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:var(--sh2);margin-bottom:18px}
-.game-click-area{text-align:center;padding:4px 0 10px}
-.game-click-btn{background:var(--acc);color:var(--act);border:none;border-radius:12px;padding:16px 34px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 4px 14px rgba(59,109,212,.3);transition:transform .12s ease,box-shadow .12s ease}
-.game-click-btn:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(59,109,212,.38)}
-.game-click-btn:active{transform:translateY(1px) scale(.98)}
-.game-click-btn span{margin-left:6px;opacity:.9;font-weight:600}
-.game-click-fx{position:fixed;transform:translate(-50%,0);font-size:15px;font-weight:700;color:var(--acc);pointer-events:none;z-index:500;animation:gameFxRise .8s ease-out forwards}
+/* ── DESK EMPIRE (Spiele, renderGame in app.js) ──────────────────────────── */
+.ge{max-width:1280px;margin:0 auto;padding:18px 20px 30px}
+.ge-top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px;margin-bottom:12px}
+.ge-title{font-size:20px;font-weight:800;letter-spacing:.2px}
+.ge-sub{font-size:12px;color:var(--mu);margin-top:2px}
+.ge-kpis{display:flex;flex-wrap:wrap;gap:8px}
+.ge-kpi{display:flex;flex-direction:column;gap:2px;background:var(--sf);border:1px solid var(--border);border-radius:10px;padding:7px 12px;min-width:92px}
+.ge-kpi>span{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--mu)}
+.ge-kpi b{font-size:15px;font-weight:800;color:var(--tx);font-variant-numeric:tabular-nums}
+.ge-kpi-lvl{min-width:130px}
+.ge-xp{height:6px;border-radius:4px;background:var(--sf3);overflow:hidden;margin-top:6px}
+.ge-xp>div{height:100%;background:var(--acc);border-radius:4px;transition:width .4s ease}
+.ge-pos{color:var(--ok)!important}.ge-neg{color:var(--danger)!important}
+.ge-order{display:flex;align-items:center;gap:12px;background:var(--sf);border:1px solid var(--acc);border-radius:12px;padding:10px 14px;margin-bottom:12px;flex-wrap:wrap}
+.ge-order-ic{font-size:22px}
+.ge-order-txt{flex:1;min-width:200px;display:flex;flex-direction:column;gap:2px;font-size:13px}
+.ge-order-txt>span{font-size:12px;color:var(--mu)}
+.ge-order-bar{height:6px;background:var(--sf3);border-radius:4px;overflow:hidden;margin-top:5px}
+.ge-order-bar>div{height:100%;background:var(--ok);transition:width .3s}
+.ge-order-time{display:flex;flex-direction:column;align-items:flex-end;font-size:18px;font-weight:800;font-variant-numeric:tabular-nums}
+.ge-order-time small{font-size:11px;font-weight:600;color:var(--mu)}
+.ge-main{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:16px;align-items:start}
+.ge-scene{background:linear-gradient(180deg,var(--sf) 0%,var(--bg) 100%);border:1px solid var(--border);border-radius:14px;box-shadow:var(--sh2);padding:10px;overflow:hidden}
+.ge-svg{width:100%;height:auto;max-height:62vh;display:block}
+.ge-obj{cursor:pointer}
+.ge-obj:hover{filter:brightness(1.08)}
+.ge-obj.sel{filter:drop-shadow(0 0 6px var(--acc))}
+.ge-tile{cursor:pointer}
+.ge-pop{animation:gePop .55s cubic-bezier(.2,.9,.3,1.3) both}
+@keyframes gePop{0%{transform:translateY(-46px);opacity:0}100%{transform:none;opacity:1}}
+.ge-hint{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--mu);padding:8px 4px}
+.ge-hint.sel{background:var(--sf);border:1px solid var(--acc);border-radius:10px;padding:8px 12px;margin-top:10px;color:var(--tx)}
+.ge-actions{display:flex;gap:12px;align-items:stretch;flex-wrap:wrap;margin-top:6px}
+.ge-work{background:var(--acc);color:var(--act);border:none;border-radius:12px;padding:14px 30px;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;box-shadow:var(--sh2);transition:transform .1s ease;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.ge-work:hover{transform:translateY(-1px)}
+.ge-work:active{transform:translateY(1px) scale(.97)}
+.ge-work span{margin-left:6px;opacity:.85;font-weight:700}
+.ge-move{flex:1;min-width:260px}
+.ge-move.done{display:flex;align-items:center;font-size:13px;color:var(--mu);padding:0 8px}
+.ge-panel{background:var(--sf);border:1px solid var(--border);border-radius:14px;box-shadow:var(--sh);display:flex;flex-direction:column;max-height:calc(100vh - 150px);min-height:420px;position:sticky;top:10px}
+.ge-tabs{display:flex;flex-shrink:0;gap:0;padding:6px 6px 0;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}
+.ge-tab{flex:1 0 auto;padding:8px 7px;font-size:12px;font-weight:700;background:none;border:none;border-bottom:2px solid transparent;color:var(--mu);cursor:pointer;font-family:inherit;white-space:nowrap}
+.ge-tab:hover{color:var(--tx)}
+.ge-tab.active{color:var(--acc);border-bottom-color:var(--acc)}
+.ge-panel-body{overflow-y:auto;padding:4px 12px 14px;flex:1}
+.ge-sec{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--mu);margin:14px 0 6px;display:flex;align-items:baseline;gap:8px}
+.ge-sec small{font-size:11px;font-weight:500;text-transform:none;letter-spacing:0;color:var(--di)}
+.ge-card{display:flex;align-items:center;gap:10px;background:var(--sf2);border:1px solid var(--border);border-radius:10px;padding:8px 10px;margin-bottom:6px;transition:border-color .15s}
+.ge-card.ge-afford{border-color:var(--acc)}
+.ge-card.locked{opacity:.5}
+.ge-card.owned{opacity:.7}
+.ge-card-ic{font-size:22px;width:30px;text-align:center;flex-shrink:0}
+.ge-card-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.ge-card-info b{font-size:13px;color:var(--tx)}
+.ge-card-info b em{font-style:normal;font-weight:600;color:var(--mu);font-size:12px}
+.ge-card-info>span{font-size:11px;color:var(--mu);line-height:1.4}
+.ge-buy{background:var(--acc);color:var(--act);border:none;border-radius:7px;padding:7px 10px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit;flex-shrink:0;white-space:nowrap;font-variant-numeric:tabular-nums}
+.ge-buy:disabled{background:var(--sf3);color:var(--di);cursor:not-allowed}
+.ge-lock{font-size:11px;color:var(--di);flex-shrink:0;white-space:nowrap}
+.ge-owned{font-size:12px;font-weight:700;color:var(--ok);flex-shrink:0}
+.ge-warn{background:rgba(245,158,11,.12);border:1px solid var(--warn);border-radius:8px;padding:8px 10px;font-size:12px;margin-top:10px}
+.ge-empty{font-size:12px;color:var(--mu);padding:6px 2px}
+.ge-team-sum{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
+.ge-team-sum>div{background:var(--sf2);border:1px solid var(--border);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column}
+.ge-team-sum span{font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mu)}
+.ge-team-sum b{font-size:16px}
+.ge-team-sum small{font-size:10px;color:var(--di)}
+.ge-emp{display:flex;align-items:center;gap:10px;background:var(--sf2);border:1px solid var(--border);border-radius:10px;padding:7px 10px;margin-bottom:6px}
+.ge-emp-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.ge-emp-dot.good{background:#22c55e}.ge-emp-dot.mid{background:#f59e0b}.ge-emp-dot.bad{background:#ef4444}
+.ge-emp-name{flex:1;min-width:0;display:flex;flex-direction:column}
+.ge-emp-name b{font-size:13px}
+.ge-emp-name>span{font-size:11px;color:var(--mu)}
+.ge-emp-bars{display:grid;grid-template-columns:auto 64px;gap:2px 6px;align-items:center;font-size:10px}
+.ge-bar{height:5px;border-radius:3px;background:var(--sf3);overflow:hidden}
+.ge-bar>div{height:100%;border-radius:3px;transition:width .4s}
+.ge-bar .h{background:#22c55e}.ge-bar .s{background:#3b82f6}
+.ge-x{background:none;border:1px solid var(--border);border-radius:6px;color:var(--mu);cursor:pointer;width:26px;height:26px;flex-shrink:0;font-size:11px}
+.ge-x:hover{border-color:var(--danger);color:var(--danger)}
+.ge-fcard{background:var(--sf2);border:1px solid var(--border);border-radius:10px;padding:2px 12px}
+.ge-frow{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+.ge-frow:last-child{border-bottom:none}
+.ge-frow span{color:var(--mu)}
+.ge-ach{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-top:10px}
+.ge-ach-card{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;background:var(--sf2);border:1px solid var(--border);border-radius:10px;padding:12px 6px;opacity:.5;font-size:11px}
+.ge-ach-card>div{font-size:24px}
+.ge-ach-card.on{opacity:1;border-color:var(--acc)}
+.game-click-fx{position:fixed;transform:translate(-50%,0);font-size:15px;font-weight:800;color:var(--acc);pointer-events:none;z-index:500;animation:gameFxRise .8s ease-out forwards}
 @keyframes gameFxRise{0%{opacity:1;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,-42px)}}
-.game-shop-section-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--mu);margin-bottom:8px}
-.game-shop-list{display:flex;flex-direction:column;gap:8px}
-.game-shop-card{display:flex;align-items:center;gap:12px;background:var(--sf);border:1px solid var(--border);border-radius:10px;padding:10px 14px;transition:border-color .15s}
-.game-shop-card.locked{opacity:.55}
-.game-shop-icon{font-size:24px;width:36px;text-align:center;flex-shrink:0}
-.game-shop-info{flex:1;min-width:0}
-.game-shop-name{font-size:13px;font-weight:700;color:var(--tx)}
-.game-shop-meta{font-size:11px;color:var(--mu);margin-top:1px}
-.game-shop-buy{background:var(--acc);color:var(--act);border:none;border-radius:7px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0;white-space:nowrap;transition:.15s}
-.game-shop-buy:disabled{background:var(--sf2);color:var(--di);cursor:not-allowed}
-.game-shop-owned{font-size:12px;font-weight:700;color:var(--ok);flex-shrink:0}
-.game-ach-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
-.game-ach-card{display:flex;flex-direction:column;align-items:center;gap:6px;background:var(--sf);border:1px solid var(--border);border-radius:10px;padding:16px 10px;text-align:center;opacity:.55}
-.game-ach-card.unlocked{opacity:1;border-color:var(--acc)}
-.game-ach-icon{font-size:26px}
-.game-ach-name{font-size:12px;font-weight:600;color:var(--tx)}
-.game-stats-card{background:var(--sf);border:1px solid var(--border);border-radius:12px;padding:6px 18px}
-.game-stats-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px}
-.game-stats-row:last-child{border-bottom:none}
-.game-stats-row span:first-child{color:var(--mu)}
-.game-stats-row span:last-child{font-weight:700;color:var(--tx)}
-@media(max-width:640px){
-  .game-hdr{flex-direction:column;align-items:flex-start}
-  .game-stats{gap:14px}
-  .game-click-btn{width:100%}
+@media(max-width:1000px){
+  .ge-main{grid-template-columns:1fr}
+  .ge-panel{position:static;max-height:none}
 }
-
-/* ── DESK EMPIRE: Mitarbeiter/Betriebswirtschaft-Erweiterung ───────────── */
-.game-overview-strip{display:flex;gap:18px;flex-wrap:wrap;background:var(--sf);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:16px}
-.game-emp-list{display:flex;flex-direction:column;gap:8px}
-.game-emp-row{display:flex;align-items:center;gap:12px;background:var(--sf);border:1px solid var(--border);border-radius:10px;padding:10px 14px;flex-wrap:wrap}
-.game-emp-row.terminated{opacity:.5}
-.game-emp-name{font-size:13px;font-weight:700;color:var(--tx);flex:1;min-width:140px}
-.game-emp-pos{font-size:11px;font-weight:500;color:var(--mu)}
-.game-emp-bars{display:grid;grid-template-columns:auto 90px;gap:4px 8px;align-items:center;font-size:11px;color:var(--mu)}
-.game-bar{width:90px;height:6px;border-radius:4px;background:var(--sf2);overflow:hidden}
-.game-bar-fill{height:100%;border-radius:4px;transition:width .4s ease}
-.game-bar-fill.health{background:#ef4444}
-.game-bar-fill.sat{background:#3b6dd4}
 @media(max-width:640px){
-  .game-overview-strip{gap:12px}
-  .game-emp-row{flex-direction:column;align-items:flex-start}
+  .ge{padding:12px 12px 24px}
+  .ge-kpi{min-width:0;flex:1 1 40%}
+  .ge-work{width:100%}
 }
 
 /* Rolle "Assessment": reine Assessment-Nutzer sehen nur den Assessment-Reiter */

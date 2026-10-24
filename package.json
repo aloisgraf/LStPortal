@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "game-sim": "node scripts/game-sim.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.120.0",
