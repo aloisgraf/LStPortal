@@ -603,7 +603,7 @@ function asmOpenDetailHtml(list){
   if(!a)return '';
   return `<div class="asm-detail" id="asmDetail"><div class="asm-detail-head"><b>Details: ${esc(a.userName)}</b>${a.archivedAt?` <span style="color:var(--mu)">(archiviert ${fdt(a.archivedAt)})</span>`:''}
     <span style="display:flex;gap:6px"><button class="btn-s" style="font-size:11px" onclick="asmPdf('${a.id}')">📄 PDF</button><button class="btn-s" style="font-size:11px" onclick="ASM.openResult=null;asmRenderOverview()">Schließen</button></span></div>
-    <div style="font-size:11px;color:var(--mu);margin-bottom:8px">Nachbewertung: Bei Auswahl-, Zahlen- und Freitextantworten kannst du eine Antwort als richtig oder falsch werten. Motivationstext und Abschrift bewertest du mit dem Raster (je Kriterium 0–3 Punkte). Punkte und Prozent werden sofort neu berechnet, die ursprüngliche Wertung bleibt sichtbar.</div>${asmDetailHtml(a)}</div>`;
+    <div style="font-size:11px;color:var(--mu);margin-bottom:8px">Nachbewertung: Bei Auswahl-, Zahlen- und Freitextantworten kannst du eine Antwort als richtig oder falsch werten. Motivationstext und Abschrift bewertest du mit dem Raster (je Kriterium 1–5 Punkte). Punkte und Prozent werden sofort neu berechnet, die ursprüngliche Wertung bleibt sichtbar.</div>${asmDetailHtml(a)}</div>`;
 }
 async function asmOverride(attId,section,qid,correct){
   const y=window.scrollY;
@@ -653,7 +653,7 @@ function asmDetailHtml(a){
       const det=b.details||[];const scoredRows=det.filter(d=>d.type!=='writing'&&d.type!=='markwords');
       let h=(r.blocks.length>1?`<div class="asm-det-block">${esc(b.title)}${b.max?` – ${b.points}/${b.max}`:''}${typeof b.used==='number'?`<span class="asm-det-btime">⏱ ${asmMmss(b.used)} Min.</span>`:''}${b.timeUp?'<span class="asm-det-bflag">⏰ hier war die Zeit aus</span>':''}${b.notReached?`<span class="asm-det-bflag">${b.notReached==='aborted'?'⛔ nicht mehr aufgerufen (abgebrochen)':'⏰ aus Zeitgründen nicht mehr aufgerufen'}</span>`:''}</div>`:'');
       det.filter(d=>d.type==='markwords').forEach(d=>h+=asmMarkwordsDetail(d));
-      det.filter(d=>d.type==='writing').forEach(d=>h+=asmWritingDetail(d,a.id,r.key));
+      det.filter(d=>d.type==='writing').forEach(d=>h+=asmWritingDetail(d,a.id,r.key,r));
       if(scoredRows.length)h+=`<table class="asm-det"><colgroup><col class="c-mark"><col class="c-q"><col class="c-a"><col class="c-sol"><col class="c-btn"></colgroup><tbody>${scoredRows.map(d=>d.type==='likert'
         ?`<tr><td></td><td>${esc(d.text)}</td><td>${d.given===null?asmNone:`<b>${d.given}</b>`}</td><td></td></tr>`
         :`<tr${d.override?' class="asm-ovr"':''}><td>${asmMark(d.correct)}</td><td>${esc(d.text)}</td><td>${d.given===null?asmNone:esc(d.given)}</td><td style="color:var(--mu)">${d.correct&&!d.override?'':'richtig: '+esc(d.expected)}${d.override?`<div class="asm-ovr-note">✎ nachbewertet als ${d.correct?'richtig':'falsch'} von ${esc(d.override.by)}, ${fdt(d.override.at)}</div>`:''}</td>
@@ -719,18 +719,22 @@ function asmKpm(log,seconds){
   const typed=(log||[]).reduce((n,e)=>n+String(e[3]||'').length,0);
   return Math.round(typed/seconds*60);
 }
-function asmWritingDetail(d,attId,secKey){
+function asmWritingDetail(d,attId,secKey,r){
   const s=d.stats||{},log=d.log||[];
   const id='asmRp_'+d.id+'_'+Math.random().toString(36).slice(2,7);
   ASM._logs=ASM._logs||{};ASM._logs[id]=log;
+  // Auf einen Blick: Wortanzahl und ob der Text rechtzeitig abgeschlossen wurde.
+  const t=r?.time,timeUp=!d.done||t?.expired||r?.late;
+  const status=r?.aborted?'⛔ Durchgang abgebrochen':timeUp?'⏰ Zeit abgelaufen – Text wurde automatisch abgegeben':`🔒 rechtzeitig abgeschlossen${t?` – ${asmMmss(t.remaining)} Min. Restzeit`:''}`;
   return `<div class="asm-wd">
     <div class="asm-wd-q">${esc(d.text)}</div>
+    <div class="asm-wd-key"><span class="asm-wd-words">📝 ${s.words||0} Wörter${d.targetWords?` <small>(Ziel ca. ${d.targetWords})</small>`:''}</span><span class="asm-wd-status ${timeUp&&!r?.aborted?'exp':''}">${status}</span></div>
     <div class="asm-wd-stats"><span>${s.words||0} Wörter</span><span>${s.chars||0} Zeichen</span><span>${s.corrections||0} Korrekturen</span><span>${s.deletedChars||0} gelöschte Zeichen</span><span>Schreibzeit ${asmFmt(s.seconds||0)}</span><span><b>${asmKpm(log,s.seconds)}</b> Anschläge/Min.</span><span>${s.seconds?Math.round((s.chars||0)/s.seconds*60):0} Zeichen/Min. netto</span><span>${d.done?'🔒 abgeschlossen':'⏱ nicht abgeschlossen (Zeitablauf)'}</span></div>
     ${asmAutoStatsHtml(d,log)}${d.rubric?asmRubricHtml(d,attId,secKey):''}
     <div class="asm-wd-label">Endtext</div><div class="asm-wd-text">${d.given?esc(d.given):asmNone}</div>
     <div class="asm-wd-label">Korrekturen <span style="font-weight:400">(<del>gelöscht</del>, <ins>nachträglich eingefügt</ins>)</span></div><div class="asm-wd-text">${log.length?asmCharsHtml(asmReplay(log)):asmNone}</div>
     ${log.length?`<div class="asm-wd-replay"><div class="asm-wd-label">Wiedergabe des Schreibprozesses</div>
-    <div class="asm-wd-play"><button class="btn-s" onclick="asmPlay('${id}')">▶ Abspielen</button><input type="range" min="0" max="${log.length}" value="${log.length}" id="${id}_r" oninput="asmShowStep('${id}',+this.value)"><span id="${id}_t" style="font-size:11px;color:var(--mu)"></span></div>
+    <div class="asm-wd-play"><button class="btn-s" title="Zum Anfang" onclick="asmPause();asmShowStep('${id}',0)">⏮</button><button class="btn-s asm-play-btn" id="${id}_b" onclick="asmPlay('${id}')">▶ Abspielen</button><input type="range" min="0" max="${log.length}" value="${log.length}" id="${id}_r" title="Ziehen zum Vor- und Zurückspulen" oninput="asmPause();asmShowStep('${id}',+this.value)"><span id="${id}_t" class="asm-play-time">${asmFmt(log[log.length-1][0]/1000)} / ${asmFmt(log[log.length-1][0]/1000)}</span></div>
     <div class="asm-wd-text" id="${id}">${asmCharsHtml(asmReplay(log))}</div></div>`:''}
   </div>`;
 }
@@ -745,12 +749,12 @@ function asmAutoStatsHtml(d,log){
   else if(d.copy){const c=d.copy;items.push(`<span>Abgeschrieben <b>${c.reachedWords}</b> von ${c.originalWords} Wörtern</span><span>Fehler <b>${c.errors}</b> (falsch, fehlend oder zusätzlich)</span><span>Fehlerquote <b>${c.rate??0} %</b></span>`);}
   return `<div class="asm-wd-auto"><div class="asm-wd-label">Automatische Kennzahlen</div><div class="asm-wd-stats">${items.join('')}</div></div>`;
 }
-// Bewertungsraster: je Kriterium 0–3 Punkte, ein Klick auf den gewählten Wert entfernt ihn.
+// Bewertungsraster: je Kriterium 1–5 Punkte, ein Klick auf den gewählten Wert entfernt ihn.
 function asmRubricHtml(d,attId,secKey){
-  const sc=d.rating?.scores||{},n=Object.keys(sc).length,full=d.rubric.length*3;
+  const sc=d.rating?.scores||{},n=Object.keys(sc).length,full=d.rubric.length*5;
   const rows=d.rubric.map(c=>{const v=sc[c.key];
-    return `<tr><td><b>${esc(c.label)}</b><div class="asm-rb-hint">${esc(c.hint||'')}</div></td><td class="asm-rb-pts">${[0,1,2,3].map(p=>`<button class="asm-rb-btn${v===p?' on':''}" title="${['nicht erfüllt','kaum erfüllt','überwiegend erfüllt','voll erfüllt'][p]}" onclick="asmRate('${attId}','${secKey}','${d.id}','${c.key}',${v===p?'null':p})">${p}</button>`).join('')}${v===undefined?'<span class="asm-rb-none">offen</span>':''}</td></tr>`;}).join('');
-  return `<div class="asm-rb"><div class="asm-wd-label">Bewertung <span style="font-weight:400">(0 = nicht erfüllt … 3 = voll erfüllt)</span></div>
+    return `<tr><td><b>${esc(c.label)}</b><div class="asm-rb-hint">${esc(c.hint||'')}</div></td><td class="asm-rb-pts">${[1,2,3,4,5].map(p=>`<button class="asm-rb-btn${v===p?' on':''}" title="${['','sehr schwach','schwach','mittel','gut','sehr gut'][p]}" onclick="asmRate('${attId}','${secKey}','${d.id}','${c.key}',${v===p?'null':p})">${p}</button>`).join('')}${v===undefined?'<span class="asm-rb-none">offen</span>':''}</td></tr>`;}).join('');
+  return `<div class="asm-rb"><div class="asm-wd-label">Bewertung <span style="font-weight:400">(1 = sehr schwach … 5 = sehr gut)</span></div>
     <table class="asm-det asm-rb-tab"><tbody>${rows}</tbody></table>
     <div class="asm-rb-sum">${n?`<b>${d.points}/${d.max} Punkte</b>${n<d.rubric.length?` · ${d.rubric.length-n} ${d.rubric.length-n===1?'Kriterium':'Kriterien'} noch offen (max. ${full})`:''}${d.rating?.by?` · bewertet von ${esc(d.rating.by)}, ${fdt(d.rating.at)}`:''}`:'Noch nicht bewertet – der Text zählt erst nach der Bewertung ins Gesamtergebnis.'}</div></div>`;
 }
@@ -780,14 +784,28 @@ function asmShowStep(id,k){
   const log=ASM._logs?.[id];if(!log)return;
   const el=document.getElementById(id),t=document.getElementById(id+'_t'),r=document.getElementById(id+'_r');
   if(el)el.innerHTML=asmCharsHtml(asmReplay(log,k));
-  if(t)t.textContent=k?asmFmt(log[k-1][0]/1000):'00:00';
+  if(t)t.textContent=(k?asmFmt(log[k-1][0]/1000):'00:00')+' / '+asmFmt(log[log.length-1][0]/1000);
   if(r&&+r.value!==k)r.value=k;
+}
+// Wiedergabe: ▶ spielt ab der aktuellen Position des Reglers weiter (am Ende
+// von vorn), ⏸ hält an. Ziehen am Regler hält ebenfalls an.
+function asmPause(){
+  if(ASM._play){clearInterval(ASM._play);ASM._play=null;}
+  if(ASM._playId){const b=document.getElementById(ASM._playId+'_b');if(b)b.textContent='▶ Abspielen';ASM._playId=null;}
 }
 function asmPlay(id){
   const log=ASM._logs?.[id];if(!log)return;
-  if(ASM._play)clearInterval(ASM._play);
-  let k=0;
-  ASM._play=setInterval(()=>{k=Math.min(log.length,k+Math.max(1,Math.ceil(log.length/400)));asmShowStep(id,k);if(k>=log.length||!document.getElementById(id)){clearInterval(ASM._play);ASM._play=null;}},80);
+  if(ASM._playId===id){asmPause();return;}
+  asmPause();
+  const r=document.getElementById(id+'_r');
+  let k=r?+r.value:0;if(k>=log.length)k=0;
+  ASM._playId=id;const b=document.getElementById(id+'_b');if(b)b.textContent='⏸ Pause';
+  asmShowStep(id,k);
+  ASM._play=setInterval(()=>{
+    if(!document.getElementById(id)){asmPause();return;}
+    k=Math.min(log.length,k+Math.max(1,Math.ceil(log.length/400)));asmShowStep(id,k);
+    if(k>=log.length)asmPause();
+  },80);
 }
 // Admin bricht den eigenen Testdurchgang ab: wird beendet und gleich
 // archiviert, danach kann er sofort neu starten.

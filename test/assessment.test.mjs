@@ -279,11 +279,11 @@ describe('Bewertungsraster für Texte', () => {
     expect(A.summarize([r]).max).toBe(0);
   });
   it('bewertete Kriterien fließen ins Ergebnis', () => {
-    const r = A.applyRatings(res(), { 'motivation/mo1': { scores: { inhalt: 3, aufbau: 1, bogus: 3, sprache: 7 }, by: 'X', at: 't' } })[0];
+    const r = A.applyRatings(res(), { 'motivation/mo1': { scores: { inhalt: 5, aufbau: 2, bogus: 3, sprache: 7, ausdruck: 0 }, by: 'X', at: 't' } })[0];
     expect(r.scored).toBe(true);
-    expect(r.points).toBe(4);
-    expect(r.max).toBe(6);
-    expect(r.percent).toBe(67);
+    expect(r.points).toBe(7);
+    expect(r.max).toBe(10);
+    expect(r.percent).toBe(70);
   });
   it('Abschrift: Fehler gegen das Original, Rest zählt nicht', () => {
     expect(A.compareCopy('Der Hund lauft schnell', 'Der Hund läuft schnell über die Wiese')).toMatchObject({ typedWords: 4, reachedWords: 4, errors: 1, rate: 25 });

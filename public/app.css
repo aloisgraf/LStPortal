@@ -836,10 +836,15 @@ body.asm-run .asm-bar{box-shadow:var(--sh)}
 .asm-rb{margin:8px 0 10px}
 .asm-rb-tab td{vertical-align:middle}
 .asm-rb-hint{font-size:10px;color:var(--mu);font-weight:400}
-.asm-rb-pts{text-align:right;white-space:nowrap;width:190px}
+.asm-rb-pts{text-align:right;white-space:nowrap;width:230px}
 .asm-rb-btn{width:28px;height:26px;margin-left:4px;border:1px solid var(--border);border-radius:6px;background:var(--card,#fff);color:inherit;font-weight:700;cursor:pointer}
 .asm-rb-btn.on{background:var(--info);border-color:var(--info);color:#fff}
 .asm-rb-none{font-size:10px;color:var(--di);margin-left:6px}
 .asm-rb-sum{font-size:12px;margin-top:4px}
 .asm-orig{margin-top:12px;font-size:12px}.asm-orig summary{cursor:pointer;font-weight:700}
 .asm-det-bflag{font-weight:700;color:var(--danger);font-size:11px;margin-left:8px}
+.asm-wd-key{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;margin:2px 0 6px}
+.asm-wd-words{font-size:14px;font-weight:800}.asm-wd-words small{font-weight:400;color:var(--mu)}
+.asm-wd-status{font-size:12px;font-weight:700;color:var(--ok)}.asm-wd-status.exp{color:var(--danger)}
+.asm-play-time{font-size:11px;color:var(--mu);white-space:nowrap;font-variant-numeric:tabular-nums}
+.asm-play-btn{min-width:100px}
