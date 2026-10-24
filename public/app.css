@@ -244,6 +244,16 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
 .atabs{display:flex;flex-direction:column;width:170px;flex-shrink:0;border-right:1px solid var(--border);margin:-18px 0 -18px -20px;padding:12px 6px;overflow-y:auto;background:var(--sf2)}
 .tb{padding:9px 12px 9px 14px;font-size:13px;font-weight:500;background:none;border:none;color:var(--mu);cursor:pointer;border-left:3px solid transparent;text-align:left;transition:.15s;font-family:inherit;white-space:nowrap;width:100%;border-radius:0 6px 6px 0}.tb:hover{color:var(--tx);background:var(--sf3)}.tb.on{color:var(--acc);border-left-color:var(--acc);background:rgba(59,109,212,.07);font-weight:600}
 .tp{display:none;flex:1;padding:18px 20px;min-width:0}.tp.on{display:block}
+/* Administration als eigene Seite: Einstellungs-Menü links (direkt neben dem
+   Hauptmenü), Inhalt nutzt die volle restliche Breite. */
+.adm-page{min-width:0;max-height:calc(100vh - var(--hdr));overflow:hidden}
+.adm-page .adm-layout{height:calc(100vh - var(--hdr))}
+.adm-page .atabs{margin:0;padding:12px 6px;width:190px}
+.adm-page .tp{overflow:auto;padding:20px 22px}
+.atabs-h{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--mu);padding:4px 6px 10px 14px}
+.adm-wide-btn{background:none;border:1px solid var(--border);border-radius:5px;color:var(--mu);cursor:pointer;font-size:13px;line-height:1;padding:3px 7px;font-family:inherit}.adm-wide-btn:hover{color:var(--tx);background:var(--sf3)}
+@media(min-width:769px){body.adm-view.adm-wide .app{grid-template-columns:1fr}body.adm-view.adm-wide #sidebar{display:none}}
+#adminBtn.on{background:var(--sf3);color:var(--acc)}
 .al{display:flex;flex-direction:column;gap:7px;margin-bottom:12px}
 .ai{display:flex;align-items:center;gap:9px;padding:9px 12px;background:var(--sf2);border:1px solid var(--border);border-radius:7px}
 .aii{flex:1;min-width:0}.ain{font-size:13px;font-weight:600;display:flex;align-items:center;gap:4px;flex-wrap:wrap}.ais{font-size:11px;color:var(--mu);margin-top:2px}.aia{display:flex;gap:5px;flex-shrink:0;align-items:center}
@@ -378,6 +388,10 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}textarea{resize:vertical
   .tb{width:auto;flex-shrink:0;border-left:none;border-bottom:2px solid transparent;border-radius:6px 6px 0 0;padding:7px 12px}
   .tb.on{border-left-color:transparent;border-bottom-color:var(--acc)}
   .tp{padding:14px 16px}
+  .adm-page,.adm-page .adm-layout{height:auto;max-height:none;overflow:visible}
+  .adm-page .atabs{width:100%;padding:6px 8px;position:sticky;top:0;z-index:5}
+  .adm-page .tp{padding:14px 12px;overflow:visible}
+  .atabs-h{display:none}
   /* Ticketdetail Tabs */
   .tk-main{gap:10px}
   /* Filter-Bar wrapping */
