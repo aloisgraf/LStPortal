@@ -3042,9 +3042,10 @@ function renderRightsMatrix(){
   const ov={};
   (S.rolePermissions||[]).forEach(o=>{(ov[o.role]=ov[o.role]||{})[o.permission]=o;});
   const th=`<th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--border);min-width:220px;position:sticky;left:0;background:var(--sf)">Modul</th>`+
-    M.roles.map(r=>`<th style="padding:6px 4px;border-bottom:2px solid var(--border);text-align:center;font-size:11px;white-space:nowrap">${esc(roleLabel(r))}</th>`).join('');
+    M.roles.map(r=>`<th style="padding:6px 4px;border-bottom:2px solid var(--border);text-align:center;font-size:11px;white-space:nowrap;width:160px;min-width:160px">${esc(roleLabel(r))}</th>`).join('');
   const cellStyle='text-align:center;padding:4px';
-  const mark=(isOv,up)=>isOv?`<span title="vom Standard abweichend" style="font-size:10px;color:${up?'var(--ok)':'var(--danger)'}">${up?'↑':'↓'}</span>`:'';
+  // Fester Platz für die Markierung, damit alle Auswahlfelder exakt gleich breit und mittig stehen
+  const mark=(isOv,up)=>`<span title="${isOv?'vom Standard abweichend':''}" style="display:inline-block;width:10px;font-size:10px;color:${up?'var(--ok)':'var(--danger)'}">${isOv?(up?'↑':'↓'):''}</span>`;
   const modRows=M.modules.map((m,i)=>`<tr style="background:${i%2===0?'var(--sf2)':'transparent'}">
       <td style="padding:6px 8px;font-size:12px;position:sticky;left:0;background:inherit" title="${esc(m.hint||'')}">${esc(m.label)}${m.hint?' ℹ️':''}</td>
       ${M.roles.map(r=>{
@@ -3054,8 +3055,8 @@ function renderRightsMatrix(){
         const def=m.defaults[r];
         const cur=o&&idx(o.level)>=0?o.level:def;
         const isOv=!!o&&cur!==def;
-        return`<td style="${cellStyle}"><div style="display:flex;align-items:center;gap:2px;justify-content:center">
-          <select class="flt" style="font-size:11px;padding:2px 4px;min-width:0;width:auto${cur==='aus'?';color:var(--mu)':''}" onchange="setRightLevel('${r}','${m.key}',this.value)">
+        return`<td style="${cellStyle}"><div style="display:flex;align-items:center;gap:2px;justify-content:center;padding-left:12px">
+          <select class="flt" title="${esc(m.levels[idx(cur)]?.label||'')}" style="font-size:11px;padding:3px 4px;width:140px;max-width:140px;text-overflow:ellipsis${cur==='aus'?';color:var(--mu)':''}" onchange="setRightLevel('${r}','${m.key}',this.value)">
             ${m.levels.map(l=>`<option value="${l.id}"${l.id===cur?' selected':''}>${esc(l.label)}</option>`).join('')}
           </select>${mark(isOv,idx(cur)>idx(def))}</div></td>`;
       }).join('')}
@@ -3067,7 +3068,7 @@ function renderRightsMatrix(){
         const o=ov[r]?.['flag:'+f.key];
         const def=!!f.defaults[r];
         const cur=o?!!o.granted:def;
-        return`<td style="${cellStyle}"><label style="display:flex;align-items:center;justify-content:center;gap:2px;cursor:pointer">
+        return`<td style="${cellStyle}"><label style="display:flex;align-items:center;justify-content:center;gap:2px;cursor:pointer;padding-left:12px">
           <input type="checkbox" ${cur?'checked':''} onchange="setRightFlag('${r}','${f.key}',this.checked)">${mark(!!o&&cur!==def,cur)}</label></td>`;
       }).join('')}
     </tr>`).join('');
