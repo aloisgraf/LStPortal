@@ -1,0 +1,39 @@
+name: Version hochzählen
+
+# Bei jedem Push auf main: Version +1, Aktualisierungsdatum setzen, Changelog-Eintrag ergänzen.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'public/version.json'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: version-bump
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Version hochzählen
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: node scripts/bump-version.js
+      - name: Commit & Push
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/version.json package.json
+          git commit -m "Version $(node -p "require('./public/version.json').version")"
+          git pull --rebase origin main
+          git push origin HEAD:main
